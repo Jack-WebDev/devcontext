@@ -2,11 +2,14 @@
 
 Dev Context is a local desktop launcher for keeping development identities separate on the same machine.
 
-The MVP focuses on launching VS Code with isolated Personal and Company environments for Claude Code, Codex, and editor state. The longer-term goal is to make `devctx` the entry point for a complete development context, including accounts, environment variables, editor state, and other developer tooling.
+It is built for developers who move between personal projects, company repositories, freelance work, and client code on one workstation. Instead of relying on whatever account or editor state happens to be active globally, Dev Context makes the active development context explicit before launching your tools.
 
-## Status
+## Goals
 
-This project is early-stage. The current codebase is a Wails desktop app scaffold with the product plan kept outside the public repository.
+- Prevent accidental use of the wrong AI account or subscription.
+- Keep personal and company editor state isolated.
+- Support multiple active development contexts on the same machine.
+- Provide a small local-first app with no hosted service requirement.
 
 ## Tech Stack
 
@@ -16,6 +19,14 @@ This project is early-stage. The current codebase is a Wails desktop app scaffol
 - Vite
 - TypeScript
 - Tailwind CSS
+- Shadcn UI
+
+## Requirements
+
+- Go 1.25 or newer
+- Node.js 22 or newer
+- npm
+- Wails CLI v2
 
 ## Development
 
@@ -26,10 +37,20 @@ cd frontend
 npm install
 ```
 
-Run the desktop app in development mode from the repository root:
+Run the desktop app from the repository root:
 
 ```bash
 wails dev
+```
+
+Run the core checks used by CI:
+
+```bash
+cd frontend
+npm ci
+npm run build
+cd ..
+go test ./...
 ```
 
 ## Building
@@ -42,8 +63,10 @@ wails build
 
 ## Contributing
 
-Issues and pull requests are welcome. Keep changes focused, include a clear description of the behavior being changed, and run the relevant build or test command before opening a pull request.
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening larger changes.
+
+For security reports, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-MIT
+Dev Context is released under the [MIT License](LICENSE).
