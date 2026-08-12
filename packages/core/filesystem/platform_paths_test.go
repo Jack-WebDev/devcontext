@@ -91,3 +91,59 @@ func TestPlatformPathsFakeCanReturnErrors(t *testing.T) {
 		t.Fatalf("normalize error = %v, want %v", err, expectedErr)
 	}
 }
+
+func TestDefaultPlatformPathsResolveDevContextHomeFromUnixHome(t *testing.T) {
+	paths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return "/home/alex", nil
+	})
+
+	home, err := paths.DevContextHomeDir()
+	if err != nil {
+		t.Fatalf("dev context home: %v", err)
+	}
+
+	if home != "/home/alex/.devctx" {
+		t.Fatalf("dev context home = %q, want %q", home, "/home/alex/.devctx")
+	}
+}
+
+func TestDefaultPlatformPathsResolveDevContextHomeFromWindowsHome(t *testing.T) {
+	paths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return `C:\Users\Alex`, nil
+	})
+
+	home, err := paths.DevContextHomeDir()
+	if err != nil {
+		t.Fatalf("dev context home: %v", err)
+	}
+
+	if home != `C:\Users\Alex\.devctx` {
+		t.Fatalf("dev context home = %q, want %q", home, `C:\Users\Alex\.devctx`)
+	}
+}
+
+func TestDefaultPlatformPathsReturnsClearErrorWhenUserHomeFails(t *testing.T) {
+	expectedErr := errors.New("lookup failed")
+	paths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return "", expectedErr
+	})
+
+	_, err := paths.DevContextHomeDir()
+	if !errors.Is(err, filesystem.ErrUserHomeUnavailable) {
+		t.Fatalf("dev context home error = %v, want %v", err, filesystem.ErrUserHomeUnavailable)
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("dev context home error = %v, want wrapped %v", err, expectedErr)
+	}
+}
+
+func TestDefaultPlatformPathsReturnsClearErrorWhenUserHomeIsEmpty(t *testing.T) {
+	paths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return "", nil
+	})
+
+	_, err := paths.DevContextHomeDir()
+	if !errors.Is(err, filesystem.ErrUserHomeUnavailable) {
+		t.Fatalf("dev context home error = %v, want %v", err, filesystem.ErrUserHomeUnavailable)
+	}
+}
