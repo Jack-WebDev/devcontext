@@ -263,6 +263,114 @@ func TestResolverEnforcesContextResolutionPrecedence(t *testing.T) {
 	}
 }
 
+func TestResolverMVPBranchMatrix(t *testing.T) {
+	tests := []struct {
+		name               string
+		requestedContextID string
+		boundContextID     string
+		confirmation       launcher.ContextMismatchConfirmation
+		wantContextID      string
+		wantSource         launcher.ResolutionSource
+		wantSelection      bool
+		wantWarnings       []launcher.WarningCode
+		wantErr            error
+	}{
+		{
+			name:               "explicit match",
+			requestedContextID: "personal",
+			boundContextID:     "personal",
+			wantContextID:      "personal",
+			wantSource:         launcher.ResolutionSourceExplicit,
+		},
+		{
+			name:               "explicit mismatch requires confirmation",
+			requestedContextID: "personal",
+			boundContextID:     "company",
+			wantErr:            launcher.ErrContextMismatchRequiresConfirmation,
+		},
+		{
+			name:               "explicit mismatch accepted",
+			requestedContextID: "personal",
+			boundContextID:     "company",
+			confirmation:       launcher.ContextMismatchAccepted,
+			wantContextID:      "personal",
+			wantSource:         launcher.ResolutionSourceExplicit,
+			wantWarnings:       []launcher.WarningCode{launcher.WarningContextMismatch},
+		},
+		{
+			name:           "binding only",
+			boundContextID: "company",
+			wantContextID:  "company",
+			wantSource:     launcher.ResolutionSourceProjectBinding,
+		},
+		{
+			name:          "unbound",
+			wantSource:    launcher.ResolutionSourceUserSelection,
+			wantSelection: true,
+		},
+		{
+			name:               "missing explicit context",
+			requestedContextID: "missing",
+			wantErr:            devcontext.ErrContextNotFound,
+		},
+		{
+			name:           "dangling binding",
+			boundContextID: "missing",
+			wantSource:     launcher.ResolutionSourceUserSelection,
+			wantSelection:  true,
+			wantWarnings:   []launcher.WarningCode{launcher.WarningDanglingProjectBinding},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newResolverFixture(t)
+			fixture.writeContexts(t, testContext("personal", "Personal"), testContext("company", "Company"))
+			if tt.boundContextID != "" {
+				fixture.writeBindings(t, project.Binding{
+					ProjectPath: project.Path(fixture.projectDir),
+					ContextID:   devcontext.MustID(tt.boundContextID),
+					CreatedAt:   testResolverTime(10, 0),
+				})
+			}
+
+			request := launcher.LaunchRequest{
+				ProjectPath:          project.Path(fixture.projectDir),
+				MismatchConfirmation: tt.confirmation,
+				Interactive:          tt.requestedContextID == "",
+				Source:               launcher.InvocationSourceCLI,
+			}
+			if tt.requestedContextID != "" {
+				contextID := devcontext.MustID(tt.requestedContextID)
+				request.RequestedContext = &contextID
+			}
+
+			result, err := fixture.resolver.Resolve(request)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("error = %v, want %v", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("resolve context: %v", err)
+			}
+			if result.Source != tt.wantSource {
+				t.Fatalf("source = %q, want %q", result.Source, tt.wantSource)
+			}
+			if result.SelectionRequired != tt.wantSelection {
+				t.Fatalf("selection required = %t, want %t", result.SelectionRequired, tt.wantSelection)
+			}
+			if tt.wantContextID != "" {
+				if result.Context == nil || result.Context.ID != devcontext.MustID(tt.wantContextID) {
+					t.Fatalf("context = %#v, want %q", result.Context, tt.wantContextID)
+				}
+			}
+			assertResolutionWarnings(t, result.Warnings, tt.wantWarnings, request, tt.boundContextID)
+		})
+	}
+}
+
 func TestResolverRequiresIntentionalMismatchOverride(t *testing.T) {
 	tests := []struct {
 		name         string

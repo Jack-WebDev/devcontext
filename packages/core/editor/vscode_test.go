@@ -299,6 +299,51 @@ func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "non ASCII paths",
+			request: editor.CommandRequest{
+				Config:      editor.DefaultConfig(),
+				Executable:  "/usr/local/bin/code",
+				ProjectPath: "/Users/Alex/équipe/Café Portal",
+				Paths: editor.ContextPaths{
+					RootDir:     "/Users/Alex/.devctx/contexts/cafe",
+					DataDir:     "/Users/Alex/.devctx/contexts/cafe/vscode",
+					UserDataDir: "/Users/Alex/.devctx/contexts/cafe/vscode/user-data",
+				},
+			},
+			want: editor.Command{
+				Executable: "/usr/local/bin/code",
+				Arguments: editor.Arguments{
+					editor.VSCodeUserDataDirFlag,
+					"/Users/Alex/.devctx/contexts/cafe/vscode/user-data",
+					"/Users/Alex/équipe/Café Portal",
+				},
+			},
+		},
+		{
+			name: "custom executable and distinct user data directory",
+			request: editor.CommandRequest{
+				Config: editor.Config{
+					Type:               editor.TypeVSCode,
+					ExecutableOverride: "/opt/vscode-insiders/bin/code-insiders",
+				},
+				Executable:  "/opt/vscode-insiders/bin/code-insiders",
+				ProjectPath: "/work/app",
+				Paths: editor.ContextPaths{
+					RootDir:     "/home/alex/.devctx/contexts/company",
+					DataDir:     "/home/alex/.devctx/contexts/company/vscode",
+					UserDataDir: "/tmp/devctx-company-vscode-user-data",
+				},
+			},
+			want: editor.Command{
+				Executable: "/opt/vscode-insiders/bin/code-insiders",
+				Arguments: editor.Arguments{
+					editor.VSCodeUserDataDirFlag,
+					"/tmp/devctx-company-vscode-user-data",
+					"/work/app",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
