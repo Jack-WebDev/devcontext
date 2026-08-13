@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "noEmit": false,
+    "outDir": ".tmp-test",
+    "rootDir": ".",
+    "sourceMap": false,
+    "tsBuildInfoFile": ".tmp-test/tsconfig.test.tsbuildinfo"
+  },
+  "include": [
+    "src/lib/devctx-api.ts"
+  ]
+}

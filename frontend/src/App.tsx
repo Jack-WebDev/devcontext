@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import logo from './assets/images/logo-universal.png';
-import {Greet} from "../wailsjs/go/wailsapp/App";
+import {devContextApi} from "./lib/devctx-api";
 
 function App() {
     const [resultText, setResultText] = useState("Please enter your name below 👇");
@@ -9,7 +9,13 @@ function App() {
     const updateResultText = (result: string) => setResultText(result);
 
     function greet() {
-        Greet(name).then(updateResultText);
+        devContextApi.greet(name).then((result) => {
+            if (result.ok) {
+                updateResultText(result.data);
+                return;
+            }
+            updateResultText(result.error.message);
+        });
     }
 
     return (
