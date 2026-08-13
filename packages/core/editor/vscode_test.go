@@ -1,0 +1,130 @@
+package editor_test
+
+import (
+	"errors"
+	"reflect"
+	"testing"
+
+	"devctx/packages/core/editor"
+)
+
+func TestVSCodeEditorDetectsUnixExecutableFromSearchPath(t *testing.T) {
+	probe := fakeExecutableProbe{
+		paths: map[string]string{
+			"code": "/usr/local/bin/code",
+		},
+	}
+
+	executable, err := (editor.VSCodeEditor{
+		Probe:           &probe,
+		OperatingSystem: "linux",
+	}).DetectExecutable(editor.DefaultConfig())
+	if err != nil {
+		t.Fatalf("detect executable: %v", err)
+	}
+
+	if executable != "/usr/local/bin/code" {
+		t.Fatalf("executable = %q, want %q", executable, "/usr/local/bin/code")
+	}
+	if !reflect.DeepEqual(probe.calls, []string{"code"}) {
+		t.Fatalf("lookup calls = %#v, want %#v", probe.calls, []string{"code"})
+	}
+}
+
+func TestVSCodeEditorDetectsWindowsExecutableFormsFromSearchPath(t *testing.T) {
+	tests := []struct {
+		name      string
+		paths     map[string]string
+		want      editor.Executable
+		wantCalls []string
+	}{
+		{
+			name: "code",
+			paths: map[string]string{
+				"code": `C:\Users\Alex\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd`,
+			},
+			want:      `C:\Users\Alex\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd`,
+			wantCalls: []string{"code"},
+		},
+		{
+			name: "code cmd",
+			paths: map[string]string{
+				"code.cmd": `C:\Users\Alex\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd`,
+			},
+			want:      `C:\Users\Alex\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd`,
+			wantCalls: []string{"code", "code.cmd"},
+		},
+		{
+			name: "code exe",
+			paths: map[string]string{
+				"Code.exe": `C:\Users\Alex\AppData\Local\Programs\Microsoft VS Code\Code.exe`,
+			},
+			want:      `C:\Users\Alex\AppData\Local\Programs\Microsoft VS Code\Code.exe`,
+			wantCalls: []string{"code", "code.cmd", "Code.exe"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			probe := fakeExecutableProbe{paths: tt.paths}
+
+			executable, err := (editor.VSCodeEditor{
+				Probe:           &probe,
+				OperatingSystem: "windows",
+			}).DetectExecutable(editor.DefaultConfig())
+			if err != nil {
+				t.Fatalf("detect executable: %v", err)
+			}
+
+			if executable != tt.want {
+				t.Fatalf("executable = %q, want %q", executable, tt.want)
+			}
+			if !reflect.DeepEqual(probe.calls, tt.wantCalls) {
+				t.Fatalf("lookup calls = %#v, want %#v", probe.calls, tt.wantCalls)
+			}
+		})
+	}
+}
+
+func TestVSCodeEditorReportsTypedExecutableNotFoundError(t *testing.T) {
+	probe := fakeExecutableProbe{}
+
+	_, err := (editor.VSCodeEditor{
+		Probe:           &probe,
+		OperatingSystem: "windows",
+	}).DetectExecutable(editor.DefaultConfig())
+	if err == nil {
+		t.Fatal("detect executable returned nil error, want not found")
+	}
+	if !errors.Is(err, editor.ErrExecutableNotFound) {
+		t.Fatalf("error = %v, want %v", err, editor.ErrExecutableNotFound)
+	}
+
+	var notFound *editor.ExecutableNotFoundError
+	if !errors.As(err, &notFound) {
+		t.Fatalf("error = %T, want *editor.ExecutableNotFoundError", err)
+	}
+	if notFound.EditorID != editor.VSCodeID {
+		t.Fatalf("editor id = %q, want %q", notFound.EditorID, editor.VSCodeID)
+	}
+	wantCandidates := []string{"code", "code.cmd", "Code.exe"}
+	if !reflect.DeepEqual(notFound.Candidates, wantCandidates) {
+		t.Fatalf("candidates = %#v, want %#v", notFound.Candidates, wantCandidates)
+	}
+	if !reflect.DeepEqual(probe.calls, wantCandidates) {
+		t.Fatalf("lookup calls = %#v, want %#v", probe.calls, wantCandidates)
+	}
+}
+
+type fakeExecutableProbe struct {
+	paths map[string]string
+	calls []string
+}
+
+func (p *fakeExecutableProbe) LookPath(file string) (string, error) {
+	p.calls = append(p.calls, file)
+	if path, ok := p.paths[file]; ok {
+		return path, nil
+	}
+	return "", errors.New("executable not found")
+}
