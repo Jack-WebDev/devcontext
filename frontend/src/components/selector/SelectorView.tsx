@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { LaunchState } from "../../lib/devctx-api";
 import { ContextCard } from "./ContextCard";
 import { ProjectIdentity } from "./ProjectIdentity";
+import { RememberProjectControl } from "./RememberProjectControl";
 import { initialSelectedContextId, nextSelectedContextId } from "./selection-state";
 
 interface SelectorViewProps {
@@ -13,9 +14,11 @@ function SelectorView({ launchState }: SelectorViewProps) {
   const [selectedContextId, setSelectedContextId] = useState<string | undefined>(() =>
     initialSelectedContextId(launchState),
   );
+  const [rememberProject, setRememberProject] = useState(false);
 
   useEffect(() => {
     setSelectedContextId(initialSelectedContextId(launchState));
+    setRememberProject(false);
   }, [launchState]);
 
   return (
@@ -37,6 +40,14 @@ function SelectorView({ launchState }: SelectorViewProps) {
             />
           ))}
         </div>
+
+        <RememberProjectControl
+          binding={launchState.binding}
+          contexts={launchState.contexts}
+          rememberProject={rememberProject}
+          selectedContextId={selectedContextId}
+          onRememberProjectChange={setRememberProject}
+        />
       </div>
     </div>
   );

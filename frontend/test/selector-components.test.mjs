@@ -6,6 +6,10 @@ import {renderToStaticMarkup} from "react-dom/server";
 import {ContextCard} from "../.tmp-test/src/components/selector/ContextCard.js";
 import {ProjectIdentity} from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import {
+  boundContextName,
+  RememberProjectControl,
+} from "../.tmp-test/src/components/selector/RememberProjectControl.js";
+import {
   initialSelectedContextId,
   nextSelectedContextId,
 } from "../.tmp-test/src/components/selector/selection-state.js";
@@ -146,6 +150,78 @@ test("selection changes to one existing context at a time", () => {
 
   assert.equal(nextSelectedContextId(contexts, "client-a"), "client-a");
   assert.equal(nextSelectedContextId(contexts, "missing"), undefined);
+});
+
+test("remember control renders unchecked for unbound selected projects", () => {
+  const state = launchStateFixture();
+  const html = renderToStaticMarkup(
+    RememberProjectControl({
+      binding: state.binding,
+      contexts: state.contexts,
+      rememberProject: false,
+      selectedContextId: "personal",
+    }),
+  );
+
+  assert.match(html, /type="checkbox"/);
+  assert.doesNotMatch(html, /checked=""/);
+  assert.doesNotMatch(html, /disabled=""/);
+  assert.ok(html.includes("Remember this project"));
+  assert.ok(html.includes("Use this context automatically for this project next time."));
+});
+
+test("remember control renders checked user intent for unbound selected projects", () => {
+  const state = launchStateFixture();
+  const html = renderToStaticMarkup(
+    RememberProjectControl({
+      binding: state.binding,
+      contexts: state.contexts,
+      rememberProject: true,
+      selectedContextId: "personal",
+    }),
+  );
+
+  assert.match(html, /type="checkbox"/);
+  assert.match(html, /checked=""/);
+});
+
+test("remember control renders existing binding without a checkbox", () => {
+  const state = launchStateFixture({
+    binding: {
+      projectPath: "/work/api",
+      bound: true,
+      contextId: "company",
+      dangling: false,
+    },
+  });
+  const html = renderToStaticMarkup(
+    RememberProjectControl({
+      binding: state.binding,
+      contexts: state.contexts,
+      rememberProject: false,
+      selectedContextId: "company",
+    }),
+  );
+
+  assert.doesNotMatch(html, /type="checkbox"/);
+  assert.ok(html.includes("This project is remembered for"));
+  assert.ok(html.includes("Company"));
+  assert.equal(boundContextName(state.binding, state.contexts), "Company");
+});
+
+test("remember control is disabled when no context is selected", () => {
+  const state = launchStateFixture();
+  const html = renderToStaticMarkup(
+    RememberProjectControl({
+      binding: state.binding,
+      contexts: state.contexts,
+      rememberProject: false,
+    }),
+  );
+
+  assert.match(html, /type="checkbox"/);
+  assert.match(html, /disabled=""/);
+  assert.ok(html.includes("Select a context before remembering this project."));
 });
 
 function contextFixture(id, name, providers = []) {
