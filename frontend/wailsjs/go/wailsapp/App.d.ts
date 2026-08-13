@@ -6,8 +6,6 @@ export function BindProject(arg1:application.BindProjectRequest):Promise<applica
 
 export function GetLaunchState(arg1:application.GetLaunchStateRequest):Promise<application.LaunchState|application.Error>;
 
-export function Greet(arg1:string):Promise<string>;
-
 export function LaunchProject(arg1:application.LaunchProjectRequest):Promise<application.LaunchProjectResult|application.Error>;
 
 export function UnbindProject(arg1:application.UnbindProjectRequest):Promise<application.ProjectBindingState|application.Error>;

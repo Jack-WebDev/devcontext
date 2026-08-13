@@ -7,7 +7,6 @@ import (
 )
 
 type service interface {
-	Greet(name string) string
 	GetLaunchState(application.GetLaunchStateRequest) (application.LaunchState, *application.Error)
 	LaunchProject(application.LaunchProjectRequest) (application.LaunchProjectResult, *application.Error)
 	BindProject(application.BindProjectRequest) (application.ProjectBindingState, *application.Error)
@@ -28,11 +27,6 @@ func New(service service) *App {
 // Startup stores the process context supplied by Wails.
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
-}
-
-// Greet returns a greeting for the current starter UI.
-func (a *App) Greet(name string) string {
-	return a.service.Greet(name)
 }
 
 // GetLaunchState returns selector state for the current project.

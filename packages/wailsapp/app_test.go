@@ -8,24 +8,6 @@ import (
 	"devctx/packages/application"
 )
 
-func TestAppDelegatesStarterMethodToService(t *testing.T) {
-	service := &fakeService{}
-	app := New(service)
-
-	app.Startup(context.Background())
-	got := app.Greet("Alex")
-
-	if got != "fake greeting for Alex" {
-		t.Fatalf("greeting = %q, want delegated greeting", got)
-	}
-	if service.greetedName != "Alex" {
-		t.Fatalf("service greeted name = %q, want Alex", service.greetedName)
-	}
-	if app.ctx == nil {
-		t.Fatal("startup context was not stored")
-	}
-}
-
 func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	service := &fakeService{
 		launchState: application.LaunchState{
@@ -46,6 +28,11 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 		},
 	}
 	app := New(service)
+	app.Startup(context.Background())
+
+	if app.ctx == nil {
+		t.Fatal("startup context was not stored")
+	}
 
 	stateRequest := application.GetLaunchStateRequest{ProjectPath: "/work/api"}
 	state, stateErr := app.GetLaunchState(stateRequest)
@@ -97,8 +84,6 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 }
 
 type fakeService struct {
-	greetedName string
-
 	launchStateRequest application.GetLaunchStateRequest
 	launchState        application.LaunchState
 	launchStateErr     *application.Error
@@ -114,11 +99,6 @@ type fakeService struct {
 	unbindRequest application.UnbindProjectRequest
 	unbindResult  application.ProjectBindingState
 	unbindErr     *application.Error
-}
-
-func (s *fakeService) Greet(name string) string {
-	s.greetedName = name
-	return "fake greeting for " + name
 }
 
 func (s *fakeService) GetLaunchState(request application.GetLaunchStateRequest) (application.LaunchState, *application.Error) {
