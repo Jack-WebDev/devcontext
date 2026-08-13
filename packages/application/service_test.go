@@ -160,7 +160,11 @@ func TestNewErrorReturnsPresentationSafeTypedErrors(t *testing.T) {
 }
 
 type applicationFakeProvider struct {
-	id provider.ID
+	id              provider.ID
+	displayName     string
+	statusByContext map[string]provider.Status
+	statusErr       error
+	environment     provider.EnvironmentContribution
 }
 
 func (p applicationFakeProvider) ID() provider.ID {
@@ -168,36 +172,70 @@ func (p applicationFakeProvider) ID() provider.ID {
 }
 
 func (p applicationFakeProvider) DisplayName() string {
+	if p.displayName != "" {
+		return p.displayName
+	}
 	return "Fake Provider"
 }
 
-func (p applicationFakeProvider) BuildEnvironment(provider.RuntimeContext) (provider.EnvironmentContribution, error) {
-	return provider.EnvironmentContribution{"FAKE": "1"}, nil
+func (p applicationFakeProvider) BuildEnvironment(ctx provider.RuntimeContext) (provider.EnvironmentContribution, error) {
+	if p.environment != nil {
+		return p.environment, nil
+	}
+	return provider.EnvironmentContribution{"FAKE_CONTEXT": ctx.ContextID}, nil
 }
 
-func (p applicationFakeProvider) Status(provider.RuntimeContext) (provider.Status, error) {
+func (p applicationFakeProvider) Status(ctx provider.RuntimeContext) (provider.Status, error) {
+	if p.statusErr != nil {
+		return provider.Status{}, p.statusErr
+	}
+	if status, ok := p.statusByContext[ctx.ContextID]; ok {
+		return status, nil
+	}
 	return provider.ReadyStatus(), nil
 }
 
-type applicationFakeEditor struct{}
+type applicationFakeEditor struct {
+	executable editor.Executable
+	err        error
+	requests   []editor.CommandRequest
+}
 
 func (e *applicationFakeEditor) ID() editor.ID {
 	return "fake-editor"
 }
 
 func (e *applicationFakeEditor) DetectExecutable(editor.Config) (editor.Executable, error) {
+	if e.err != nil {
+		return "", e.err
+	}
+	if e.executable != "" {
+		return e.executable, nil
+	}
 	return "/fixture/editor", nil
 }
 
 func (e *applicationFakeEditor) BuildLaunchCommand(request editor.CommandRequest) (editor.Command, error) {
+	e.requests = append(e.requests, request)
 	return editor.Command{
 		Executable: request.Executable,
-		Arguments:  editor.Arguments{request.ProjectPath},
+		Arguments: editor.Arguments{
+			editor.VSCodeUserDataDirFlag,
+			request.Paths.UserDataDir,
+			request.ProjectPath,
+		},
 	}, nil
 }
 
-type applicationFakeProcessLauncher struct{}
+type applicationFakeProcessLauncher struct {
+	requests []launcher.ProcessRequest
+	err      error
+}
 
-func (l *applicationFakeProcessLauncher) Launch(launcher.ProcessRequest) error {
+func (l *applicationFakeProcessLauncher) Launch(request launcher.ProcessRequest) error {
+	l.requests = append(l.requests, request)
+	if l.err != nil {
+		return l.err
+	}
 	return nil
 }

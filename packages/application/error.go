@@ -22,6 +22,11 @@ const (
 	// ErrorCodeValidation identifies invalid user input or invalid stored data.
 	ErrorCodeValidation ErrorCode = "validation_error"
 
+	// ErrorCodeContextMismatch identifies a launch that requires explicit
+	// confirmation because the selected context conflicts with the project
+	// binding.
+	ErrorCodeContextMismatch ErrorCode = "context_mismatch_requires_confirmation"
+
 	// ErrorCodeLaunch identifies a failure to start the configured editor.
 	ErrorCodeLaunch ErrorCode = "launch_error"
 
@@ -34,6 +39,8 @@ type Error struct {
 	Code     ErrorCode `json:"code"`
 	Message  string    `json:"message"`
 	Recovery string    `json:"recovery"`
+
+	ContextMismatch *ContextMismatch `json:"contextMismatch,omitempty"`
 
 	cause error
 }
@@ -59,7 +66,20 @@ func NewError(err error) *Error {
 		return nil
 	}
 
+	var contextMismatchError *launcher.ContextMismatchError
 	switch {
+	case errors.As(err, &contextMismatchError) && errors.Is(err, launcher.ErrContextMismatchRequiresConfirmation):
+		return &Error{
+			Code:     ErrorCodeContextMismatch,
+			Message:  "Context mismatch requires confirmation.",
+			Recovery: "Confirm the mismatch intentionally or choose the bound context.",
+			ContextMismatch: &ContextMismatch{
+				ProjectPath:        string(contextMismatchError.ProjectPath),
+				BoundContextID:     contextMismatchError.BoundContextID.String(),
+				RequestedContextID: contextMismatchError.RequestedContextID.String(),
+			},
+			cause: err,
+		}
 	case errors.Is(err, launcher.ErrContextMismatchRejected):
 		return applicationError(ErrorCodeCanceled, "Command canceled.", "Run the action again when you are ready.", err)
 	case isLaunchError(err):
@@ -69,6 +89,14 @@ func NewError(err error) *Error {
 	default:
 		return applicationError(ErrorCodeInternal, "Dev Context failed unexpectedly.", "Retry the action. If it keeps failing, include debug details in a bug report.", err)
 	}
+}
+
+// ContextMismatch contains presentation-safe details for a conflicting launch
+// request.
+type ContextMismatch struct {
+	ProjectPath        string `json:"projectPath"`
+	BoundContextID     string `json:"boundContextId"`
+	RequestedContextID string `json:"requestedContextId"`
 }
 
 func applicationError(code ErrorCode, message string, recovery string, cause error) *Error {
