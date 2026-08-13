@@ -26,7 +26,6 @@ args=(
   -clean
   -trimpath
   -ldflags "${ldflags}"
-  -o devctx
 )
 
 if [[ -n "${platform}" ]]; then
