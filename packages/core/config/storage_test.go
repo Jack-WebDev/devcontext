@@ -3,10 +3,12 @@ package config_test
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"devctx/packages/core/config"
 	"devctx/packages/core/editor"
+	"devctx/packages/core/filesystem"
 )
 
 type fakePlatformPaths struct {
@@ -58,6 +60,7 @@ func TestWriteGlobalConfigFileAtomicallyReplacesConfig(t *testing.T) {
 	if decoded != globalConfig {
 		t.Fatalf("decoded config = %#v, want %#v", decoded, globalConfig)
 	}
+	assertPermission(t, path, filesystem.RestrictedFileMode)
 }
 
 func TestInitializeDevContextHomeCreatesLayoutIdempotently(t *testing.T) {
@@ -80,6 +83,9 @@ func TestInitializeDevContextHomeCreatesLayoutIdempotently(t *testing.T) {
 	assertDirExists(t, firstLayout.HomeDir)
 	assertDirExists(t, firstLayout.ContextsDir)
 	assertDirExists(t, firstLayout.LogsDir)
+	assertPermission(t, firstLayout.HomeDir, filesystem.RestrictedDirectoryMode)
+	assertPermission(t, firstLayout.ContextsDir, filesystem.RestrictedDirectoryMode)
+	assertPermission(t, firstLayout.LogsDir, filesystem.RestrictedDirectoryMode)
 
 	contextEntries, err := os.ReadDir(firstLayout.ContextsDir)
 	if err != nil {
@@ -100,6 +106,7 @@ func TestInitializeDevContextHomeCreatesLayoutIdempotently(t *testing.T) {
 	if decoded != config.DefaultGlobalConfig() {
 		t.Fatalf("decoded default config = %#v, want %#v", decoded, config.DefaultGlobalConfig())
 	}
+	assertPermission(t, firstLayout.ConfigPath, filesystem.RestrictedFileMode)
 }
 
 func TestInitializeDevContextHomePreservesExistingGlobalConfig(t *testing.T) {
@@ -152,5 +159,21 @@ func assertDirExists(t *testing.T, path string) {
 	}
 	if !info.IsDir() {
 		t.Fatalf("%s is not a directory", path)
+	}
+}
+
+func assertPermission(t *testing.T, path string, want os.FileMode) {
+	t.Helper()
+
+	if runtime.GOOS == "windows" {
+		return
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat %s: %v", path, err)
+	}
+	if got := info.Mode().Perm(); got != want {
+		t.Fatalf("%s mode = %v, want %v", path, got, want)
 	}
 }

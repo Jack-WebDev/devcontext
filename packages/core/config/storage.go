@@ -12,7 +12,6 @@ const (
 	globalConfigFileName = "config.toml"
 	contextsDirName      = "contexts"
 	logsDirName          = "logs"
-	directoryMode        = 0o755
 )
 
 // HomeLayout describes the top-level Dev Context storage paths.
@@ -41,51 +40,70 @@ func DevContextHomeLayout(paths filesystem.PlatformPaths) (HomeLayout, error) {
 // WriteGlobalConfigFile writes global configuration through a same-directory
 // temporary file and atomic rename.
 func WriteGlobalConfigFile(path string, globalConfig GlobalConfig) error {
+	return WriteGlobalConfigFileWithPermissions(path, globalConfig, filesystem.NewDefaultStoragePermissions())
+}
+
+// WriteGlobalConfigFileWithPermissions writes global configuration using the
+// supplied storage permission policy.
+func WriteGlobalConfigFileWithPermissions(path string, globalConfig GlobalConfig, permissions filesystem.StoragePermissions) error {
 	data, err := EncodeGlobalConfigTOML(globalConfig)
 	if err != nil {
 		return err
 	}
 
-	return writeFileAtomically(path, func(file *os.File) error {
+	if err := writeFileAtomically(path, func(file *os.File) error {
 		_, err := file.Write(data)
 		return err
-	})
+	}); err != nil {
+		return err
+	}
+
+	return permissions.ApplyFile(path)
 }
 
 // InitializeDevContextHome creates the top-level storage layout and default
 // global configuration when it does not already exist.
 func InitializeDevContextHome(paths filesystem.PlatformPaths) (HomeLayout, error) {
+	return InitializeDevContextHomeWithPermissions(paths, filesystem.NewDefaultStoragePermissions())
+}
+
+// InitializeDevContextHomeWithPermissions creates the top-level storage layout
+// with the supplied storage permission policy.
+func InitializeDevContextHomeWithPermissions(paths filesystem.PlatformPaths, permissions filesystem.StoragePermissions) (HomeLayout, error) {
 	layout, err := DevContextHomeLayout(paths)
 	if err != nil {
 		return HomeLayout{}, err
 	}
 
 	for _, dir := range []string{layout.HomeDir, layout.ContextsDir, layout.LogsDir} {
-		if err := os.MkdirAll(dir, directoryMode); err != nil {
+		if err := os.MkdirAll(dir, permissions.DirectoryMode()); err != nil {
 			return HomeLayout{}, fmt.Errorf("create Dev Context directory %q: %w", dir, err)
+		}
+		if err := permissions.ApplyDirectory(dir); err != nil {
+			return HomeLayout{}, err
 		}
 	}
 
-	if err := ensureDefaultGlobalConfig(layout.ConfigPath); err != nil {
+	if err := ensureDefaultGlobalConfig(layout.ConfigPath, permissions); err != nil {
 		return HomeLayout{}, err
 	}
 
 	return layout, nil
 }
 
-func ensureDefaultGlobalConfig(path string) error {
+func ensureDefaultGlobalConfig(path string, permissions filesystem.StoragePermissions) error {
 	info, err := os.Stat(path)
 	if err == nil {
 		if info.IsDir() {
 			return fmt.Errorf("global configuration path %q is a directory", path)
 		}
-		return nil
+		return permissions.ApplyFile(path)
 	}
 	if !os.IsNotExist(err) {
 		return fmt.Errorf("inspect global configuration %q: %w", path, err)
 	}
 
-	if err := WriteGlobalConfigFile(path, DefaultGlobalConfig()); err != nil {
+	if err := WriteGlobalConfigFileWithPermissions(path, DefaultGlobalConfig(), permissions); err != nil {
 		return fmt.Errorf("write default global configuration %q: %w", path, err)
 	}
 	return nil
