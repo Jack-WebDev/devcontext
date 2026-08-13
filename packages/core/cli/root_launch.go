@@ -10,7 +10,11 @@ import (
 	"devctx/packages/core/project"
 )
 
-const contextFlag = "--context"
+const (
+	contextFlag  = "--context"
+	personalFlag = "--personal"
+	companyFlag  = "--company"
+)
 
 type rootLaunchArguments struct {
 	projectPath      string
@@ -66,9 +70,6 @@ func parseRootLaunchArguments(args []string) (rootLaunchArguments, error) {
 		arg := args[i]
 		switch {
 		case arg == contextFlag:
-			if parsed.requestedContext != nil {
-				return rootLaunchArguments{}, fmt.Errorf("%w: %s can only be provided once", ErrInvalidCommand, contextFlag)
-			}
 			if i+1 >= len(args) {
 				return rootLaunchArguments{}, fmt.Errorf("%w: %s requires a context ID", ErrInvalidCommand, contextFlag)
 			}
@@ -78,12 +79,18 @@ func parseRootLaunchArguments(args []string) (rootLaunchArguments, error) {
 				return rootLaunchArguments{}, fmt.Errorf("%w: %s requires a context ID", ErrInvalidCommand, contextFlag)
 			}
 
-			contextID, err := devcontext.NewID(value)
-			if err != nil {
-				return rootLaunchArguments{}, fmt.Errorf("%w: %s: %w", ErrInvalidCommand, contextFlag, err)
+			if err := parsed.setRequestedContext(contextFlag, value); err != nil {
+				return rootLaunchArguments{}, err
 			}
-			parsed.requestedContext = &contextID
 			i++
+		case arg == personalFlag:
+			if err := parsed.setRequestedContext(personalFlag, "personal"); err != nil {
+				return rootLaunchArguments{}, err
+			}
+		case arg == companyFlag:
+			if err := parsed.setRequestedContext(companyFlag, "company"); err != nil {
+				return rootLaunchArguments{}, err
+			}
 		case strings.HasPrefix(arg, "-"):
 			return rootLaunchArguments{}, fmt.Errorf("%w: unknown root option %q", ErrInvalidCommand, arg)
 		default:
@@ -95,4 +102,17 @@ func parseRootLaunchArguments(args []string) (rootLaunchArguments, error) {
 	}
 
 	return parsed, nil
+}
+
+func (a *rootLaunchArguments) setRequestedContext(flag string, value string) error {
+	if a.requestedContext != nil {
+		return fmt.Errorf("%w: context can only be selected once", ErrInvalidCommand)
+	}
+
+	contextID, err := devcontext.NewID(value)
+	if err != nil {
+		return fmt.Errorf("%w: %s: %w", ErrInvalidCommand, flag, err)
+	}
+	a.requestedContext = &contextID
+	return nil
 }

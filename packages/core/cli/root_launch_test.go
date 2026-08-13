@@ -162,6 +162,76 @@ func TestParseLaunchRequestAcceptsGenericContextFlag(t *testing.T) {
 	}
 }
 
+func TestParseLaunchRequestAcceptsPersonalAndCompanyAliases(t *testing.T) {
+	fixture := newLaunchRequestFixture(t)
+
+	tests := []struct {
+		name        string
+		aliasArgs   []string
+		genericArgs []string
+	}{
+		{
+			name:        "personal",
+			aliasArgs:   []string{"--personal", "."},
+			genericArgs: []string{"--context", "personal", "."},
+		},
+		{
+			name:        "company",
+			aliasArgs:   []string{"--company", "."},
+			genericArgs: []string{"--context", "company", "."},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			aliasRequest, err := cli.ParseLaunchRequest(tt.aliasArgs, fixture.workingDir, fixture.paths)
+			if err != nil {
+				t.Fatalf("parse alias launch request: %v", err)
+			}
+			genericRequest, err := cli.ParseLaunchRequest(tt.genericArgs, fixture.workingDir, fixture.paths)
+			if err != nil {
+				t.Fatalf("parse generic launch request: %v", err)
+			}
+
+			assertLaunchRequest(t, aliasRequest, genericRequest)
+		})
+	}
+}
+
+func TestParseLaunchRequestRejectsConflictingContextSelections(t *testing.T) {
+	fixture := newLaunchRequestFixture(t)
+
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "personal and company aliases",
+			args: []string{"--personal", "--company", "."},
+		},
+		{
+			name: "alias and generic flag",
+			args: []string{"--personal", "--context", "personal", "."},
+		},
+		{
+			name: "repeated generic flag",
+			args: []string{"--context", "personal", "--context", "company", "."},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := cli.ParseLaunchRequest(tt.args, fixture.workingDir, fixture.paths)
+			if !errors.Is(err, cli.ErrInvalidCommand) {
+				t.Fatalf("error = %v, want %v", err, cli.ErrInvalidCommand)
+			}
+			if !strings.Contains(err.Error(), "context can only be selected once") {
+				t.Fatalf("error = %q, want conflict message", err.Error())
+			}
+		})
+	}
+}
+
 func TestParseLaunchRequestRejectsInvalidGenericContextFlagForms(t *testing.T) {
 	fixture := newLaunchRequestFixture(t)
 
@@ -193,13 +263,7 @@ func TestParseLaunchRequestRejectsInvalidGenericContextFlagForms(t *testing.T) {
 			name:        "repeated context flag",
 			args:        []string{"--context", "personal", "--context", "company", "."},
 			want:        cli.ErrInvalidCommand,
-			wantMessage: "--context can only be provided once",
-		},
-		{
-			name:        "unsupported alias before phase 043",
-			args:        []string{"--personal", "."},
-			want:        cli.ErrInvalidCommand,
-			wantMessage: `unknown root option "--personal"`,
+			wantMessage: "context can only be selected once",
 		},
 	}
 
