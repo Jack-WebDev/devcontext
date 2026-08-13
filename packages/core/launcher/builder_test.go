@@ -8,6 +8,7 @@ import (
 
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/editor"
+	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
 	"devctx/packages/core/provider"
@@ -79,6 +80,15 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 			"DEVCTX_CONTEXT": "client-a",
 			"FAKE_CONTEXT":   "client-a",
 			"FAKE_ROOT":      "/home/alex/.devctx/contexts/client-a",
+		},
+		ContextPaths: filesystem.ContextPaths{
+			ContextID:         devcontext.MustID("client-a"),
+			RootDir:           "/home/alex/.devctx/contexts/client-a",
+			ConfigPath:        "/home/alex/.devctx/contexts/client-a/context.toml",
+			ClaudeDir:         "/home/alex/.devctx/contexts/client-a/claude",
+			CodexDir:          "/home/alex/.devctx/contexts/client-a/codex",
+			VSCodeDir:         "/home/alex/.devctx/contexts/client-a/vscode",
+			VSCodeUserDataDir: "/home/alex/.devctx/contexts/client-a/vscode/user-data",
 		},
 		Warnings:         warnings,
 		ResolutionSource: launcher.ResolutionSourceExplicit,

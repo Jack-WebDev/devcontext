@@ -2,6 +2,7 @@ package launcher
 
 import (
 	"errors"
+	"sort"
 
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/editor"
@@ -73,7 +74,7 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 		return LaunchPlan{}, err
 	}
 
-	contributions, err := b.providerContributions(*resolution.Context, contextPaths)
+	contributions, missingProviderIDs, err := b.providerContributions(*resolution.Context, contextPaths)
 	if err != nil {
 		return LaunchPlan{}, err
 	}
@@ -101,29 +102,34 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 	}
 
 	return LaunchPlan{
-		ProjectPath:      request.ProjectPath,
-		Context:          *resolution.Context,
-		Editor:           resolution.Context.Editor,
-		Executable:       Executable(command.Executable),
-		Arguments:        launchArguments(command.Arguments),
-		WorkingDirectory: WorkingDirectory(request.ProjectPath),
-		Environment:      launchEnvironment(variables),
-		Warnings:         resolution.Warnings,
-		ResolutionSource: resolution.Source,
+		ProjectPath:        request.ProjectPath,
+		Context:            *resolution.Context,
+		Editor:             resolution.Context.Editor,
+		Executable:         Executable(command.Executable),
+		Arguments:          launchArguments(command.Arguments),
+		WorkingDirectory:   WorkingDirectory(request.ProjectPath),
+		Environment:        launchEnvironment(variables),
+		ContextPaths:       contextPaths,
+		Warnings:           resolution.Warnings,
+		ResolutionSource:   resolution.Source,
+		MissingProviderIDs: missingProviderIDs,
 	}, nil
 }
 
-func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, paths filesystem.ContextPaths) ([]provider.EnvironmentContribution, error) {
+func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, paths filesystem.ContextPaths) ([]provider.EnvironmentContribution, []provider.ID, error) {
+	knownProviderIDs := make(map[provider.ID]struct{}, len(b.Providers))
 	contributions := make([]provider.EnvironmentContribution, 0, len(b.Providers))
 	for _, integration := range b.Providers {
 		if integration == nil {
 			continue
 		}
-		config, ok := ctxContext.Providers[integration.ID()]
+		providerID := integration.ID()
+		knownProviderIDs[providerID] = struct{}{}
+
+		config, ok := ctxContext.Providers[providerID]
 		if !ok || !config.Enabled {
 			continue
 		}
-
 		contribution, err := integration.BuildEnvironment(provider.RuntimeContext{
 			ContextID: ctxContext.ID.String(),
 			Config:    config,
@@ -136,11 +142,27 @@ func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, 
 			},
 		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		contributions = append(contributions, contribution)
 	}
-	return contributions, nil
+
+	missingProviderIDs := make([]provider.ID, 0)
+	for providerID, config := range ctxContext.Providers {
+		if !config.Enabled {
+			continue
+		}
+		if _, ok := knownProviderIDs[providerID]; !ok {
+			missingProviderIDs = append(missingProviderIDs, providerID)
+		}
+	}
+	sort.Slice(missingProviderIDs, func(i int, j int) bool {
+		return missingProviderIDs[i] < missingProviderIDs[j]
+	})
+	if len(missingProviderIDs) == 0 {
+		missingProviderIDs = nil
+	}
+	return contributions, missingProviderIDs, nil
 }
 
 func launchArguments(arguments editor.Arguments) Arguments {

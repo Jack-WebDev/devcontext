@@ -13,6 +13,7 @@ import (
 	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
+	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
 	"devctx/packages/core/provider"
 	"devctx/packages/wailsapp"
@@ -61,6 +62,11 @@ func shouldRunCLI(args []string) bool {
 	if len(args) == 0 {
 		return false
 	}
+	for _, arg := range args {
+		if arg == "--debug" {
+			return true
+		}
+	}
 	if args[0] == string(cli.CommandContext) || args[0] == string(cli.CommandProject) {
 		return true
 	}
@@ -73,21 +79,22 @@ func shouldRunCLI(args []string) bool {
 }
 
 func runCLI(args []string) cli.ExitCode {
-	if _, err := cli.Parse(args); err != nil {
-		fmt.Fprint(os.Stderr, cli.RenderError(err, false))
+	parsedArgs, debug := cli.SplitDebugFlag(args)
+	if _, err := cli.Parse(parsedArgs); err != nil {
+		fmt.Fprint(os.Stderr, cli.RenderError(err, debug))
 		return cli.ExitCodeForError(err)
 	}
 
 	paths := filesystem.NewDefaultPlatformPaths()
 	layout, err := config.InitializeDevContextHome(paths)
 	if err != nil {
-		fmt.Fprint(os.Stderr, cli.RenderError(err, false))
+		fmt.Fprint(os.Stderr, cli.RenderError(err, debug))
 		return cli.ExitCodeForError(err)
 	}
 
 	workingDirectory, err := os.Getwd()
 	if err != nil {
-		fmt.Fprint(os.Stderr, cli.RenderError(err, false))
+		fmt.Fprint(os.Stderr, cli.RenderError(err, debug))
 		return cli.ExitInternalError
 	}
 
@@ -101,10 +108,12 @@ func runCLI(args []string) cli.ExitCode {
 		ProcessLauncher:   launcher.NativeProcessLauncher{},
 		ParentEnvironment: os.Environ(),
 		DetachMode:        launcher.DetachModeDetached,
+		Debug:             debug,
+		Logger:            devlog.NewLocalLogger(layout.LogsDir, filesystem.NewDefaultStoragePermissions(), nil),
 	}
-	result := runner.Run(args)
+	result := runner.Run(parsedArgs)
 	if err := result.Write(os.Stdout, os.Stderr); err != nil {
-		fmt.Fprint(os.Stderr, cli.RenderError(err, false))
+		fmt.Fprint(os.Stderr, cli.RenderError(err, debug))
 		return cli.ExitInternalError
 	}
 	return result.Code

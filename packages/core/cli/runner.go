@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/editor"
+	"devctx/packages/core/environment"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
+	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
 	"devctx/packages/core/provider"
 )
@@ -50,10 +53,16 @@ type Runner struct {
 	DetachMode        launcher.DetachMode
 	Now               func() time.Time
 	Debug             bool
+	Logger            devlog.Logger
 }
 
 // Run parses and executes one CLI command.
 func (r Runner) Run(args []string) Result {
+	args, debug := SplitDebugFlag(args)
+	if debug {
+		r.Debug = true
+	}
+
 	command, err := Parse(args)
 	if err != nil {
 		return r.errorResult(err)
@@ -75,6 +84,12 @@ func (r Runner) runRootLaunch(command RootLaunchCommand) Result {
 	paths := r.paths()
 	request, err := launchRequestFromRootCommand(command, r.WorkingDirectory, paths)
 	if err != nil {
+		r.recordLaunchEvent(devlog.NewEvent(devlog.EventInput{
+			Name:             devlog.LaunchEventNameForError(err),
+			Timestamp:        r.now(),
+			Err:              err,
+			KnownEnvironment: r.parentEnvironment(),
+		}))
 		return r.errorResult(err)
 	}
 
@@ -87,14 +102,36 @@ func (r Runner) runRootLaunch(command RootLaunchCommand) Result {
 	}
 	plan, err := builder.Build(request)
 	if err != nil {
+		r.recordLaunchEvent(devlog.NewEvent(devlog.EventInput{
+			Name:             devlog.LaunchEventNameForError(err),
+			Timestamp:        r.now(),
+			ProjectPath:      string(request.ProjectPath),
+			ContextID:        requestedContextID(request),
+			Err:              err,
+			KnownEnvironment: r.parentEnvironment(),
+		}))
 		return r.errorResult(err)
+	}
+
+	r.recordLaunchEvent(eventFromPlan(devlog.EventContextResolution, plan, nil, r.now()))
+	for range plan.MissingProviderIDs {
+		event := eventFromPlan(devlog.EventLaunchProviderMissing, plan, nil, r.now())
+		event.ErrorCategory = devlog.ErrorCategoryProvider
+		r.recordLaunchEvent(event)
 	}
 
 	if err := r.processLauncher().Launch(processRequestFromLaunchPlan(plan, r.detachMode())); err != nil {
+		r.recordLaunchEvent(eventFromPlan(devlog.EventLaunchProcessFailure, plan, err, r.now()))
 		return r.errorResult(err)
 	}
 
-	return successResult(renderLaunchPlan(plan))
+	r.recordLaunchEvent(eventFromPlan(devlog.EventLaunchSucceeded, plan, nil, r.now()))
+
+	output := renderLaunchPlan(plan)
+	if r.Debug {
+		output += "\n" + renderDebugLaunchPlan(plan)
+	}
+	return successResult(output)
 }
 
 func (r Runner) runContext(command ContextCommand) Result {
@@ -206,6 +243,17 @@ func (r Runner) detachMode() launcher.DetachMode {
 	return launcher.DetachModeDetached
 }
 
+func (r Runner) logger() devlog.Logger {
+	if r.Logger != nil {
+		return r.Logger
+	}
+	return devlog.NoopLogger{}
+}
+
+func (r Runner) recordLaunchEvent(event devlog.Event) {
+	_ = r.logger().Record(event)
+}
+
 func processRequestFromLaunchPlan(plan launcher.LaunchPlan, detachMode launcher.DetachMode) launcher.ProcessRequest {
 	return launcher.ProcessRequest{
 		Executable:       plan.Executable,
@@ -236,6 +284,21 @@ func (r Runner) errorResult(err error) Result {
 		Code:   ExitCodeForError(err),
 		Stderr: RenderError(err, r.Debug),
 	}
+}
+
+// SplitDebugFlag removes --debug from command arguments and reports whether it
+// was present.
+func SplitDebugFlag(args []string) ([]string, bool) {
+	filtered := make([]string, 0, len(args))
+	debug := false
+	for _, arg := range args {
+		if arg == debugFlag {
+			debug = true
+			continue
+		}
+		filtered = append(filtered, arg)
+	}
+	return filtered, debug
 }
 
 func renderContextList(contexts []devcontext.Context) string {
@@ -289,4 +352,68 @@ func renderProjectUnbind(result project.UnbindResult) string {
 
 func renderLaunchPlan(plan launcher.LaunchPlan) string {
 	return fmt.Sprintf("Project:\n%s\n\nContext:\n%s\n\nStatus:\nlaunched\n", plan.ProjectPath, plan.Context.ID.String())
+}
+
+func renderDebugLaunchPlan(plan launcher.LaunchPlan) string {
+	var builder strings.Builder
+	builder.WriteString("Debug:\n")
+	fmt.Fprintf(&builder, "resolution_source: %s\n", plan.ResolutionSource)
+	fmt.Fprintf(&builder, "editor_id: %s\n", plan.Editor.Type)
+	fmt.Fprintf(&builder, "editor_executable: %s\n", plan.Executable)
+	builder.WriteString("context_directories:\n")
+	fmt.Fprintf(&builder, "  root: %s\n", plan.ContextPaths.RootDir)
+	fmt.Fprintf(&builder, "  claude: %s\n", plan.ContextPaths.ClaudeDir)
+	fmt.Fprintf(&builder, "  codex: %s\n", plan.ContextPaths.CodexDir)
+	fmt.Fprintf(&builder, "  vscode: %s\n", plan.ContextPaths.VSCodeDir)
+	fmt.Fprintf(&builder, "  vscode_user_data: %s\n", plan.ContextPaths.VSCodeUserDataDir)
+	builder.WriteString("arguments:\n")
+	for i, argument := range plan.Arguments {
+		fmt.Fprintf(&builder, "  %d: %s\n", i, argument)
+	}
+	builder.WriteString("environment:\n")
+	for _, entry := range redactedEnvironment(plan.Environment) {
+		fmt.Fprintf(&builder, "  %s\n", entry)
+	}
+	return builder.String()
+}
+
+func redactedEnvironment(variables launcher.Environment) []string {
+	keys := make([]string, 0, len(variables))
+	for key := range variables {
+		if key == "" {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	entries := make([]string, 0, len(keys))
+	for _, key := range keys {
+		value := variables[key]
+		if environment.IsSensitiveKey(key) {
+			value = environment.RedactedValue
+		}
+		entries = append(entries, key+"="+value)
+	}
+	return entries
+}
+
+func eventFromPlan(name devlog.EventName, plan launcher.LaunchPlan, err error, timestamp time.Time) devlog.Event {
+	return devlog.NewEvent(devlog.EventInput{
+		Name:             name,
+		Timestamp:        timestamp,
+		ProjectPath:      string(plan.ProjectPath),
+		ContextID:        plan.Context.ID.String(),
+		EditorID:         string(plan.Editor.Type),
+		ResolutionSource: string(plan.ResolutionSource),
+		Err:              err,
+		KnownEnvironment: plan.Environment.Environ(),
+	})
+}
+
+func requestedContextID(request launcher.LaunchRequest) string {
+	if request.RequestedContext == nil {
+		return ""
+	}
+	return request.RequestedContext.String()
 }
