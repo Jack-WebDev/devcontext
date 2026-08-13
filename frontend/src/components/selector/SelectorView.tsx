@@ -1,19 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type {
   ApiResult,
   BindProjectRequest,
+  DisplayError,
   LaunchProjectRequest,
   LaunchProjectResult,
   LaunchState,
   ProjectBindingState,
 } from "../../lib/devctx-api";
+import { ContextMismatchDialog } from "./ContextMismatchDialog";
 import { ContextCard } from "./ContextCard";
+import { GuiErrorNotice } from "./GuiErrorNotice";
 import { ProjectIdentity } from "./ProjectIdentity";
 import { RememberProjectControl } from "./RememberProjectControl";
 import { SelectorActions } from "./SelectorActions";
 import { cancelSelector } from "./cancel-action";
-import { launchSelectedContext } from "./launch-action";
+import { createLaunchRequestGuard, launchSelectedContext } from "./launch-action";
 import { initialSelectedContextId, nextSelectedContextId } from "./selection-state";
 
 interface SelectorViewProps {
@@ -29,27 +32,48 @@ function SelectorView({ launchState, onBindProject, onLaunchProject, onCancel }:
   );
   const [rememberProject, setRememberProject] = useState(false);
   const [launchPending, setLaunchPending] = useState(false);
+  const [launchError, setLaunchError] = useState<DisplayError | undefined>(undefined);
+  const [mismatchError, setMismatchError] = useState<DisplayError | undefined>(undefined);
+  const launchGuard = useRef(createLaunchRequestGuard());
 
   useEffect(() => {
     setSelectedContextId(initialSelectedContextId(launchState));
     setRememberProject(false);
     setLaunchPending(false);
+    setLaunchError(undefined);
+    setMismatchError(undefined);
+    launchGuard.current = createLaunchRequestGuard();
   }, [launchState]);
 
-  async function handleLaunch() {
-    if (launchPending) {
-      return;
-    }
+  async function handleLaunch(confirmContextMismatch = false) {
+    await launchGuard.current.run(async () => {
+      setLaunchPending(true);
+      setLaunchError(undefined);
+      if (confirmContextMismatch) {
+        setMismatchError(undefined);
+      }
 
-    setLaunchPending(true);
-    await launchSelectedContext({
-      projectPath: launchState.project.path,
-      selectedContextId,
-      rememberProject,
-      bindProject: onBindProject,
-      launchProject: onLaunchProject,
+      try {
+        const result = await launchSelectedContext({
+          projectPath: launchState.project.path,
+          selectedContextId,
+          rememberProject,
+          confirmContextMismatch,
+          bindProject: onBindProject,
+          launchProject: onLaunchProject,
+        });
+
+        if (result && !result.ok) {
+          if (result.error.code === "context_mismatch_requires_confirmation" && result.error.contextMismatch) {
+            setMismatchError(result.error);
+          } else {
+            setLaunchError(result.error);
+          }
+        }
+      } finally {
+        setLaunchPending(false);
+      }
     });
-    setLaunchPending(false);
   }
 
   return (
@@ -67,16 +91,36 @@ function SelectorView({ launchState, onBindProject, onLaunchProject, onCancel }:
               key={context.id}
               context={context}
               selected={selectedContextId === context.id}
+              disabled={launchPending}
               onSelect={(contextId) => setSelectedContextId(nextSelectedContextId(launchState.contexts, contextId))}
             />
           ))}
         </div>
+
+        {launchPending ? (
+          <p className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground" role="status">
+            Launching selected context...
+          </p>
+        ) : null}
+
+        {launchError ? <GuiErrorNotice error={launchError} /> : null}
+
+        {mismatchError?.contextMismatch ? (
+          <ContextMismatchDialog
+            mismatch={mismatchError.contextMismatch}
+            contexts={launchState.contexts}
+            launchPending={launchPending}
+            onCancel={() => setMismatchError(undefined)}
+            onOpenAnyway={() => void handleLaunch(true)}
+          />
+        ) : null}
 
         <RememberProjectControl
           binding={launchState.binding}
           contexts={launchState.contexts}
           rememberProject={rememberProject}
           selectedContextId={selectedContextId}
+          disabled={launchPending}
           onRememberProjectChange={setRememberProject}
         />
 

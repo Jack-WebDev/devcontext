@@ -3,15 +3,18 @@ import type { ContextState, ProviderState } from "../../lib/devctx-api";
 interface ContextCardProps {
   context: ContextState;
   selected?: boolean;
+  disabled?: boolean;
   onSelect?: (contextId: string) => void;
 }
 
-function ContextCard({ context, selected = false, onSelect }: ContextCardProps) {
-  const unselectedClassName = onSelect ? "border-border hover:border-foreground/20" : "border-border";
+function ContextCard({ context, selected = false, disabled = false, onSelect }: ContextCardProps) {
+  const interactive = onSelect !== undefined && !disabled;
+  const unselectedClassName = interactive ? "border-border hover:border-foreground/20" : "border-border";
   const selectedClassName = selected
     ? "border-primary ring-2 ring-ring/40"
     : unselectedClassName;
-  const className = `min-w-0 border bg-card p-5 text-left text-card-foreground shadow-sm transition-colors ${selectedClassName}`;
+  const disabledClassName = disabled ? "opacity-60" : "";
+  const className = `min-w-0 border bg-card p-5 text-left text-card-foreground shadow-sm transition-colors ${selectedClassName} ${disabledClassName}`;
   const enabledProviders = context.providers.filter((provider) => provider.enabled);
 
   return (
@@ -27,6 +30,7 @@ function ContextCard({ context, selected = false, onSelect }: ContextCardProps) 
             className="block min-w-0 text-left"
             aria-labelledby={`context-${context.id}-name`}
             aria-pressed={selected}
+            disabled={disabled}
             onClick={() => onSelect(context.id)}
           >
             <ContextIdentity context={context} />

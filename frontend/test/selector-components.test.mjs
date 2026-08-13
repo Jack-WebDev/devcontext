@@ -3,7 +3,9 @@ import test from "node:test";
 
 import {renderToStaticMarkup} from "react-dom/server";
 
+import {ContextMismatchDialog} from "../.tmp-test/src/components/selector/ContextMismatchDialog.js";
 import {ContextCard} from "../.tmp-test/src/components/selector/ContextCard.js";
+import {GuiErrorNotice} from "../.tmp-test/src/components/selector/GuiErrorNotice.js";
 import {ProjectIdentity} from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import {
   boundContextName,
@@ -11,7 +13,10 @@ import {
 } from "../.tmp-test/src/components/selector/RememberProjectControl.js";
 import {SelectorActions} from "../.tmp-test/src/components/selector/SelectorActions.js";
 import {cancelSelector} from "../.tmp-test/src/components/selector/cancel-action.js";
-import {launchSelectedContext} from "../.tmp-test/src/components/selector/launch-action.js";
+import {
+  createLaunchRequestGuard,
+  launchSelectedContext,
+} from "../.tmp-test/src/components/selector/launch-action.js";
 import {
   initialSelectedContextId,
   nextSelectedContextId,
@@ -331,6 +336,149 @@ test("launch action binds before launch when remember is on", async () => {
   ]);
 });
 
+test("launch action returns binding errors without launching", async () => {
+  const calls = [];
+  const result = await launchSelectedContext({
+    projectPath: "/work/api",
+    selectedContextId: "company",
+    rememberProject: true,
+    bindProject(request) {
+      calls.push(["bindProject", request]);
+      return Promise.resolve(apiError("validation_error", "Unable to complete request.", "Check the selected project and context, then retry."));
+    },
+    launchProject(request) {
+      calls.push(["launchProject", request]);
+      return Promise.resolve(launchProjectResult());
+    },
+  });
+
+  assert.deepEqual(result, apiError("validation_error", "Unable to complete request.", "Check the selected project and context, then retry."));
+  assert.deepEqual(calls, [
+    ["bindProject", {projectPath: "/work/api", contextId: "company"}],
+  ]);
+});
+
+test("launch action resubmits explicit context mismatch confirmation", async () => {
+  const calls = [];
+  const result = await launchSelectedContext({
+    projectPath: "/work/api",
+    selectedContextId: "personal",
+    rememberProject: false,
+    confirmContextMismatch: true,
+    bindProject(request) {
+      calls.push(["bindProject", request]);
+      return Promise.resolve(projectBindingResult());
+    },
+    launchProject(request) {
+      calls.push(["launchProject", request]);
+      return Promise.resolve(launchProjectResult());
+    },
+  });
+
+  assert.deepEqual(result, launchProjectResult());
+  assert.deepEqual(calls, [
+    [
+      "launchProject",
+      {
+        projectPath: "/work/api",
+        contextId: "personal",
+        confirmContextMismatch: true,
+      },
+    ],
+  ]);
+});
+
+test("context mismatch dialog shows risk details and deliberate actions", () => {
+  const html = renderToStaticMarkup(
+    ContextMismatchDialog({
+      mismatch: {
+        projectPath: "/work/api",
+        boundContextId: "company",
+        requestedContextId: "personal",
+      },
+      contexts: [contextFixture("company", "Company"), contextFixture("personal", "Personal")],
+      launchPending: false,
+      onCancel: () => {},
+      onOpenAnyway: () => {},
+    }),
+  );
+
+  assert.match(html, /role="dialog"/);
+  assert.ok(html.includes("Context mismatch"));
+  assert.ok(html.includes("/work/api"));
+  assert.ok(html.includes("Company"));
+  assert.ok(html.includes("Personal"));
+  assert.ok(html.includes("expose project files"));
+  assert.ok(html.includes("Cancel"));
+  assert.ok(html.includes("Open Anyway"));
+});
+
+test("context mismatch open anyway pending state disables actions", () => {
+  const html = renderToStaticMarkup(
+    ContextMismatchDialog({
+      mismatch: {
+        projectPath: "/work/api",
+        boundContextId: "company",
+        requestedContextId: "personal",
+      },
+      contexts: [],
+      launchPending: true,
+      onCancel: () => {},
+      onOpenAnyway: () => {},
+    }),
+  );
+
+  assert.ok(html.includes("Opening..."));
+  assert.match(html, /disabled=""/);
+});
+
+test("gui error notice renders failure and recovery guidance", () => {
+  const errors = [
+    apiError("validation_error", "Unable to complete request.", "Check the selected project and context, then retry."),
+    apiError("launch_error", "Unable to launch editor.", "Check the editor command, project path, and permissions, then retry."),
+    apiError("internal_error", "Dev Context failed unexpectedly.", "Retry the action. If it keeps failing, include debug details in a bug report."),
+    apiError("unexpected_error", "Wails bridge unavailable", "Retry the action. If it keeps failing, include the error details in a bug report."),
+  ];
+
+  for (const error of errors) {
+    const html = renderToStaticMarkup(GuiErrorNotice({error: error.error}));
+
+    assert.match(html, /role="alert"/);
+    assert.ok(html.includes(error.error.message));
+    assert.ok(html.includes(error.error.recovery));
+  }
+});
+
+test("launch progress guard allows only one in-flight launch and restores after rejection", async () => {
+  const guard = createLaunchRequestGuard();
+  const deferred = createDeferred();
+  const calls = [];
+
+  const first = guard.run(async () => {
+    calls.push("first");
+    await deferred.promise;
+    return "done";
+  });
+  const duplicate = await guard.run(async () => {
+    calls.push("duplicate");
+    return "duplicate";
+  });
+
+  assert.equal(duplicate, undefined);
+  assert.deepEqual(calls, ["first"]);
+
+  deferred.reject(new Error("launch failed"));
+  await assert.rejects(first, /launch failed/);
+
+  const afterFailure = await guard.run(async () => {
+    calls.push("afterFailure");
+    return "restored";
+  });
+
+  assert.equal(afterFailure, "restored");
+  assert.deepEqual(calls, ["first", "afterFailure"]);
+});
+
 test("cancel closes the selector without launch or binding side effects", async () => {
   const calls = [];
   const window = createDevContextWindow({
@@ -412,6 +560,29 @@ function launchProjectResult() {
       warnings: [],
     },
   };
+}
+
+function apiError(code, message, recovery, contextMismatch) {
+  return {
+    ok: false,
+    error: {
+      code,
+      message,
+      recovery,
+      contextMismatch,
+    },
+  };
+}
+
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+
+  return {promise, resolve, reject};
 }
 
 function escapeRegExp(value) {

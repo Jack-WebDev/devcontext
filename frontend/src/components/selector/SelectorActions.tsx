@@ -11,6 +11,7 @@ function SelectorActions({ launchDisabled, launchPending, onLaunch, onCancel }: 
       <button
         type="button"
         className="border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-foreground/30"
+        disabled={launchPending}
         onClick={onCancel}
       >
         Cancel

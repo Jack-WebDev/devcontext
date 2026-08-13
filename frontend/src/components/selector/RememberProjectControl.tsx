@@ -5,6 +5,7 @@ interface RememberProjectControlProps {
   contexts: ContextState[];
   rememberProject: boolean;
   selectedContextId?: string;
+  disabled?: boolean;
   onRememberProjectChange?: (rememberProject: boolean) => void;
 }
 
@@ -13,6 +14,7 @@ function RememberProjectControl({
   contexts,
   rememberProject,
   selectedContextId,
+  disabled: disabledByParent = false,
   onRememberProjectChange,
 }: RememberProjectControlProps) {
   const boundContext = boundContextName(binding, contexts);
@@ -24,7 +26,7 @@ function RememberProjectControl({
     );
   }
 
-  const disabled = selectedContextId === undefined;
+  const disabled = disabledByParent || selectedContextId === undefined;
 
   return (
     <label className="flex items-start gap-3 border border-border p-3 text-sm">
@@ -40,7 +42,9 @@ function RememberProjectControl({
         <span className="block font-medium">Remember this project</span>
         <span className="block text-muted-foreground">
           {disabled
-            ? "Select a context before remembering this project."
+            ? disabledByParent
+              ? "Remembering is unavailable while launch is in progress."
+              : "Select a context before remembering this project."
             : "Use this context automatically for this project next time."}
         </span>
       </span>

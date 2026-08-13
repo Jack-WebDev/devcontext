@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
 import { SelectorView } from "./components/selector/SelectorView";
 import { devContextApi, type DisplayError, type LaunchState } from "./lib/devctx-api";
 import { devContextWindow } from "./lib/devctx-window";
@@ -62,12 +63,7 @@ function renderSelectorContent(launchState: LaunchStateLoad) {
   }
 
   if (launchState.status === "error") {
-    return (
-      <div className="border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-        <p className="font-medium">{launchState.error.message}</p>
-        <p className="mt-1 text-destructive/80">{launchState.error.recovery}</p>
-      </div>
-    );
+    return <GuiErrorNotice error={launchState.error} />;
   }
 
   return (
