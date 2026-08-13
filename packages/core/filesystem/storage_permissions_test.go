@@ -72,6 +72,28 @@ func TestStoragePermissionsReturnChmodErrorsWhenSupported(t *testing.T) {
 	}
 }
 
+func TestStoragePermissionsReturnPathOperationForPermissionDenied(t *testing.T) {
+	permissions := filesystem.NewStoragePermissions(true, func(string, os.FileMode) error {
+		return os.ErrPermission
+	})
+
+	err := permissions.ApplyDirectory("/home/alex/.devctx")
+	if !errors.Is(err, filesystem.ErrStoragePermissionDenied) {
+		t.Fatalf("error = %v, want %v", err, filesystem.ErrStoragePermissionDenied)
+	}
+
+	var permissionErr *filesystem.StoragePermissionError
+	if !errors.As(err, &permissionErr) {
+		t.Fatalf("error = %T, want *filesystem.StoragePermissionError", err)
+	}
+	if permissionErr.StorageOperation() != "set directory permissions" {
+		t.Fatalf("operation = %q, want set directory permissions", permissionErr.StorageOperation())
+	}
+	if permissionErr.StoragePath() != "/home/alex/.devctx" {
+		t.Fatalf("path = %q, want /home/alex/.devctx", permissionErr.StoragePath())
+	}
+}
+
 func assertMode(t *testing.T, path string, want os.FileMode) {
 	t.Helper()
 

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"devctx/packages/core/filesystem"
 )
 
 // ReadProjectBindingsFile reads project bindings from projects.toml.
@@ -12,6 +14,9 @@ func ReadProjectBindingsFile(path string) ([]Binding, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
+		}
+		if wrapped := filesystem.WrapStoragePermissionError("read file", path, err); wrapped != err {
+			return nil, fmt.Errorf("read project bindings %q: %w", path, wrapped)
 		}
 		return nil, fmt.Errorf("read project bindings %q: %w", path, err)
 	}
@@ -45,6 +50,9 @@ func writeProjectBindingsFileAtomically(path string, write projectBindingsAtomic
 
 	file, err := os.CreateTemp(dir, "."+base+".tmp-*")
 	if err != nil {
+		if wrapped := filesystem.WrapStoragePermissionError("create temporary file", dir, err); wrapped != err {
+			return fmt.Errorf("create temporary file for %q: %w", path, wrapped)
+		}
 		return fmt.Errorf("create temporary file for %q: %w", path, err)
 	}
 
@@ -58,16 +66,28 @@ func writeProjectBindingsFileAtomically(path string, write projectBindingsAtomic
 
 	if err := write(file); err != nil {
 		_ = file.Close()
+		if wrapped := filesystem.WrapStoragePermissionError("write temporary file", tempPath, err); wrapped != err {
+			return fmt.Errorf("write temporary file for %q: %w", path, wrapped)
+		}
 		return fmt.Errorf("write temporary file for %q: %w", path, err)
 	}
 	if err := file.Sync(); err != nil {
 		_ = file.Close()
+		if wrapped := filesystem.WrapStoragePermissionError("sync temporary file", tempPath, err); wrapped != err {
+			return fmt.Errorf("sync temporary file for %q: %w", path, wrapped)
+		}
 		return fmt.Errorf("sync temporary file for %q: %w", path, err)
 	}
 	if err := file.Close(); err != nil {
+		if wrapped := filesystem.WrapStoragePermissionError("close temporary file", tempPath, err); wrapped != err {
+			return fmt.Errorf("close temporary file for %q: %w", path, wrapped)
+		}
 		return fmt.Errorf("close temporary file for %q: %w", path, err)
 	}
 	if err := os.Rename(tempPath, path); err != nil {
+		if wrapped := filesystem.WrapStoragePermissionError("replace file", path, err); wrapped != err {
+			return fmt.Errorf("replace %q atomically: %w", path, wrapped)
+		}
 		return fmt.Errorf("replace %q atomically: %w", path, err)
 	}
 

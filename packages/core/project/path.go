@@ -29,40 +29,40 @@ func CanonicalizePath(paths filesystem.PlatformPaths, input string, baseDir Path
 func CanonicalizePathWithSymlinkResolver(paths filesystem.PlatformPaths, input string, baseDir Path, resolveSymlink SymlinkResolver) (Path, error) {
 	normalizedInput, err := normalizeProjectPath(paths, input)
 	if err != nil {
-		return "", err
+		return "", newPathError(input, "resolve", ErrInvalidProjectPath, err)
 	}
 
 	canonical := normalizedInput
 	if !isAbsoluteProjectPath(canonical) {
 		normalizedBase, err := normalizeProjectPath(paths, string(baseDir))
 		if err != nil {
-			return "", fmt.Errorf("%w: base directory: %w", ErrInvalidProjectPath, err)
+			return "", newPathError(string(baseDir), "resolve base directory", ErrInvalidProjectPath, err)
 		}
 		if !isAbsoluteProjectPath(normalizedBase) {
-			return "", fmt.Errorf("%w: base directory %q is not absolute", ErrInvalidProjectPath, normalizedBase)
+			return "", newPathError(string(baseDir), "resolve base directory", ErrInvalidProjectPath, fmt.Errorf("%q is not absolute", normalizedBase))
 		}
 		canonical, err = normalizeProjectPath(paths, joinProjectPath(normalizedBase, canonical))
 		if err != nil {
-			return "", err
+			return "", newPathError(input, "resolve", ErrInvalidProjectPath, err)
 		}
 	}
 
 	if resolveSymlink != nil {
 		resolved, err := resolveSymlink(canonical)
 		if err != nil {
-			return "", fmt.Errorf("%w: resolve symlink %q: %w", ErrInvalidProjectPath, canonical, err)
+			return "", newPathError(canonical, "resolve symlink", ErrInvalidProjectPath, err)
 		}
 		canonical, err = normalizeProjectPath(paths, resolved)
 		if err != nil {
-			return "", err
+			return "", newPathError(canonical, "resolve symlink", ErrInvalidProjectPath, err)
 		}
 		if !isAbsoluteProjectPath(canonical) {
-			return "", fmt.Errorf("%w: resolved path %q is not absolute", ErrInvalidProjectPath, canonical)
+			return "", newPathError(canonical, "resolve symlink", ErrInvalidProjectPath, fmt.Errorf("resolved path is not absolute"))
 		}
 	}
 
 	if !isAbsoluteProjectPath(canonical) {
-		return "", fmt.Errorf("%w: %q is not absolute", ErrInvalidProjectPath, canonical)
+		return "", newPathError(input, "resolve", ErrInvalidProjectPath, fmt.Errorf("%q is not absolute", canonical))
 	}
 	return Path(canonical), nil
 }

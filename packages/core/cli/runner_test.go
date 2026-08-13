@@ -680,9 +680,16 @@ func newRunnerFixture(t *testing.T) runnerFixture {
 	fixture.paths = filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
 		return fixture.homeDir, nil
 	})
+	devContextHomeDir, err := fixture.paths.DevContextHomeDir()
+	if err != nil {
+		t.Fatalf("dev context home: %v", err)
+	}
+	fixture.contextsDir = filepath.Join(devContextHomeDir, "contexts")
 
 	fixture.mkdir(t, "home")
-	fixture.mkdir(t, "contexts")
+	if err := os.MkdirAll(fixture.contextsDir, 0o700); err != nil {
+		t.Fatalf("create contexts directory fixture %q: %v", fixture.contextsDir, err)
+	}
 	fixture.mkdir(t, "projects", "current")
 
 	return fixture
@@ -713,8 +720,20 @@ func (f runnerFixture) mkdir(t *testing.T, elements ...string) string {
 func (f runnerFixture) writeContext(t *testing.T, ctx devcontext.Context) {
 	t.Helper()
 
-	if err := os.MkdirAll(filepath.Join(f.contextsDir, ctx.ID.String()), 0o700); err != nil {
-		t.Fatalf("create context directory %q: %v", ctx.ID.String(), err)
+	contextPaths, err := filesystem.DeriveContextPaths(f.paths, ctx.ID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	for _, dir := range []string{
+		contextPaths.RootDir,
+		contextPaths.ClaudeDir,
+		contextPaths.CodexDir,
+		contextPaths.VSCodeDir,
+		contextPaths.VSCodeUserDataDir,
+	} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatalf("create context directory %q: %v", dir, err)
+		}
 	}
 	if err := devcontext.NewRepository(f.contextsDir).Write(ctx); err != nil {
 		t.Fatalf("write context %q: %v", ctx.ID.String(), err)

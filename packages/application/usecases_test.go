@@ -616,7 +616,15 @@ func (f applicationFixture) context(id string, name string) devcontext.Context {
 func (f applicationFixture) writeContext(t *testing.T, ctx devcontext.Context) {
 	t.Helper()
 
-	mkdir(t, filepath.Join(f.contextsDir, ctx.ID.String()))
+	contextPaths, err := filesystem.DeriveContextPaths(f.paths, ctx.ID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	mkdir(t, contextPaths.RootDir)
+	mkdir(t, contextPaths.ClaudeDir)
+	mkdir(t, contextPaths.CodexDir)
+	mkdir(t, contextPaths.VSCodeDir)
+	mkdir(t, contextPaths.VSCodeUserDataDir)
 	if err := devcontext.NewRepository(f.contextsDir).Write(ctx); err != nil {
 		t.Fatalf("write context %q: %v", ctx.ID.String(), err)
 	}

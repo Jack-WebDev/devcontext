@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -92,6 +93,40 @@ func TestGlobalConfigPersistenceRoundTrip(t *testing.T) {
 	}
 	if loaded != original {
 		t.Fatalf("loaded config = %#v, want %#v", loaded, original)
+	}
+}
+
+func TestReadGlobalConfigFileReportsPermissionDeniedPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not expose Unix directory permissions consistently")
+	}
+
+	dir := filepath.Join(t.TempDir(), "locked")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatalf("create locked dir: %v", err)
+	}
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte("version = "), 0o600); err != nil {
+		t.Fatalf("write config fixture: %v", err)
+	}
+	if err := os.Chmod(dir, 0o000); err != nil {
+		t.Fatalf("chmod locked dir: %v", err)
+	}
+	defer os.Chmod(dir, 0o700)
+
+	_, err := config.ReadGlobalConfigFile(path)
+	if err == nil {
+		t.Skip("current user can still read files below mode 000 directories")
+	}
+	var permissionErr *filesystem.StoragePermissionError
+	if !errors.As(err, &permissionErr) {
+		t.Fatalf("error = %T %v, want *filesystem.StoragePermissionError", err, err)
+	}
+	if permissionErr.StorageOperation() != "read file" {
+		t.Fatalf("operation = %q, want read file", permissionErr.StorageOperation())
+	}
+	if permissionErr.StoragePath() != path {
+		t.Fatalf("path = %q, want %q", permissionErr.StoragePath(), path)
 	}
 }
 

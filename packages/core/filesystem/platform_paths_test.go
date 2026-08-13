@@ -122,6 +122,28 @@ func TestDefaultPlatformPathsResolveDevContextHomeFromWindowsHome(t *testing.T) 
 	}
 }
 
+func TestDefaultPlatformPathsCanonicalizesWindowsDriveLetters(t *testing.T) {
+	paths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return `c:\Users\Alex`, nil
+	})
+
+	home, err := paths.UserHomeDir()
+	if err != nil {
+		t.Fatalf("user home: %v", err)
+	}
+	if home != `C:\Users\Alex` {
+		t.Fatalf("home = %q, want %q", home, `C:\Users\Alex`)
+	}
+
+	normalized, err := paths.NormalizePath(`d:/work/client-a/../client-b`)
+	if err != nil {
+		t.Fatalf("normalize path: %v", err)
+	}
+	if normalized != `D:\work\client-b` {
+		t.Fatalf("normalized path = %q, want %q", normalized, `D:\work\client-b`)
+	}
+}
+
 func TestDefaultPlatformPathsReturnsClearErrorWhenUserHomeFails(t *testing.T) {
 	expectedErr := errors.New("lookup failed")
 	paths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {

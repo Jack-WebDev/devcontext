@@ -66,6 +66,9 @@ func (l LocalLogger) Record(event Event) error {
 		permissions = filesystem.NewDefaultStoragePermissions()
 	}
 	if err := os.MkdirAll(l.LogsDir, permissions.DirectoryMode()); err != nil {
+		if wrapped := filesystem.WrapStoragePermissionError("create directory", l.LogsDir, err); wrapped != err {
+			return fmt.Errorf("create logs directory %q: %w", l.LogsDir, wrapped)
+		}
 		return fmt.Errorf("create logs directory %q: %w", l.LogsDir, err)
 	}
 	if err := permissions.ApplyDirectory(l.LogsDir); err != nil {
@@ -85,6 +88,9 @@ func (l LocalLogger) Record(event Event) error {
 	path := filepath.Join(l.LogsDir, l.fileName())
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, permissions.FileMode())
 	if err != nil {
+		if wrapped := filesystem.WrapStoragePermissionError("open file", path, err); wrapped != err {
+			return fmt.Errorf("open log file %q: %w", path, wrapped)
+		}
 		return fmt.Errorf("open log file %q: %w", path, err)
 	}
 	defer file.Close()
@@ -93,6 +99,9 @@ func (l LocalLogger) Record(event Event) error {
 		return err
 	}
 	if _, err := file.Write(append(data, '\n')); err != nil {
+		if wrapped := filesystem.WrapStoragePermissionError("append file", path, err); wrapped != err {
+			return fmt.Errorf("append log event to %q: %w", path, wrapped)
+		}
 		return fmt.Errorf("append log event to %q: %w", path, err)
 	}
 	return nil

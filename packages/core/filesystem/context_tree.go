@@ -29,6 +29,9 @@ func CreateContextDirectoryTreeWithPermissions(paths ContextPaths, ctx devcontex
 
 	for _, dir := range contextTreeDirectories(paths) {
 		if err := os.MkdirAll(dir, permissions.DirectoryMode()); err != nil {
+			if wrapped := WrapStoragePermissionError("create directory", dir, err); wrapped != err {
+				return fmt.Errorf("create context directory %q: %w", dir, wrapped)
+			}
 			return fmt.Errorf("create context directory %q: %w", dir, err)
 		}
 		if err := permissions.ApplyDirectory(dir); err != nil {
@@ -91,6 +94,9 @@ func ensureContextRootDoesNotExist(path string) error {
 	case os.IsNotExist(err):
 		return nil
 	default:
+		if wrapped := WrapStoragePermissionError("inspect directory", path, err); wrapped != err {
+			return fmt.Errorf("inspect context directory %q: %w", path, wrapped)
+		}
 		return fmt.Errorf("inspect context directory %q: %w", path, err)
 	}
 }

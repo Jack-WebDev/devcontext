@@ -2,7 +2,9 @@ package application
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"strings"
 
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
@@ -67,6 +69,12 @@ func NewError(err error) *Error {
 	}
 
 	var contextMismatchError *launcher.ContextMismatchError
+	var storagePermission storagePermissionDetails
+	var projectPathError *project.PathError
+	var missingContextError *devcontext.MissingContextError
+	var contextStorageError *filesystem.ContextStorageError
+	var executableNotFound *editor.ExecutableNotFoundError
+	var processLaunchError *launcher.ProcessLaunchError
 	switch {
 	case errors.As(err, &contextMismatchError) && errors.Is(err, launcher.ErrContextMismatchRequiresConfirmation):
 		return &Error{
@@ -82,6 +90,44 @@ func NewError(err error) *Error {
 		}
 	case errors.Is(err, launcher.ErrContextMismatchRejected):
 		return applicationError(ErrorCodeCanceled, "Command canceled.", "Run the action again when you are ready.", err)
+	case errors.As(err, &storagePermission):
+		return applicationError(
+			ErrorCodeValidation,
+			"Unable to access local storage.",
+			storagePermissionRecovery(storagePermission),
+			err,
+		)
+	case errors.As(err, &projectPathError):
+		message, recovery := projectPathMessageAndRecovery(projectPathError)
+		return applicationError(ErrorCodeValidation, message, recovery, err)
+	case errors.As(err, &missingContextError):
+		return applicationError(
+			ErrorCodeValidation,
+			fmt.Sprintf("Context %q does not exist.", missingContextError.ContextID.String()),
+			missingContextRecovery(missingContextError.AvailableIDs),
+			err,
+		)
+	case errors.As(err, &contextStorageError):
+		return applicationError(
+			ErrorCodeValidation,
+			"Context storage is incomplete.",
+			contextStorageRecovery(contextStorageError),
+			err,
+		)
+	case errors.As(err, &executableNotFound) && executableNotFound.EditorID == editor.VSCodeID:
+		return applicationError(
+			ErrorCodeLaunch,
+			"VS Code command not found.",
+			missingVSCodeRecovery(executableNotFound.Candidates),
+			err,
+		)
+	case errors.As(err, &processLaunchError) && errors.Is(err, launcher.ErrProcessExecutableNotFound):
+		return applicationError(
+			ErrorCodeLaunch,
+			"VS Code command not found.",
+			processExecutableRecovery(processLaunchError),
+			err,
+		)
 	case isLaunchError(err):
 		return applicationError(ErrorCodeLaunch, "Unable to launch editor.", "Check the editor command, project path, and permissions, then retry.", err)
 	case isValidationError(err):
@@ -89,6 +135,11 @@ func NewError(err error) *Error {
 	default:
 		return applicationError(ErrorCodeInternal, "Dev Context failed unexpectedly.", "Retry the action. If it keeps failing, include debug details in a bug report.", err)
 	}
+}
+
+type storagePermissionDetails interface {
+	StorageOperation() string
+	StoragePath() string
 }
 
 // ContextMismatch contains presentation-safe details for a conflicting launch
@@ -128,6 +179,8 @@ func isValidationError(err error) bool {
 		errors.Is(err, devcontext.ErrContextIDMismatch) ||
 		errors.Is(err, config.ErrInvalidGlobalConfig) ||
 		errors.Is(err, config.ErrUnsupportedSchemaVersion) ||
+		errors.Is(err, filesystem.ErrContextStorageIncomplete) ||
+		errors.Is(err, filesystem.ErrStoragePermissionDenied) ||
 		errors.Is(err, filesystem.ErrUserHomeUnavailable) ||
 		errors.Is(err, launcher.ErrContextMismatchRequiresConfirmation) ||
 		errors.Is(err, launcher.ErrLaunchSelectionRequired) ||
@@ -138,4 +191,93 @@ func isValidationError(err error) bool {
 		errors.Is(err, project.ErrInvalidProjectBindings) ||
 		errors.Is(err, project.ErrDuplicateProjectBinding) ||
 		errors.Is(err, os.ErrPermission)
+}
+
+func storagePermissionRecovery(err storagePermissionDetails) string {
+	operation := strings.TrimSpace(err.StorageOperation())
+	path := strings.TrimSpace(err.StoragePath())
+	switch {
+	case operation != "" && path != "":
+		return fmt.Sprintf("Dev Context was denied permission to %s at %q. Check ownership and permissions, then retry.", operation, path)
+	case path != "":
+		return fmt.Sprintf("Dev Context was denied permission at %q. Check ownership and permissions, then retry.", path)
+	default:
+		return "Check ownership and permissions for ~/.devctx and the selected project, then retry."
+	}
+}
+
+func projectPathMessageAndRecovery(err *project.PathError) (string, string) {
+	path := strings.TrimSpace(err.Path)
+	if path == "" {
+		path = "the supplied path"
+	}
+
+	switch {
+	case errors.Is(err, project.ErrProjectDirectoryNotFound):
+		return "Project path does not exist.", fmt.Sprintf("Check %q and choose an existing project directory.", path)
+	case errors.Is(err, project.ErrProjectPathNotDirectory):
+		return "Project path is not a directory.", fmt.Sprintf("Choose a project directory instead of %q.", path)
+	case errors.Is(err, project.ErrProjectDirectoryUnreadable):
+		return "Project directory is not readable.", fmt.Sprintf("Check permissions for %q, then retry.", path)
+	case errors.Is(err, project.ErrInvalidProjectPath):
+		return "Project path is invalid.", fmt.Sprintf("Choose a valid project directory path instead of %q.", path)
+	default:
+		return "Unable to use project path.", fmt.Sprintf("Check %q and retry.", path)
+	}
+}
+
+func missingContextRecovery(availableIDs []devcontext.ID) string {
+	if len(availableIDs) == 0 {
+		return "Create the context, then retry. Dev Context will not launch under a different context automatically."
+	}
+	return fmt.Sprintf(
+		"Choose one of these configured contexts: %s. Dev Context will not launch under a different context automatically.",
+		strings.Join(contextIDStrings(availableIDs), ", "),
+	)
+}
+
+func contextStorageRecovery(err *filesystem.ContextStorageError) string {
+	if err == nil || len(err.Missing) == 0 {
+		return "Repair or recreate the selected context before launching."
+	}
+
+	paths := make([]string, 0, len(err.Missing))
+	for _, missing := range err.Missing {
+		paths = append(paths, fmt.Sprintf("%s: %s", missing.Kind, missing.Path))
+	}
+	return fmt.Sprintf(
+		"Repair or recreate context %q. Missing paths: %s.",
+		err.ContextID.String(),
+		strings.Join(paths, "; "),
+	)
+}
+
+func missingVSCodeRecovery(candidates []string) string {
+	expected := "`code`"
+	if len(candidates) > 0 {
+		expected = "`" + strings.Join(candidates, "`, `") + "`"
+	}
+	return fmt.Sprintf(
+		"Install the VS Code command line launcher so %s is on PATH, or set editor.executable_override in the context to a valid VS Code CLI path.",
+		expected,
+	)
+}
+
+func processExecutableRecovery(err *launcher.ProcessLaunchError) string {
+	executable := strings.TrimSpace(string(err.Executable))
+	if executable == "" {
+		return missingVSCodeRecovery([]string{"code"})
+	}
+	return fmt.Sprintf(
+		"The configured VS Code command %q was not found. Install the VS Code command line launcher, add it to PATH, or set editor.executable_override in the context.",
+		executable,
+	)
+}
+
+func contextIDStrings(ids []devcontext.ID) []string {
+	values := make([]string, len(ids))
+	for i, id := range ids {
+		values[i] = id.String()
+	}
+	return values
 }

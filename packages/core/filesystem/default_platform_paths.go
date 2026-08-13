@@ -130,7 +130,7 @@ func cleanWindowsPath(path string) string {
 	prefix := ""
 	rest := path
 	if isWindowsDrivePath(path) {
-		prefix = path[:2]
+		prefix = strings.ToUpper(path[:1]) + ":"
 		rest = path[2:]
 	} else if strings.HasPrefix(path, `\\`) {
 		prefix = `\\`

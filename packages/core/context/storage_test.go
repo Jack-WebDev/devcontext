@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -30,6 +31,39 @@ func TestRepositoryWriteAndGetContext(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, ctx) {
 		t.Fatalf("stored context = %#v, want %#v", got, ctx)
+	}
+}
+
+func TestRepositoryWriteReportsPermissionDeniedPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not expose Unix directory permissions consistently")
+	}
+
+	contextsDir := filepath.Join(t.TempDir(), "contexts")
+	repository := devcontext.NewRepository(contextsDir)
+	contextID := devcontext.MustID("personal")
+	contextDir := filepath.Join(contextsDir, contextID.String())
+	if err := os.MkdirAll(contextDir, 0o700); err != nil {
+		t.Fatalf("create context dir: %v", err)
+	}
+	if err := os.Chmod(contextDir, 0o000); err != nil {
+		t.Fatalf("chmod context dir: %v", err)
+	}
+	defer os.Chmod(contextDir, 0o700)
+
+	err := repository.Write(storedContext("personal", "Personal"))
+	if err == nil {
+		t.Skip("current user can still write files below mode 000 directories")
+	}
+	var permissionErr *devcontext.StoragePermissionError
+	if !errors.As(err, &permissionErr) {
+		t.Fatalf("error = %T %v, want *devcontext.StoragePermissionError", err, err)
+	}
+	if permissionErr.StorageOperation() != "create temporary file" {
+		t.Fatalf("operation = %q, want create temporary file", permissionErr.StorageOperation())
+	}
+	if permissionErr.StoragePath() != contextDir {
+		t.Fatalf("path = %q, want %q", permissionErr.StoragePath(), contextDir)
 	}
 }
 
@@ -193,6 +227,33 @@ func TestRepositoryGetDistinguishesErrorCategories(t *testing.T) {
 	_, err = repository.Get(unreadableID)
 	if !errors.Is(err, devcontext.ErrUnreadableContextConfig) {
 		t.Fatalf("unreadable config error = %v, want %v", err, devcontext.ErrUnreadableContextConfig)
+	}
+}
+
+func TestRepositoryGetMissingContextReportsAvailableIDs(t *testing.T) {
+	contextsDir := t.TempDir()
+	repository := devcontext.NewRepository(contextsDir)
+	writeStoredContext(t, contextsDir, repository, storedContext("personal", "Personal"))
+	writeStoredContext(t, contextsDir, repository, storedContext("company", "Company"))
+
+	_, err := repository.Get(devcontext.MustID("client-a"))
+	if !errors.Is(err, devcontext.ErrContextNotFound) {
+		t.Fatalf("error = %v, want %v", err, devcontext.ErrContextNotFound)
+	}
+
+	var missingErr *devcontext.MissingContextError
+	if !errors.As(err, &missingErr) {
+		t.Fatalf("error = %T, want *devcontext.MissingContextError", err)
+	}
+	if missingErr.ContextID != devcontext.MustID("client-a") {
+		t.Fatalf("context ID = %q, want client-a", missingErr.ContextID.String())
+	}
+	wantAvailable := []devcontext.ID{
+		devcontext.MustID("company"),
+		devcontext.MustID("personal"),
+	}
+	if !reflect.DeepEqual(missingErr.AvailableIDs, wantAvailable) {
+		t.Fatalf("available IDs = %#v, want %#v", missingErr.AvailableIDs, wantAvailable)
 	}
 }
 
