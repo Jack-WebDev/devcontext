@@ -21,6 +21,13 @@ var (
 	// ErrMissingUserDataDir identifies a VS Code command request without an
 	// isolated user-data directory.
 	ErrMissingUserDataDir = errors.New("missing VS Code user-data directory")
+
+	// ErrMissingExecutable identifies a command request without a resolved
+	// editor executable.
+	ErrMissingExecutable = errors.New("missing editor executable")
+
+	// ErrMissingProjectPath identifies a command request without a project path.
+	ErrMissingProjectPath = errors.New("missing project path")
 )
 
 const (
@@ -86,6 +93,8 @@ type VSCodeEditor struct {
 	OperatingSystem string
 }
 
+var _ Editor = VSCodeEditor{}
+
 // ID returns the persisted editor identifier.
 func (VSCodeEditor) ID() ID {
 	return VSCodeID
@@ -112,6 +121,28 @@ func (e VSCodeEditor) DetectExecutable(config Config) (Executable, error) {
 		EditorID:   VSCodeID,
 		Candidates: candidates,
 	}
+}
+
+// BuildLaunchCommand returns the structured VS Code command for one project and
+// context-owned user-data directory.
+func (VSCodeEditor) BuildLaunchCommand(request CommandRequest) (Command, error) {
+	if strings.TrimSpace(string(request.Executable)) == "" {
+		return Command{}, ErrMissingExecutable
+	}
+	if strings.TrimSpace(request.ProjectPath) == "" {
+		return Command{}, ErrMissingProjectPath
+	}
+
+	arguments, err := VSCodeUserDataArguments(request.Paths)
+	if err != nil {
+		return Command{}, err
+	}
+	arguments = append(append(Arguments(nil), arguments...), request.ProjectPath)
+
+	return Command{
+		Executable: request.Executable,
+		Arguments:  arguments,
+	}, nil
 }
 
 func (e VSCodeEditor) resolveProbe() ExecutableProbe {

@@ -251,6 +251,124 @@ func TestVSCodeUserDataArgumentsUseDerivedContextPaths(t *testing.T) {
 	}
 }
 
+func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
+	tests := []struct {
+		name    string
+		request editor.CommandRequest
+		want    editor.Command
+	}{
+		{
+			name: "paths with spaces",
+			request: editor.CommandRequest{
+				Config:      editor.DefaultConfig(),
+				Executable:  "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
+				ProjectPath: "/Users/Alex/Work/Client A/API",
+				Paths: editor.ContextPaths{
+					RootDir:     "/Users/Alex/.devctx/contexts/client-a",
+					DataDir:     "/Users/Alex/.devctx/contexts/client-a/vscode",
+					UserDataDir: "/Users/Alex/.devctx/contexts/client-a/vscode/user data",
+				},
+			},
+			want: editor.Command{
+				Executable: "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
+				Arguments: editor.Arguments{
+					editor.VSCodeUserDataDirFlag,
+					"/Users/Alex/.devctx/contexts/client-a/vscode/user data",
+					"/Users/Alex/Work/Client A/API",
+				},
+			},
+		},
+		{
+			name: "windows separators",
+			request: editor.CommandRequest{
+				Config:      editor.DefaultConfig(),
+				Executable:  `C:\Users\Alex\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd`,
+				ProjectPath: `C:\Users\Alex\Projects\Client A\API`,
+				Paths: editor.ContextPaths{
+					RootDir:     `C:\Users\Alex\.devctx\contexts\client-a`,
+					DataDir:     `C:\Users\Alex\.devctx\contexts\client-a\vscode`,
+					UserDataDir: `C:\Users\Alex\.devctx\contexts\client-a\vscode\user-data`,
+				},
+			},
+			want: editor.Command{
+				Executable: `C:\Users\Alex\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd`,
+				Arguments: editor.Arguments{
+					editor.VSCodeUserDataDirFlag,
+					`C:\Users\Alex\.devctx\contexts\client-a\vscode\user-data`,
+					`C:\Users\Alex\Projects\Client A\API`,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			command, err := editor.VSCodeEditor{}.BuildLaunchCommand(tt.request)
+			if err != nil {
+				t.Fatalf("build launch command: %v", err)
+			}
+
+			if !reflect.DeepEqual(command, tt.want) {
+				t.Fatalf("command = %#v, want %#v", command, tt.want)
+			}
+		})
+	}
+}
+
+func TestVSCodeEditorBuildLaunchCommandRejectsMissingInputs(t *testing.T) {
+	validRequest := editor.CommandRequest{
+		Config:      editor.DefaultConfig(),
+		Executable:  "/usr/local/bin/code",
+		ProjectPath: "/work/client-a/api",
+		Paths: editor.ContextPaths{
+			UserDataDir: "/home/alex/.devctx/contexts/client-a/vscode/user-data",
+		},
+	}
+
+	tests := []struct {
+		name    string
+		request editor.CommandRequest
+		wantErr error
+	}{
+		{
+			name: "missing executable",
+			request: editor.CommandRequest{
+				Config:      validRequest.Config,
+				ProjectPath: validRequest.ProjectPath,
+				Paths:       validRequest.Paths,
+			},
+			wantErr: editor.ErrMissingExecutable,
+		},
+		{
+			name: "missing project path",
+			request: editor.CommandRequest{
+				Config:     validRequest.Config,
+				Executable: validRequest.Executable,
+				Paths:      validRequest.Paths,
+			},
+			wantErr: editor.ErrMissingProjectPath,
+		},
+		{
+			name: "missing user-data dir",
+			request: editor.CommandRequest{
+				Config:      validRequest.Config,
+				Executable:  validRequest.Executable,
+				ProjectPath: validRequest.ProjectPath,
+			},
+			wantErr: editor.ErrMissingUserDataDir,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := editor.VSCodeEditor{}.BuildLaunchCommand(tt.request)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("error = %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 type fakeExecutableProbe struct {
 	paths     map[string]string
 	files     map[string]os.FileInfo
