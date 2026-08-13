@@ -6,6 +6,7 @@ import (
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/filesystem"
+	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
 )
 
@@ -46,7 +47,7 @@ func ExitCodeForError(err error) ExitCode {
 	switch {
 	case err == nil:
 		return ExitSuccess
-	case errors.Is(err, ErrCanceled):
+	case errors.Is(err, ErrCanceled), errors.Is(err, launcher.ErrContextMismatchRejected):
 		return ExitCanceled
 	case errors.Is(err, ErrLaunchFailed):
 		return ExitLaunchFailure
@@ -68,6 +69,7 @@ func isValidationError(err error) bool {
 		errors.Is(err, config.ErrInvalidGlobalConfig) ||
 		errors.Is(err, config.ErrUnsupportedSchemaVersion) ||
 		errors.Is(err, filesystem.ErrUserHomeUnavailable) ||
+		errors.Is(err, launcher.ErrContextMismatchRequiresConfirmation) ||
 		errors.Is(err, project.ErrInvalidProjectPath) ||
 		errors.Is(err, project.ErrProjectDirectoryNotFound) ||
 		errors.Is(err, project.ErrProjectPathNotDirectory) ||

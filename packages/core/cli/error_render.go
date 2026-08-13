@@ -9,6 +9,7 @@ import (
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/filesystem"
+	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
 )
 
@@ -48,12 +49,33 @@ func RenderError(err error, debug bool) string {
 
 func classifyError(err error) renderedError {
 	var globalConfigFileError *config.GlobalConfigFileError
+	var contextMismatchError *launcher.ContextMismatchError
 	switch {
 	case errors.As(err, &globalConfigFileError):
 		return renderedError{
 			Title:    "Unable to read Dev Context configuration",
 			Why:      fmt.Sprintf("The global configuration file at %q is invalid: %s.", globalConfigFileError.Path, globalConfigFileError.Cause),
 			Recovery: globalConfigFileError.Recovery + ".",
+		}
+	case errors.As(err, &contextMismatchError) && errors.Is(err, launcher.ErrContextMismatchRequiresConfirmation):
+		return renderedError{
+			Title: "Context mismatch requires confirmation",
+			Why: fmt.Sprintf(
+				"The project at %q is bound to context %q, but the request selected context %q.",
+				contextMismatchError.ProjectPath,
+				contextMismatchError.BoundContextID.String(),
+				contextMismatchError.RequestedContextID.String(),
+			),
+			Recovery: "Confirm the mismatch intentionally or rerun with the bound context.",
+		}
+	case errors.As(err, &contextMismatchError) && errors.Is(err, launcher.ErrContextMismatchRejected):
+		return renderedError{
+			Title: "Command canceled",
+			Why: fmt.Sprintf(
+				"The context mismatch for project %q was not approved.",
+				contextMismatchError.ProjectPath,
+			),
+			Recovery: "Run the command again when you are ready.",
 		}
 	case errors.Is(err, ErrInvalidCommand), errors.Is(err, ErrUnknownCommand):
 		return renderedError{

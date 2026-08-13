@@ -8,6 +8,7 @@ import (
 
 	"devctx/packages/core/cli"
 	"devctx/packages/core/config"
+	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
 )
 
@@ -38,6 +39,11 @@ func TestExitCodeForErrorMapsStableCLIOutcomes(t *testing.T) {
 			want: cli.ExitValidationError,
 		},
 		{
+			name: "context mismatch requires confirmation",
+			err:  fmt.Errorf("resolve context: %w", launcher.ErrContextMismatchRequiresConfirmation),
+			want: cli.ExitValidationError,
+		},
+		{
 			name: "config validation",
 			err:  fmt.Errorf("load config: %w", config.ErrInvalidGlobalConfig),
 			want: cli.ExitValidationError,
@@ -50,6 +56,11 @@ func TestExitCodeForErrorMapsStableCLIOutcomes(t *testing.T) {
 		{
 			name: "canceled",
 			err:  fmt.Errorf("confirm launch: %w", cli.ErrCanceled),
+			want: cli.ExitCanceled,
+		},
+		{
+			name: "context mismatch rejected",
+			err:  fmt.Errorf("resolve context: %w", launcher.ErrContextMismatchRejected),
 			want: cli.ExitCanceled,
 		},
 		{
