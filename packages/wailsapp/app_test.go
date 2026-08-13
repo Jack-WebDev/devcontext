@@ -26,6 +26,9 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 			ProjectPath: "/work/api",
 			Bound:       false,
 		},
+		createContextResult: application.CreateContextResult{
+			Context: application.ContextState{ID: "personal", Name: "Personal"},
+		},
 	}
 	app := New(service)
 	app.Startup(context.Background())
@@ -81,6 +84,18 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	if service.unbindRequest != unbindRequest {
 		t.Fatalf("unbind request = %#v, want %#v", service.unbindRequest, unbindRequest)
 	}
+
+	createContextRequest := application.CreateContextRequest{ContextID: "personal"}
+	contextResult, createContextErr := app.CreateContext(createContextRequest)
+	if createContextErr != nil {
+		t.Fatalf("create context error = %v, want nil", createContextErr)
+	}
+	if !reflect.DeepEqual(contextResult, service.createContextResult) {
+		t.Fatalf("create context result = %#v, want %#v", contextResult, service.createContextResult)
+	}
+	if service.createContextRequest != createContextRequest {
+		t.Fatalf("create context request = %#v, want %#v", service.createContextRequest, createContextRequest)
+	}
 }
 
 type fakeService struct {
@@ -99,6 +114,10 @@ type fakeService struct {
 	unbindRequest application.UnbindProjectRequest
 	unbindResult  application.ProjectBindingState
 	unbindErr     *application.Error
+
+	createContextRequest application.CreateContextRequest
+	createContextResult  application.CreateContextResult
+	createContextErr     *application.Error
 }
 
 func (s *fakeService) GetLaunchState(request application.GetLaunchStateRequest) (application.LaunchState, *application.Error) {
@@ -119,4 +138,9 @@ func (s *fakeService) BindProject(request application.BindProjectRequest) (appli
 func (s *fakeService) UnbindProject(request application.UnbindProjectRequest) (application.ProjectBindingState, *application.Error) {
 	s.unbindRequest = request
 	return s.unbindResult, s.unbindErr
+}
+
+func (s *fakeService) CreateContext(request application.CreateContextRequest) (application.CreateContextResult, *application.Error) {
+	s.createContextRequest = request
+	return s.createContextResult, s.createContextErr
 }

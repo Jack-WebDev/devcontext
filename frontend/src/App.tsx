@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
 import { SelectorView } from "./components/selector/SelectorView";
-import { devContextApi, type DisplayError, type LaunchState } from "./lib/devctx-api";
+import {
+  devContextApi,
+  type ApiResult,
+  type CreateContextResult,
+  type DisplayError,
+  type LaunchState,
+} from "./lib/devctx-api";
 import { devContextWindow } from "./lib/devctx-window";
 
 type LaunchStateLoad =
@@ -34,6 +40,22 @@ function App() {
     };
   }, []);
 
+  async function handleCreateContext(contextId: string): Promise<ApiResult<CreateContextResult>> {
+    const result = await devContextApi.createContext({ contextId });
+    if (!result.ok) {
+      return result;
+    }
+
+    const refreshed = await devContextApi.getLaunchState();
+    if (refreshed.ok) {
+      setLaunchState({ status: "loaded", data: refreshed.data });
+    } else {
+      setLaunchState({ status: "error", error: refreshed.error });
+    }
+
+    return result;
+  }
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-background">
@@ -50,14 +72,17 @@ function App() {
             </h2>
           </div>
 
-          {renderSelectorContent(launchState)}
+          {renderSelectorContent(launchState, handleCreateContext)}
         </section>
       </div>
     </main>
   );
 }
 
-function renderSelectorContent(launchState: LaunchStateLoad) {
+function renderSelectorContent(
+  launchState: LaunchStateLoad,
+  onCreateContext: (contextId: string) => Promise<ApiResult<CreateContextResult>>,
+) {
   if (launchState.status === "loading") {
     return <p className="text-sm text-muted-foreground">Loading selector...</p>;
   }
@@ -72,6 +97,8 @@ function renderSelectorContent(launchState: LaunchStateLoad) {
       onBindProject={(request) => devContextApi.bindProject(request)}
       onLaunchProject={(request) => devContextApi.launchProject(request)}
       onCancel={() => devContextWindow.closeSelector()}
+      onCreatePersonalContext={() => onCreateContext("personal")}
+      onCreateCompanyContext={() => onCreateContext("company")}
     />
   );
 }

@@ -190,6 +190,103 @@ func TestGetLaunchStateReportsContextStorageErrors(t *testing.T) {
 	}
 }
 
+func TestCreateContextCreatesDefaultPersonalAndCompanyContexts(t *testing.T) {
+	tests := []struct {
+		name      string
+		contextID string
+		want      devcontext.Context
+	}{
+		{
+			name:      "personal",
+			contextID: "personal",
+			want:      devcontext.DefaultPersonalContext(time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC)),
+		},
+		{
+			name:      "company",
+			contextID: "company",
+			want:      devcontext.DefaultCompanyContext(time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC)),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newApplicationFixture(t)
+
+			result, appErr := fixture.service().CreateContext(CreateContextRequest{ContextID: tt.contextID})
+			if appErr != nil {
+				t.Fatalf("create context: %v", appErr)
+			}
+
+			if result.Context.ID != tt.want.ID.String() || result.Context.Name != tt.want.Name {
+				t.Fatalf("context state = %#v, want %s %s", result.Context, tt.want.ID.String(), tt.want.Name)
+			}
+
+			stored, err := devcontext.NewRepository(fixture.contextsDir).Get(tt.want.ID)
+			if err != nil {
+				t.Fatalf("get stored context: %v", err)
+			}
+			if !reflect.DeepEqual(stored, tt.want) {
+				t.Fatalf("stored context = %#v, want %#v", stored, tt.want)
+			}
+
+			state, stateErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+			if stateErr != nil {
+				t.Fatalf("get launch state: %v", stateErr)
+			}
+			if state.FirstRun {
+				t.Fatal("first run = true, want false")
+			}
+			if len(state.Contexts) != 1 || state.Contexts[0].ID != tt.contextID {
+				t.Fatalf("contexts = %#v, want created context", state.Contexts)
+			}
+		})
+	}
+}
+
+func TestCreateContextReportsDuplicateDefaultContext(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	if _, appErr := fixture.service().CreateContext(CreateContextRequest{ContextID: "personal"}); appErr != nil {
+		t.Fatalf("create original context: %v", appErr)
+	}
+
+	_, appErr := fixture.service().CreateContext(CreateContextRequest{ContextID: "personal"})
+	if appErr == nil {
+		t.Fatal("create duplicate error = nil, want validation error")
+	}
+	if appErr.Code != ErrorCodeValidation {
+		t.Fatalf("error code = %q, want %q", appErr.Code, ErrorCodeValidation)
+	}
+}
+
+func TestCreateContextReportsPermissionFailure(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.storagePermissions = filesystem.NewStoragePermissions(true, func(string, os.FileMode) error {
+		return os.ErrPermission
+	})
+
+	_, appErr := fixture.service().CreateContext(CreateContextRequest{ContextID: "personal"})
+	if appErr == nil {
+		t.Fatal("create context error = nil, want permission error")
+	}
+	if appErr.Code != ErrorCodeValidation {
+		t.Fatalf("error code = %q, want %q", appErr.Code, ErrorCodeValidation)
+	}
+}
+
+func TestCreateContextReportsStorageWriteFailure(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	removeAll(t, fixture.contextsDir)
+	writeFile(t, fixture.contextsDir, []byte("not a directory"))
+
+	_, appErr := fixture.service().CreateContext(CreateContextRequest{ContextID: "personal"})
+	if appErr == nil {
+		t.Fatal("create context error = nil, want write failure")
+	}
+	if appErr.Code != ErrorCodeInternal {
+		t.Fatalf("error code = %q, want %q", appErr.Code, ErrorCodeInternal)
+	}
+}
+
 func TestLaunchProjectBuildsPlanAndStartsProcess(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.writeContext(t, fixture.context("personal", "Personal"))
@@ -407,16 +504,17 @@ func assertFirstRunState(t *testing.T, state LaunchState, projectDir string) {
 }
 
 type applicationFixture struct {
-	root         string
-	homeDir      string
-	contextsDir  string
-	projectDir   string
-	bindingsPath string
-	paths        filesystem.PlatformPaths
-	now          time.Time
-	provider     *applicationFakeProvider
-	editor       *applicationFakeEditor
-	process      *applicationFakeProcessLauncher
+	root               string
+	homeDir            string
+	contextsDir        string
+	projectDir         string
+	bindingsPath       string
+	paths              filesystem.PlatformPaths
+	now                time.Time
+	provider           *applicationFakeProvider
+	editor             *applicationFakeEditor
+	process            *applicationFakeProcessLauncher
+	storagePermissions filesystem.StoragePermissions
 }
 
 func newApplicationFixture(t *testing.T) applicationFixture {
@@ -437,6 +535,11 @@ func newApplicationFixture(t *testing.T) applicationFixture {
 	fixture.paths = filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
 		return fixture.homeDir, nil
 	})
+	devContextHomeDir, err := fixture.paths.DevContextHomeDir()
+	if err != nil {
+		t.Fatalf("dev context home: %v", err)
+	}
+	fixture.contextsDir = filepath.Join(devContextHomeDir, "contexts")
 	mkdir(t, fixture.homeDir)
 	mkdir(t, fixture.contextsDir)
 	mkdir(t, fixture.projectDir)
@@ -445,15 +548,16 @@ func newApplicationFixture(t *testing.T) applicationFixture {
 
 func (f applicationFixture) service() *Service {
 	return NewServiceWithDependencies(Dependencies{
-		Contexts:          devcontext.NewRepository(f.contextsDir),
-		Projects:          project.NewRepository(f.bindingsPath, f.paths),
-		Paths:             f.paths,
-		Providers:         []provider.Provider{f.provider},
-		Editor:            f.editor,
-		ProcessLauncher:   f.process,
-		ParentEnvironment: []string{"PATH=/fixture/bin"},
-		WorkingDirectory:  f.projectDir,
-		DetachMode:        launcher.DetachModeAttached,
+		Contexts:           devcontext.NewRepository(f.contextsDir),
+		Projects:           project.NewRepository(f.bindingsPath, f.paths),
+		Paths:              f.paths,
+		Providers:          []provider.Provider{f.provider},
+		Editor:             f.editor,
+		ProcessLauncher:    f.process,
+		StoragePermissions: f.storagePermissions,
+		ParentEnvironment:  []string{"PATH=/fixture/bin"},
+		WorkingDirectory:   f.projectDir,
+		DetachMode:         launcher.DetachModeAttached,
 		Now: func() time.Time {
 			return f.now
 		},

@@ -3,6 +3,7 @@ import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import type {
   ApiResult,
   BindProjectRequest,
+  CreateContextResult,
   DisplayError,
   LaunchProjectRequest,
   LaunchProjectResult,
@@ -32,8 +33,8 @@ interface SelectorViewProps {
   onBindProject: (request: BindProjectRequest) => Promise<ApiResult<ProjectBindingState>>;
   onLaunchProject: (request: LaunchProjectRequest) => Promise<ApiResult<LaunchProjectResult>>;
   onCancel: () => Promise<void> | void;
-  onCreatePersonalContext?: () => void;
-  onCreateCompanyContext?: () => void;
+  onCreatePersonalContext?: () => Promise<ApiResult<CreateContextResult>>;
+  onCreateCompanyContext?: () => Promise<ApiResult<CreateContextResult>>;
 }
 
 function SelectorView({
@@ -54,6 +55,8 @@ function SelectorView({
   const [launchPending, setLaunchPending] = useState(false);
   const [launchError, setLaunchError] = useState<DisplayError | undefined>(undefined);
   const [mismatchError, setMismatchError] = useState<DisplayError | undefined>(undefined);
+  const [onboardingPendingContextId, setOnboardingPendingContextId] = useState<string | undefined>(undefined);
+  const [onboardingError, setOnboardingError] = useState<DisplayError | undefined>(undefined);
   const contextButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const launchGuard = useRef(createLaunchRequestGuard());
   const mismatchDialogOpen = mismatchError?.contextMismatch !== undefined;
@@ -70,6 +73,8 @@ function SelectorView({
     setLaunchPending(false);
     setLaunchError(undefined);
     setMismatchError(undefined);
+    setOnboardingPendingContextId(undefined);
+    setOnboardingError(undefined);
     launchGuard.current = createLaunchRequestGuard();
   }, [launchState]);
 
@@ -160,6 +165,20 @@ function SelectorView({
     });
   }
 
+  async function handleCreateContext(contextId: string, createContext: () => Promise<ApiResult<CreateContextResult>>) {
+    setOnboardingPendingContextId(contextId);
+    setOnboardingError(undefined);
+
+    try {
+      const result = await createContext();
+      if (!result.ok) {
+        setOnboardingError(result.error);
+      }
+    } finally {
+      setOnboardingPendingContextId(undefined);
+    }
+  }
+
   return (
     <div className="space-y-8" onKeyDown={handleSelectorKeyDown}>
       <ProjectIdentity project={launchState.project} />
@@ -167,8 +186,18 @@ function SelectorView({
       {shouldRenderFirstRunWelcome(launchState) ? (
         <FirstRunWelcome
           launchState={launchState}
-          onCreatePersonal={onCreatePersonalContext}
-          onCreateCompany={onCreateCompanyContext}
+          pendingContextId={onboardingPendingContextId}
+          error={onboardingError}
+          onCreatePersonal={
+            onCreatePersonalContext
+              ? () => void handleCreateContext("personal", onCreatePersonalContext)
+              : undefined
+          }
+          onCreateCompany={
+            onCreateCompanyContext
+              ? () => void handleCreateContext("company", onCreateCompanyContext)
+              : undefined
+          }
         />
       ) : (
         <div className="space-y-3">

@@ -99,6 +99,34 @@ test("first-run welcome disables setup actions until handlers are wired", () => 
   assert.match(html, /disabled=""/);
 });
 
+test("first-run welcome shows pending and error states", () => {
+  const state = launchStateFixture({
+    contexts: [],
+    firstRun: true,
+  });
+  const pending = renderToStaticMarkup(
+    FirstRunWelcome({
+      launchState: state,
+      onCreatePersonal: () => {},
+      onCreateCompany: () => {},
+      pendingContextId: "company",
+    }),
+  );
+  const failed = renderToStaticMarkup(
+    FirstRunWelcome({
+      launchState: state,
+      error: apiError("validation_error", "Unable to complete request.", "Check the selected project and context, then retry.").error,
+    }),
+  );
+
+  assert.ok(pending.includes("Creating Company context..."));
+  assert.ok(pending.includes("Creating..."));
+  assert.match(pending, /role="status"/);
+  assert.match(pending, /disabled=""/);
+  assert.match(failed, /role="alert"/);
+  assert.ok(failed.includes("Unable to complete request."));
+});
+
 test("first-run predicate separates new and returning users", () => {
   assert.equal(
     shouldRenderFirstRunWelcome(

@@ -4,6 +4,8 @@ import {application} from '../models';
 
 export function BindProject(arg1:application.BindProjectRequest):Promise<application.ProjectBindingState|application.Error>;
 
+export function CreateContext(arg1:application.CreateContextRequest):Promise<application.CreateContextResult|application.Error>;
+
 export function GetLaunchState(arg1:application.GetLaunchStateRequest):Promise<application.LaunchState|application.Error>;
 
 export function LaunchProject(arg1:application.LaunchProjectRequest):Promise<application.LaunchProjectResult|application.Error>;

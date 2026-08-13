@@ -1,12 +1,22 @@
-import type { LaunchState } from "../../lib/devctx-api";
+import type { DisplayError, LaunchState } from "../../lib/devctx-api";
 
 interface FirstRunWelcomeProps {
   launchState: LaunchState;
   onCreatePersonal?: () => void;
   onCreateCompany?: () => void;
+  pendingContextId?: string;
+  error?: DisplayError;
 }
 
-function FirstRunWelcome({ launchState, onCreatePersonal, onCreateCompany }: FirstRunWelcomeProps) {
+function FirstRunWelcome({
+  launchState,
+  onCreatePersonal,
+  onCreateCompany,
+  pendingContextId,
+  error,
+}: FirstRunWelcomeProps) {
+  const pending = pendingContextId !== undefined;
+
   return (
     <section aria-labelledby="first-run-title" className="space-y-6">
       <div className="space-y-2">
@@ -38,18 +48,26 @@ function FirstRunWelcome({ launchState, onCreatePersonal, onCreateCompany }: Fir
         <OnboardingAction
           title="Personal"
           description="Use this for personal repositories, experiments, and tools tied to your own accounts."
-          buttonLabel="Create Personal"
-          disabled={onCreatePersonal === undefined}
+          buttonLabel={pendingContextId === "personal" ? "Creating..." : "Create Personal"}
+          disabled={pending || onCreatePersonal === undefined}
           onClick={onCreatePersonal}
         />
         <OnboardingAction
           title="Company"
           description="Use this for work repositories and tools tied to employer or client accounts."
-          buttonLabel="Create Company"
-          disabled={onCreateCompany === undefined}
+          buttonLabel={pendingContextId === "company" ? "Creating..." : "Create Company"}
+          disabled={pending || onCreateCompany === undefined}
           onClick={onCreateCompany}
         />
       </div>
+
+      {pendingContextId ? (
+        <p className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground" role="status">
+          Creating {pendingContextId === "personal" ? "Personal" : "Company"} context...
+        </p>
+      ) : null}
+
+      {error ? <FirstRunErrorNotice error={error} /> : null}
 
       <p className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
         Current project: <span className="font-medium text-foreground">{launchState.project.path}</span>
@@ -94,6 +112,15 @@ function OnboardingAction({
       >
         {buttonLabel}
       </button>
+    </div>
+  );
+}
+
+function FirstRunErrorNotice({ error }: { error: DisplayError }) {
+  return (
+    <div className="border border-destructive/40 bg-destructive/5 p-4 text-sm" role="alert">
+      <p className="font-medium text-destructive">{error.message}</p>
+      <p className="mt-1 text-muted-foreground">{error.recovery}</p>
     </div>
   );
 }
