@@ -10,6 +10,7 @@ import (
 	"devctx/packages/core/cli"
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
 )
 
@@ -67,6 +68,22 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 				"\n" +
 				"Next step:\n" +
 				"Check ownership and permissions for the project and ~/.devctx paths, then retry.\n",
+		},
+		{
+			name: "context mismatch requires confirmation",
+			err: &launcher.ContextMismatchError{
+				ProjectPath:        "/work/constructa",
+				BoundContextID:     devcontext.MustID("personal"),
+				RequestedContextID: devcontext.MustID("company"),
+				Err:                launcher.ErrContextMismatchRequiresConfirmation,
+			},
+			want: "" +
+				"Context mismatch requires confirmation\n" +
+				"\n" +
+				"The project at \"/work/constructa\" is bound to context \"personal\", but the request selected context \"company\".\n" +
+				"\n" +
+				"Next step:\n" +
+				"Confirm the mismatch intentionally or rerun with the bound context.\n",
 		},
 	}
 

@@ -44,10 +44,15 @@ func (r Resolver) resolveExplicitContext(request LaunchRequest) (ResolutionResul
 		return ResolutionResult{}, err
 	}
 
+	warnings, err := explicitContextWarnings(request, lookup)
+	if err != nil {
+		return ResolutionResult{}, err
+	}
+
 	return ResolutionResult{
 		Context:  &ctx,
 		Source:   ResolutionSourceExplicit,
-		Warnings: explicitContextWarnings(request, lookup),
+		Warnings: warnings,
 	}, nil
 }
 
@@ -101,18 +106,18 @@ func danglingBindingWarnings(lookup project.BindingLookup) []ResolutionWarning {
 	}
 }
 
-func explicitContextWarnings(request LaunchRequest, lookup project.BindingLookup) []ResolutionWarning {
+func explicitContextWarnings(request LaunchRequest, lookup project.BindingLookup) ([]ResolutionWarning, error) {
 	warnings := danglingBindingWarnings(lookup)
 	if !lookup.Bound {
-		return warnings
+		return warnings, nil
 	}
 
 	requestedContextID := *request.RequestedContext
 	if lookup.Binding.ContextID == requestedContextID {
-		return warnings
+		return warnings, nil
 	}
 
-	return append(warnings, ResolutionWarning{
+	warning := ResolutionWarning{
 		Code:               WarningContextMismatch,
 		ProjectPath:        lookup.ProjectPath,
 		BoundContextID:     lookup.Binding.ContextID,
@@ -123,5 +128,23 @@ func explicitContextWarnings(request LaunchRequest, lookup project.BindingLookup
 			lookup.Binding.ContextID.String(),
 			lookup.ProjectPath,
 		),
-	})
+	}
+
+	switch request.MismatchConfirmation {
+	case ContextMismatchAccepted:
+		return append(warnings, warning), nil
+	case ContextMismatchRejected:
+		return nil, contextMismatchError(ErrContextMismatchRejected, warning)
+	default:
+		return nil, contextMismatchError(ErrContextMismatchRequiresConfirmation, warning)
+	}
+}
+
+func contextMismatchError(err error, warning ResolutionWarning) error {
+	return &ContextMismatchError{
+		ProjectPath:        warning.ProjectPath,
+		BoundContextID:     warning.BoundContextID,
+		RequestedContextID: warning.RequestedContextID,
+		Err:                err,
+	}
 }

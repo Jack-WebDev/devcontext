@@ -156,6 +156,7 @@ func TestResolverEnforcesContextResolutionPrecedence(t *testing.T) {
 		name               string
 		requestedContextID string
 		boundContextID     string
+		confirmation       launcher.ContextMismatchConfirmation
 		wantContextID      string
 		wantSource         launcher.ResolutionSource
 		wantSelection      bool
@@ -196,6 +197,7 @@ func TestResolverEnforcesContextResolutionPrecedence(t *testing.T) {
 			name:               "explicit context wins over conflicting binding with mismatch warning",
 			requestedContextID: "company",
 			boundContextID:     "personal",
+			confirmation:       launcher.ContextMismatchAccepted,
 			wantContextID:      "company",
 			wantSource:         launcher.ResolutionSourceExplicit,
 			wantWarningCodes:   []launcher.WarningCode{launcher.WarningContextMismatch},
@@ -225,9 +227,10 @@ func TestResolverEnforcesContextResolutionPrecedence(t *testing.T) {
 			}
 
 			request := launcher.LaunchRequest{
-				ProjectPath: project.Path(fixture.projectDir),
-				Interactive: tt.requestedContextID == "",
-				Source:      launcher.InvocationSourceCLI,
+				ProjectPath:          project.Path(fixture.projectDir),
+				MismatchConfirmation: tt.confirmation,
+				Interactive:          tt.requestedContextID == "",
+				Source:               launcher.InvocationSourceCLI,
 			}
 			if tt.requestedContextID != "" {
 				contextID := devcontext.MustID(tt.requestedContextID)
@@ -256,6 +259,80 @@ func TestResolverEnforcesContextResolutionPrecedence(t *testing.T) {
 				}
 			}
 			assertResolutionWarnings(t, result.Warnings, tt.wantWarningCodes, request, tt.boundContextID)
+		})
+	}
+}
+
+func TestResolverRequiresIntentionalMismatchOverride(t *testing.T) {
+	tests := []struct {
+		name         string
+		confirmation launcher.ContextMismatchConfirmation
+		interactive  bool
+		wantErr      error
+	}{
+		{
+			name:         "accepted confirmation preserves explicit context",
+			confirmation: launcher.ContextMismatchAccepted,
+			interactive:  false,
+		},
+		{
+			name:         "rejected confirmation cancels resolution",
+			confirmation: launcher.ContextMismatchRejected,
+			interactive:  true,
+			wantErr:      launcher.ErrContextMismatchRejected,
+		},
+		{
+			name:        "non-interactive request without confirmation is rejected",
+			interactive: false,
+			wantErr:     launcher.ErrContextMismatchRequiresConfirmation,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newResolverFixture(t)
+			company := testContext("company", "Company")
+			personal := testContext("personal", "Personal")
+			fixture.writeContexts(t, personal, company)
+			fixture.writeBindings(t, project.Binding{
+				ProjectPath: project.Path(fixture.projectDir),
+				ContextID:   personal.ID,
+				CreatedAt:   testResolverTime(10, 0),
+			})
+			requestedContext := company.ID
+
+			result, err := fixture.resolver.Resolve(launcher.LaunchRequest{
+				ProjectPath:          project.Path(fixture.projectDir),
+				RequestedContext:     &requestedContext,
+				MismatchConfirmation: tt.confirmation,
+				Interactive:          tt.interactive,
+				Source:               launcher.InvocationSourceCLI,
+			})
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("error = %v, want %v", err, tt.wantErr)
+				}
+				assertContextMismatchError(t, err, project.Path(fixture.projectDir), personal.ID, company.ID)
+				if result.Context != nil {
+					t.Fatalf("context = %#v, want nil", *result.Context)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("resolve context: %v", err)
+			}
+
+			assertResolvedContext(t, result, company, launcher.ResolutionSourceExplicit)
+			assertResolutionWarnings(
+				t,
+				result.Warnings,
+				[]launcher.WarningCode{launcher.WarningContextMismatch},
+				launcher.LaunchRequest{
+					ProjectPath:      project.Path(fixture.projectDir),
+					RequestedContext: &requestedContext,
+				},
+				personal.ID.String(),
+			)
 		})
 	}
 }
@@ -391,6 +468,30 @@ func assertResolutionWarnings(
 				t.Fatalf("warning[%d] message = %q, want bound and requested contexts", index, warning.Message)
 			}
 		}
+	}
+}
+
+func assertContextMismatchError(
+	t *testing.T,
+	err error,
+	wantProjectPath project.Path,
+	wantBoundContext devcontext.ID,
+	wantRequestedContext devcontext.ID,
+) {
+	t.Helper()
+
+	var mismatchErr *launcher.ContextMismatchError
+	if !errors.As(err, &mismatchErr) {
+		t.Fatalf("error = %v, want ContextMismatchError", err)
+	}
+	if mismatchErr.ProjectPath != wantProjectPath {
+		t.Fatalf("mismatch project path = %q, want %q", mismatchErr.ProjectPath, wantProjectPath)
+	}
+	if mismatchErr.BoundContextID != wantBoundContext {
+		t.Fatalf("mismatch bound context = %q, want %q", mismatchErr.BoundContextID, wantBoundContext)
+	}
+	if mismatchErr.RequestedContextID != wantRequestedContext {
+		t.Fatalf("mismatch requested context = %q, want %q", mismatchErr.RequestedContextID, wantRequestedContext)
 	}
 }
 

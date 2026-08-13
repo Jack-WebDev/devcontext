@@ -35,6 +35,22 @@ func TestLaunchRequestRepresentsDirectCLIInput(t *testing.T) {
 	}
 }
 
+func TestLaunchRequestRepresentsMismatchConfirmationInput(t *testing.T) {
+	contextID := devcontext.MustID("company")
+
+	request := launcher.LaunchRequest{
+		ProjectPath:          project.Path("/work/internal/api"),
+		RequestedContext:     &contextID,
+		MismatchConfirmation: launcher.ContextMismatchAccepted,
+		Interactive:          false,
+		Source:               launcher.InvocationSourceCLI,
+	}
+
+	if request.MismatchConfirmation != launcher.ContextMismatchAccepted {
+		t.Fatalf("mismatch confirmation = %q, want %q", request.MismatchConfirmation, launcher.ContextMismatchAccepted)
+	}
+}
+
 func TestLaunchRequestRepresentsInteractiveGUIInput(t *testing.T) {
 	request := launcher.LaunchRequest{
 		ProjectPath: project.Path("/work/client-a/api"),
