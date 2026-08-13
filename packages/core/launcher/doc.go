@@ -1,5 +1,6 @@
 // Package launcher owns launch requests, launch planning, and native process
 // execution boundaries.
 //
-// Future phases add process launcher interfaces and launch failure mapping here.
+// Native process implementations and launch failure mapping are added by later
+// phases.
 package launcher

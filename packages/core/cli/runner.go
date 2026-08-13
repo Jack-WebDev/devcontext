@@ -3,11 +3,16 @@ package cli
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
 	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/editor"
+	"devctx/packages/core/filesystem"
+	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
+	"devctx/packages/core/provider"
 )
 
 // Result is the rendered outcome of a CLI command.
@@ -34,11 +39,17 @@ func (r Result) Write(stdout io.Writer, stderr io.Writer) error {
 
 // Runner executes implemented CLI commands against core repositories.
 type Runner struct {
-	Contexts         devcontext.Repository
-	Projects         project.Repository
-	WorkingDirectory string
-	Now              func() time.Time
-	Debug            bool
+	Contexts          devcontext.Repository
+	Projects          project.Repository
+	WorkingDirectory  string
+	Paths             filesystem.PlatformPaths
+	Providers         []provider.Provider
+	Editor            editor.Editor
+	ProcessLauncher   launcher.ProcessLauncher
+	ParentEnvironment []string
+	DetachMode        launcher.DetachMode
+	Now               func() time.Time
+	Debug             bool
 }
 
 // Run parses and executes one CLI command.
@@ -53,9 +64,37 @@ func (r Runner) Run(args []string) Result {
 		return r.runContext(command.Context)
 	case CommandProject:
 		return r.runProject(command.Project)
+	case CommandRootLaunch:
+		return r.runRootLaunch(command.RootLaunch)
 	default:
 		return r.errorResult(fmt.Errorf("%w: root launch execution is not implemented in this adapter", ErrInvalidCommand))
 	}
+}
+
+func (r Runner) runRootLaunch(command RootLaunchCommand) Result {
+	paths := r.paths()
+	request, err := launchRequestFromRootCommand(command, r.WorkingDirectory, paths)
+	if err != nil {
+		return r.errorResult(err)
+	}
+
+	builder := launcher.LaunchPlanBuilder{
+		Resolver:          launcher.NewResolver(r.Contexts, r.Projects),
+		PlatformPaths:     paths,
+		Providers:         r.providers(),
+		Editor:            r.editor(),
+		ParentEnvironment: r.parentEnvironment(),
+	}
+	plan, err := builder.Build(request)
+	if err != nil {
+		return r.errorResult(err)
+	}
+
+	if err := r.processLauncher().Launch(processRequestFromLaunchPlan(plan, r.detachMode())); err != nil {
+		return r.errorResult(err)
+	}
+
+	return successResult(renderLaunchPlan(plan))
 }
 
 func (r Runner) runContext(command ContextCommand) Result {
@@ -122,6 +161,69 @@ func (r Runner) now() time.Time {
 	return time.Now()
 }
 
+func (r Runner) paths() filesystem.PlatformPaths {
+	if r.Paths != nil {
+		return r.Paths
+	}
+	return filesystem.NewDefaultPlatformPaths()
+}
+
+func (r Runner) providers() []provider.Provider {
+	if r.Providers != nil {
+		return r.Providers
+	}
+	return []provider.Provider{
+		provider.ClaudeProvider{},
+		provider.CodexProvider{},
+	}
+}
+
+func (r Runner) editor() editor.Editor {
+	if r.Editor != nil {
+		return r.Editor
+	}
+	return editor.VSCodeEditor{}
+}
+
+func (r Runner) processLauncher() launcher.ProcessLauncher {
+	if r.ProcessLauncher != nil {
+		return r.ProcessLauncher
+	}
+	return launcher.NativeProcessLauncher{}
+}
+
+func (r Runner) parentEnvironment() []string {
+	if r.ParentEnvironment != nil {
+		return append([]string(nil), r.ParentEnvironment...)
+	}
+	return os.Environ()
+}
+
+func (r Runner) detachMode() launcher.DetachMode {
+	if r.DetachMode != "" {
+		return r.DetachMode
+	}
+	return launcher.DetachModeDetached
+}
+
+func processRequestFromLaunchPlan(plan launcher.LaunchPlan, detachMode launcher.DetachMode) launcher.ProcessRequest {
+	return launcher.ProcessRequest{
+		Executable:       plan.Executable,
+		Arguments:        append(launcher.Arguments(nil), plan.Arguments...),
+		Environment:      cloneLaunchEnvironment(plan.Environment),
+		WorkingDirectory: plan.WorkingDirectory,
+		DetachMode:       detachMode,
+	}
+}
+
+func cloneLaunchEnvironment(environment launcher.Environment) launcher.Environment {
+	cloned := make(launcher.Environment, len(environment))
+	for key, value := range environment {
+		cloned[key] = value
+	}
+	return cloned
+}
+
 func successResult(output string) Result {
 	return Result{
 		Code:   ExitSuccess,
@@ -183,4 +285,8 @@ func renderProjectUnbind(result project.UnbindResult) string {
 		return fmt.Sprintf("Project:\n%s\n\nRemoved context:\n%s\n\nStatus:\nunbound\n", result.ProjectPath, result.Binding.ContextID.String())
 	}
 	return fmt.Sprintf("Project:\n%s\n\nContext:\nunbound\n\nStatus:\nunchanged\n", result.ProjectPath)
+}
+
+func renderLaunchPlan(plan launcher.LaunchPlan) string {
+	return fmt.Sprintf("Project:\n%s\n\nContext:\n%s\n\nStatus:\nlaunched\n", plan.ProjectPath, plan.Context.ID.String())
 }

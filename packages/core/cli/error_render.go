@@ -8,6 +8,7 @@ import (
 
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
@@ -77,6 +78,12 @@ func classifyError(err error) renderedError {
 			),
 			Recovery: "Run the command again when you are ready.",
 		}
+	case errors.Is(err, launcher.ErrLaunchSelectionRequired):
+		return renderedError{
+			Title:    "Context selection required",
+			Why:      "No explicit context or trusted project binding selected a context.",
+			Recovery: "Choose a context in the selector or rerun with `--context <id>`.",
+		}
 	case errors.Is(err, ErrInvalidCommand), errors.Is(err, ErrUnknownCommand):
 		return renderedError{
 			Title:    "Unable to parse command",
@@ -142,6 +149,48 @@ func classifyError(err error) renderedError {
 			Title:    "Unable to locate Dev Context storage",
 			Why:      "The current user's home directory could not be determined.",
 			Recovery: "Check the user environment and try again.",
+		}
+	case errors.Is(err, editor.ErrExecutableNotFound):
+		return renderedError{
+			Title:    "Unable to launch editor",
+			Why:      "Dev Context could not find the configured editor executable.",
+			Recovery: "Install the editor command, add it to PATH, or configure a valid editor executable.",
+		}
+	case errors.Is(err, editor.ErrExecutableNotExecutable):
+		return renderedError{
+			Title:    "Unable to launch editor",
+			Why:      "The configured editor executable is not usable.",
+			Recovery: "Configure an executable editor path or install the editor command on PATH.",
+		}
+	case errors.Is(err, editor.ErrMissingExecutable), errors.Is(err, launcher.ErrMissingProcessExecutable):
+		return renderedError{
+			Title:    "Unable to launch editor",
+			Why:      "No editor executable was resolved for the selected context.",
+			Recovery: "Configure an editor executable or install the editor command on PATH.",
+		}
+	case errors.Is(err, launcher.ErrProcessExecutableNotFound):
+		return renderedError{
+			Title:    "Unable to launch editor",
+			Why:      "Dev Context could not find the configured editor executable.",
+			Recovery: "Install the editor command, add it to PATH, or configure a valid editor executable.",
+		}
+	case errors.Is(err, launcher.ErrProcessPermissionDenied):
+		return renderedError{
+			Title:    "Unable to launch editor",
+			Why:      "The operating system denied permission to start the editor process.",
+			Recovery: "Check executable, project, and Dev Context storage permissions, then retry.",
+		}
+	case errors.Is(err, launcher.ErrProcessWorkingDirectoryInvalid):
+		return renderedError{
+			Title:    "Unable to launch editor",
+			Why:      "The editor working directory is missing or is not a directory.",
+			Recovery: "Check the project path and run Dev Context from an existing project directory.",
+		}
+	case errors.Is(err, launcher.ErrProcessStartFailed):
+		return renderedError{
+			Title:    "Unable to launch editor",
+			Why:      "The operating system could not start the editor process.",
+			Recovery: "Check the editor command and project path, then retry.",
 		}
 	case isPermissionError(err):
 		return renderedError{

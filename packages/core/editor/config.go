@@ -1,11 +1,21 @@
 package editor
 
+// ID identifies an editor implementation.
+type ID string
+
 // Type identifies an editor implementation.
-type Type string
+//
+// Type is kept as the configuration field name because existing config models
+// describe editor intent. It is the same value as the editor ID used by runtime
+// implementations.
+type Type = ID
 
 const (
+	// VSCodeID identifies the Visual Studio Code editor implementation.
+	VSCodeID ID = "vscode"
+
 	// TypeVSCode identifies Visual Studio Code editor intent.
-	TypeVSCode Type = "vscode"
+	TypeVSCode Type = VSCodeID
 )
 
 // Config describes editor intent for a context.

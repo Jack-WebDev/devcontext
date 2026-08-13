@@ -1,9 +1,13 @@
 package cli_test
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,7 +15,9 @@ import (
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
+	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
+	"devctx/packages/core/provider"
 )
 
 func TestRunnerContextListRendersEmptyAndPopulatedContexts(t *testing.T) {
@@ -200,6 +206,261 @@ func TestRunnerProjectUnbindIsIdempotentForUnboundProject(t *testing.T) {
 	assertResult(t, result, cli.ExitSuccess, "Project:\n"+fixture.workingDir+"\n\nContext:\nunbound\n\nStatus:\nunchanged\n", "")
 }
 
+func TestRunnerRootLaunchBuildsPlanAndStartsDetachedProcess(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	context := testCLIContext("personal", "Personal")
+	context.Providers = provider.Configs{
+		provider.ClaudeID: {Enabled: true},
+		provider.CodexID:  {Enabled: true},
+	}
+	fixture.writeContext(t, context)
+
+	launchEditor := &recordingCLIEditor{}
+	processLauncher := &recordingProcessLauncher{}
+	runner := fixture.runner()
+	runner.Providers = []provider.Provider{provider.ClaudeProvider{}, provider.CodexProvider{}}
+	runner.Editor = launchEditor
+	runner.ProcessLauncher = processLauncher
+	runner.ParentEnvironment = []string{
+		"PATH=/usr/local/bin",
+		"CODEX_HOME=/parent/codex",
+		"CLAUDE_CONFIG_DIR=/parent/claude",
+	}
+
+	result := runner.Run([]string{"--context", "personal", "."})
+	assertResult(t, result, cli.ExitSuccess, "Project:\n"+fixture.workingDir+"\n\nContext:\npersonal\n\nStatus:\nlaunched\n", "")
+
+	contextRoot := filepath.Join(fixture.homeDir, ".devctx", "contexts", "personal")
+	wantRequest := launcher.ProcessRequest{
+		Executable: launcher.Executable("/recording/code"),
+		Arguments: launcher.Arguments{
+			"--user-data-dir",
+			filepath.Join(contextRoot, "vscode", "user-data"),
+			fixture.workingDir,
+		},
+		Environment: launcher.Environment{
+			"PATH":              "/usr/local/bin",
+			"CODEX_HOME":        filepath.Join(contextRoot, "codex"),
+			"CLAUDE_CONFIG_DIR": filepath.Join(contextRoot, "claude"),
+			"DEVCTX_CONTEXT":    "personal",
+		},
+		WorkingDirectory: launcher.WorkingDirectory(fixture.workingDir),
+		DetachMode:       launcher.DetachModeDetached,
+	}
+	if !reflect.DeepEqual(processLauncher.requests, []launcher.ProcessRequest{wantRequest}) {
+		t.Fatalf("process requests = %#v, want %#v", processLauncher.requests, []launcher.ProcessRequest{wantRequest})
+	}
+
+	wantEditorRequest := editor.CommandRequest{
+		Config:      context.Editor,
+		Executable:  "/recording/code",
+		ProjectPath: fixture.workingDir,
+		Paths: editor.ContextPaths{
+			RootDir:     contextRoot,
+			DataDir:     filepath.Join(contextRoot, "vscode"),
+			UserDataDir: filepath.Join(contextRoot, "vscode", "user-data"),
+		},
+	}
+	if !reflect.DeepEqual(launchEditor.requests, []editor.CommandRequest{wantEditorRequest}) {
+		t.Fatalf("editor requests = %#v, want %#v", launchEditor.requests, []editor.CommandRequest{wantEditorRequest})
+	}
+}
+
+func TestRunnerRootLaunchRequiresMismatchConfirmation(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	fixture.writeContext(t, testCLIContext("personal", "Personal"))
+	fixture.writeContext(t, testCLIContext("company", "Company"))
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.workingDir),
+		ContextID:   devcontext.MustID("company"),
+		CreatedAt:   fixture.now,
+	})
+
+	processLauncher := &recordingProcessLauncher{}
+	runner := fixture.runner()
+	runner.Editor = &recordingCLIEditor{}
+	runner.ProcessLauncher = processLauncher
+	runner.ParentEnvironment = []string{"PATH=/usr/local/bin"}
+
+	result := runner.Run([]string{"--context", "personal", "."})
+	if result.Code != cli.ExitValidationError {
+		t.Fatalf("exit code = %d, want %d; stderr = %q", result.Code, cli.ExitValidationError, result.Stderr)
+	}
+	if !strings.Contains(result.Stderr, "Context mismatch requires confirmation") {
+		t.Fatalf("stderr = %q, want mismatch confirmation guidance", result.Stderr)
+	}
+	if len(processLauncher.requests) != 0 {
+		t.Fatalf("process requests = %#v, want none", processLauncher.requests)
+	}
+}
+
+func TestRunnerRootLaunchExecutesDirectCLIWithRecordingExecutable(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	fixture.writeContext(t, testCLIContext("personal", "Personal"))
+
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatalf("resolve test executable: %v", err)
+	}
+	recordPath := filepath.Join(fixture.root, "recording.txt")
+
+	runner := fixture.runner()
+	runner.Editor = recordingExecutableEditor{executable: executable}
+	runner.ProcessLauncher = launcher.NativeProcessLauncher{}
+	runner.ParentEnvironment = []string{
+		"DEVCTX_RECORDING_EXECUTABLE=1",
+		"DEVCTX_RECORDING_PATH=" + recordPath,
+		"PATH=/usr/local/bin",
+	}
+	runner.DetachMode = launcher.DetachModeAttached
+
+	result := runner.Run([]string{"--context", "personal", fixture.workingDir})
+	assertResult(t, result, cli.ExitSuccess, "Project:\n"+fixture.workingDir+"\n\nContext:\npersonal\n\nStatus:\nlaunched\n", "")
+
+	data, err := os.ReadFile(recordPath)
+	if err != nil {
+		t.Fatalf("read recording: %v", err)
+	}
+	recording := string(data)
+	contextRoot := filepath.Join(fixture.homeDir, ".devctx", "contexts", "personal")
+	for _, want := range []string{
+		"arg=-test.run=TestDirectCLIRecordingExecutableHelper\n",
+		"arg=--\n",
+		"arg=--user-data-dir\n",
+		"arg=" + filepath.Join(contextRoot, "vscode", "user-data") + "\n",
+		"arg=" + fixture.workingDir + "\n",
+		"env=personal\n",
+	} {
+		if !strings.Contains(recording, want) {
+			t.Fatalf("recording = %q, want containing %q", recording, want)
+		}
+	}
+}
+
+func TestRunnerRootLaunchKeepsSimultaneousContextsIsolated(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	fixture.writeContext(t, devcontext.DefaultPersonalContext(fixture.now))
+	fixture.writeContext(t, devcontext.DefaultCompanyContext(fixture.now))
+
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatalf("resolve test executable: %v", err)
+	}
+
+	isolationDir := fixture.mkdir(t, "isolation")
+	personalProject := fixture.mkdir(t, "projects", "personal")
+	companyProject := fixture.mkdir(t, "projects", "company")
+
+	baseRunner := fixture.runner()
+	baseRunner.Editor = simultaneousIsolationEditor{executable: executable}
+	baseRunner.ProcessLauncher = launcher.NativeProcessLauncher{}
+	baseRunner.ParentEnvironment = []string{
+		"DEVCTX_SIMULTANEOUS_ISOLATION_HELPER=1",
+		"DEVCTX_SIMULTANEOUS_ISOLATION_DIR=" + isolationDir,
+		"PATH=/usr/local/bin",
+	}
+	baseRunner.DetachMode = launcher.DetachModeAttached
+
+	type launchCase struct {
+		contextID string
+		project   string
+	}
+	cases := []launchCase{
+		{contextID: "personal", project: personalProject},
+		{contextID: "company", project: companyProject},
+	}
+
+	var wg sync.WaitGroup
+	outcomes := make(chan cli.Result, len(cases))
+	for _, launch := range cases {
+		launch := launch
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			runner := baseRunner
+			outcomes <- runner.Run([]string{"--context", launch.contextID, launch.project})
+		}()
+	}
+	wg.Wait()
+	close(outcomes)
+
+	for result := range outcomes {
+		if result.Code != cli.ExitSuccess {
+			t.Fatalf("exit code = %d, want %d; stderr = %q", result.Code, cli.ExitSuccess, result.Stderr)
+		}
+	}
+
+	personal := readSimultaneousIsolationRecord(t, filepath.Join(isolationDir, "personal.json"))
+	company := readSimultaneousIsolationRecord(t, filepath.Join(isolationDir, "company.json"))
+
+	assertDifferent(t, personal.CodexHome, company.CodexHome, "CODEX_HOME")
+	assertDifferent(t, personal.ClaudeConfigDir, company.ClaudeConfigDir, "CLAUDE_CONFIG_DIR")
+	assertDifferent(t, personal.DevContext, company.DevContext, "DEVCTX_CONTEXT")
+	assertDifferent(t, personal.UserDataDir, company.UserDataDir, editor.VSCodeUserDataDirFlag)
+	assertDifferent(t, personal.ProjectPath, company.ProjectPath, "project path")
+
+	assertContextOwnedMarker(t, personal, "personal")
+	assertContextOwnedMarker(t, company, "company")
+	assertNoContextOwnedMarker(t, personal, "company")
+	assertNoContextOwnedMarker(t, company, "personal")
+}
+
+func TestSimultaneousContextIsolationHelper(t *testing.T) {
+	if os.Getenv("DEVCTX_SIMULTANEOUS_ISOLATION_HELPER") != "1" {
+		return
+	}
+
+	contextID := os.Getenv("DEVCTX_CONTEXT")
+	isolationDir := os.Getenv("DEVCTX_SIMULTANEOUS_ISOLATION_DIR")
+	if contextID == "" || isolationDir == "" {
+		t.Fatal("missing simultaneous isolation helper environment")
+	}
+
+	if err := os.WriteFile(filepath.Join(isolationDir, contextID+".started"), []byte("started"), 0o600); err != nil {
+		t.Fatalf("write started marker: %v", err)
+	}
+	waitForSimultaneousIsolationPeer(t, isolationDir, "personal")
+	waitForSimultaneousIsolationPeer(t, isolationDir, "company")
+
+	args := argsAfterDoubleDash(os.Args)
+	userDataDir := argumentValue(args, editor.VSCodeUserDataDirFlag)
+	projectPath := lastArgument(args)
+	if userDataDir == "" || projectPath == "" {
+		t.Fatalf("invalid helper arguments: %#v", args)
+	}
+
+	record := simultaneousIsolationRecord{
+		DevContext:      contextID,
+		CodexHome:       os.Getenv(provider.CodexHomeEnvVar),
+		ClaudeConfigDir: os.Getenv(provider.ClaudeConfigDirEnvVar),
+		UserDataDir:     userDataDir,
+		ProjectPath:     projectPath,
+	}
+
+	writeContextOwnedMarker(t, record.CodexHome, contextID)
+	writeContextOwnedMarker(t, record.ClaudeConfigDir, contextID)
+	writeContextOwnedMarker(t, record.UserDataDir, contextID)
+	writeSimultaneousIsolationRecord(t, filepath.Join(isolationDir, contextID+".json"), record)
+	os.Exit(0)
+}
+
+func TestDirectCLIRecordingExecutableHelper(t *testing.T) {
+	if os.Getenv("DEVCTX_RECORDING_EXECUTABLE") != "1" {
+		return
+	}
+
+	var builder strings.Builder
+	for _, arg := range os.Args[1:] {
+		fmt.Fprintf(&builder, "arg=%s\n", arg)
+	}
+	fmt.Fprintf(&builder, "env=%s\n", os.Getenv("DEVCTX_CONTEXT"))
+
+	if err := os.WriteFile(os.Getenv("DEVCTX_RECORDING_PATH"), []byte(builder.String()), 0o600); err != nil {
+		os.Exit(1)
+	}
+	os.Exit(0)
+}
+
 func TestRunnerReturnsUsageExitCodeForInvalidCommandShapes(t *testing.T) {
 	fixture := newRunnerFixture(t)
 
@@ -250,6 +511,7 @@ func (f runnerFixture) runner() cli.Runner {
 		Contexts:         devcontext.NewRepository(f.contextsDir),
 		Projects:         project.NewRepository(f.bindingsPath, f.paths),
 		WorkingDirectory: f.workingDir,
+		Paths:            f.paths,
 		Now: func() time.Time {
 			return f.now
 		},
@@ -306,4 +568,216 @@ func assertResult(t *testing.T, got cli.Result, wantCode cli.ExitCode, wantStdou
 	if got.Stderr != wantStderr {
 		t.Fatalf("stderr = %q, want %q", got.Stderr, wantStderr)
 	}
+}
+
+type recordingCLIEditor struct {
+	requests []editor.CommandRequest
+}
+
+func (e *recordingCLIEditor) ID() editor.ID {
+	return editor.VSCodeID
+}
+
+func (e *recordingCLIEditor) DetectExecutable(editor.Config) (editor.Executable, error) {
+	return "/recording/code", nil
+}
+
+func (e *recordingCLIEditor) BuildLaunchCommand(request editor.CommandRequest) (editor.Command, error) {
+	e.requests = append(e.requests, request)
+	return editor.Command{
+		Executable: request.Executable,
+		Arguments: editor.Arguments{
+			editor.VSCodeUserDataDirFlag,
+			request.Paths.UserDataDir,
+			request.ProjectPath,
+		},
+	}, nil
+}
+
+type recordingProcessLauncher struct {
+	requests []launcher.ProcessRequest
+	err      error
+}
+
+func (l *recordingProcessLauncher) Launch(request launcher.ProcessRequest) error {
+	l.requests = append(l.requests, request)
+	return l.err
+}
+
+type recordingExecutableEditor struct {
+	executable string
+}
+
+func (e recordingExecutableEditor) ID() editor.ID {
+	return editor.VSCodeID
+}
+
+func (e recordingExecutableEditor) DetectExecutable(editor.Config) (editor.Executable, error) {
+	return editor.Executable(e.executable), nil
+}
+
+func (e recordingExecutableEditor) BuildLaunchCommand(request editor.CommandRequest) (editor.Command, error) {
+	return editor.Command{
+		Executable: request.Executable,
+		Arguments: editor.Arguments{
+			"-test.run=TestDirectCLIRecordingExecutableHelper",
+			"--",
+			editor.VSCodeUserDataDirFlag,
+			request.Paths.UserDataDir,
+			request.ProjectPath,
+		},
+	}, nil
+}
+
+type simultaneousIsolationEditor struct {
+	executable string
+}
+
+func (e simultaneousIsolationEditor) ID() editor.ID {
+	return editor.VSCodeID
+}
+
+func (e simultaneousIsolationEditor) DetectExecutable(editor.Config) (editor.Executable, error) {
+	return editor.Executable(e.executable), nil
+}
+
+func (e simultaneousIsolationEditor) BuildLaunchCommand(request editor.CommandRequest) (editor.Command, error) {
+	return editor.Command{
+		Executable: request.Executable,
+		Arguments: editor.Arguments{
+			"-test.run=TestSimultaneousContextIsolationHelper",
+			"--",
+			editor.VSCodeUserDataDirFlag,
+			request.Paths.UserDataDir,
+			request.ProjectPath,
+		},
+	}, nil
+}
+
+type simultaneousIsolationRecord struct {
+	DevContext      string `json:"devctx_context"`
+	CodexHome       string `json:"codex_home"`
+	ClaudeConfigDir string `json:"claude_config_dir"`
+	UserDataDir     string `json:"user_data_dir"`
+	ProjectPath     string `json:"project_path"`
+}
+
+func writeSimultaneousIsolationRecord(t *testing.T, path string, record simultaneousIsolationRecord) {
+	t.Helper()
+
+	data, err := json.Marshal(record)
+	if err != nil {
+		t.Fatalf("marshal simultaneous isolation record: %v", err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("write simultaneous isolation record: %v", err)
+	}
+}
+
+func readSimultaneousIsolationRecord(t *testing.T, path string) simultaneousIsolationRecord {
+	t.Helper()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read simultaneous isolation record: %v", err)
+	}
+
+	var record simultaneousIsolationRecord
+	if err := json.Unmarshal(data, &record); err != nil {
+		t.Fatalf("decode simultaneous isolation record: %v", err)
+	}
+	return record
+}
+
+func assertDifferent(t *testing.T, first string, second string, label string) {
+	t.Helper()
+
+	if first == "" || second == "" {
+		t.Fatalf("%s values must both be present: %q, %q", label, first, second)
+	}
+	if first == second {
+		t.Fatalf("%s = %q for both launches, want isolated values", label, first)
+	}
+}
+
+func assertContextOwnedMarker(t *testing.T, record simultaneousIsolationRecord, contextID string) {
+	t.Helper()
+
+	for _, dir := range []string{record.CodexHome, record.ClaudeConfigDir, record.UserDataDir} {
+		data, err := os.ReadFile(filepath.Join(dir, contextID+".txt"))
+		if err != nil {
+			t.Fatalf("read %s marker in %q: %v", contextID, dir, err)
+		}
+		if string(data) != contextID {
+			t.Fatalf("marker in %q = %q, want %q", dir, string(data), contextID)
+		}
+	}
+}
+
+func assertNoContextOwnedMarker(t *testing.T, record simultaneousIsolationRecord, contextID string) {
+	t.Helper()
+
+	for _, dir := range []string{record.CodexHome, record.ClaudeConfigDir, record.UserDataDir} {
+		path := filepath.Join(dir, contextID+".txt")
+		if _, err := os.Stat(path); err == nil {
+			t.Fatalf("unexpected %s marker in %q", contextID, dir)
+		} else if !os.IsNotExist(err) {
+			t.Fatalf("inspect %s marker in %q: %v", contextID, dir, err)
+		}
+	}
+}
+
+func writeContextOwnedMarker(t *testing.T, dir string, contextID string) {
+	t.Helper()
+
+	if dir == "" {
+		t.Fatalf("missing context-owned directory for %s", contextID)
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("create context-owned directory %q: %v", dir, err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, contextID+".txt"), []byte(contextID), 0o600); err != nil {
+		t.Fatalf("write %s marker in %q: %v", contextID, dir, err)
+	}
+}
+
+func waitForSimultaneousIsolationPeer(t *testing.T, isolationDir string, contextID string) {
+	t.Helper()
+
+	path := filepath.Join(isolationDir, contextID+".started")
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(path); err == nil {
+			return
+		} else if !os.IsNotExist(err) {
+			t.Fatalf("inspect started marker %q: %v", path, err)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %s launch to start", contextID)
+}
+
+func argsAfterDoubleDash(args []string) []string {
+	for index, arg := range args {
+		if arg == "--" {
+			return append([]string(nil), args[index+1:]...)
+		}
+	}
+	return nil
+}
+
+func argumentValue(args []string, flag string) string {
+	for index, arg := range args {
+		if arg == flag && index+1 < len(args) {
+			return args[index+1]
+		}
+	}
+	return ""
+}
+
+func lastArgument(args []string) string {
+	if len(args) == 0 {
+		return ""
+	}
+	return args[len(args)-1]
 }
