@@ -25,6 +25,7 @@ args=(
   build
   -clean
   -trimpath
+  -v 2
   -ldflags "${ldflags}"
 )
 
