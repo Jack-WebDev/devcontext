@@ -1,0 +1,183 @@
+package context_test
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"reflect"
+	"testing"
+	"time"
+
+	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/editor"
+	"devctx/packages/core/provider"
+)
+
+func TestRepositoryWriteAndGetContext(t *testing.T) {
+	contextsDir := t.TempDir()
+	repository := devcontext.NewRepository(contextsDir)
+	ctx := storedContext("client-a", "Client A")
+	createContextDir(t, contextsDir, ctx.ID)
+
+	if err := repository.Write(ctx); err != nil {
+		t.Fatalf("write context: %v", err)
+	}
+
+	got, err := repository.Get(ctx.ID)
+	if err != nil {
+		t.Fatalf("get context: %v", err)
+	}
+	if !reflect.DeepEqual(got, ctx) {
+		t.Fatalf("stored context = %#v, want %#v", got, ctx)
+	}
+}
+
+func TestRepositoryListReturnsEmptyForNoContexts(t *testing.T) {
+	repository := devcontext.NewRepository(t.TempDir())
+
+	contexts, err := repository.List()
+	if err != nil {
+		t.Fatalf("list contexts: %v", err)
+	}
+	if len(contexts) != 0 {
+		t.Fatalf("context count = %d, want 0", len(contexts))
+	}
+}
+
+func TestRepositoryListReturnsContextsInDeterministicOrder(t *testing.T) {
+	contextsDir := t.TempDir()
+	repository := devcontext.NewRepository(contextsDir)
+	company := storedContext("company", "Company")
+	personal := storedContext("personal", "Personal")
+	client := storedContext("client-a", "Client A")
+
+	writeStoredContext(t, contextsDir, repository, personal)
+	writeStoredContext(t, contextsDir, repository, company)
+	writeStoredContext(t, contextsDir, repository, client)
+
+	contexts, err := repository.List()
+	if err != nil {
+		t.Fatalf("list contexts: %v", err)
+	}
+
+	want := []devcontext.Context{client, company, personal}
+	if !reflect.DeepEqual(contexts, want) {
+		t.Fatalf("contexts = %#v, want %#v", contexts, want)
+	}
+}
+
+func TestRepositoryListSkipsMalformedEntries(t *testing.T) {
+	contextsDir := t.TempDir()
+	repository := devcontext.NewRepository(contextsDir)
+	valid := storedContext("personal", "Personal")
+
+	writeStoredContext(t, contextsDir, repository, valid)
+	writeFile(t, filepath.Join(contextsDir, "not-a-context"), []byte("ignored"))
+	createContextDir(t, contextsDir, devcontext.MustID("broken"))
+	writeFile(t, filepath.Join(contextsDir, "broken", "context.toml"), []byte("id = "))
+	createContextDir(t, contextsDir, devcontext.MustID("missing-config"))
+	createContextDir(t, contextsDir, devcontext.MustID("mismatch"))
+	writeFile(t, filepath.Join(contextsDir, "mismatch", "context.toml"), []byte(`
+id = "company"
+name = "Company"
+created_at = 2026-08-13T12:30:00Z
+
+[editor]
+type = "vscode"
+`))
+	if err := os.Mkdir(filepath.Join(contextsDir, "Invalid"), 0o700); err != nil {
+		t.Fatalf("create invalid ID dir: %v", err)
+	}
+
+	contexts, err := repository.List()
+	if err != nil {
+		t.Fatalf("list contexts: %v", err)
+	}
+
+	want := []devcontext.Context{valid}
+	if !reflect.DeepEqual(contexts, want) {
+		t.Fatalf("contexts = %#v, want %#v", contexts, want)
+	}
+}
+
+func TestRepositoryGetDistinguishesErrorCategories(t *testing.T) {
+	contextsDir := t.TempDir()
+	repository := devcontext.NewRepository(contextsDir)
+
+	_, err := repository.Get(devcontext.ID{})
+	if !errors.Is(err, devcontext.ErrInvalidID) {
+		t.Fatalf("invalid ID error = %v, want %v", err, devcontext.ErrInvalidID)
+	}
+
+	_, err = repository.Get(devcontext.MustID("missing"))
+	if !errors.Is(err, devcontext.ErrContextNotFound) {
+		t.Fatalf("not found error = %v, want %v", err, devcontext.ErrContextNotFound)
+	}
+
+	unreadableID := devcontext.MustID("unreadable")
+	createContextDir(t, contextsDir, unreadableID)
+	if err := os.Mkdir(filepath.Join(contextsDir, unreadableID.String(), "context.toml"), 0o700); err != nil {
+		t.Fatalf("create unreadable context config: %v", err)
+	}
+	_, err = repository.Get(unreadableID)
+	if !errors.Is(err, devcontext.ErrUnreadableContextConfig) {
+		t.Fatalf("unreadable config error = %v, want %v", err, devcontext.ErrUnreadableContextConfig)
+	}
+}
+
+func TestRepositoryGetWrapsMalformedConfigAsUnreadable(t *testing.T) {
+	contextsDir := t.TempDir()
+	repository := devcontext.NewRepository(contextsDir)
+	contextID := devcontext.MustID("broken")
+	createContextDir(t, contextsDir, contextID)
+	writeFile(t, filepath.Join(contextsDir, contextID.String(), "context.toml"), []byte("id = "))
+
+	_, err := repository.Get(contextID)
+	if !errors.Is(err, devcontext.ErrUnreadableContextConfig) {
+		t.Fatalf("error = %v, want %v", err, devcontext.ErrUnreadableContextConfig)
+	}
+	if !errors.Is(err, devcontext.ErrInvalidContextConfig) {
+		t.Fatalf("error = %v, want %v", err, devcontext.ErrInvalidContextConfig)
+	}
+}
+
+func writeStoredContext(t *testing.T, contextsDir string, repository devcontext.Repository, ctx devcontext.Context) {
+	t.Helper()
+
+	createContextDir(t, contextsDir, ctx.ID)
+	if err := repository.Write(ctx); err != nil {
+		t.Fatalf("write context %q: %v", ctx.ID, err)
+	}
+}
+
+func createContextDir(t *testing.T, contextsDir string, contextID devcontext.ID) {
+	t.Helper()
+
+	if err := os.MkdirAll(filepath.Join(contextsDir, contextID.String()), 0o700); err != nil {
+		t.Fatalf("create context dir %q: %v", contextID, err)
+	}
+}
+
+func writeFile(t *testing.T, path string, data []byte) {
+	t.Helper()
+
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func storedContext(id string, name string) devcontext.Context {
+	return devcontext.Context{
+		ID:     devcontext.MustID(id),
+		Name:   name,
+		Editor: editor.DefaultConfig(),
+		Providers: provider.Configs{
+			"claude": {Enabled: true},
+			"codex":  {Enabled: true},
+		},
+		Metadata: devcontext.Metadata{
+			"kind": "test",
+		},
+		CreatedAt: time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC),
+	}
+}
