@@ -51,6 +51,12 @@ func RenderError(err error, debug bool) string {
 func classifyError(err error) renderedError {
 	var globalConfigFileError *config.GlobalConfigFileError
 	var contextMismatchError *launcher.ContextMismatchError
+	var storagePermission storagePermissionDetails
+	var projectPathError *project.PathError
+	var missingContextError *devcontext.MissingContextError
+	var contextStorageError *filesystem.ContextStorageError
+	var executableNotFound *editor.ExecutableNotFoundError
+	var processLaunchError *launcher.ProcessLaunchError
 	switch {
 	case errors.As(err, &globalConfigFileError):
 		return renderedError{
@@ -84,6 +90,12 @@ func classifyError(err error) renderedError {
 			Why:      "No explicit context or trusted project binding selected a context.",
 			Recovery: "Choose a context in the selector or rerun with `--context <id>`.",
 		}
+	case errors.As(err, &storagePermission):
+		return renderedError{
+			Title:    "Unable to access local storage",
+			Why:      storagePermissionWhy(storagePermission),
+			Recovery: "Check ownership and permissions for the affected path, then retry.",
+		}
 	case errors.Is(err, ErrInvalidCommand), errors.Is(err, ErrUnknownCommand):
 		return renderedError{
 			Title:    "Unable to parse command",
@@ -96,11 +108,23 @@ func classifyError(err error) renderedError {
 			Why:      "The context ID is not filesystem-safe.",
 			Recovery: "Use lowercase letters, digits, and hyphens only, starting and ending with a letter or digit.",
 		}
+	case errors.As(err, &missingContextError):
+		return renderedError{
+			Title:    "Unable to find context",
+			Why:      fmt.Sprintf("Context %q is not configured on this machine.", missingContextError.ContextID.String()),
+			Recovery: missingContextRecovery(missingContextError.AvailableIDs),
+		}
 	case errors.Is(err, devcontext.ErrContextNotFound):
 		return renderedError{
 			Title:    "Unable to find context",
 			Why:      "The requested context is not configured on this machine.",
 			Recovery: "Run `devctx context list` to see available contexts, then retry with one of those IDs.",
+		}
+	case errors.As(err, &contextStorageError):
+		return renderedError{
+			Title:    "Context storage is incomplete",
+			Why:      contextStorageWhy(contextStorageError),
+			Recovery: "Repair or recreate the context before launching. Dev Context will not recreate incomplete context storage automatically.",
 		}
 	case errors.Is(err, devcontext.ErrUnreadableContextConfig), errors.Is(err, devcontext.ErrInvalidContextConfig), errors.Is(err, devcontext.ErrContextIDMismatch):
 		return renderedError{
@@ -108,6 +132,8 @@ func classifyError(err error) renderedError {
 			Why:      "A stored context configuration is missing, malformed, or does not match its directory.",
 			Recovery: "Inspect the affected context.toml file or recreate the context.",
 		}
+	case errors.As(err, &projectPathError):
+		return projectPathRenderedError(projectPathError)
 	case errors.Is(err, project.ErrProjectDirectoryNotFound):
 		return renderedError{
 			Title:    "Unable to open project",
@@ -150,6 +176,12 @@ func classifyError(err error) renderedError {
 			Why:      "The current user's home directory could not be determined.",
 			Recovery: "Check the user environment and try again.",
 		}
+	case errors.As(err, &executableNotFound) && executableNotFound.EditorID == editor.VSCodeID:
+		return renderedError{
+			Title:    "VS Code command not found",
+			Why:      missingVSCodeWhy(executableNotFound.Candidates),
+			Recovery: missingVSCodeRecovery(executableNotFound.Candidates),
+		}
 	case errors.Is(err, editor.ErrExecutableNotFound):
 		return renderedError{
 			Title:    "Unable to launch editor",
@@ -167,6 +199,12 @@ func classifyError(err error) renderedError {
 			Title:    "Unable to launch editor",
 			Why:      "No editor executable was resolved for the selected context.",
 			Recovery: "Configure an editor executable or install the editor command on PATH.",
+		}
+	case errors.As(err, &processLaunchError) && errors.Is(err, launcher.ErrProcessExecutableNotFound):
+		return renderedError{
+			Title:    "VS Code command not found",
+			Why:      processExecutableWhy(processLaunchError),
+			Recovery: "Install the VS Code command line launcher, add it to PATH, or set editor.executable_override in the context to a valid VS Code CLI path.",
 		}
 	case errors.Is(err, launcher.ErrProcessExecutableNotFound):
 		return renderedError{
@@ -219,6 +257,118 @@ func classifyError(err error) renderedError {
 	}
 }
 
+type storagePermissionDetails interface {
+	StorageOperation() string
+	StoragePath() string
+}
+
 func redactSensitiveValues(value string) string {
 	return sensitiveAssignmentPattern.ReplaceAllString(value, "$1=<redacted>")
+}
+
+func storagePermissionWhy(err storagePermissionDetails) string {
+	operation := strings.TrimSpace(err.StorageOperation())
+	path := strings.TrimSpace(err.StoragePath())
+	switch {
+	case operation != "" && path != "":
+		return fmt.Sprintf("The operating system denied permission to %s at %q.", operation, path)
+	case path != "":
+		return fmt.Sprintf("The operating system denied permission at %q.", path)
+	default:
+		return "The operating system denied permission to a required file or directory."
+	}
+}
+
+func missingContextRecovery(availableIDs []devcontext.ID) string {
+	if len(availableIDs) == 0 {
+		return "Create the context or run `devctx context list` to see available contexts, then retry."
+	}
+	return fmt.Sprintf("Retry with one of these context IDs: %s.", strings.Join(contextIDStrings(availableIDs), ", "))
+}
+
+func contextStorageWhy(err *filesystem.ContextStorageError) string {
+	if err == nil || len(err.Missing) == 0 {
+		return "The selected context is missing required storage directories."
+	}
+
+	entries := make([]string, 0, len(err.Missing))
+	for _, missing := range err.Missing {
+		if missing.Reason == "" {
+			entries = append(entries, fmt.Sprintf("%s %q", missing.Kind, missing.Path))
+			continue
+		}
+		entries = append(entries, fmt.Sprintf("%s %q (%s)", missing.Kind, missing.Path, missing.Reason))
+	}
+	return fmt.Sprintf("Context %q is missing required storage directories: %s.", err.ContextID.String(), strings.Join(entries, "; "))
+}
+
+func projectPathRenderedError(err *project.PathError) renderedError {
+	path := strings.TrimSpace(err.Path)
+	if path == "" {
+		path = "the supplied path"
+	}
+
+	switch {
+	case errors.Is(err, project.ErrProjectDirectoryNotFound):
+		return renderedError{
+			Title:    "Unable to open project",
+			Why:      fmt.Sprintf("The project path %q does not exist.", path),
+			Recovery: "Create the directory or pass an existing project directory.",
+		}
+	case errors.Is(err, project.ErrProjectPathNotDirectory):
+		return renderedError{
+			Title:    "Unable to open project",
+			Why:      fmt.Sprintf("The project path %q points to a file, not a directory.", path),
+			Recovery: "Pass a project directory or run the command from inside one.",
+		}
+	case errors.Is(err, project.ErrProjectDirectoryUnreadable):
+		return renderedError{
+			Title:    "Unable to open project",
+			Why:      fmt.Sprintf("Dev Context cannot read the project directory %q.", path),
+			Recovery: "Check directory permissions and try again.",
+		}
+	case errors.Is(err, project.ErrInvalidProjectPath):
+		return renderedError{
+			Title:    "Unable to use project path",
+			Why:      fmt.Sprintf("The project path %q cannot be resolved to a valid absolute path.", path),
+			Recovery: "Pass a valid project directory path.",
+		}
+	default:
+		return renderedError{
+			Title:    "Unable to use project path",
+			Why:      fmt.Sprintf("Dev Context could not use project path %q.", path),
+			Recovery: "Check the project path and try again.",
+		}
+	}
+}
+
+func missingVSCodeWhy(candidates []string) string {
+	if len(candidates) == 0 {
+		return "Dev Context expected the VS Code CLI command `code` but could not find it on PATH."
+	}
+	return fmt.Sprintf("Dev Context expected the VS Code CLI command on PATH and checked: `%s`.", strings.Join(candidates, "`, `"))
+}
+
+func missingVSCodeRecovery(candidates []string) string {
+	expected := "`code`"
+	if len(candidates) > 0 {
+		expected = "`" + strings.Join(candidates, "`, `") + "`"
+	}
+	return fmt.Sprintf("Install the VS Code command line launcher so %s is on PATH, or set editor.executable_override in the context to a valid VS Code CLI path.", expected)
+}
+
+func processExecutableWhy(err *launcher.ProcessLaunchError) string {
+	executable := strings.TrimSpace(string(err.Executable))
+	if executable == "" {
+		return "Dev Context could not find the configured VS Code command."
+	}
+	return fmt.Sprintf("Dev Context could not find the configured VS Code command %q.", executable)
+}
+
+func contextIDStrings(ids []devcontext.ID) []string {
+	values := make([]string, len(ids))
+	for i, id := range ids {
+		values[i] = id.String()
+	}
+	return values
 }

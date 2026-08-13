@@ -121,6 +121,59 @@ func TestCreateContextDirectoryTreeRejectsDuplicateWithoutModifyingTree(t *testi
 	}
 }
 
+func TestValidateContextDirectoryTreeReportsIncompleteStorage(t *testing.T) {
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return t.TempDir(), nil
+	})
+	contextID := devcontext.MustID("client-a")
+	contextPaths, err := filesystem.DeriveContextPaths(platformPaths, contextID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	ctx := contextTreeContext(contextID, "Client A")
+	if err := filesystem.CreateContextDirectoryTree(contextPaths, ctx); err != nil {
+		t.Fatalf("create context directory tree: %v", err)
+	}
+	if err := os.RemoveAll(contextPaths.CodexDir); err != nil {
+		t.Fatalf("remove codex dir: %v", err)
+	}
+	if err := os.RemoveAll(contextPaths.VSCodeDir); err != nil {
+		t.Fatalf("remove vscode dir: %v", err)
+	}
+	if err := os.WriteFile(contextPaths.VSCodeDir, []byte("not a directory"), 0o600); err != nil {
+		t.Fatalf("write vscode file: %v", err)
+	}
+
+	err = filesystem.ValidateContextDirectoryTree(contextPaths)
+	if !errors.Is(err, filesystem.ErrContextStorageIncomplete) {
+		t.Fatalf("error = %v, want %v", err, filesystem.ErrContextStorageIncomplete)
+	}
+	var storageErr *filesystem.ContextStorageError
+	if !errors.As(err, &storageErr) {
+		t.Fatalf("error = %T, want *filesystem.ContextStorageError", err)
+	}
+	wantMissing := []filesystem.MissingContextDirectory{
+		{
+			Kind:   filesystem.ContextDirectoryCodex,
+			Path:   contextPaths.CodexDir,
+			Reason: "missing",
+		},
+		{
+			Kind:   filesystem.ContextDirectoryVSCode,
+			Path:   contextPaths.VSCodeDir,
+			Reason: "not a directory",
+		},
+		{
+			Kind:   filesystem.ContextDirectoryVSCodeUserData,
+			Path:   contextPaths.VSCodeUserDataDir,
+			Reason: "missing",
+		},
+	}
+	if !reflect.DeepEqual(storageErr.Missing, wantMissing) {
+		t.Fatalf("missing directories = %#v, want %#v", storageErr.Missing, wantMissing)
+	}
+}
+
 func TestBootstrapDefaultContextsCreateLoadableSeeds(t *testing.T) {
 	homeDir := t.TempDir()
 	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {

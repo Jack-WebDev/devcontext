@@ -2,6 +2,7 @@ package logging
 
 import (
 	"errors"
+	"os"
 	"time"
 
 	"devctx/packages/core/config"
@@ -92,9 +93,12 @@ func CategoryForError(err error) ErrorCategory {
 		return ""
 	case errors.Is(err, config.ErrInvalidGlobalConfig), errors.Is(err, config.ErrUnsupportedSchemaVersion):
 		return ErrorCategoryConfiguration
+	case errors.Is(err, filesystem.ErrStoragePermissionDenied):
+		return ErrorCategoryPermission
 	case errors.Is(err, devcontext.ErrInvalidID), errors.Is(err, devcontext.ErrContextNotFound),
 		errors.Is(err, devcontext.ErrUnreadableContextConfig), errors.Is(err, devcontext.ErrInvalidContextConfig),
-		errors.Is(err, devcontext.ErrContextIDMismatch), errors.Is(err, launcher.ErrLaunchSelectionRequired):
+		errors.Is(err, devcontext.ErrContextIDMismatch), errors.Is(err, filesystem.ErrContextStorageIncomplete),
+		errors.Is(err, launcher.ErrLaunchSelectionRequired):
 		if errors.Is(err, launcher.ErrLaunchSelectionRequired) {
 			return ErrorCategorySelection
 		}
@@ -133,5 +137,7 @@ func LaunchEventNameForError(err error) EventName {
 }
 
 func isPermissionError(err error) bool {
-	return errors.Is(err, filesystem.ErrUserHomeUnavailable)
+	return errors.Is(err, filesystem.ErrUserHomeUnavailable) ||
+		os.IsPermission(err) ||
+		errors.Is(err, os.ErrPermission)
 }

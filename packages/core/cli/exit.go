@@ -77,6 +77,8 @@ func isValidationError(err error) bool {
 		errors.Is(err, devcontext.ErrContextIDMismatch) ||
 		errors.Is(err, config.ErrInvalidGlobalConfig) ||
 		errors.Is(err, config.ErrUnsupportedSchemaVersion) ||
+		errors.Is(err, filesystem.ErrContextStorageIncomplete) ||
+		errors.Is(err, filesystem.ErrStoragePermissionDenied) ||
 		errors.Is(err, filesystem.ErrUserHomeUnavailable) ||
 		errors.Is(err, launcher.ErrContextMismatchRequiresConfirmation) ||
 		errors.Is(err, launcher.ErrLaunchSelectionRequired) ||

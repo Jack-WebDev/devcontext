@@ -2,6 +2,8 @@ package launcher_test
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -33,6 +35,16 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 		},
 	}
 
+	devContextHome := filepath.Join(t.TempDir(), ".devctx")
+	platformPaths := fakePlanPlatformPaths{
+		devContextHome: devContextHome,
+	}
+	contextPaths, err := filesystem.DeriveContextPaths(platformPaths, context.ID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	createContextDirectories(t, contextPaths)
+
 	fakeEditor := &builderFakeEditor{}
 	builder := launcher.LaunchPlanBuilder{
 		Resolver: fakePlanResolver{
@@ -42,9 +54,7 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 				Warnings: warnings,
 			},
 		},
-		PlatformPaths: fakePlanPlatformPaths{
-			devContextHome: "/home/alex/.devctx",
-		},
+		PlatformPaths: platformPaths,
 		Providers: []provider.Provider{
 			builderFakeProvider{id: "fake"},
 			builderFakeProvider{id: "disabled"},
@@ -72,24 +82,16 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 		Context:          context,
 		Editor:           context.Editor,
 		Executable:       launcher.Executable("/usr/local/bin/fake-editor"),
-		Arguments:        launcher.Arguments{"--state-dir", "/home/alex/.devctx/contexts/client-a/vscode/user-data", projectDir},
+		Arguments:        launcher.Arguments{"--state-dir", contextPaths.VSCodeUserDataDir, projectDir},
 		WorkingDirectory: launcher.WorkingDirectory(projectDir),
 		Environment: launcher.Environment{
 			"PATH":           "/usr/local/bin",
 			"CODEX_HOME":     "/old/codex",
 			"DEVCTX_CONTEXT": "client-a",
 			"FAKE_CONTEXT":   "client-a",
-			"FAKE_ROOT":      "/home/alex/.devctx/contexts/client-a",
+			"FAKE_ROOT":      contextPaths.RootDir,
 		},
-		ContextPaths: filesystem.ContextPaths{
-			ContextID:         devcontext.MustID("client-a"),
-			RootDir:           "/home/alex/.devctx/contexts/client-a",
-			ConfigPath:        "/home/alex/.devctx/contexts/client-a/context.toml",
-			ClaudeDir:         "/home/alex/.devctx/contexts/client-a/claude",
-			CodexDir:          "/home/alex/.devctx/contexts/client-a/codex",
-			VSCodeDir:         "/home/alex/.devctx/contexts/client-a/vscode",
-			VSCodeUserDataDir: "/home/alex/.devctx/contexts/client-a/vscode/user-data",
-		},
+		ContextPaths:     contextPaths,
 		Warnings:         warnings,
 		ResolutionSource: launcher.ResolutionSourceExplicit,
 	}
@@ -102,13 +104,29 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 		Executable:  "/usr/local/bin/fake-editor",
 		ProjectPath: projectDir,
 		Paths: editor.ContextPaths{
-			RootDir:     "/home/alex/.devctx/contexts/client-a",
-			DataDir:     "/home/alex/.devctx/contexts/client-a/vscode",
-			UserDataDir: "/home/alex/.devctx/contexts/client-a/vscode/user-data",
+			RootDir:     contextPaths.RootDir,
+			DataDir:     contextPaths.VSCodeDir,
+			UserDataDir: contextPaths.VSCodeUserDataDir,
 		},
 	}
 	if !reflect.DeepEqual(fakeEditor.commandRequests, []editor.CommandRequest{wantEditorRequest}) {
 		t.Fatalf("editor requests = %#v, want %#v", fakeEditor.commandRequests, []editor.CommandRequest{wantEditorRequest})
+	}
+}
+
+func createContextDirectories(t *testing.T, paths filesystem.ContextPaths) {
+	t.Helper()
+
+	for _, dir := range []string{
+		paths.RootDir,
+		paths.ClaudeDir,
+		paths.CodexDir,
+		paths.VSCodeDir,
+		paths.VSCodeUserDataDir,
+	} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatalf("create context directory %q: %v", dir, err)
+		}
 	}
 }
 
@@ -129,6 +147,50 @@ func TestLaunchPlanBuilderRequiresResolvedContext(t *testing.T) {
 	})
 	if !errors.Is(err, launcher.ErrLaunchSelectionRequired) {
 		t.Fatalf("error = %v, want %v", err, launcher.ErrLaunchSelectionRequired)
+	}
+}
+
+func TestLaunchPlanBuilderRejectsIncompleteContextStorage(t *testing.T) {
+	projectDir := t.TempDir()
+	context := devcontext.Context{
+		ID:        devcontext.MustID("personal"),
+		Name:      "Personal",
+		Editor:    editor.DefaultConfig(),
+		CreatedAt: time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC),
+	}
+	platformPaths := fakePlanPlatformPaths{
+		devContextHome: filepath.Join(t.TempDir(), ".devctx"),
+	}
+	contextPaths, err := filesystem.DeriveContextPaths(platformPaths, context.ID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	createContextDirectories(t, contextPaths)
+	if err := os.RemoveAll(contextPaths.CodexDir); err != nil {
+		t.Fatalf("remove codex dir: %v", err)
+	}
+	fakeEditor := &builderFakeEditor{}
+
+	builder := launcher.LaunchPlanBuilder{
+		Resolver: fakePlanResolver{
+			result: launcher.ResolutionResult{
+				Context: &context,
+				Source:  launcher.ResolutionSourceExplicit,
+			},
+		},
+		PlatformPaths: platformPaths,
+		Editor:        fakeEditor,
+	}
+
+	_, err = builder.Build(launcher.LaunchRequest{
+		ProjectPath:      project.Path(projectDir),
+		RequestedContext: &context.ID,
+	})
+	if !errors.Is(err, filesystem.ErrContextStorageIncomplete) {
+		t.Fatalf("error = %v, want %v", err, filesystem.ErrContextStorageIncomplete)
+	}
+	if len(fakeEditor.commandRequests) != 0 {
+		t.Fatalf("editor requests = %#v, want none", fakeEditor.commandRequests)
 	}
 }
 

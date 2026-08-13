@@ -77,6 +77,9 @@ func (p *DefaultStoragePermissions) apply(path string, mode os.FileMode, kind st
 		return nil
 	}
 	if err := p.chmod(path, mode); err != nil {
+		if wrapped := WrapStoragePermissionError("set "+kind+" permissions", path, err); wrapped != err {
+			return wrapped
+		}
 		return fmt.Errorf("apply storage permissions to %s %q: %w", kind, path, err)
 	}
 	return nil

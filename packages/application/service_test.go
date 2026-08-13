@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -229,6 +230,78 @@ func TestNewErrorReturnsPresentationSafeTypedErrors(t *testing.T) {
 
 	if got := NewError(nil); got != nil {
 		t.Fatalf("nil error = %#v, want nil", got)
+	}
+}
+
+func TestNewErrorReturnsActionableRecoveryDetails(t *testing.T) {
+	tests := []struct {
+		name         string
+		err          error
+		wantCode     ErrorCode
+		wantMessage  string
+		wantRecovery []string
+	}{
+		{
+			name: "project path",
+			err: &project.PathError{
+				Path: "/missing/project",
+				Err:  project.ErrProjectDirectoryNotFound,
+			},
+			wantCode:     ErrorCodeValidation,
+			wantMessage:  "Project path does not exist.",
+			wantRecovery: []string{"/missing/project", "existing project directory"},
+		},
+		{
+			name: "missing context",
+			err: &devcontext.MissingContextError{
+				ContextID: devcontext.MustID("client-a"),
+				AvailableIDs: []devcontext.ID{
+					devcontext.MustID("company"),
+					devcontext.MustID("personal"),
+				},
+			},
+			wantCode:     ErrorCodeValidation,
+			wantMessage:  `Context "client-a" does not exist.`,
+			wantRecovery: []string{"company", "personal", "will not launch under a different context"},
+		},
+		{
+			name: "missing vscode command",
+			err: &editor.ExecutableNotFoundError{
+				EditorID:   editor.VSCodeID,
+				Candidates: []string{"code"},
+			},
+			wantCode:     ErrorCodeLaunch,
+			wantMessage:  "VS Code command not found.",
+			wantRecovery: []string{"VS Code command line launcher", "code", "editor.executable_override"},
+		},
+		{
+			name: "storage permission",
+			err: &filesystem.StoragePermissionError{
+				Operation: "write file",
+				Path:      "/home/alex/.devctx/projects.toml",
+				Err:       os.ErrPermission,
+			},
+			wantCode:     ErrorCodeValidation,
+			wantMessage:  "Unable to access local storage.",
+			wantRecovery: []string{"write file", "/home/alex/.devctx/projects.toml", "permissions"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NewError(tt.err)
+			if got.Code != tt.wantCode {
+				t.Fatalf("code = %q, want %q", got.Code, tt.wantCode)
+			}
+			if got.Message != tt.wantMessage {
+				t.Fatalf("message = %q, want %q", got.Message, tt.wantMessage)
+			}
+			for _, want := range tt.wantRecovery {
+				if !strings.Contains(got.Recovery, want) {
+					t.Fatalf("recovery = %q, want containing %q", got.Recovery, want)
+				}
+			}
+		})
 	}
 }
 

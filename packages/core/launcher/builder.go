@@ -73,6 +73,9 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 	if err != nil {
 		return LaunchPlan{}, err
 	}
+	if err := filesystem.ValidateContextDirectoryTree(contextPaths); err != nil {
+		return LaunchPlan{}, err
+	}
 
 	contributions, missingProviderIDs, err := b.providerContributions(*resolution.Context, contextPaths)
 	if err != nil {

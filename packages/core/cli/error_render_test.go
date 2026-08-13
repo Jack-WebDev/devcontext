@@ -2,7 +2,6 @@ package cli_test
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -11,6 +10,7 @@ import (
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/editor"
+	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
 )
@@ -23,14 +23,19 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 	}{
 		{
 			name: "missing project path",
-			err:  fmt.Errorf("validate project: %w: /missing/project", project.ErrProjectDirectoryNotFound),
+			err: &project.PathError{
+				Path:      "/missing/project",
+				Operation: "inspect",
+				Err:       project.ErrProjectDirectoryNotFound,
+				Cause:     os.ErrNotExist,
+			},
 			want: "" +
 				"Unable to open project\n" +
 				"\n" +
-				"The project path does not exist.\n" +
+				"The project path \"/missing/project\" does not exist.\n" +
 				"\n" +
 				"Next step:\n" +
-				"Check the path and run the command from an existing project directory.\n",
+				"Create the directory or pass an existing project directory.\n",
 		},
 		{
 			name: "corrupt config",
@@ -50,25 +55,55 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 		},
 		{
 			name: "missing context",
-			err:  fmt.Errorf("validate target context %q: %w", "personal", devcontext.ErrContextNotFound),
+			err: &devcontext.MissingContextError{
+				ContextID: devcontext.MustID("client-a"),
+				AvailableIDs: []devcontext.ID{
+					devcontext.MustID("company"),
+					devcontext.MustID("personal"),
+				},
+			},
 			want: "" +
 				"Unable to find context\n" +
 				"\n" +
-				"The requested context is not configured on this machine.\n" +
+				"Context \"client-a\" is not configured on this machine.\n" +
 				"\n" +
 				"Next step:\n" +
-				"Run `devctx context list` to see available contexts, then retry with one of those IDs.\n",
+				"Retry with one of these context IDs: company, personal.\n",
 		},
 		{
 			name: "permission denied",
-			err:  fmt.Errorf("create Dev Context directory %q: %w", "/home/alex/.devctx", os.ErrPermission),
+			err: &filesystem.StoragePermissionError{
+				Operation: "create directory",
+				Path:      "/home/alex/.devctx",
+				Err:       os.ErrPermission,
+			},
 			want: "" +
 				"Unable to access local storage\n" +
 				"\n" +
-				"The operating system denied permission to a required file or directory.\n" +
+				"The operating system denied permission to create directory at \"/home/alex/.devctx\".\n" +
 				"\n" +
 				"Next step:\n" +
-				"Check ownership and permissions for the project and ~/.devctx paths, then retry.\n",
+				"Check ownership and permissions for the affected path, then retry.\n",
+		},
+		{
+			name: "context storage incomplete",
+			err: &filesystem.ContextStorageError{
+				ContextID: devcontext.MustID("personal"),
+				Missing: []filesystem.MissingContextDirectory{
+					{
+						Kind:   filesystem.ContextDirectoryCodex,
+						Path:   "/home/alex/.devctx/contexts/personal/codex",
+						Reason: "missing",
+					},
+				},
+			},
+			want: "" +
+				"Context storage is incomplete\n" +
+				"\n" +
+				"Context \"personal\" is missing required storage directories: codex \"/home/alex/.devctx/contexts/personal/codex\" (missing).\n" +
+				"\n" +
+				"Next step:\n" +
+				"Repair or recreate the context before launching. Dev Context will not recreate incomplete context storage automatically.\n",
 		},
 		{
 			name: "context mismatch requires confirmation",
@@ -104,12 +139,12 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 				Candidates: []string{"code"},
 			},
 			want: "" +
-				"Unable to launch editor\n" +
+				"VS Code command not found\n" +
 				"\n" +
-				"Dev Context could not find the configured editor executable.\n" +
+				"Dev Context expected the VS Code CLI command on PATH and checked: `code`.\n" +
 				"\n" +
 				"Next step:\n" +
-				"Install the editor command, add it to PATH, or configure a valid editor executable.\n",
+				"Install the VS Code command line launcher so `code` is on PATH, or set editor.executable_override in the context to a valid VS Code CLI path.\n",
 		},
 		{
 			name: "process executable missing",
@@ -119,12 +154,12 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 				Cause:      os.ErrNotExist,
 			},
 			want: "" +
-				"Unable to launch editor\n" +
+				"VS Code command not found\n" +
 				"\n" +
-				"Dev Context could not find the configured editor executable.\n" +
+				"Dev Context could not find the configured VS Code command \"/missing/code\".\n" +
 				"\n" +
 				"Next step:\n" +
-				"Install the editor command, add it to PATH, or configure a valid editor executable.\n",
+				"Install the VS Code command line launcher, add it to PATH, or set editor.executable_override in the context to a valid VS Code CLI path.\n",
 		},
 		{
 			name: "process permission denied",
