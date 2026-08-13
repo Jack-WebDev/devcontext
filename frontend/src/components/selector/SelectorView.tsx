@@ -18,6 +18,7 @@ import { ProjectIdentity } from "./ProjectIdentity";
 import { RememberProjectControl } from "./RememberProjectControl";
 import { SelectorActions } from "./SelectorActions";
 import { cancelSelector } from "./cancel-action";
+import { missingDefaultContextIds } from "./default-context-actions";
 import { createLaunchRequestGuard, launchSelectedContext } from "./launch-action";
 import {
   initialRovingContextId,
@@ -221,6 +222,22 @@ function SelectorView({
             ))}
           </div>
 
+          <MissingDefaultContextActions
+            launchState={launchState}
+            pendingContextId={onboardingPendingContextId}
+            error={onboardingError}
+            onCreatePersonal={
+              onCreatePersonalContext
+                ? () => void handleCreateContext("personal", onCreatePersonalContext)
+                : undefined
+            }
+            onCreateCompany={
+              onCreateCompanyContext
+                ? () => void handleCreateContext("company", onCreateCompanyContext)
+                : undefined
+            }
+          />
+
           {launchPending ? (
             <p className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground" role="status">
               Launching selected context...
@@ -257,6 +274,70 @@ function SelectorView({
         </div>
       )}
     </div>
+  );
+}
+
+function MissingDefaultContextActions({
+  launchState,
+  pendingContextId,
+  error,
+  onCreatePersonal,
+  onCreateCompany,
+}: {
+  launchState: LaunchState;
+  pendingContextId?: string;
+  error?: DisplayError;
+  onCreatePersonal?: () => void;
+  onCreateCompany?: () => void;
+}) {
+  const missingDefaults = missingDefaultContextIds(launchState.contexts);
+  const missingPersonal = missingDefaults.includes("personal");
+  const missingCompany = missingDefaults.includes("company");
+  const pending = pendingContextId !== undefined;
+
+  if (!missingPersonal && !missingCompany) {
+    return null;
+  }
+
+  return (
+    <section className="border border-border bg-muted/30 p-4" aria-label="Add default contexts">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold">Add another default context</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Create the missing Personal or Company context when this machine needs both identities.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {missingPersonal ? (
+            <button
+              type="button"
+              className="border border-border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={pending || onCreatePersonal === undefined}
+              onClick={onCreatePersonal}
+            >
+              {pendingContextId === "personal" ? "Creating..." : "Add Personal"}
+            </button>
+          ) : null}
+          {missingCompany ? (
+            <button
+              type="button"
+              className="border border-border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={pending || onCreateCompany === undefined}
+              onClick={onCreateCompany}
+            >
+              {pendingContextId === "company" ? "Creating..." : "Add Company"}
+            </button>
+          ) : null}
+        </div>
+      </div>
+      {pendingContextId ? (
+        <p className="mt-3 text-sm text-muted-foreground" role="status">
+          Creating {pendingContextId === "personal" ? "Personal" : "Company"} context...
+        </p>
+      ) : null}
+      {error ? <GuiErrorNotice error={error} /> : null}
+    </section>
   );
 }
 

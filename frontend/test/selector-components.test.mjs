@@ -17,6 +17,7 @@ import {
 } from "../.tmp-test/src/components/selector/RememberProjectControl.js";
 import {SelectorActions} from "../.tmp-test/src/components/selector/SelectorActions.js";
 import {cancelSelector} from "../.tmp-test/src/components/selector/cancel-action.js";
+import {missingDefaultContextIds} from "../.tmp-test/src/components/selector/default-context-actions.js";
 import {
   createLaunchRequestGuard,
   launchSelectedContext,
@@ -139,6 +140,13 @@ test("first-run predicate separates new and returning users", () => {
     true,
   );
   assert.equal(shouldRenderFirstRunWelcome(launchStateFixture()), false);
+});
+
+test("default context setup finds only missing default contexts", () => {
+  assert.deepEqual(missingDefaultContextIds([contextFixture("personal", "Personal")]), ["company"]);
+  assert.deepEqual(missingDefaultContextIds([contextFixture("company", "Company")]), ["personal"]);
+  assert.deepEqual(missingDefaultContextIds([contextFixture("personal", "Personal"), contextFixture("company", "Company")]), []);
+  assert.deepEqual(missingDefaultContextIds([contextFixture("client-a", "Client A")]), ["personal", "company"]);
 });
 
 test("context card renders generic context names and ids", () => {
