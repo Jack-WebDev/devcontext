@@ -6,6 +6,23 @@ import (
 	"path/filepath"
 )
 
+// ReadProjectBindingsFile reads project bindings from projects.toml.
+func ReadProjectBindingsFile(path string) ([]Binding, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read project bindings %q: %w", path, err)
+	}
+
+	bindings, err := DecodeProjectBindingsTOML(data)
+	if err != nil {
+		return nil, fmt.Errorf("decode project bindings %q: %w", path, err)
+	}
+	return bindings, nil
+}
+
 // WriteProjectBindingsFile writes project bindings through a same-directory
 // temporary file and atomic rename.
 func WriteProjectBindingsFile(path string, bindings []Binding) error {
