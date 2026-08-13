@@ -1,28 +1,56 @@
 import { useEffect, useState } from "react";
 
-import type { LaunchState } from "../../lib/devctx-api";
+import type {
+  ApiResult,
+  BindProjectRequest,
+  LaunchProjectRequest,
+  LaunchProjectResult,
+  LaunchState,
+  ProjectBindingState,
+} from "../../lib/devctx-api";
 import { ContextCard } from "./ContextCard";
 import { ProjectIdentity } from "./ProjectIdentity";
 import { RememberProjectControl } from "./RememberProjectControl";
 import { SelectorActions } from "./SelectorActions";
 import { cancelSelector } from "./cancel-action";
+import { launchSelectedContext } from "./launch-action";
 import { initialSelectedContextId, nextSelectedContextId } from "./selection-state";
 
 interface SelectorViewProps {
   launchState: LaunchState;
+  onBindProject: (request: BindProjectRequest) => Promise<ApiResult<ProjectBindingState>>;
+  onLaunchProject: (request: LaunchProjectRequest) => Promise<ApiResult<LaunchProjectResult>>;
   onCancel: () => Promise<void> | void;
 }
 
-function SelectorView({ launchState, onCancel }: SelectorViewProps) {
+function SelectorView({ launchState, onBindProject, onLaunchProject, onCancel }: SelectorViewProps) {
   const [selectedContextId, setSelectedContextId] = useState<string | undefined>(() =>
     initialSelectedContextId(launchState),
   );
   const [rememberProject, setRememberProject] = useState(false);
+  const [launchPending, setLaunchPending] = useState(false);
 
   useEffect(() => {
     setSelectedContextId(initialSelectedContextId(launchState));
     setRememberProject(false);
+    setLaunchPending(false);
   }, [launchState]);
+
+  async function handleLaunch() {
+    if (launchPending) {
+      return;
+    }
+
+    setLaunchPending(true);
+    await launchSelectedContext({
+      projectPath: launchState.project.path,
+      selectedContextId,
+      rememberProject,
+      bindProject: onBindProject,
+      launchProject: onLaunchProject,
+    });
+    setLaunchPending(false);
+  }
 
   return (
     <div className="space-y-8">
@@ -52,7 +80,12 @@ function SelectorView({ launchState, onCancel }: SelectorViewProps) {
           onRememberProjectChange={setRememberProject}
         />
 
-        <SelectorActions onCancel={() => void cancelSelector({ closeSelector: onCancel })} />
+        <SelectorActions
+          launchDisabled={selectedContextId === undefined}
+          launchPending={launchPending}
+          onLaunch={() => void handleLaunch()}
+          onCancel={() => void cancelSelector({ closeSelector: onCancel })}
+        />
       </div>
     </div>
   );

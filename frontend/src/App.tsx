@@ -71,7 +71,12 @@ function renderSelectorContent(launchState: LaunchStateLoad) {
   }
 
   return (
-    <SelectorView launchState={launchState.data} onCancel={() => devContextWindow.closeSelector()} />
+    <SelectorView
+      launchState={launchState.data}
+      onBindProject={(request) => devContextApi.bindProject(request)}
+      onLaunchProject={(request) => devContextApi.launchProject(request)}
+      onCancel={() => devContextWindow.closeSelector()}
+    />
   );
 }
 

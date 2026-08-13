@@ -11,6 +11,7 @@ import {
 } from "../.tmp-test/src/components/selector/RememberProjectControl.js";
 import {SelectorActions} from "../.tmp-test/src/components/selector/SelectorActions.js";
 import {cancelSelector} from "../.tmp-test/src/components/selector/cancel-action.js";
+import {launchSelectedContext} from "../.tmp-test/src/components/selector/launch-action.js";
 import {
   initialSelectedContextId,
   nextSelectedContextId,
@@ -227,11 +228,107 @@ test("remember control is disabled when no context is selected", () => {
   assert.ok(html.includes("Select a context before remembering this project."));
 });
 
-test("selector actions render a cancel control", () => {
-  const html = renderToStaticMarkup(SelectorActions({onCancel: () => {}}));
+test("selector actions disable launch without a selected context", () => {
+  const html = renderToStaticMarkup(
+    SelectorActions({
+      launchDisabled: true,
+      launchPending: false,
+      onLaunch: () => {},
+      onCancel: () => {},
+    }),
+  );
 
-  assert.match(html, /<button/);
+  assert.ok(html.includes("Launch"));
   assert.ok(html.includes("Cancel"));
+  assert.match(html, /disabled=""/);
+});
+
+test("selector actions show launch as enabled and pending", () => {
+  const enabled = renderToStaticMarkup(
+    SelectorActions({
+      launchDisabled: false,
+      launchPending: false,
+      onLaunch: () => {},
+      onCancel: () => {},
+    }),
+  );
+  const pending = renderToStaticMarkup(
+    SelectorActions({
+      launchDisabled: false,
+      launchPending: true,
+      onLaunch: () => {},
+      onCancel: () => {},
+    }),
+  );
+
+  assert.doesNotMatch(enabled, /disabled=""/);
+  assert.ok(enabled.includes("Launch"));
+  assert.match(pending, /disabled=""/);
+  assert.ok(pending.includes("Launching..."));
+});
+
+test("launch action does nothing without a selected context", async () => {
+  const calls = [];
+  const result = await launchSelectedContext({
+    projectPath: "/work/api",
+    rememberProject: false,
+    bindProject(request) {
+      calls.push(["bindProject", request]);
+      return Promise.resolve(projectBindingResult());
+    },
+    launchProject(request) {
+      calls.push(["launchProject", request]);
+      return Promise.resolve(launchProjectResult());
+    },
+  });
+
+  assert.equal(result, undefined);
+  assert.deepEqual(calls, []);
+});
+
+test("launch action launches the selected context when remember is off", async () => {
+  const calls = [];
+  const result = await launchSelectedContext({
+    projectPath: "/work/api",
+    selectedContextId: "personal",
+    rememberProject: false,
+    bindProject(request) {
+      calls.push(["bindProject", request]);
+      return Promise.resolve(projectBindingResult());
+    },
+    launchProject(request) {
+      calls.push(["launchProject", request]);
+      return Promise.resolve(launchProjectResult());
+    },
+  });
+
+  assert.deepEqual(result, launchProjectResult());
+  assert.deepEqual(calls, [
+    ["launchProject", {projectPath: "/work/api", contextId: "personal"}],
+  ]);
+});
+
+test("launch action binds before launch when remember is on", async () => {
+  const calls = [];
+  const result = await launchSelectedContext({
+    projectPath: "/work/api",
+    selectedContextId: "company",
+    rememberProject: true,
+    bindProject(request) {
+      calls.push(["bindProject", request]);
+      return Promise.resolve(projectBindingResult());
+    },
+    launchProject(request) {
+      calls.push(["launchProject", request]);
+      return Promise.resolve(launchProjectResult());
+    },
+  });
+
+  assert.deepEqual(result, launchProjectResult());
+  assert.deepEqual(calls, [
+    ["bindProject", {projectPath: "/work/api", contextId: "company"}],
+    ["launchProject", {projectPath: "/work/api", contextId: "company"}],
+  ]);
 });
 
 test("cancel closes the selector without launch or binding side effects", async () => {
@@ -291,6 +388,29 @@ function launchStateFixture(overrides = {}) {
     warnings: [],
     firstRun: false,
     ...overrides,
+  };
+}
+
+function projectBindingResult() {
+  return {
+    ok: true,
+    data: {
+      projectPath: "/work/api",
+      bound: true,
+      contextId: "personal",
+      dangling: false,
+    },
+  };
+}
+
+function launchProjectResult() {
+  return {
+    ok: true,
+    data: {
+      project: {name: "api", path: "/work/api"},
+      context: contextFixture("personal", "Personal"),
+      warnings: [],
+    },
   };
 }
 
