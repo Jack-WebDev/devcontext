@@ -7,18 +7,8 @@ import (
 	"devctx/packages/core/editor"
 )
 
-func TestGlobalConfigConstructsVersionedApplicationSettings(t *testing.T) {
-	globalConfig := config.GlobalConfig{
-		Version:       config.CurrentSchemaVersion,
-		DefaultEditor: editor.TypeVSCode,
-		UI: config.UISettings{
-			RememberWindowPosition: true,
-		},
-		Safety: config.SafetySettings{
-			WarnOnContextMismatch:  true,
-			ConfirmUnboundProjects: true,
-		},
-	}
+func TestDefaultGlobalConfig(t *testing.T) {
+	globalConfig := config.DefaultGlobalConfig()
 
 	if globalConfig.Version != config.CurrentSchemaVersion {
 		t.Fatalf("version = %d, want %d", globalConfig.Version, config.CurrentSchemaVersion)
