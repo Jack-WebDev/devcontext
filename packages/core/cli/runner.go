@@ -16,6 +16,7 @@ import (
 	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
 	"devctx/packages/core/provider"
+	"devctx/packages/core/version"
 )
 
 // Result is the rendered outcome of a CLI command.
@@ -73,6 +74,8 @@ func (r Runner) Run(args []string) Result {
 		return r.runContext(command.Context)
 	case CommandProject:
 		return r.runProject(command.Project)
+	case CommandVersion:
+		return successResult(version.Render(version.Current()))
 	case CommandRootLaunch:
 		return r.runRootLaunch(command.RootLaunch)
 	default:

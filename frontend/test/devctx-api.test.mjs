@@ -252,6 +252,77 @@ test("adapter normalizes resolved application errors", async () => {
   });
 });
 
+test("adapter unwraps tuple-shaped Wails responses", async () => {
+  const api = createDevContextApi({
+    async getLaunchState() {
+      return [
+        {
+          project: {name: "api", path: "/work/api"},
+          contexts: [],
+          binding: {
+            projectPath: "/work/api",
+            bound: false,
+            dangling: false,
+          },
+          selectionRequired: true,
+          firstRun: true,
+        },
+        null,
+      ];
+    },
+    async launchProject() {
+      return [
+        {},
+        {
+          code: "launch_error",
+          message: "Unable to launch editor.",
+          recovery: "Check the editor command.",
+        },
+      ];
+    },
+    async bindProject() {
+      throw new Error("not used");
+    },
+    async unbindProject() {
+      throw new Error("not used");
+    },
+    async createContext() {
+      throw new Error("not used");
+    },
+  });
+
+  assert.deepEqual(await api.getLaunchState(), {
+    ok: true,
+    data: {
+      project: {name: "api", path: "/work/api"},
+      contexts: [],
+      binding: {
+        projectPath: "/work/api",
+        bound: false,
+        contextId: undefined,
+        dangling: false,
+        missingContextId: undefined,
+        recovery: undefined,
+      },
+      selectedContextId: undefined,
+      selectionRequired: true,
+      resolutionSource: undefined,
+      warnings: [],
+      firstRun: true,
+    },
+  });
+
+  assert.deepEqual(await api.launchProject({contextId: "personal"}), {
+    ok: false,
+    error: {
+      code: "launch_error",
+      message: "Unable to launch editor.",
+      recovery: "Check the editor command.",
+      contextMismatch: undefined,
+    },
+  });
+});
+
 test("adapter normalizes rejected promises into displayable errors", async () => {
   const api = createDevContextApi({
     async getLaunchState() {

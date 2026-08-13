@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"devctx/packages/application"
+	"devctx/packages/core/project"
 )
 
 func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
@@ -38,10 +39,7 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	}
 
 	stateRequest := application.GetLaunchStateRequest{ProjectPath: "/work/api"}
-	state, stateErr := app.GetLaunchState(stateRequest)
-	if stateErr != nil {
-		t.Fatalf("get launch state error = %v, want nil", stateErr)
-	}
+	state := app.GetLaunchState(stateRequest)
 	if !reflect.DeepEqual(state, service.launchState) {
 		t.Fatalf("launch state = %#v, want %#v", state, service.launchState)
 	}
@@ -50,10 +48,7 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	}
 
 	launchRequest := application.LaunchProjectRequest{ProjectPath: "/work/api", ContextID: "personal"}
-	launch, launchErr := app.LaunchProject(launchRequest)
-	if launchErr != nil {
-		t.Fatalf("launch project error = %v, want nil", launchErr)
-	}
+	launch := app.LaunchProject(launchRequest)
 	if !reflect.DeepEqual(launch, service.launchResult) {
 		t.Fatalf("launch result = %#v, want %#v", launch, service.launchResult)
 	}
@@ -62,10 +57,7 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	}
 
 	bindRequest := application.BindProjectRequest{ProjectPath: "/work/api", ContextID: "personal"}
-	binding, bindErr := app.BindProject(bindRequest)
-	if bindErr != nil {
-		t.Fatalf("bind project error = %v, want nil", bindErr)
-	}
+	binding := app.BindProject(bindRequest)
 	if !reflect.DeepEqual(binding, service.bindResult) {
 		t.Fatalf("binding = %#v, want %#v", binding, service.bindResult)
 	}
@@ -74,10 +66,7 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	}
 
 	unbindRequest := application.UnbindProjectRequest{ProjectPath: "/work/api"}
-	unbound, unbindErr := app.UnbindProject(unbindRequest)
-	if unbindErr != nil {
-		t.Fatalf("unbind project error = %v, want nil", unbindErr)
-	}
+	unbound := app.UnbindProject(unbindRequest)
 	if !reflect.DeepEqual(unbound, service.unbindResult) {
 		t.Fatalf("unbound state = %#v, want %#v", unbound, service.unbindResult)
 	}
@@ -86,15 +75,22 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	}
 
 	createContextRequest := application.CreateContextRequest{ContextID: "personal"}
-	contextResult, createContextErr := app.CreateContext(createContextRequest)
-	if createContextErr != nil {
-		t.Fatalf("create context error = %v, want nil", createContextErr)
-	}
+	contextResult := app.CreateContext(createContextRequest)
 	if !reflect.DeepEqual(contextResult, service.createContextResult) {
 		t.Fatalf("create context result = %#v, want %#v", contextResult, service.createContextResult)
 	}
 	if service.createContextRequest != createContextRequest {
 		t.Fatalf("create context request = %#v, want %#v", service.createContextRequest, createContextRequest)
+	}
+}
+
+func TestAppReturnsApplicationErrorsAsSingleValues(t *testing.T) {
+	want := application.NewError(project.ErrProjectDirectoryNotFound)
+	app := New(&fakeService{launchStateErr: want})
+
+	got := app.GetLaunchState(application.GetLaunchStateRequest{})
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("error value = %#v, want %#v", got, want)
 	}
 }
 
