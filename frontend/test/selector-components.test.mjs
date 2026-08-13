@@ -5,6 +5,10 @@ import {renderToStaticMarkup} from "react-dom/server";
 
 import {ContextMismatchDialog} from "../.tmp-test/src/components/selector/ContextMismatchDialog.js";
 import {ContextCard} from "../.tmp-test/src/components/selector/ContextCard.js";
+import {
+  FirstRunWelcome,
+  shouldRenderFirstRunWelcome,
+} from "../.tmp-test/src/components/selector/FirstRunWelcome.js";
 import {GuiErrorNotice} from "../.tmp-test/src/components/selector/GuiErrorNotice.js";
 import {ProjectIdentity} from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import {
@@ -17,6 +21,7 @@ import {
   createLaunchRequestGuard,
   launchSelectedContext,
 } from "../.tmp-test/src/components/selector/launch-action.js";
+import {createOnboardingContextAndRefresh} from "../.tmp-test/src/components/selector/onboarding-action.js";
 import {
   initialRovingContextId,
   initialSelectedContextId,
@@ -58,6 +63,82 @@ test("project identity preserves full project names and paths", () => {
     assert.ok(html.includes(project.name));
     assert.ok(html.includes(project.path));
   }
+});
+
+test("first-run welcome explains local identity boundaries and setup choices", () => {
+  const state = launchStateFixture({
+    contexts: [],
+    firstRun: true,
+  });
+  const html = renderToStaticMarkup(
+    FirstRunWelcome({
+      launchState: state,
+      onCreatePersonal: () => {},
+      onCreateCompany: () => {},
+    }),
+  );
+
+  assert.ok(html.includes("Create your first development context"));
+  assert.ok(html.includes("Local first"));
+  assert.ok(html.includes("Nothing is synced or uploaded by Dev Context."));
+  assert.ok(html.includes("Isolated tools"));
+  assert.ok(html.includes("Separate authentication"));
+  assert.ok(html.includes("does not store passwords, tokens, or cloud accounts"));
+  assert.ok(html.includes("Create Personal"));
+  assert.ok(html.includes("Create Company"));
+  assert.ok(html.includes(state.project.path));
+  assert.doesNotMatch(html, /disabled=""/);
+});
+
+test("first-run welcome disables setup actions until handlers are wired", () => {
+  const state = launchStateFixture({
+    contexts: [],
+    firstRun: true,
+  });
+  const html = renderToStaticMarkup(FirstRunWelcome({launchState: state}));
+
+  assert.match(html, /disabled=""/);
+});
+
+test("first-run welcome shows pending and error states", () => {
+  const state = launchStateFixture({
+    contexts: [],
+    firstRun: true,
+  });
+  const pending = renderToStaticMarkup(
+    FirstRunWelcome({
+      launchState: state,
+      onCreatePersonal: () => {},
+      onCreateCompany: () => {},
+      pendingContextId: "company",
+    }),
+  );
+  const failed = renderToStaticMarkup(
+    FirstRunWelcome({
+      launchState: state,
+      error: apiError("validation_error", "Unable to complete request.", "Check the selected project and context, then retry.").error,
+    }),
+  );
+
+  assert.ok(pending.includes("Creating Company context..."));
+  assert.ok(pending.includes("Creating..."));
+  assert.match(pending, /role="status"/);
+  assert.match(pending, /disabled=""/);
+  assert.match(failed, /role="alert"/);
+  assert.ok(failed.includes("Unable to complete request."));
+});
+
+test("first-run predicate separates new and returning users", () => {
+  assert.equal(
+    shouldRenderFirstRunWelcome(
+      launchStateFixture({
+        contexts: [],
+        firstRun: true,
+      }),
+    ),
+    true,
+  );
+  assert.equal(shouldRenderFirstRunWelcome(launchStateFixture()), false);
 });
 
 test("context card renders generic context names and ids", () => {
@@ -113,6 +194,28 @@ test("context card renders enabled provider status variants with accessible name
   assert.match(html, /Codex local status: Unavailable/);
   assert.ok(html.includes("Codex context directory is empty"));
   assert.ok(!html.includes("Disabled Provider"));
+});
+
+test("context card attaches authentication guidance to not configured Claude and Codex providers", () => {
+  const personal = contextFixture("personal", "Personal", [
+    providerFixture("codex", "Codex", true, "not_configured", "Codex context directory is empty"),
+    providerFixture("claude", "Claude", true, "ready"),
+  ]);
+  const company = contextFixture("company", "Company", [
+    providerFixture("codex", "Codex", true, "ready"),
+    providerFixture("internal", "Internal Tool", true, "not_configured"),
+  ]);
+  const html = [
+    renderToStaticMarkup(ContextCard({context: personal})),
+    renderToStaticMarkup(ContextCard({context: company})),
+  ].join("");
+
+  assert.ok(html.includes("Codex is enabled for Personal but is not signed in yet."));
+  assert.ok(html.includes("Open Personal, then sign in with Codex inside that tool."));
+  assert.ok(html.includes("Dev Context will not copy credentials or ask for passwords or tokens."));
+  assert.ok(!html.includes("Claude is enabled for Personal"));
+  assert.ok(!html.includes("Codex is enabled for Company"));
+  assert.ok(!html.includes("Internal Tool is enabled for Company"));
 });
 
 test("selection initializes from a valid bound context", () => {
@@ -600,6 +703,69 @@ test("cancel closes the selector without launch or binding side effects", async 
   });
 
   assert.deepEqual(calls, ["closeSelector"]);
+});
+
+test("onboarding context creation refreshes launch state after success", async () => {
+  const calls = [];
+  const refreshedState = launchStateFixture({
+    contexts: [contextFixture("personal", "Personal")],
+    firstRun: false,
+  });
+
+  const result = await createOnboardingContextAndRefresh({
+    contextId: "personal",
+    createContext(contextId) {
+      calls.push(["createContext", contextId]);
+      return Promise.resolve({
+        ok: true,
+        data: {
+          context: contextFixture("personal", "Personal"),
+        },
+      });
+    },
+    getLaunchState() {
+      calls.push(["getLaunchState"]);
+      return Promise.resolve({
+        ok: true,
+        data: refreshedState,
+      });
+    },
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    created: {
+      context: contextFixture("personal", "Personal"),
+    },
+    launchState: refreshedState,
+  });
+  assert.deepEqual(calls, [
+    ["createContext", "personal"],
+    ["getLaunchState"],
+  ]);
+});
+
+test("onboarding context creation returns failures without refreshing", async () => {
+  const calls = [];
+  const error = apiError("validation_error", "Unable to complete request.", "Check the selected project and context, then retry.");
+
+  const result = await createOnboardingContextAndRefresh({
+    contextId: "company",
+    createContext(contextId) {
+      calls.push(["createContext", contextId]);
+      return Promise.resolve(error);
+    },
+    getLaunchState() {
+      calls.push(["getLaunchState"]);
+      return Promise.resolve({ok: true, data: launchStateFixture()});
+    },
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    error: error.error,
+  });
+  assert.deepEqual(calls, [["createContext", "company"]]);
 });
 
 function contextFixture(id, name, providers = []) {

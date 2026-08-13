@@ -67,6 +67,17 @@ test("adapter normalizes successful Wails calls", async () => {
         dangling: false,
       };
     },
+    async createContext(request) {
+      calls.push(["createContext", request]);
+      return {
+        context: {
+          id: "personal",
+          name: "Personal",
+          editor: {type: "vscode"},
+          providers: [],
+        },
+      };
+    },
   });
 
   assert.deepEqual(await api.getLaunchState({projectPath: "/work/api"}), {
@@ -142,6 +153,18 @@ test("adapter normalizes successful Wails calls", async () => {
       recovery: undefined,
     },
   });
+  assert.deepEqual(await api.createContext({contextId: "personal"}), {
+    ok: true,
+    data: {
+      context: {
+        id: "personal",
+        name: "Personal",
+        editor: {type: "vscode"},
+        providers: [],
+        metadata: undefined,
+      },
+    },
+  });
   assert.deepEqual(calls, [
     ["getLaunchState", {projectPath: "/work/api"}],
     [
@@ -154,6 +177,7 @@ test("adapter normalizes successful Wails calls", async () => {
     ],
     ["bindProject", {projectPath: "/work/api", contextId: "personal"}],
     ["unbindProject", {projectPath: "/work/api"}],
+    ["createContext", {contextId: "personal"}],
   ]);
 });
 
@@ -184,6 +208,13 @@ test("adapter normalizes resolved application errors", async () => {
     async unbindProject() {
       throw new Error("not used");
     },
+    async createContext() {
+      return {
+        code: "validation_error",
+        message: "Unable to complete request.",
+        recovery: "Check the selected project and context, then retry.",
+      };
+    },
   });
 
   assert.deepEqual(await api.launchProject({projectPath: "/work/api", contextId: "personal"}), {
@@ -209,6 +240,16 @@ test("adapter normalizes resolved application errors", async () => {
       contextMismatch: undefined,
     },
   });
+
+  assert.deepEqual(await api.createContext({contextId: "personal"}), {
+    ok: false,
+    error: {
+      code: "validation_error",
+      message: "Unable to complete request.",
+      recovery: "Check the selected project and context, then retry.",
+      contextMismatch: undefined,
+    },
+  });
 });
 
 test("adapter normalizes rejected promises into displayable errors", async () => {
@@ -228,6 +269,9 @@ test("adapter normalizes rejected promises into displayable errors", async () =>
     },
     async unbindProject() {
       throw null;
+    },
+    async createContext() {
+      throw new Error("create failed");
     },
   });
 
@@ -265,6 +309,82 @@ test("adapter normalizes rejected promises into displayable errors", async () =>
       code: "unexpected_error",
       message: "Dev Context could not complete the request.",
       recovery: "Retry the action. If it keeps failing, include the error details in a bug report.",
+    },
+  });
+
+  assert.deepEqual(await api.createContext({contextId: "personal"}), {
+    ok: false,
+    error: {
+      code: "unexpected_error",
+      message: "create failed",
+      recovery: "Retry the action. If it keeps failing, include the error details in a bug report.",
+    },
+  });
+});
+
+test("adapter normalizes create context onboarding failure responses", async () => {
+  const api = createDevContextApi({
+    async getLaunchState() {
+      throw new Error("not used");
+    },
+    async launchProject() {
+      throw new Error("not used");
+    },
+    async bindProject() {
+      throw new Error("not used");
+    },
+    async unbindProject() {
+      throw new Error("not used");
+    },
+    async createContext(request) {
+      switch (request.contextId) {
+        case "duplicate":
+          return {
+            code: "validation_error",
+            message: "Unable to complete request.",
+            recovery: "A context with this ID already exists.",
+          };
+        case "permission":
+          return {
+            code: "validation_error",
+            message: "Unable to complete request.",
+            recovery: "Check Dev Context storage permissions, then retry.",
+          };
+        default:
+          return {
+            code: "internal_error",
+            message: "Dev Context failed unexpectedly.",
+            recovery: "Retry the action. If it keeps failing, include debug details in a bug report.",
+          };
+      }
+    },
+  });
+
+  assert.deepEqual(await api.createContext({contextId: "duplicate"}), {
+    ok: false,
+    error: {
+      code: "validation_error",
+      message: "Unable to complete request.",
+      recovery: "A context with this ID already exists.",
+      contextMismatch: undefined,
+    },
+  });
+  assert.deepEqual(await api.createContext({contextId: "permission"}), {
+    ok: false,
+    error: {
+      code: "validation_error",
+      message: "Unable to complete request.",
+      recovery: "Check Dev Context storage permissions, then retry.",
+      contextMismatch: undefined,
+    },
+  });
+  assert.deepEqual(await api.createContext({contextId: "write-failure"}), {
+    ok: false,
+    error: {
+      code: "internal_error",
+      message: "Dev Context failed unexpectedly.",
+      recovery: "Retry the action. If it keeps failing, include debug details in a bug report.",
+      contextMismatch: undefined,
     },
   });
 });

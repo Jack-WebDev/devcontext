@@ -82,7 +82,7 @@ function ContextCard({
         {enabledProviders.length > 0 ? (
           <ul className="space-y-2">
             {enabledProviders.map((provider) => (
-              <ProviderStatusRow key={provider.id} provider={provider} />
+              <ProviderStatusRow key={provider.id} context={context} provider={provider} />
             ))}
           </ul>
         ) : null}
@@ -116,32 +116,54 @@ function ContextIdentity({ context, selected }: { context: ContextState; selecte
   );
 }
 
-function ProviderStatusRow({ provider }: { provider: ProviderState }) {
+function ProviderStatusRow({ context, provider }: { context: ContextState; provider: ProviderState }) {
   const status = providerStatusPresentation(provider.state);
   const accessibleStatus = `${provider.name} local status: ${status.label}`;
+  const authenticationGuidance = providerAuthenticationGuidance(context, provider);
 
   return (
-    <li className="flex min-w-0 items-start justify-between gap-3 text-sm">
-      <div className="min-w-0">
-        <p className="truncate font-medium" title={provider.name}>
-          {provider.name}
-        </p>
-        {provider.explanation ? (
-          <p className="mt-1 truncate text-xs text-muted-foreground" title={provider.explanation}>
-            {provider.explanation}
+    <li className="min-w-0 text-sm">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate font-medium" title={provider.name}>
+            {provider.name}
           </p>
-        ) : null}
+          {provider.explanation ? (
+            <p className="mt-1 truncate text-xs text-muted-foreground" title={provider.explanation}>
+              {provider.explanation}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span
+            className={`size-2.5 rounded-full ${status.indicatorClassName}`}
+            role="img"
+            aria-label={accessibleStatus}
+          />
+          <span className="text-xs font-medium text-muted-foreground">{status.label}</span>
+        </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <span
-          className={`size-2.5 rounded-full ${status.indicatorClassName}`}
-          role="img"
-          aria-label={accessibleStatus}
-        />
-        <span className="text-xs font-medium text-muted-foreground">{status.label}</span>
-      </div>
+      {authenticationGuidance ? (
+        <p className="mt-2 border border-border bg-muted/30 p-2 text-xs text-muted-foreground">
+          {authenticationGuidance}
+        </p>
+      ) : null}
     </li>
   );
+}
+
+function providerAuthenticationGuidance(context: ContextState, provider: ProviderState): string | undefined {
+  if (provider.state !== "not_configured") {
+    return undefined;
+  }
+
+  switch (provider.id) {
+    case "claude":
+    case "codex":
+      return `${provider.name} is enabled for ${context.name} but is not signed in yet. Open ${context.name}, then sign in with ${provider.name} inside that tool. Dev Context will not copy credentials or ask for passwords or tokens.`;
+    default:
+      return undefined;
+  }
 }
 
 function providerStatusPresentation(state: string): { label: string; indicatorClassName: string } {

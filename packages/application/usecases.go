@@ -1,8 +1,10 @@
 package application
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/filesystem"
@@ -48,6 +50,15 @@ func (s *Service) UnbindProject(request UnbindProjectRequest) (ProjectBindingSta
 	return state, nil
 }
 
+// CreateContext creates one default context for first-run onboarding.
+func (s *Service) CreateContext(request CreateContextRequest) (CreateContextResult, *Error) {
+	result, err := s.createContext(request)
+	if err != nil {
+		return CreateContextResult{}, NewError(err)
+	}
+	return result, nil
+}
+
 func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, error) {
 	projectPath, err := s.validatedProjectPath(request.ProjectPath)
 	if err != nil {
@@ -57,6 +68,9 @@ func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, er
 	contexts, err := s.dependencies.Contexts.List()
 	if err != nil {
 		return LaunchState{}, err
+	}
+	if len(contexts) == 0 {
+		return firstRunLaunchState(projectPath), nil
 	}
 
 	lookup, err := s.dependencies.Projects.LookupWithContextValidation(string(projectPath), projectPath, s.dependencies.Contexts)
@@ -81,8 +95,55 @@ func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, er
 		SelectionRequired: resolution.SelectionRequired,
 		ResolutionSource:  string(resolution.Source),
 		Warnings:          warningStates(resolution.Warnings),
-		FirstRun:          len(contexts) == 0,
 	}, nil
+}
+
+func firstRunLaunchState(projectPath project.Path) LaunchState {
+	return LaunchState{
+		Project:           projectState(projectPath),
+		Contexts:          []ContextState{},
+		Binding:           ProjectBindingState{ProjectPath: string(projectPath)},
+		SelectionRequired: true,
+		ResolutionSource:  string(launcher.ResolutionSourceUserSelection),
+		FirstRun:          true,
+	}
+}
+
+func (s *Service) createContext(request CreateContextRequest) (CreateContextResult, error) {
+	contextID, err := devcontext.NewID(request.ContextID)
+	if err != nil {
+		return CreateContextResult{}, err
+	}
+
+	ctx, err := defaultContextForID(contextID, s.now())
+	if err != nil {
+		return CreateContextResult{}, err
+	}
+
+	contextPaths, err := filesystem.DeriveContextPaths(s.dependencies.Paths, contextID)
+	if err != nil {
+		return CreateContextResult{}, err
+	}
+	if err := filesystem.CreateContextDirectoryTreeWithPermissions(
+		contextPaths,
+		ctx,
+		s.dependencies.StoragePermissions,
+	); err != nil {
+		return CreateContextResult{}, err
+	}
+
+	return CreateContextResult{Context: s.contextState(ctx)}, nil
+}
+
+func defaultContextForID(contextID devcontext.ID, createdAt time.Time) (devcontext.Context, error) {
+	switch contextID.String() {
+	case "personal":
+		return devcontext.DefaultPersonalContext(createdAt), nil
+	case "company":
+		return devcontext.DefaultCompanyContext(createdAt), nil
+	default:
+		return devcontext.Context{}, fmt.Errorf("%w: unsupported default context %q", devcontext.ErrContextNotFound, contextID.String())
+	}
 }
 
 func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResult, error) {

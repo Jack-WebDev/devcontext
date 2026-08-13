@@ -17,16 +17,17 @@ import (
 
 // Dependencies contains the core collaborators used by application use cases.
 type Dependencies struct {
-	Contexts          devcontext.Repository
-	Projects          project.Repository
-	Paths             filesystem.PlatformPaths
-	Providers         []provider.Provider
-	Editor            editor.Editor
-	ProcessLauncher   launcher.ProcessLauncher
-	ParentEnvironment []string
-	WorkingDirectory  string
-	DetachMode        launcher.DetachMode
-	Now               func() time.Time
+	Contexts           devcontext.Repository
+	Projects           project.Repository
+	Paths              filesystem.PlatformPaths
+	Providers          []provider.Provider
+	Editor             editor.Editor
+	ProcessLauncher    launcher.ProcessLauncher
+	StoragePermissions filesystem.StoragePermissions
+	ParentEnvironment  []string
+	WorkingDirectory   string
+	DetachMode         launcher.DetachMode
+	Now                func() time.Time
 }
 
 // DefaultOptions contains host-provided values needed to construct the default
@@ -70,16 +71,17 @@ func NewDefaultService(options DefaultOptions) (*Service, error) {
 	}
 
 	return NewServiceWithDependencies(Dependencies{
-		Contexts:          devcontext.NewRepository(layout.ContextsDir),
-		Projects:          project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
-		Paths:             paths,
-		Providers:         []provider.Provider{provider.ClaudeProvider{}, provider.CodexProvider{}},
-		Editor:            editor.VSCodeEditor{},
-		ProcessLauncher:   launcher.NativeProcessLauncher{},
-		ParentEnvironment: options.ParentEnvironment,
-		WorkingDirectory:  workingDirectory,
-		DetachMode:        launcher.DetachModeDetached,
-		Now:               options.Now,
+		Contexts:           devcontext.NewRepository(layout.ContextsDir),
+		Projects:           project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
+		Paths:              paths,
+		Providers:          []provider.Provider{provider.ClaudeProvider{}, provider.CodexProvider{}},
+		Editor:             editor.VSCodeEditor{},
+		ProcessLauncher:    launcher.NativeProcessLauncher{},
+		StoragePermissions: filesystem.NewDefaultStoragePermissions(),
+		ParentEnvironment:  options.ParentEnvironment,
+		WorkingDirectory:   workingDirectory,
+		DetachMode:         launcher.DetachModeDetached,
+		Now:                options.Now,
 	}), nil
 }
 
@@ -122,6 +124,9 @@ func normalizeDependencies(dependencies Dependencies) Dependencies {
 	}
 	if dependencies.ProcessLauncher == nil {
 		dependencies.ProcessLauncher = launcher.NativeProcessLauncher{}
+	}
+	if dependencies.StoragePermissions == nil {
+		dependencies.StoragePermissions = filesystem.NewDefaultStoragePermissions()
 	}
 	if dependencies.ParentEnvironment == nil {
 		dependencies.ParentEnvironment = os.Environ()

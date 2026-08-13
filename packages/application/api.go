@@ -60,6 +60,16 @@ type ProjectBindingState struct {
 	Recovery         string `json:"recovery,omitempty"`
 }
 
+// CreateContextRequest asks the service to create one default context.
+type CreateContextRequest struct {
+	ContextID string `json:"contextId"`
+}
+
+// CreateContextResult describes a newly created context.
+type CreateContextResult struct {
+	Context ContextState `json:"context"`
+}
+
 // ResolutionWarning is a presentation-safe launch warning.
 type ResolutionWarning struct {
 	Code               string `json:"code"`

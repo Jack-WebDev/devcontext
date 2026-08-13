@@ -101,11 +101,20 @@ export interface UnbindProjectRequest {
   projectPath?: string;
 }
 
+export interface CreateContextRequest {
+  contextId: string;
+}
+
+export interface CreateContextResult {
+  context: ContextState;
+}
+
 export interface DevContextApi {
   getLaunchState(request?: GetLaunchStateRequest): Promise<ApiResult<LaunchState>>;
   launchProject(request: LaunchProjectRequest): Promise<ApiResult<LaunchProjectResult>>;
   bindProject(request: BindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
   unbindProject(request?: UnbindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
+  createContext(request: CreateContextRequest): Promise<ApiResult<CreateContextResult>>;
 }
 
 export interface WailsBindings {
@@ -113,6 +122,7 @@ export interface WailsBindings {
   launchProject(request: LaunchProjectRequest): Promise<unknown>;
   bindProject(request: BindProjectRequest): Promise<unknown>;
   unbindProject(request: UnbindProjectRequest): Promise<unknown>;
+  createContext(request: CreateContextRequest): Promise<unknown>;
 }
 
 export function createDevContextApi(bindings: WailsBindings = generatedBindings): DevContextApi {
@@ -136,6 +146,9 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
     unbindProject(request = {}) {
       return callBinding(() => bindings.unbindProject(request), normalizeProjectBindingState);
     },
+    createContext(request) {
+      return callBinding(() => bindings.createContext(request), normalizeCreateContextResult);
+    },
   };
 }
 
@@ -158,6 +171,10 @@ const generatedBindings: WailsBindings = {
   async unbindProject(request) {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
     return bindings.UnbindProject(request);
+  },
+  async createContext(request) {
+    const bindings = await import("../../wailsjs/go/wailsapp/App");
+    return bindings.CreateContext(request);
   },
 };
 
@@ -198,6 +215,13 @@ function normalizeLaunchProjectResult(value: unknown): LaunchProjectResult {
     project: normalizeProjectState(object.project),
     context: normalizeContextState(object.context),
     warnings: arrayValue(object.warnings).map(normalizeResolutionWarning),
+  };
+}
+
+function normalizeCreateContextResult(value: unknown): CreateContextResult {
+  const object = objectValue(value);
+  return {
+    context: normalizeContextState(object.context),
   };
 }
 

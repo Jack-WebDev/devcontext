@@ -11,6 +11,7 @@ type service interface {
 	LaunchProject(application.LaunchProjectRequest) (application.LaunchProjectResult, *application.Error)
 	BindProject(application.BindProjectRequest) (application.ProjectBindingState, *application.Error)
 	UnbindProject(application.UnbindProjectRequest) (application.ProjectBindingState, *application.Error)
+	CreateContext(application.CreateContextRequest) (application.CreateContextResult, *application.Error)
 }
 
 // App is the Wails-bound application surface.
@@ -47,4 +48,9 @@ func (a *App) BindProject(request application.BindProjectRequest) (application.P
 // UnbindProject removes the remembered context for a project.
 func (a *App) UnbindProject(request application.UnbindProjectRequest) (application.ProjectBindingState, *application.Error) {
 	return a.service.UnbindProject(request)
+}
+
+// CreateContext creates a default context during first-run onboarding.
+func (a *App) CreateContext(request application.CreateContextRequest) (application.CreateContextResult, *application.Error) {
+	return a.service.CreateContext(request)
 }

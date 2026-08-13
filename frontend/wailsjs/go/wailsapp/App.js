@@ -6,6 +6,10 @@ export function BindProject(arg1) {
   return window['go']['wailsapp']['App']['BindProject'](arg1);
 }
 
+export function CreateContext(arg1) {
+  return window['go']['wailsapp']['App']['CreateContext'](arg1);
+}
+
 export function GetLaunchState(arg1) {
   return window['go']['wailsapp']['App']['GetLaunchState'](arg1);
 }

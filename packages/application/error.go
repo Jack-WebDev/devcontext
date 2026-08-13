@@ -122,6 +122,7 @@ func isLaunchError(err error) bool {
 func isValidationError(err error) bool {
 	return errors.Is(err, devcontext.ErrInvalidID) ||
 		errors.Is(err, devcontext.ErrContextNotFound) ||
+		errors.Is(err, devcontext.ErrContextAlreadyExists) ||
 		errors.Is(err, devcontext.ErrUnreadableContextConfig) ||
 		errors.Is(err, devcontext.ErrInvalidContextConfig) ||
 		errors.Is(err, devcontext.ErrContextIDMismatch) ||

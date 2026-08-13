@@ -2,7 +2,14 @@ import { useEffect, useState } from "react";
 
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
 import { SelectorView } from "./components/selector/SelectorView";
-import { devContextApi, type DisplayError, type LaunchState } from "./lib/devctx-api";
+import { createOnboardingContextAndRefresh } from "./components/selector/onboarding-action";
+import {
+  devContextApi,
+  type ApiResult,
+  type CreateContextResult,
+  type DisplayError,
+  type LaunchState,
+} from "./lib/devctx-api";
 import { devContextWindow } from "./lib/devctx-window";
 
 type LaunchStateLoad =
@@ -11,7 +18,9 @@ type LaunchStateLoad =
   | { status: "error"; error: DisplayError };
 
 function App() {
-  const [launchState, setLaunchState] = useState<LaunchStateLoad>({ status: "loading" });
+  const [launchState, setLaunchState] = useState<LaunchStateLoad>({
+    status: "loading",
+  });
 
   useEffect(() => {
     let active = true;
@@ -34,6 +43,23 @@ function App() {
     };
   }, []);
 
+  async function handleCreateContext(
+    contextId: string,
+  ): Promise<ApiResult<CreateContextResult>> {
+    const result = await createOnboardingContextAndRefresh({
+      contextId,
+      createContext: (requestedContextId) =>
+        devContextApi.createContext({ contextId: requestedContextId }),
+      getLaunchState: () => devContextApi.getLaunchState(),
+    });
+    if (result.ok) {
+      setLaunchState({ status: "loaded", data: result.launchState });
+      return { ok: true, data: result.created };
+    }
+
+    return { ok: false, error: result.error };
+  }
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-background">
@@ -43,21 +69,32 @@ function App() {
       </header>
 
       <div className="mx-auto max-w-5xl px-6 py-8">
-        <section aria-labelledby="context-selector-heading" className="space-y-6">
+        <section
+          aria-labelledby="context-selector-heading"
+          className="space-y-6"
+        >
           <div>
-            <h2 id="context-selector-heading" className="text-2xl font-semibold">
+            <h2
+              id="context-selector-heading"
+              className="text-2xl font-semibold"
+            >
               Context selector
             </h2>
           </div>
 
-          {renderSelectorContent(launchState)}
+          {renderSelectorContent(launchState, handleCreateContext)}
         </section>
       </div>
     </main>
   );
 }
 
-function renderSelectorContent(launchState: LaunchStateLoad) {
+function renderSelectorContent(
+  launchState: LaunchStateLoad,
+  onCreateContext: (
+    contextId: string,
+  ) => Promise<ApiResult<CreateContextResult>>,
+) {
   if (launchState.status === "loading") {
     return <p className="text-sm text-muted-foreground">Loading selector...</p>;
   }
@@ -72,6 +109,8 @@ function renderSelectorContent(launchState: LaunchStateLoad) {
       onBindProject={(request) => devContextApi.bindProject(request)}
       onLaunchProject={(request) => devContextApi.launchProject(request)}
       onCancel={() => devContextWindow.closeSelector()}
+      onCreatePersonalContext={() => onCreateContext("personal")}
+      onCreateCompanyContext={() => onCreateContext("company")}
     />
   );
 }
