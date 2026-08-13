@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -176,6 +177,130 @@ func TestRepositoryBindRejectsMissingTargetContext(t *testing.T) {
 	}
 	if len(stored) != 0 {
 		t.Fatalf("stored binding count = %d, want 0", len(stored))
+	}
+}
+
+func TestRepositoryUnbindRemovesSelectedBindingOnly(t *testing.T) {
+	homeDir := t.TempDir()
+	projectDir := filepath.Join(homeDir, "projects", "app")
+	unrelatedDir := filepath.Join(homeDir, "projects", "other")
+	createDirectory(t, projectDir)
+	createDirectory(t, unrelatedDir)
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return homeDir, nil
+	})
+	bindingsPath := filepath.Join(homeDir, ".devctx", "projects.toml")
+	createDirectory(t, filepath.Dir(bindingsPath))
+	target := projectBinding(projectDir, "personal", testTime(9, 0))
+	unrelated := projectBinding(unrelatedDir, "company", testTime(9, 5))
+	if err := project.WriteProjectBindingsFile(bindingsPath, []project.Binding{target, unrelated}); err != nil {
+		t.Fatalf("write initial bindings: %v", err)
+	}
+	repository := project.NewRepository(bindingsPath, platformPaths)
+
+	result, err := repository.Unbind("~/projects/app", project.Path(homeDir))
+	if err != nil {
+		t.Fatalf("unbind project: %v", err)
+	}
+	if !result.Removed {
+		t.Fatal("removed = false, want true")
+	}
+	if result.ProjectPath != project.Path(projectDir) {
+		t.Fatalf("result path = %q, want %q", result.ProjectPath, projectDir)
+	}
+	if !reflect.DeepEqual(result.Binding, target) {
+		t.Fatalf("removed binding = %#v, want %#v", result.Binding, target)
+	}
+
+	stored, err := project.ReadProjectBindingsFile(bindingsPath)
+	if err != nil {
+		t.Fatalf("read stored bindings: %v", err)
+	}
+	want := []project.Binding{unrelated}
+	if !reflect.DeepEqual(stored, want) {
+		t.Fatalf("stored bindings = %#v, want %#v", stored, want)
+	}
+}
+
+func TestRepositoryUnbindIsIdempotentForAlreadyUnboundProject(t *testing.T) {
+	homeDir := t.TempDir()
+	projectDir := filepath.Join(homeDir, "projects", "app")
+	unrelatedDir := filepath.Join(homeDir, "projects", "other")
+	createDirectory(t, projectDir)
+	createDirectory(t, unrelatedDir)
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return homeDir, nil
+	})
+	bindingsPath := filepath.Join(homeDir, ".devctx", "projects.toml")
+	createDirectory(t, filepath.Dir(bindingsPath))
+	unrelated := projectBinding(unrelatedDir, "company", testTime(9, 5))
+	if err := project.WriteProjectBindingsFile(bindingsPath, []project.Binding{unrelated}); err != nil {
+		t.Fatalf("write initial bindings: %v", err)
+	}
+	repository := project.NewRepository(bindingsPath, platformPaths)
+
+	result, err := repository.Unbind(projectDir, project.Path(homeDir))
+	if err != nil {
+		t.Fatalf("unbind project: %v", err)
+	}
+	if result.Removed {
+		t.Fatal("removed = true, want false")
+	}
+	if result.ProjectPath != project.Path(projectDir) {
+		t.Fatalf("result path = %q, want %q", result.ProjectPath, projectDir)
+	}
+
+	stored, err := project.ReadProjectBindingsFile(bindingsPath)
+	if err != nil {
+		t.Fatalf("read stored bindings: %v", err)
+	}
+	want := []project.Binding{unrelated}
+	if !reflect.DeepEqual(stored, want) {
+		t.Fatalf("stored bindings = %#v, want %#v", stored, want)
+	}
+}
+
+func TestRepositoryLookupWithContextValidationReportsDanglingBinding(t *testing.T) {
+	homeDir := t.TempDir()
+	projectDir := filepath.Join(homeDir, "projects", "app")
+	createDirectory(t, projectDir)
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return homeDir, nil
+	})
+	contextsDir := filepath.Join(homeDir, ".devctx", "contexts")
+	contextRepository := createContextRepository(t, contextsDir, devcontext.DefaultPersonalContext(testTime(10, 0)), devcontext.DefaultCompanyContext(testTime(10, 5)))
+	if err := os.RemoveAll(filepath.Join(contextsDir, "company")); err != nil {
+		t.Fatalf("remove company context directory: %v", err)
+	}
+	bindingsPath := filepath.Join(homeDir, ".devctx", "projects.toml")
+	createDirectory(t, filepath.Dir(bindingsPath))
+	binding := projectBinding(projectDir, "company", testTime(9, 0))
+	if err := project.WriteProjectBindingsFile(bindingsPath, []project.Binding{binding}); err != nil {
+		t.Fatalf("write project bindings: %v", err)
+	}
+	repository := project.NewRepository(bindingsPath, platformPaths)
+
+	lookup, err := repository.LookupWithContextValidation(projectDir, project.Path(homeDir), contextRepository)
+	if err != nil {
+		t.Fatalf("lookup with context validation: %v", err)
+	}
+	if lookup.Bound {
+		t.Fatal("bound = true, want false")
+	}
+	if !lookup.Dangling {
+		t.Fatal("dangling = false, want true")
+	}
+	if lookup.ProjectPath != project.Path(projectDir) {
+		t.Fatalf("lookup path = %q, want %q", lookup.ProjectPath, projectDir)
+	}
+	if !reflect.DeepEqual(lookup.Binding, binding) {
+		t.Fatalf("binding = %#v, want %#v", lookup.Binding, binding)
+	}
+	if lookup.MissingContextID != devcontext.MustID("company") {
+		t.Fatalf("missing context ID = %q, want company", lookup.MissingContextID)
+	}
+	if !strings.Contains(lookup.Recovery, "rebind") || !strings.Contains(lookup.Recovery, "unbind") {
+		t.Fatalf("recovery = %q, want rebind/unbind guidance", lookup.Recovery)
 	}
 }
 
