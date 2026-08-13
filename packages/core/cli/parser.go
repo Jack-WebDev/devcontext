@@ -64,7 +64,8 @@ type Command struct {
 }
 
 // RootLaunchCommand stores root launch arguments exactly as supplied after the
-// executable name. Later phases interpret these as paths and context flags.
+// executable name. ParseLaunchRequest interprets supported launch arguments
+// when filesystem context is available.
 type RootLaunchCommand struct {
 	Arguments []string
 }

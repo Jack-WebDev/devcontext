@@ -1,6 +1,5 @@
-// Package cli parses Dev Context command-line input into typed command
-// requests.
+// Package cli parses Dev Context command-line input into typed requests.
 //
-// The parser only recognizes command shape. It does not canonicalize paths,
-// validate context IDs, read storage, or execute application behavior.
+// Command-shape parsing is kept separate from adapters that need filesystem
+// context, such as root launch request construction.
 package cli
