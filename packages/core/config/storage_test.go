@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 
 	"devctx/packages/core/config"
@@ -61,6 +62,84 @@ func TestWriteGlobalConfigFileAtomicallyReplacesConfig(t *testing.T) {
 		t.Fatalf("decoded config = %#v, want %#v", decoded, globalConfig)
 	}
 	assertPermission(t, path, filesystem.RestrictedFileMode)
+}
+
+func TestGlobalConfigPersistenceRoundTrip(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	original := config.GlobalConfig{
+		Version:       config.CurrentSchemaVersion,
+		DefaultEditor: editor.TypeVSCode,
+		UI: config.UISettings{
+			RememberWindowPosition: false,
+		},
+		Safety: config.SafetySettings{
+			WarnOnContextMismatch:  false,
+			ConfirmUnboundProjects: true,
+		},
+	}
+
+	if err := config.WriteGlobalConfigFile(path, original); err != nil {
+		t.Fatalf("write global config: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read global config: %v", err)
+	}
+	loaded, err := config.DecodeGlobalConfigFileTOML(path, data)
+	if err != nil {
+		t.Fatalf("decode stored global config: %v", err)
+	}
+	if loaded != original {
+		t.Fatalf("loaded config = %#v, want %#v", loaded, original)
+	}
+}
+
+func TestConcurrentGlobalConfigWritesLeaveParseableConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	values := []config.GlobalConfig{
+		config.DefaultGlobalConfig(),
+		{
+			Version:       config.CurrentSchemaVersion,
+			DefaultEditor: editor.TypeVSCode,
+			UI: config.UISettings{
+				RememberWindowPosition: false,
+			},
+			Safety: config.SafetySettings{
+				WarnOnContextMismatch:  false,
+				ConfirmUnboundProjects: false,
+			},
+		},
+	}
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 40)
+	for i := 0; i < 40; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			errs <- config.WriteGlobalConfigFile(path, values[index%len(values)])
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("write global config: %v", err)
+		}
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read global config: %v", err)
+	}
+	decoded, err := config.DecodeGlobalConfigTOML(data)
+	if err != nil {
+		t.Fatalf("decode final global config: %v\n%s", err, data)
+	}
+	if decoded != values[0] && decoded != values[1] {
+		t.Fatalf("decoded config = %#v, want one complete written value", decoded)
+	}
 }
 
 func TestInitializeDevContextHomeCreatesLayoutIdempotently(t *testing.T) {

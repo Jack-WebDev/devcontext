@@ -2,6 +2,7 @@ package project_test
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"devctx/packages/core/filesystem"
@@ -121,6 +122,87 @@ func TestCanonicalizePathDoesNotResolveSymlinksByDefault(t *testing.T) {
 
 	if got != "/home/jack/link" {
 		t.Fatalf("canonical path = %q, want %q", got, "/home/jack/link")
+	}
+}
+
+func TestCanonicalizePathMatrixProducesSingleBindingIdentity(t *testing.T) {
+	tests := []struct {
+		name   string
+		home   string
+		base   project.Path
+		inputs []string
+		want   project.Path
+	}{
+		{
+			name: "unix variants",
+			home: "/home/jack",
+			base: "/home/jack/projects/app",
+			inputs: []string{
+				".",
+				"../app",
+				"/home/jack/projects/app",
+				"/home/jack/projects/app/",
+				"/home/jack/projects/./app",
+				"/home/jack/projects/other/../app",
+				"~/projects/app",
+			},
+			want: "/home/jack/projects/app",
+		},
+		{
+			name: "windows variants",
+			home: `C:\Users\Jack`,
+			base: `C:\Users\Jack\projects\app`,
+			inputs: []string{
+				".",
+				`..\app`,
+				`C:\Users\Jack\projects\app`,
+				`C:\Users\Jack\projects\app\`,
+				`C:/Users/Jack/projects/app`,
+				`C:\Users\Jack\projects\.\app`,
+				`C:\Users\Jack\projects\other\..\app`,
+				`~\projects\app`,
+			},
+			want: `C:\Users\Jack\projects\app`,
+		},
+		{
+			name: "windows separator variants remain equivalent",
+			home: `D:\Users\Alex`,
+			base: `D:\Users\Alex\workspace`,
+			inputs: []string{
+				`.\Client Portal`,
+				`Client Portal\`,
+				`Client Portal/.`,
+				`D:/Users/Alex/workspace/Client Portal`,
+				`D:\Users\Alex\workspace\other\..\Client Portal`,
+			},
+			want: `D:\Users\Alex\workspace\Client Portal`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			paths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+				return tt.home, nil
+			})
+			got := make([]project.Path, 0, len(tt.inputs))
+			for _, input := range tt.inputs {
+				canonical, err := project.CanonicalizePath(paths, input, tt.base)
+				if err != nil {
+					t.Fatalf("canonicalize %q: %v", input, err)
+				}
+				got = append(got, canonical)
+				if canonical != tt.want {
+					t.Fatalf("canonicalize %q = %q, want %q", input, canonical, tt.want)
+				}
+			}
+			wantAll := make([]project.Path, len(tt.inputs))
+			for i := range wantAll {
+				wantAll[i] = tt.want
+			}
+			if !reflect.DeepEqual(got, wantAll) {
+				t.Fatalf("canonical paths = %#v, want %#v", got, wantAll)
+			}
+		})
 	}
 }
 

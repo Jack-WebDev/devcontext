@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -63,6 +64,76 @@ func TestRepositoryListReturnsContextsInDeterministicOrder(t *testing.T) {
 	want := []devcontext.Context{client, company, personal}
 	if !reflect.DeepEqual(contexts, want) {
 		t.Fatalf("contexts = %#v, want %#v", contexts, want)
+	}
+}
+
+func TestRepositoryPersistenceRoundTripsMultipleContexts(t *testing.T) {
+	contextsDir := t.TempDir()
+	repository := devcontext.NewRepository(contextsDir)
+	contexts := []devcontext.Context{
+		storedContext("personal", "Personal"),
+		storedContext("company", "Company"),
+		storedContext("client-a", "Client A"),
+	}
+
+	for _, ctx := range contexts {
+		writeStoredContext(t, contextsDir, repository, ctx)
+	}
+
+	restartedRepository := devcontext.NewRepository(contextsDir)
+	got, err := restartedRepository.List()
+	if err != nil {
+		t.Fatalf("list contexts after restart: %v", err)
+	}
+
+	want := []devcontext.Context{contexts[2], contexts[1], contexts[0]}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("contexts = %#v, want %#v", got, want)
+	}
+	for _, wantContext := range contexts {
+		gotContext, err := restartedRepository.Get(wantContext.ID)
+		if err != nil {
+			t.Fatalf("get context %q after restart: %v", wantContext.ID, err)
+		}
+		if !reflect.DeepEqual(gotContext, wantContext) {
+			t.Fatalf("context %q = %#v, want %#v", wantContext.ID, gotContext, wantContext)
+		}
+	}
+}
+
+func TestConcurrentContextWritesLeaveParseableContext(t *testing.T) {
+	contextsDir := t.TempDir()
+	repository := devcontext.NewRepository(contextsDir)
+	contextID := devcontext.MustID("personal")
+	createContextDir(t, contextsDir, contextID)
+
+	values := []devcontext.Context{
+		storedContext("personal", "Personal"),
+		storedContext("personal", "Personal Updated"),
+	}
+	var wg sync.WaitGroup
+	errs := make(chan error, 40)
+	for i := 0; i < 40; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			errs <- repository.Write(values[index%len(values)])
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("write context: %v", err)
+		}
+	}
+
+	got, err := repository.Get(contextID)
+	if err != nil {
+		t.Fatalf("get final context: %v", err)
+	}
+	if !reflect.DeepEqual(got, values[0]) && !reflect.DeepEqual(got, values[1]) {
+		t.Fatalf("context = %#v, want one complete written value", got)
 	}
 }
 

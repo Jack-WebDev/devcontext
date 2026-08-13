@@ -451,6 +451,56 @@ func TestRunnerRootLaunchExecutesDirectCLIWithRecordingExecutable(t *testing.T) 
 	recording := string(data)
 	contextRoot := filepath.Join(fixture.homeDir, ".devctx", "contexts", "personal")
 	for _, want := range []string{
+		"cwd=" + fixture.workingDir + "\n",
+		"arg=-test.run=TestDirectCLIRecordingExecutableHelper\n",
+		"arg=--\n",
+		"arg=--user-data-dir\n",
+		"arg=" + filepath.Join(contextRoot, "vscode", "user-data") + "\n",
+		"arg=" + fixture.workingDir + "\n",
+		"env=personal\n",
+	} {
+		if !strings.Contains(recording, want) {
+			t.Fatalf("recording = %q, want containing %q", recording, want)
+		}
+	}
+}
+
+func TestRunnerRootLaunchExecutesBindingDerivedCLIWithRecordingExecutable(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	fixture.writeContext(t, testCLIContext("personal", "Personal"))
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.workingDir),
+		ContextID:   devcontext.MustID("personal"),
+		CreatedAt:   fixture.now,
+	})
+
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatalf("resolve test executable: %v", err)
+	}
+	recordPath := filepath.Join(fixture.root, "binding-recording.txt")
+
+	runner := fixture.runner()
+	runner.Editor = recordingExecutableEditor{executable: executable}
+	runner.ProcessLauncher = launcher.NativeProcessLauncher{}
+	runner.ParentEnvironment = []string{
+		"DEVCTX_RECORDING_EXECUTABLE=1",
+		"DEVCTX_RECORDING_PATH=" + recordPath,
+		"PATH=/usr/local/bin",
+	}
+	runner.DetachMode = launcher.DetachModeAttached
+
+	result := runner.Run([]string{fixture.workingDir})
+	assertResult(t, result, cli.ExitSuccess, "Project:\n"+fixture.workingDir+"\n\nContext:\npersonal\n\nStatus:\nlaunched\n", "")
+
+	data, err := os.ReadFile(recordPath)
+	if err != nil {
+		t.Fatalf("read recording: %v", err)
+	}
+	recording := string(data)
+	contextRoot := filepath.Join(fixture.homeDir, ".devctx", "contexts", "personal")
+	for _, want := range []string{
+		"cwd=" + fixture.workingDir + "\n",
 		"arg=-test.run=TestDirectCLIRecordingExecutableHelper\n",
 		"arg=--\n",
 		"arg=--user-data-dir\n",
@@ -577,6 +627,11 @@ func TestDirectCLIRecordingExecutableHelper(t *testing.T) {
 	}
 
 	var builder strings.Builder
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		os.Exit(1)
+	}
+	fmt.Fprintf(&builder, "cwd=%s\n", workingDirectory)
 	for _, arg := range os.Args[1:] {
 		fmt.Fprintf(&builder, "arg=%s\n", arg)
 	}

@@ -476,6 +476,68 @@ test("selector actions show launch as enabled and pending", () => {
   assert.ok(pending.includes("Launching..."));
 });
 
+test("selector critical path renders selected context and submits remembered launch", async () => {
+  const launchState = launchStateFixture({
+    binding: {
+      projectPath: "/work/api",
+      bound: true,
+      contextId: "personal",
+      dangling: false,
+    },
+    selectedContextId: "personal",
+    selectionRequired: false,
+    resolutionSource: "project_binding",
+  });
+  const html = [
+    renderToStaticMarkup(ProjectIdentity({project: launchState.project})),
+    renderToStaticMarkup(ContextCard({context: launchState.contexts[0], selected: true, onSelect: () => {}})),
+    renderToStaticMarkup(
+      RememberProjectControl({
+        binding: launchState.binding,
+        contexts: launchState.contexts,
+        rememberProject: false,
+        selectedContextId: "personal",
+      }),
+    ),
+    renderToStaticMarkup(
+      SelectorActions({
+        launchDisabled: false,
+        launchPending: true,
+        onLaunch: () => {},
+        onCancel: () => {},
+      }),
+    ),
+  ].join("");
+
+  assert.ok(html.includes("/work/api"));
+  assert.ok(html.includes("Personal"));
+  assert.match(html, /data-selected="true"/);
+  assert.ok(html.includes("This project is remembered for"));
+  assert.ok(html.includes("Launching..."));
+
+  const calls = [];
+  const selectedContextId = nextSelectedContextId(launchState.contexts, "company");
+  const result = await launchSelectedContext({
+    projectPath: launchState.project.path,
+    selectedContextId,
+    rememberProject: true,
+    bindProject(request) {
+      calls.push(["bindProject", request]);
+      return Promise.resolve(projectBindingResult());
+    },
+    launchProject(request) {
+      calls.push(["launchProject", request]);
+      return Promise.resolve(launchProjectResult());
+    },
+  });
+
+  assert.deepEqual(result, launchProjectResult());
+  assert.deepEqual(calls, [
+    ["bindProject", {projectPath: "/work/api", contextId: "company"}],
+    ["launchProject", {projectPath: "/work/api", contextId: "company"}],
+  ]);
+});
+
 test("launch action does nothing without a selected context", async () => {
   const calls = [];
   const result = await launchSelectedContext({
@@ -635,6 +697,57 @@ test("context mismatch open anyway pending state disables actions", () => {
 
   assert.ok(html.includes("Opening..."));
   assert.match(html, /disabled=""/);
+});
+
+test("context mismatch cancel exits without launch side effects", () => {
+  const calls = [];
+  const props = {
+    mismatch: {
+      projectPath: "/work/api",
+      boundContextId: "company",
+      requestedContextId: "personal",
+    },
+    contexts: [contextFixture("company", "Company"), contextFixture("personal", "Personal")],
+    launchPending: false,
+    onCancel: () => calls.push("cancel"),
+    onOpenAnyway: () => calls.push("launchProject"),
+  };
+  const html = renderToStaticMarkup(ContextMismatchDialog(props));
+
+  assert.ok(html.includes("Cancel"));
+  assert.ok(html.includes("Open Anyway"));
+  props.onCancel();
+  assert.deepEqual(calls, ["cancel"]);
+});
+
+test("context mismatch open anyway submits exactly one confirmed launch", async () => {
+  const calls = [];
+  const result = await launchSelectedContext({
+    projectPath: "/work/api",
+    selectedContextId: "personal",
+    rememberProject: false,
+    confirmContextMismatch: true,
+    bindProject(request) {
+      calls.push(["bindProject", request]);
+      return Promise.resolve(projectBindingResult());
+    },
+    launchProject(request) {
+      calls.push(["launchProject", request]);
+      return Promise.resolve(launchProjectResult());
+    },
+  });
+
+  assert.deepEqual(result, launchProjectResult());
+  assert.deepEqual(calls, [
+    [
+      "launchProject",
+      {
+        projectPath: "/work/api",
+        contextId: "personal",
+        confirmContextMismatch: true,
+      },
+    ],
+  ]);
 });
 
 test("gui error notice renders failure and recovery guidance", () => {

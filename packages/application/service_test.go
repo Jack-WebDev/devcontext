@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
@@ -63,6 +64,78 @@ func TestNewDefaultServiceOwnsDefaultDependencies(t *testing.T) {
 	}
 	if service.processLauncher() == nil {
 		t.Fatal("process launcher is nil")
+	}
+}
+
+func TestFirstRunInitializationLifecycleIsIdempotent(t *testing.T) {
+	root := t.TempDir()
+	homeDir := filepath.Join(root, "home")
+	projectDir := filepath.Join(root, "project")
+	if err := os.MkdirAll(projectDir, 0o700); err != nil {
+		t.Fatalf("create project directory: %v", err)
+	}
+
+	paths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return homeDir, nil
+	})
+	now := time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC)
+	options := DefaultOptions{
+		Paths:             paths,
+		ParentEnvironment: []string{"PATH=/usr/local/bin"},
+		WorkingDirectory:  projectDir,
+		Now: func() time.Time {
+			return now
+		},
+	}
+
+	firstService, err := NewDefaultService(options)
+	if err != nil {
+		t.Fatalf("create default service: %v", err)
+	}
+	firstState, appErr := firstService.GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get first launch state: %v", appErr)
+	}
+	if !firstState.FirstRun || len(firstState.Contexts) != 0 {
+		t.Fatalf("first launch state = %#v, want first-run with no contexts", firstState)
+	}
+
+	if _, appErr := firstService.CreateContext(CreateContextRequest{ContextID: "personal"}); appErr != nil {
+		t.Fatalf("create personal context: %v", appErr)
+	}
+	if _, appErr := firstService.CreateContext(CreateContextRequest{ContextID: "company"}); appErr != nil {
+		t.Fatalf("create company context: %v", appErr)
+	}
+
+	restartedService, err := NewDefaultService(options)
+	if err != nil {
+		t.Fatalf("restart default service: %v", err)
+	}
+	restartedState, appErr := restartedService.GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get restarted launch state: %v", appErr)
+	}
+	if restartedState.FirstRun {
+		t.Fatal("restarted first run = true, want false")
+	}
+	if gotIDs := contextStateIDs(restartedState.Contexts); !reflect.DeepEqual(gotIDs, []string{"company", "personal"}) {
+		t.Fatalf("context IDs = %#v, want company and personal", gotIDs)
+	}
+
+	layout, err := config.DevContextHomeLayout(paths)
+	if err != nil {
+		t.Fatalf("derive home layout: %v", err)
+	}
+	data, err := os.ReadFile(layout.ConfigPath)
+	if err != nil {
+		t.Fatalf("read default config: %v", err)
+	}
+	globalConfig, err := config.DecodeGlobalConfigTOML(data)
+	if err != nil {
+		t.Fatalf("decode default config: %v", err)
+	}
+	if globalConfig != config.DefaultGlobalConfig() {
+		t.Fatalf("global config = %#v, want default", globalConfig)
 	}
 }
 
@@ -165,6 +238,14 @@ type applicationFakeProvider struct {
 	statusByContext map[string]provider.Status
 	statusErr       error
 	environment     provider.EnvironmentContribution
+}
+
+func contextStateIDs(contexts []ContextState) []string {
+	ids := make([]string, len(contexts))
+	for i, ctx := range contexts {
+		ids[i] = ctx.ID
+	}
+	return ids
 }
 
 func (p applicationFakeProvider) ID() provider.ID {
