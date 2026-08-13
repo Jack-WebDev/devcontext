@@ -1,4 +1,38 @@
+import { useEffect, useState } from "react";
+
+import { ContextCard } from "./components/selector/ContextCard";
+import { ProjectIdentity } from "./components/selector/ProjectIdentity";
+import { devContextApi, type DisplayError, type LaunchState } from "./lib/devctx-api";
+
+type LaunchStateLoad =
+  | { status: "loading" }
+  | { status: "loaded"; data: LaunchState }
+  | { status: "error"; error: DisplayError };
+
 function App() {
+  const [launchState, setLaunchState] = useState<LaunchStateLoad>({ status: "loading" });
+
+  useEffect(() => {
+    let active = true;
+
+    devContextApi.getLaunchState().then((result) => {
+      if (!active) {
+        return;
+      }
+
+      if (result.ok) {
+        setLaunchState({ status: "loaded", data: result.data });
+        return;
+      }
+
+      setLaunchState({ status: "error", error: result.error });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-background">
@@ -14,9 +48,42 @@ function App() {
               Context selector
             </h2>
           </div>
+
+          {renderSelectorContent(launchState)}
         </section>
       </div>
     </main>
+  );
+}
+
+function renderSelectorContent(launchState: LaunchStateLoad) {
+  if (launchState.status === "loading") {
+    return <p className="text-sm text-muted-foreground">Loading selector...</p>;
+  }
+
+  if (launchState.status === "error") {
+    return (
+      <div className="border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+        <p className="font-medium">{launchState.error.message}</p>
+        <p className="mt-1 text-destructive/80">{launchState.error.recovery}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <ProjectIdentity project={launchState.data.project} />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        {launchState.data.contexts.map((context) => (
+          <ContextCard
+            key={context.id}
+            context={context}
+            selected={launchState.data.selectedContextId === context.id}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
