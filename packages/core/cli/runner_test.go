@@ -1,8 +1,10 @@
 package cli_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -11,7 +13,9 @@ import (
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
+	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
+	"devctx/packages/core/provider"
 )
 
 func TestRunnerContextListRendersEmptyAndPopulatedContexts(t *testing.T) {
@@ -200,6 +204,154 @@ func TestRunnerProjectUnbindIsIdempotentForUnboundProject(t *testing.T) {
 	assertResult(t, result, cli.ExitSuccess, "Project:\n"+fixture.workingDir+"\n\nContext:\nunbound\n\nStatus:\nunchanged\n", "")
 }
 
+func TestRunnerRootLaunchBuildsPlanAndStartsDetachedProcess(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	context := testCLIContext("personal", "Personal")
+	context.Providers = provider.Configs{
+		provider.ClaudeID: {Enabled: true},
+		provider.CodexID:  {Enabled: true},
+	}
+	fixture.writeContext(t, context)
+
+	launchEditor := &recordingCLIEditor{}
+	processLauncher := &recordingProcessLauncher{}
+	runner := fixture.runner()
+	runner.Providers = []provider.Provider{provider.ClaudeProvider{}, provider.CodexProvider{}}
+	runner.Editor = launchEditor
+	runner.ProcessLauncher = processLauncher
+	runner.ParentEnvironment = []string{
+		"PATH=/usr/local/bin",
+		"CODEX_HOME=/parent/codex",
+		"CLAUDE_CONFIG_DIR=/parent/claude",
+	}
+
+	result := runner.Run([]string{"--context", "personal", "."})
+	assertResult(t, result, cli.ExitSuccess, "Project:\n"+fixture.workingDir+"\n\nContext:\npersonal\n\nStatus:\nlaunched\n", "")
+
+	contextRoot := filepath.Join(fixture.homeDir, ".devctx", "contexts", "personal")
+	wantRequest := launcher.ProcessRequest{
+		Executable: launcher.Executable("/recording/code"),
+		Arguments: launcher.Arguments{
+			"--user-data-dir",
+			filepath.Join(contextRoot, "vscode", "user-data"),
+			fixture.workingDir,
+		},
+		Environment: launcher.Environment{
+			"PATH":              "/usr/local/bin",
+			"CODEX_HOME":        filepath.Join(contextRoot, "codex"),
+			"CLAUDE_CONFIG_DIR": filepath.Join(contextRoot, "claude"),
+			"DEVCTX_CONTEXT":    "personal",
+		},
+		WorkingDirectory: launcher.WorkingDirectory(fixture.workingDir),
+		DetachMode:       launcher.DetachModeDetached,
+	}
+	if !reflect.DeepEqual(processLauncher.requests, []launcher.ProcessRequest{wantRequest}) {
+		t.Fatalf("process requests = %#v, want %#v", processLauncher.requests, []launcher.ProcessRequest{wantRequest})
+	}
+
+	wantEditorRequest := editor.CommandRequest{
+		Config:      context.Editor,
+		Executable:  "/recording/code",
+		ProjectPath: fixture.workingDir,
+		Paths: editor.ContextPaths{
+			RootDir:     contextRoot,
+			DataDir:     filepath.Join(contextRoot, "vscode"),
+			UserDataDir: filepath.Join(contextRoot, "vscode", "user-data"),
+		},
+	}
+	if !reflect.DeepEqual(launchEditor.requests, []editor.CommandRequest{wantEditorRequest}) {
+		t.Fatalf("editor requests = %#v, want %#v", launchEditor.requests, []editor.CommandRequest{wantEditorRequest})
+	}
+}
+
+func TestRunnerRootLaunchRequiresMismatchConfirmation(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	fixture.writeContext(t, testCLIContext("personal", "Personal"))
+	fixture.writeContext(t, testCLIContext("company", "Company"))
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.workingDir),
+		ContextID:   devcontext.MustID("company"),
+		CreatedAt:   fixture.now,
+	})
+
+	processLauncher := &recordingProcessLauncher{}
+	runner := fixture.runner()
+	runner.Editor = &recordingCLIEditor{}
+	runner.ProcessLauncher = processLauncher
+	runner.ParentEnvironment = []string{"PATH=/usr/local/bin"}
+
+	result := runner.Run([]string{"--context", "personal", "."})
+	if result.Code != cli.ExitValidationError {
+		t.Fatalf("exit code = %d, want %d; stderr = %q", result.Code, cli.ExitValidationError, result.Stderr)
+	}
+	if !strings.Contains(result.Stderr, "Context mismatch requires confirmation") {
+		t.Fatalf("stderr = %q, want mismatch confirmation guidance", result.Stderr)
+	}
+	if len(processLauncher.requests) != 0 {
+		t.Fatalf("process requests = %#v, want none", processLauncher.requests)
+	}
+}
+
+func TestRunnerRootLaunchExecutesDirectCLIWithRecordingExecutable(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	fixture.writeContext(t, testCLIContext("personal", "Personal"))
+
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatalf("resolve test executable: %v", err)
+	}
+	recordPath := filepath.Join(fixture.root, "recording.txt")
+
+	runner := fixture.runner()
+	runner.Editor = recordingExecutableEditor{executable: executable}
+	runner.ProcessLauncher = launcher.NativeProcessLauncher{}
+	runner.ParentEnvironment = []string{
+		"DEVCTX_RECORDING_EXECUTABLE=1",
+		"DEVCTX_RECORDING_PATH=" + recordPath,
+		"PATH=/usr/local/bin",
+	}
+	runner.DetachMode = launcher.DetachModeAttached
+
+	result := runner.Run([]string{"--context", "personal", fixture.workingDir})
+	assertResult(t, result, cli.ExitSuccess, "Project:\n"+fixture.workingDir+"\n\nContext:\npersonal\n\nStatus:\nlaunched\n", "")
+
+	data, err := os.ReadFile(recordPath)
+	if err != nil {
+		t.Fatalf("read recording: %v", err)
+	}
+	recording := string(data)
+	contextRoot := filepath.Join(fixture.homeDir, ".devctx", "contexts", "personal")
+	for _, want := range []string{
+		"arg=-test.run=TestDirectCLIRecordingExecutableHelper\n",
+		"arg=--\n",
+		"arg=--user-data-dir\n",
+		"arg=" + filepath.Join(contextRoot, "vscode", "user-data") + "\n",
+		"arg=" + fixture.workingDir + "\n",
+		"env=personal\n",
+	} {
+		if !strings.Contains(recording, want) {
+			t.Fatalf("recording = %q, want containing %q", recording, want)
+		}
+	}
+}
+
+func TestDirectCLIRecordingExecutableHelper(t *testing.T) {
+	if os.Getenv("DEVCTX_RECORDING_EXECUTABLE") != "1" {
+		return
+	}
+
+	var builder strings.Builder
+	for _, arg := range os.Args[1:] {
+		fmt.Fprintf(&builder, "arg=%s\n", arg)
+	}
+	fmt.Fprintf(&builder, "env=%s\n", os.Getenv("DEVCTX_CONTEXT"))
+
+	if err := os.WriteFile(os.Getenv("DEVCTX_RECORDING_PATH"), []byte(builder.String()), 0o600); err != nil {
+		os.Exit(1)
+	}
+	os.Exit(0)
+}
+
 func TestRunnerReturnsUsageExitCodeForInvalidCommandShapes(t *testing.T) {
 	fixture := newRunnerFixture(t)
 
@@ -250,6 +402,7 @@ func (f runnerFixture) runner() cli.Runner {
 		Contexts:         devcontext.NewRepository(f.contextsDir),
 		Projects:         project.NewRepository(f.bindingsPath, f.paths),
 		WorkingDirectory: f.workingDir,
+		Paths:            f.paths,
 		Now: func() time.Time {
 			return f.now
 		},
@@ -306,4 +459,63 @@ func assertResult(t *testing.T, got cli.Result, wantCode cli.ExitCode, wantStdou
 	if got.Stderr != wantStderr {
 		t.Fatalf("stderr = %q, want %q", got.Stderr, wantStderr)
 	}
+}
+
+type recordingCLIEditor struct {
+	requests []editor.CommandRequest
+}
+
+func (e *recordingCLIEditor) ID() editor.ID {
+	return editor.VSCodeID
+}
+
+func (e *recordingCLIEditor) DetectExecutable(editor.Config) (editor.Executable, error) {
+	return "/recording/code", nil
+}
+
+func (e *recordingCLIEditor) BuildLaunchCommand(request editor.CommandRequest) (editor.Command, error) {
+	e.requests = append(e.requests, request)
+	return editor.Command{
+		Executable: request.Executable,
+		Arguments: editor.Arguments{
+			editor.VSCodeUserDataDirFlag,
+			request.Paths.UserDataDir,
+			request.ProjectPath,
+		},
+	}, nil
+}
+
+type recordingProcessLauncher struct {
+	requests []launcher.ProcessRequest
+	err      error
+}
+
+func (l *recordingProcessLauncher) Launch(request launcher.ProcessRequest) error {
+	l.requests = append(l.requests, request)
+	return l.err
+}
+
+type recordingExecutableEditor struct {
+	executable string
+}
+
+func (e recordingExecutableEditor) ID() editor.ID {
+	return editor.VSCodeID
+}
+
+func (e recordingExecutableEditor) DetectExecutable(editor.Config) (editor.Executable, error) {
+	return editor.Executable(e.executable), nil
+}
+
+func (e recordingExecutableEditor) BuildLaunchCommand(request editor.CommandRequest) (editor.Command, error) {
+	return editor.Command{
+		Executable: request.Executable,
+		Arguments: editor.Arguments{
+			"-test.run=TestDirectCLIRecordingExecutableHelper",
+			"--",
+			editor.VSCodeUserDataDirFlag,
+			request.Paths.UserDataDir,
+			request.ProjectPath,
+		},
+	}, nil
 }

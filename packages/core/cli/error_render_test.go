@@ -10,6 +10,7 @@ import (
 	"devctx/packages/core/cli"
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/editor"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
 )
@@ -84,6 +85,92 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 				"\n" +
 				"Next step:\n" +
 				"Confirm the mismatch intentionally or rerun with the bound context.\n",
+		},
+		{
+			name: "selection required",
+			err:  launcher.ErrLaunchSelectionRequired,
+			want: "" +
+				"Context selection required\n" +
+				"\n" +
+				"No explicit context or trusted project binding selected a context.\n" +
+				"\n" +
+				"Next step:\n" +
+				"Choose a context in the selector or rerun with `--context <id>`.\n",
+		},
+		{
+			name: "editor executable missing",
+			err: &editor.ExecutableNotFoundError{
+				EditorID:   editor.VSCodeID,
+				Candidates: []string{"code"},
+			},
+			want: "" +
+				"Unable to launch editor\n" +
+				"\n" +
+				"Dev Context could not find the configured editor executable.\n" +
+				"\n" +
+				"Next step:\n" +
+				"Install the editor command, add it to PATH, or configure a valid editor executable.\n",
+		},
+		{
+			name: "process executable missing",
+			err: &launcher.ProcessLaunchError{
+				Executable: "/missing/code",
+				Err:        launcher.ErrProcessExecutableNotFound,
+				Cause:      os.ErrNotExist,
+			},
+			want: "" +
+				"Unable to launch editor\n" +
+				"\n" +
+				"Dev Context could not find the configured editor executable.\n" +
+				"\n" +
+				"Next step:\n" +
+				"Install the editor command, add it to PATH, or configure a valid editor executable.\n",
+		},
+		{
+			name: "process permission denied",
+			err: &launcher.ProcessLaunchError{
+				Executable: "/opt/code",
+				Err:        launcher.ErrProcessPermissionDenied,
+				Cause:      os.ErrPermission,
+			},
+			want: "" +
+				"Unable to launch editor\n" +
+				"\n" +
+				"The operating system denied permission to start the editor process.\n" +
+				"\n" +
+				"Next step:\n" +
+				"Check executable, project, and Dev Context storage permissions, then retry.\n",
+		},
+		{
+			name: "process working directory invalid",
+			err: &launcher.ProcessLaunchError{
+				Executable:       "/usr/local/bin/code",
+				WorkingDirectory: "/missing/project",
+				Err:              launcher.ErrProcessWorkingDirectoryInvalid,
+				Cause:            os.ErrNotExist,
+			},
+			want: "" +
+				"Unable to launch editor\n" +
+				"\n" +
+				"The editor working directory is missing or is not a directory.\n" +
+				"\n" +
+				"Next step:\n" +
+				"Check the project path and run Dev Context from an existing project directory.\n",
+		},
+		{
+			name: "process start failed",
+			err: &launcher.ProcessLaunchError{
+				Executable: "/usr/local/bin/code",
+				Err:        launcher.ErrProcessStartFailed,
+				Cause:      errors.New("exit status 1"),
+			},
+			want: "" +
+				"Unable to launch editor\n" +
+				"\n" +
+				"The operating system could not start the editor process.\n" +
+				"\n" +
+				"Next step:\n" +
+				"Check the editor command and project path, then retry.\n",
 		},
 	}
 

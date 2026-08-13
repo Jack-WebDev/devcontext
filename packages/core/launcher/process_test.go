@@ -5,8 +5,10 @@ import (
 	"errors"
 	"os"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"devctx/packages/core/launcher"
 )
@@ -92,14 +94,110 @@ func TestNativeProcessLauncherLaunchesFixtureWithStructuredRequest(t *testing.T)
 	}
 }
 
-func TestNativeProcessLauncherRejectsUnsupportedDetachedLaunch(t *testing.T) {
+func TestNativeProcessLauncherDetachesFixtureProcess(t *testing.T) {
+	workingDirectory := t.TempDir()
+	startedPath := workingDirectory + string(os.PathSeparator) + "detached-started"
+	donePath := workingDirectory + string(os.PathSeparator) + "detached-done"
+
+	startedAt := time.Now()
 	err := launcher.NativeProcessLauncher{}.Launch(launcher.ProcessRequest{
 		Executable: launcher.Executable(os.Args[0]),
-		DetachMode: launcher.DetachModeDetached,
+		Arguments: launcher.Arguments{
+			"-test.run=TestNativeProcessLauncherDetachedHelper",
+		},
+		Environment: launcher.Environment{
+			"DEVCTX_DETACHED_HELPER_PROCESS": "1",
+			"DEVCTX_DETACHED_STARTED_PATH":   startedPath,
+			"DEVCTX_DETACHED_DONE_PATH":      donePath,
+		},
+		WorkingDirectory: launcher.WorkingDirectory(workingDirectory),
+		DetachMode:       launcher.DetachModeDetached,
 	})
+	if err != nil {
+		t.Fatalf("launch detached process: %v", err)
+	}
 
-	if !errors.Is(err, launcher.ErrDetachedProcessUnsupported) {
-		t.Fatalf("error = %v, want %v", err, launcher.ErrDetachedProcessUnsupported)
+	if elapsed := time.Since(startedAt); elapsed > 300*time.Millisecond {
+		t.Fatalf("detached launch took %s, want it to return without waiting", elapsed)
+	}
+	waitForFile(t, startedPath)
+	if _, err := os.Stat(donePath); err == nil {
+		t.Fatalf("detached child completed before launcher returned")
+	}
+	waitForFile(t, donePath)
+}
+
+func TestNativeProcessLauncherMapsLaunchFailures(t *testing.T) {
+	workingDirectory := t.TempDir()
+
+	tests := []struct {
+		name    string
+		request launcher.ProcessRequest
+		wantErr error
+		skip    func(t *testing.T)
+	}{
+		{
+			name: "executable missing",
+			request: launcher.ProcessRequest{
+				Executable:       launcher.Executable(workingDirectory + string(os.PathSeparator) + "missing-executable"),
+				WorkingDirectory: launcher.WorkingDirectory(workingDirectory),
+			},
+			wantErr: launcher.ErrProcessExecutableNotFound,
+		},
+		{
+			name: "permission denied",
+			request: launcher.ProcessRequest{
+				Executable:       launcher.Executable(nonExecutableFixture(t, workingDirectory)),
+				WorkingDirectory: launcher.WorkingDirectory(workingDirectory),
+			},
+			wantErr: launcher.ErrProcessPermissionDenied,
+			skip: func(t *testing.T) {
+				t.Helper()
+				if runtime.GOOS == "windows" {
+					t.Skip("Windows executable permissions are not represented by Unix mode bits")
+				}
+			},
+		},
+		{
+			name: "invalid working directory",
+			request: launcher.ProcessRequest{
+				Executable:       launcher.Executable(os.Args[0]),
+				WorkingDirectory: launcher.WorkingDirectory(workingDirectory + string(os.PathSeparator) + "missing-directory"),
+			},
+			wantErr: launcher.ErrProcessWorkingDirectoryInvalid,
+		},
+		{
+			name: "generic start failure",
+			request: launcher.ProcessRequest{
+				Executable: launcher.Executable(os.Args[0]),
+				Arguments: launcher.Arguments{
+					"-test.run=TestNativeProcessLauncherFailingHelper",
+				},
+				Environment: launcher.Environment{
+					"DEVCTX_FAILING_HELPER_PROCESS": "1",
+				},
+				WorkingDirectory: launcher.WorkingDirectory(workingDirectory),
+			},
+			wantErr: launcher.ErrProcessStartFailed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.skip != nil {
+				tt.skip(t)
+			}
+
+			err := launcher.NativeProcessLauncher{}.Launch(tt.request)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("error = %v, want %v", err, tt.wantErr)
+			}
+
+			var launchError *launcher.ProcessLaunchError
+			if !errors.As(err, &launchError) {
+				t.Fatalf("error = %T, want *launcher.ProcessLaunchError", err)
+			}
+		})
 	}
 }
 
@@ -147,6 +245,33 @@ func TestNativeProcessLauncherHelper(t *testing.T) {
 	}
 }
 
+func TestNativeProcessLauncherDetachedHelper(t *testing.T) {
+	if os.Getenv("DEVCTX_DETACHED_HELPER_PROCESS") != "1" {
+		return
+	}
+
+	startedPath := os.Getenv("DEVCTX_DETACHED_STARTED_PATH")
+	donePath := os.Getenv("DEVCTX_DETACHED_DONE_PATH")
+	if startedPath == "" || donePath == "" {
+		t.Fatal("missing detached helper paths")
+	}
+
+	if err := os.WriteFile(startedPath, []byte("started"), 0o600); err != nil {
+		t.Fatalf("write started marker: %v", err)
+	}
+	time.Sleep(500 * time.Millisecond)
+	if err := os.WriteFile(donePath, []byte("done"), 0o600); err != nil {
+		t.Fatalf("write done marker: %v", err)
+	}
+}
+
+func TestNativeProcessLauncherFailingHelper(t *testing.T) {
+	if os.Getenv("DEVCTX_FAILING_HELPER_PROCESS") != "1" {
+		return
+	}
+	os.Exit(7)
+}
+
 type processRecord struct {
 	Args             []string          `json:"args"`
 	Environment      map[string]string `json:"environment"`
@@ -187,4 +312,27 @@ func environMap(entries []string) map[string]string {
 		environment[key] = value
 	}
 	return environment
+}
+
+func waitForFile(t *testing.T, path string) {
+	t.Helper()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(path); err == nil {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %q", path)
+}
+
+func nonExecutableFixture(t *testing.T, dir string) string {
+	t.Helper()
+
+	path := dir + string(os.PathSeparator) + "not-executable"
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o644); err != nil {
+		t.Fatalf("write non-executable fixture: %v", err)
+	}
+	return path
 }

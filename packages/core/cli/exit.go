@@ -5,6 +5,7 @@ import (
 
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
@@ -49,7 +50,15 @@ func ExitCodeForError(err error) ExitCode {
 		return ExitSuccess
 	case errors.Is(err, ErrCanceled), errors.Is(err, launcher.ErrContextMismatchRejected):
 		return ExitCanceled
-	case errors.Is(err, ErrLaunchFailed):
+	case errors.Is(err, ErrLaunchFailed),
+		errors.Is(err, editor.ErrExecutableNotFound),
+		errors.Is(err, editor.ErrExecutableNotExecutable),
+		errors.Is(err, editor.ErrMissingExecutable),
+		errors.Is(err, launcher.ErrMissingProcessExecutable),
+		errors.Is(err, launcher.ErrProcessExecutableNotFound),
+		errors.Is(err, launcher.ErrProcessPermissionDenied),
+		errors.Is(err, launcher.ErrProcessWorkingDirectoryInvalid),
+		errors.Is(err, launcher.ErrProcessStartFailed):
 		return ExitLaunchFailure
 	case isValidationError(err):
 		return ExitValidationError
@@ -70,6 +79,7 @@ func isValidationError(err error) bool {
 		errors.Is(err, config.ErrUnsupportedSchemaVersion) ||
 		errors.Is(err, filesystem.ErrUserHomeUnavailable) ||
 		errors.Is(err, launcher.ErrContextMismatchRequiresConfirmation) ||
+		errors.Is(err, launcher.ErrLaunchSelectionRequired) ||
 		errors.Is(err, project.ErrInvalidProjectPath) ||
 		errors.Is(err, project.ErrProjectDirectoryNotFound) ||
 		errors.Is(err, project.ErrProjectPathNotDirectory) ||

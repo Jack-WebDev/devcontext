@@ -8,6 +8,7 @@ import (
 
 	"devctx/packages/core/cli"
 	"devctx/packages/core/config"
+	"devctx/packages/core/editor"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
 )
@@ -44,6 +45,11 @@ func TestExitCodeForErrorMapsStableCLIOutcomes(t *testing.T) {
 			want: cli.ExitValidationError,
 		},
 		{
+			name: "context selection required",
+			err:  fmt.Errorf("build launch plan: %w", launcher.ErrLaunchSelectionRequired),
+			want: cli.ExitValidationError,
+		},
+		{
 			name: "config validation",
 			err:  fmt.Errorf("load config: %w", config.ErrInvalidGlobalConfig),
 			want: cli.ExitValidationError,
@@ -66,6 +72,16 @@ func TestExitCodeForErrorMapsStableCLIOutcomes(t *testing.T) {
 		{
 			name: "launch failure",
 			err:  fmt.Errorf("start editor: %w", cli.ErrLaunchFailed),
+			want: cli.ExitLaunchFailure,
+		},
+		{
+			name: "editor detection failure",
+			err:  fmt.Errorf("detect editor: %w", editor.ErrExecutableNotFound),
+			want: cli.ExitLaunchFailure,
+		},
+		{
+			name: "mapped process launch failure",
+			err:  fmt.Errorf("start editor: %w", launcher.ErrProcessExecutableNotFound),
 			want: cli.ExitLaunchFailure,
 		},
 		{

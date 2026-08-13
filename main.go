@@ -10,8 +10,11 @@ import (
 	"devctx/packages/core/cli"
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
+	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
+	"devctx/packages/core/provider"
 	"devctx/packages/wailsapp"
 
 	"github.com/wailsapp/wails/v2"
@@ -51,7 +54,18 @@ func main() {
 }
 
 func shouldRunCLI(args []string) bool {
-	return len(args) > 0 && (args[0] == string(cli.CommandContext) || args[0] == string(cli.CommandProject))
+	if len(args) == 0 {
+		return false
+	}
+	if args[0] == string(cli.CommandContext) || args[0] == string(cli.CommandProject) {
+		return true
+	}
+	for _, arg := range args {
+		if arg == "--context" || arg == "--personal" || arg == "--company" {
+			return true
+		}
+	}
+	return false
 }
 
 func runCLI(args []string) cli.ExitCode {
@@ -74,9 +88,15 @@ func runCLI(args []string) cli.ExitCode {
 	}
 
 	runner := cli.Runner{
-		Contexts:         devcontext.NewRepository(layout.ContextsDir),
-		Projects:         project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
-		WorkingDirectory: workingDirectory,
+		Contexts:          devcontext.NewRepository(layout.ContextsDir),
+		Projects:          project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
+		WorkingDirectory:  workingDirectory,
+		Paths:             paths,
+		Providers:         []provider.Provider{provider.ClaudeProvider{}, provider.CodexProvider{}},
+		Editor:            editor.VSCodeEditor{},
+		ProcessLauncher:   launcher.NativeProcessLauncher{},
+		ParentEnvironment: os.Environ(),
+		DetachMode:        launcher.DetachModeDetached,
 	}
 	result := runner.Run(args)
 	if err := result.Write(os.Stdout, os.Stderr); err != nil {
