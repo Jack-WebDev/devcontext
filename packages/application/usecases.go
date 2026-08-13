@@ -58,6 +58,9 @@ func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, er
 	if err != nil {
 		return LaunchState{}, err
 	}
+	if len(contexts) == 0 {
+		return firstRunLaunchState(projectPath), nil
+	}
 
 	lookup, err := s.dependencies.Projects.LookupWithContextValidation(string(projectPath), projectPath, s.dependencies.Contexts)
 	if err != nil {
@@ -81,8 +84,18 @@ func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, er
 		SelectionRequired: resolution.SelectionRequired,
 		ResolutionSource:  string(resolution.Source),
 		Warnings:          warningStates(resolution.Warnings),
-		FirstRun:          len(contexts) == 0,
 	}, nil
+}
+
+func firstRunLaunchState(projectPath project.Path) LaunchState {
+	return LaunchState{
+		Project:           projectState(projectPath),
+		Contexts:          []ContextState{},
+		Binding:           ProjectBindingState{ProjectPath: string(projectPath)},
+		SelectionRequired: true,
+		ResolutionSource:  string(launcher.ResolutionSourceUserSelection),
+		FirstRun:          true,
+	}
 }
 
 func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResult, error) {

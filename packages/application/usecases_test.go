@@ -134,22 +134,59 @@ func TestGetLaunchStateReportsDanglingBindingWarning(t *testing.T) {
 	}
 }
 
-func TestGetLaunchStateReportsFirstRunWhenNoContextsExist(t *testing.T) {
+func TestGetLaunchStateDetectsFirstRunState(t *testing.T) {
+	t.Run("absent initialization", func(t *testing.T) {
+		fixture := newApplicationFixture(t)
+		removeAll(t, fixture.contextsDir)
+
+		state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+		if appErr != nil {
+			t.Fatalf("get launch state: %v", appErr)
+		}
+
+		assertFirstRunState(t, state, fixture.projectDir)
+	})
+
+	t.Run("initialized empty home", func(t *testing.T) {
+		fixture := newApplicationFixture(t)
+
+		state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+		if appErr != nil {
+			t.Fatalf("get launch state: %v", appErr)
+		}
+
+		assertFirstRunState(t, state, fixture.projectDir)
+	})
+
+	t.Run("populated home", func(t *testing.T) {
+		fixture := newApplicationFixture(t)
+		fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+		state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+		if appErr != nil {
+			t.Fatalf("get launch state: %v", appErr)
+		}
+
+		if state.FirstRun {
+			t.Fatal("first run = true, want false")
+		}
+		if len(state.Contexts) != 1 {
+			t.Fatalf("context count = %d, want 1", len(state.Contexts))
+		}
+	})
+}
+
+func TestGetLaunchStateReportsContextStorageErrors(t *testing.T) {
 	fixture := newApplicationFixture(t)
+	removeAll(t, fixture.contextsDir)
+	writeFile(t, fixture.contextsDir, []byte("not a directory"))
 
-	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
-	if appErr != nil {
-		t.Fatalf("get launch state: %v", appErr)
+	_, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr == nil {
+		t.Fatal("get launch state error = nil, want context storage error")
 	}
-
-	if !state.FirstRun {
-		t.Fatal("first run = false, want true")
-	}
-	if len(state.Contexts) != 0 {
-		t.Fatalf("contexts = %#v, want none", state.Contexts)
-	}
-	if !state.SelectionRequired {
-		t.Fatal("selection required = false, want true")
+	if appErr.Code != ErrorCodeInternal {
+		t.Fatalf("error code = %q, want %q", appErr.Code, ErrorCodeInternal)
 	}
 }
 
@@ -340,6 +377,35 @@ func assertContextStates(t *testing.T, got []ContextState, want []ContextState) 
 	}
 }
 
+func assertFirstRunState(t *testing.T, state LaunchState, projectDir string) {
+	t.Helper()
+
+	if !state.FirstRun {
+		t.Fatal("first run = false, want true")
+	}
+	if len(state.Contexts) != 0 {
+		t.Fatalf("contexts = %#v, want none", state.Contexts)
+	}
+	if state.Project != (ProjectState{Name: "current", Path: projectDir}) {
+		t.Fatalf("project = %#v, want current project", state.Project)
+	}
+	if state.Binding.Bound || state.Binding.ProjectPath != projectDir {
+		t.Fatalf("binding = %#v, want unbound current project", state.Binding)
+	}
+	if !state.SelectionRequired {
+		t.Fatal("selection required = false, want true")
+	}
+	if state.ResolutionSource != string(launcher.ResolutionSourceUserSelection) {
+		t.Fatalf("resolution source = %q, want user selection", state.ResolutionSource)
+	}
+	if state.SelectedContextID != "" {
+		t.Fatalf("selected context = %q, want empty", state.SelectedContextID)
+	}
+	if len(state.Warnings) != 0 {
+		t.Fatalf("warnings = %#v, want none", state.Warnings)
+	}
+}
+
 type applicationFixture struct {
 	root         string
 	homeDir      string
@@ -431,5 +497,21 @@ func mkdir(t *testing.T, path string) {
 
 	if err := os.MkdirAll(path, 0o700); err != nil {
 		t.Fatalf("create directory %q: %v", path, err)
+	}
+}
+
+func removeAll(t *testing.T, path string) {
+	t.Helper()
+
+	if err := os.RemoveAll(path); err != nil {
+		t.Fatalf("remove %q: %v", path, err)
+	}
+}
+
+func writeFile(t *testing.T, path string, data []byte) {
+	t.Helper()
+
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("write file %q: %v", path, err)
 	}
 }
