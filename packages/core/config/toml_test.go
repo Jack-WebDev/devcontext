@@ -161,3 +161,105 @@ confirm_unbound_projects = true
 		})
 	}
 }
+
+func TestDecodeGlobalConfigFileTOMLReportsActionableCorruptConfigError(t *testing.T) {
+	path := "/home/alex/.devctx/config.toml"
+
+	_, err := config.DecodeGlobalConfigFileTOML(path, []byte(`version = `))
+	if err == nil {
+		t.Fatal("error is nil")
+	}
+	if !errors.Is(err, config.ErrInvalidGlobalConfig) {
+		t.Fatalf("error = %v, want %v", err, config.ErrInvalidGlobalConfig)
+	}
+
+	var fileErr *config.GlobalConfigFileError
+	if !errors.As(err, &fileErr) {
+		t.Fatalf("error type = %T, want *config.GlobalConfigFileError", err)
+	}
+	if fileErr.Path != path {
+		t.Fatalf("path = %q, want %q", fileErr.Path, path)
+	}
+	if !strings.Contains(err.Error(), path) {
+		t.Fatalf("error = %q, want path %q", err.Error(), path)
+	}
+	if !strings.Contains(err.Error(), "malformed or missing required settings") {
+		t.Fatalf("error = %q, want likely cause", err.Error())
+	}
+	if !strings.Contains(err.Error(), "fix config.toml or move it aside") {
+		t.Fatalf("error = %q, want corrective action", err.Error())
+	}
+	if strings.Contains(err.Error(), "expected value") {
+		t.Fatalf("error = %q, should not expose raw parser details", err.Error())
+	}
+}
+
+func TestEncodeGlobalConfigTOMLIsDeterministic(t *testing.T) {
+	globalConfig := config.GlobalConfig{
+		Version:       config.CurrentSchemaVersion,
+		DefaultEditor: editor.TypeVSCode,
+		UI: config.UISettings{
+			RememberWindowPosition: false,
+		},
+		Safety: config.SafetySettings{
+			WarnOnContextMismatch:  true,
+			ConfirmUnboundProjects: false,
+		},
+	}
+
+	encoded, err := config.EncodeGlobalConfigTOML(globalConfig)
+	if err != nil {
+		t.Fatalf("encode global config: %v", err)
+	}
+
+	want := `version = 1
+
+default_editor = "vscode"
+
+[ui]
+remember_window_position = false
+
+[safety]
+warn_on_context_mismatch = true
+confirm_unbound_projects = false
+`
+	if string(encoded) != want {
+		t.Fatalf("encoded TOML =\n%s\nwant:\n%s", encoded, want)
+	}
+}
+
+func TestEncodeGlobalConfigTOMLRoundTripsThroughDecoder(t *testing.T) {
+	globalConfig := config.DefaultGlobalConfig()
+
+	encoded, err := config.EncodeGlobalConfigTOML(globalConfig)
+	if err != nil {
+		t.Fatalf("encode global config: %v", err)
+	}
+
+	decoded, err := config.DecodeGlobalConfigTOML(encoded)
+	if err != nil {
+		t.Fatalf("decode encoded global config: %v", err)
+	}
+
+	if decoded != globalConfig {
+		t.Fatalf("decoded config = %#v, want %#v", decoded, globalConfig)
+	}
+}
+
+func TestEncodeGlobalConfigTOMLRejectsUnsupportedValues(t *testing.T) {
+	_, err := config.EncodeGlobalConfigTOML(config.GlobalConfig{
+		Version:       config.SchemaVersion(99),
+		DefaultEditor: editor.TypeVSCode,
+	})
+	if !errors.Is(err, config.ErrUnsupportedSchemaVersion) {
+		t.Fatalf("error = %v, want %v", err, config.ErrUnsupportedSchemaVersion)
+	}
+
+	_, err = config.EncodeGlobalConfigTOML(config.GlobalConfig{
+		Version:       config.CurrentSchemaVersion,
+		DefaultEditor: editor.Type("unknown"),
+	})
+	if !errors.Is(err, config.ErrInvalidGlobalConfig) {
+		t.Fatalf("error = %v, want %v", err, config.ErrInvalidGlobalConfig)
+	}
+}
