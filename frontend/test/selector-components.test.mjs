@@ -9,10 +9,13 @@ import {
   boundContextName,
   RememberProjectControl,
 } from "../.tmp-test/src/components/selector/RememberProjectControl.js";
+import {SelectorActions} from "../.tmp-test/src/components/selector/SelectorActions.js";
+import {cancelSelector} from "../.tmp-test/src/components/selector/cancel-action.js";
 import {
   initialSelectedContextId,
   nextSelectedContextId,
 } from "../.tmp-test/src/components/selector/selection-state.js";
+import {createDevContextWindow} from "../.tmp-test/src/lib/devctx-window.js";
 
 test("project identity preserves full project names and paths", () => {
   const projects = [
@@ -222,6 +225,34 @@ test("remember control is disabled when no context is selected", () => {
   assert.match(html, /type="checkbox"/);
   assert.match(html, /disabled=""/);
   assert.ok(html.includes("Select a context before remembering this project."));
+});
+
+test("selector actions render a cancel control", () => {
+  const html = renderToStaticMarkup(SelectorActions({onCancel: () => {}}));
+
+  assert.match(html, /<button/);
+  assert.ok(html.includes("Cancel"));
+});
+
+test("cancel closes the selector without launch or binding side effects", async () => {
+  const calls = [];
+  const window = createDevContextWindow({
+    quit() {
+      calls.push("closeSelector");
+    },
+  });
+
+  await cancelSelector({
+    closeSelector: () => window.closeSelector(),
+    launchProject() {
+      calls.push("launchProject");
+    },
+    bindProject() {
+      calls.push("bindProject");
+    },
+  });
+
+  assert.deepEqual(calls, ["closeSelector"]);
 });
 
 function contextFixture(id, name, providers = []) {

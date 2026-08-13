@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { SelectorView } from "./components/selector/SelectorView";
 import { devContextApi, type DisplayError, type LaunchState } from "./lib/devctx-api";
+import { devContextWindow } from "./lib/devctx-window";
 
 type LaunchStateLoad =
   | { status: "loading" }
@@ -70,7 +71,7 @@ function renderSelectorContent(launchState: LaunchStateLoad) {
   }
 
   return (
-    <SelectorView launchState={launchState.data} />
+    <SelectorView launchState={launchState.data} onCancel={() => devContextWindow.closeSelector()} />
   );
 }
 

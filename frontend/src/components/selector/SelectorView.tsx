@@ -4,13 +4,16 @@ import type { LaunchState } from "../../lib/devctx-api";
 import { ContextCard } from "./ContextCard";
 import { ProjectIdentity } from "./ProjectIdentity";
 import { RememberProjectControl } from "./RememberProjectControl";
+import { SelectorActions } from "./SelectorActions";
+import { cancelSelector } from "./cancel-action";
 import { initialSelectedContextId, nextSelectedContextId } from "./selection-state";
 
 interface SelectorViewProps {
   launchState: LaunchState;
+  onCancel: () => Promise<void> | void;
 }
 
-function SelectorView({ launchState }: SelectorViewProps) {
+function SelectorView({ launchState, onCancel }: SelectorViewProps) {
   const [selectedContextId, setSelectedContextId] = useState<string | undefined>(() =>
     initialSelectedContextId(launchState),
   );
@@ -48,6 +51,8 @@ function SelectorView({ launchState }: SelectorViewProps) {
           selectedContextId={selectedContextId}
           onRememberProjectChange={setRememberProject}
         />
+
+        <SelectorActions onCancel={() => void cancelSelector({ closeSelector: onCancel })} />
       </div>
     </div>
   );
