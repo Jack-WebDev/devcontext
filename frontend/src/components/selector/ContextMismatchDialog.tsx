@@ -42,7 +42,7 @@ function ContextMismatchDialog({
         <div className="flex justify-end gap-3">
           <button
             type="button"
-            className="border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-foreground/30"
+            className="border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-foreground/30 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={launchPending}
             onClick={onCancel}
           >
@@ -50,7 +50,7 @@ function ContextMismatchDialog({
           </button>
           <button
             type="button"
-            className="bg-destructive px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="bg-destructive px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={launchPending}
             onClick={onOpenAnyway}
           >

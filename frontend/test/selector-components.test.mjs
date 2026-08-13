@@ -18,9 +18,15 @@ import {
   launchSelectedContext,
 } from "../.tmp-test/src/components/selector/launch-action.js";
 import {
+  initialRovingContextId,
   initialSelectedContextId,
+  nextKeyboardContextId,
   nextSelectedContextId,
 } from "../.tmp-test/src/components/selector/selection-state.js";
+import {
+  canLaunchSelectedContextFromKeyboard,
+  escapeKeyboardAction,
+} from "../.tmp-test/src/components/selector/selector-keyboard.js";
 import {createDevContextWindow} from "../.tmp-test/src/lib/devctx-window.js";
 
 test("project identity preserves full project names and paths", () => {
@@ -78,14 +84,17 @@ test("context card can represent a selected context", () => {
 
   assert.match(html, /data-selected="true"/);
   assert.match(html, /border-primary/);
+  assert.match(html, />Selected</);
 });
 
 test("context card renders as a selectable control when wired", () => {
   const context = contextFixture("client-a", "Client A");
-  const html = renderToStaticMarkup(ContextCard({context, onSelect: () => {}}));
+  const html = renderToStaticMarkup(ContextCard({context, tabIndex: -1, onSelect: () => {}}));
 
   assert.match(html, /<button/);
   assert.match(html, /aria-pressed="false"/);
+  assert.match(html, /tabindex="-1"/);
+  assert.match(html, />Not selected</);
 });
 
 test("context card renders enabled provider status variants with accessible names", () => {
@@ -118,6 +127,7 @@ test("selection initializes from a valid bound context", () => {
   });
 
   assert.equal(initialSelectedContextId(state), "company");
+  assert.equal(initialRovingContextId(state), "company");
 });
 
 test("selection stays empty for unbound and dangling launch states", () => {
@@ -161,6 +171,95 @@ test("selection changes to one existing context at a time", () => {
   assert.equal(nextSelectedContextId(contexts, "missing"), undefined);
 });
 
+test("keyboard context navigation clamps at the start, middle, and end", () => {
+  const contexts = [
+    contextFixture("personal", "Personal"),
+    contextFixture("company", "Company"),
+    contextFixture("client-a", "Client A"),
+  ];
+
+  assert.equal(nextKeyboardContextId(contexts, "personal", "previous"), "personal");
+  assert.equal(nextKeyboardContextId(contexts, "personal", "next"), "company");
+  assert.equal(nextKeyboardContextId(contexts, "company", "previous"), "personal");
+  assert.equal(nextKeyboardContextId(contexts, "company", "next"), "client-a");
+  assert.equal(nextKeyboardContextId(contexts, "client-a", "previous"), "company");
+  assert.equal(nextKeyboardContextId(contexts, "client-a", "next"), "client-a");
+});
+
+test("keyboard context navigation handles empty, single, and missing active lists", () => {
+  const singleContext = [contextFixture("personal", "Personal")];
+  const multipleContexts = [
+    contextFixture("personal", "Personal"),
+    contextFixture("company", "Company"),
+  ];
+
+  assert.equal(nextKeyboardContextId([], undefined, "next"), undefined);
+  assert.equal(nextKeyboardContextId(singleContext, "personal", "next"), "personal");
+  assert.equal(nextKeyboardContextId(singleContext, "personal", "previous"), "personal");
+  assert.equal(nextKeyboardContextId(multipleContexts, undefined, "next"), "personal");
+  assert.equal(nextKeyboardContextId(multipleContexts, "missing", "previous"), "personal");
+});
+
+test("enter launches only a selected idle base selector", () => {
+  assert.equal(
+    canLaunchSelectedContextFromKeyboard({
+      selectedContextId: "personal",
+      launchPending: false,
+      mismatchDialogOpen: false,
+    }),
+    true,
+  );
+  assert.equal(
+    canLaunchSelectedContextFromKeyboard({
+      launchPending: false,
+      mismatchDialogOpen: false,
+    }),
+    false,
+  );
+  assert.equal(
+    canLaunchSelectedContextFromKeyboard({
+      selectedContextId: "personal",
+      launchPending: true,
+      mismatchDialogOpen: false,
+    }),
+    false,
+  );
+  assert.equal(
+    canLaunchSelectedContextFromKeyboard({
+      selectedContextId: "personal",
+      launchPending: false,
+      mismatchDialogOpen: true,
+    }),
+    false,
+  );
+});
+
+test("escape cancels the active selector layer", () => {
+  assert.equal(
+    escapeKeyboardAction({
+      launchPending: false,
+      mismatchDialogOpen: false,
+    }),
+    "close-selector",
+  );
+  assert.equal(
+    escapeKeyboardAction({
+      selectedContextId: "personal",
+      launchPending: false,
+      mismatchDialogOpen: true,
+    }),
+    "close-dialog",
+  );
+  assert.equal(
+    escapeKeyboardAction({
+      selectedContextId: "personal",
+      launchPending: true,
+      mismatchDialogOpen: true,
+    }),
+    "none",
+  );
+});
+
 test("remember control renders unchecked for unbound selected projects", () => {
   const state = launchStateFixture();
   const html = renderToStaticMarkup(
@@ -173,6 +272,7 @@ test("remember control renders unchecked for unbound selected projects", () => {
   );
 
   assert.match(html, /type="checkbox"/);
+  assert.match(html, /focus-visible:ring-2/);
   assert.doesNotMatch(html, /checked=""/);
   assert.doesNotMatch(html, /disabled=""/);
   assert.ok(html.includes("Remember this project"));
@@ -246,6 +346,7 @@ test("selector actions disable launch without a selected context", () => {
   assert.ok(html.includes("Launch"));
   assert.ok(html.includes("Cancel"));
   assert.match(html, /disabled=""/);
+  assert.match(html, /focus-visible:ring-2/);
 });
 
 test("selector actions show launch as enabled and pending", () => {
@@ -411,6 +512,7 @@ test("context mismatch dialog shows risk details and deliberate actions", () => 
   assert.ok(html.includes("expose project files"));
   assert.ok(html.includes("Cancel"));
   assert.ok(html.includes("Open Anyway"));
+  assert.match(html, /focus-visible:ring-2/);
 });
 
 test("context mismatch open anyway pending state disables actions", () => {
