@@ -21,7 +21,7 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 		{
 			name: "personal",
 			context: devcontext.Context{
-				ID:   "personal",
+				ID:   devcontext.MustID("personal"),
 				Name: "Personal",
 				Editor: devcontext.EditorConfig{
 					Type: "vscode",
@@ -35,7 +35,7 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 				},
 				CreatedAt: createdAt,
 			},
-			wantID:          "personal",
+			wantID:          devcontext.MustID("personal"),
 			wantDisplayName: "Personal",
 			wantProviderState: map[devcontext.ProviderID]bool{
 				"claude": true,
@@ -48,7 +48,7 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 		{
 			name: "company",
 			context: devcontext.Context{
-				ID:   "company",
+				ID:   devcontext.MustID("company"),
 				Name: "Company",
 				Editor: devcontext.EditorConfig{
 					Type: "vscode",
@@ -62,7 +62,7 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 				},
 				CreatedAt: createdAt,
 			},
-			wantID:          "company",
+			wantID:          devcontext.MustID("company"),
 			wantDisplayName: "Company",
 			wantProviderState: map[devcontext.ProviderID]bool{
 				"claude": true,
@@ -75,7 +75,7 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 		{
 			name: "client",
 			context: devcontext.Context{
-				ID:   "client-a",
+				ID:   devcontext.MustID("client-a"),
 				Name: "Client A",
 				Editor: devcontext.EditorConfig{
 					Type: "vscode",
@@ -90,7 +90,7 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 				},
 				CreatedAt: createdAt,
 			},
-			wantID:          "client-a",
+			wantID:          devcontext.MustID("client-a"),
 			wantDisplayName: "Client A",
 			wantProviderState: map[devcontext.ProviderID]bool{
 				"claude":          true,

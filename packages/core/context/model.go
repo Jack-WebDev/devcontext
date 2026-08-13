@@ -2,13 +2,6 @@ package context
 
 import "time"
 
-// ID identifies a development context.
-//
-// Validation of safe filesystem identifiers is handled by the context
-// validation boundary; this type exists so domain models do not pass raw
-// strings for context identity.
-type ID string
-
 // EditorType identifies the editor a context intends to launch.
 type EditorType string
 
