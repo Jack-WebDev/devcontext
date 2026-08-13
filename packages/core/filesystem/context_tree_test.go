@@ -2,7 +2,9 @@ package filesystem_test
 
 import (
 	"errors"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"testing"
@@ -75,6 +77,100 @@ func TestCreateContextDirectoryTreeRejectsMismatchedContextID(t *testing.T) {
 	}
 }
 
+func TestCreateContextDirectoryTreeRejectsDuplicateWithoutModifyingTree(t *testing.T) {
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return t.TempDir(), nil
+	})
+	contextID := devcontext.MustID("client-a")
+	contextPaths, err := filesystem.DeriveContextPaths(platformPaths, contextID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	original := contextTreeContext(contextID, "Client A")
+	replacement := contextTreeContext(contextID, "Replacement")
+
+	if err := filesystem.CreateContextDirectoryTree(contextPaths, original); err != nil {
+		t.Fatalf("create original context directory tree: %v", err)
+	}
+	sentinelPath := filepath.Join(contextPaths.ClaudeDir, "auth-state.json")
+	if err := os.WriteFile(sentinelPath, []byte("keep me"), 0o600); err != nil {
+		t.Fatalf("write sentinel file: %v", err)
+	}
+	before := snapshotTree(t, contextPaths.RootDir)
+
+	err = filesystem.CreateContextDirectoryTree(contextPaths, replacement)
+	if !errors.Is(err, devcontext.ErrContextAlreadyExists) {
+		t.Fatalf("error = %v, want %v", err, devcontext.ErrContextAlreadyExists)
+	}
+
+	after := snapshotTree(t, contextPaths.RootDir)
+	if !reflect.DeepEqual(after, before) {
+		t.Fatalf("tree after duplicate create = %#v, want %#v", after, before)
+	}
+
+	data, err := os.ReadFile(contextPaths.ConfigPath)
+	if err != nil {
+		t.Fatalf("read context config: %v", err)
+	}
+	decoded, err := devcontext.DecodeContextTOML(data, contextID)
+	if err != nil {
+		t.Fatalf("decode context config: %v", err)
+	}
+	if !reflect.DeepEqual(decoded, original) {
+		t.Fatalf("decoded context = %#v, want %#v", decoded, original)
+	}
+}
+
+func TestBootstrapDefaultContextsCreateLoadableSeeds(t *testing.T) {
+	homeDir := t.TempDir()
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return homeDir, nil
+	})
+	devContextHomeDir, err := platformPaths.DevContextHomeDir()
+	if err != nil {
+		t.Fatalf("dev context home: %v", err)
+	}
+	createdAt := time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC)
+
+	tests := []struct {
+		name      string
+		bootstrap func(filesystem.PlatformPaths, time.Time) (devcontext.Context, error)
+		want      devcontext.Context
+	}{
+		{
+			name:      "personal",
+			bootstrap: filesystem.BootstrapPersonalContext,
+			want:      devcontext.DefaultPersonalContext(createdAt),
+		},
+		{
+			name:      "company",
+			bootstrap: filesystem.BootstrapCompanyContext,
+			want:      devcontext.DefaultCompanyContext(createdAt),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			seeded, err := tt.bootstrap(platformPaths, createdAt)
+			if err != nil {
+				t.Fatalf("bootstrap context: %v", err)
+			}
+			if !reflect.DeepEqual(seeded, tt.want) {
+				t.Fatalf("seeded context = %#v, want %#v", seeded, tt.want)
+			}
+
+			repository := devcontext.NewRepository(filepath.Join(devContextHomeDir, "contexts"))
+			stored, err := repository.Get(tt.want.ID)
+			if err != nil {
+				t.Fatalf("get bootstrapped context: %v", err)
+			}
+			if !reflect.DeepEqual(stored, tt.want) {
+				t.Fatalf("stored context = %#v, want %#v", stored, tt.want)
+			}
+		})
+	}
+}
+
 func assertDirectoryExists(t *testing.T, path string) {
 	t.Helper()
 
@@ -106,6 +202,36 @@ func assertDirectoryEmpty(t *testing.T, path string) {
 	if len(entries) != 0 {
 		t.Fatalf("directory %s entry count = %d, want 0", path, len(entries))
 	}
+}
+
+func snapshotTree(t *testing.T, root string) map[string]string {
+	t.Helper()
+
+	snapshot := map[string]string{}
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			snapshot[rel] = "dir"
+			return nil
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		snapshot[rel] = "file:" + string(data)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("snapshot tree %s: %v", root, err)
+	}
+	return snapshot
 }
 
 func contextTreeContext(id devcontext.ID, name string) devcontext.Context {

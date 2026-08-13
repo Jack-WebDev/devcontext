@@ -3,6 +3,7 @@ package filesystem
 import (
 	"fmt"
 	"os"
+	"time"
 
 	devcontext "devctx/packages/core/context"
 )
@@ -20,6 +21,9 @@ func CreateContextDirectoryTreeWithPermissions(paths ContextPaths, ctx devcontex
 		permissions = NewDefaultStoragePermissions()
 	}
 	if err := validateContextTree(paths, ctx); err != nil {
+		return err
+	}
+	if err := ensureContextRootDoesNotExist(paths.RootDir); err != nil {
 		return err
 	}
 
@@ -42,6 +46,28 @@ func CreateContextDirectoryTreeWithPermissions(paths ContextPaths, ctx devcontex
 	return nil
 }
 
+// BootstrapPersonalContext creates the built-in Personal context.
+func BootstrapPersonalContext(paths PlatformPaths, createdAt time.Time) (devcontext.Context, error) {
+	return BootstrapPersonalContextWithPermissions(paths, createdAt, NewDefaultStoragePermissions())
+}
+
+// BootstrapPersonalContextWithPermissions creates the built-in Personal context
+// using the supplied storage permission policy.
+func BootstrapPersonalContextWithPermissions(paths PlatformPaths, createdAt time.Time, permissions StoragePermissions) (devcontext.Context, error) {
+	return bootstrapDefaultContext(paths, devcontext.DefaultPersonalContext(createdAt), permissions)
+}
+
+// BootstrapCompanyContext creates the built-in Company context.
+func BootstrapCompanyContext(paths PlatformPaths, createdAt time.Time) (devcontext.Context, error) {
+	return BootstrapCompanyContextWithPermissions(paths, createdAt, NewDefaultStoragePermissions())
+}
+
+// BootstrapCompanyContextWithPermissions creates the built-in Company context
+// using the supplied storage permission policy.
+func BootstrapCompanyContextWithPermissions(paths PlatformPaths, createdAt time.Time, permissions StoragePermissions) (devcontext.Context, error) {
+	return bootstrapDefaultContext(paths, devcontext.DefaultCompanyContext(createdAt), permissions)
+}
+
 func validateContextTree(paths ContextPaths, ctx devcontext.Context) error {
 	if paths.ContextID.String() == "" {
 		return fmt.Errorf("%w: cannot be empty", devcontext.ErrInvalidID)
@@ -55,6 +81,29 @@ func validateContextTree(paths ContextPaths, ctx devcontext.Context) error {
 		}
 	}
 	return nil
+}
+
+func ensureContextRootDoesNotExist(path string) error {
+	_, err := os.Stat(path)
+	switch {
+	case err == nil:
+		return fmt.Errorf("%w: %q", devcontext.ErrContextAlreadyExists, path)
+	case os.IsNotExist(err):
+		return nil
+	default:
+		return fmt.Errorf("inspect context directory %q: %w", path, err)
+	}
+}
+
+func bootstrapDefaultContext(paths PlatformPaths, ctx devcontext.Context, permissions StoragePermissions) (devcontext.Context, error) {
+	contextPaths, err := DeriveContextPaths(paths, ctx.ID)
+	if err != nil {
+		return devcontext.Context{}, err
+	}
+	if err := CreateContextDirectoryTreeWithPermissions(contextPaths, ctx, permissions); err != nil {
+		return devcontext.Context{}, err
+	}
+	return ctx, nil
 }
 
 func contextTreeDirectories(paths ContextPaths) []string {

@@ -17,6 +17,9 @@ var (
 	// ErrUnreadableContextConfig identifies a stored context config that cannot
 	// be read or decoded.
 	ErrUnreadableContextConfig = errors.New("unreadable context configuration")
+
+	// ErrContextAlreadyExists identifies a context creation conflict.
+	ErrContextAlreadyExists = errors.New("context already exists")
 )
 
 // Repository stores contexts below a contexts directory.
