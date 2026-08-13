@@ -31,10 +31,14 @@ func main() {
 		os.Exit(int(runCLI(args)))
 	}
 
-	service := application.NewService()
+	service, err := application.NewService()
+	if err != nil {
+		fmt.Fprint(os.Stderr, application.NewError(err).Error()+"\n")
+		os.Exit(1)
+	}
 	app := wailsapp.New(service)
 
-	err := wails.Run(&options.App{
+	err = wails.Run(&options.App{
 		Title:  "devctx",
 		Width:  1024,
 		Height: 768,

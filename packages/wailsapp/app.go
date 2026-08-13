@@ -2,18 +2,20 @@ package wailsapp
 
 import (
 	"context"
-
-	"devctx/packages/application"
 )
+
+type service interface {
+	Greet(name string) string
+}
 
 // App is the Wails-bound application surface.
 type App struct {
 	ctx     context.Context
-	service *application.Service
+	service service
 }
 
 // New creates the application surface bound by Wails.
-func New(service *application.Service) *App {
+func New(service service) *App {
 	return &App{service: service}
 }
 
