@@ -16,6 +16,7 @@ import (
 	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
 	"devctx/packages/core/provider"
+	"devctx/packages/core/version"
 	"devctx/packages/wailsapp"
 
 	"github.com/wailsapp/wails/v2"
@@ -70,6 +71,9 @@ func shouldRunCLI(args []string) bool {
 	if args[0] == string(cli.CommandContext) || args[0] == string(cli.CommandProject) {
 		return true
 	}
+	if args[0] == "--version" {
+		return true
+	}
 	for _, arg := range args {
 		if arg == "--context" || arg == "--personal" || arg == "--company" {
 			return true
@@ -83,6 +87,10 @@ func runCLI(args []string) cli.ExitCode {
 	if _, err := cli.Parse(parsedArgs); err != nil {
 		fmt.Fprint(os.Stderr, cli.RenderError(err, debug))
 		return cli.ExitCodeForError(err)
+	}
+	if len(parsedArgs) == 1 && parsedArgs[0] == "--version" {
+		fmt.Fprint(os.Stdout, version.Render(version.Current()))
+		return cli.ExitSuccess
 	}
 
 	paths := filesystem.NewDefaultPlatformPaths()

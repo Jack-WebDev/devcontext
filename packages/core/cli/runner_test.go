@@ -267,6 +267,11 @@ func TestRunnerRootLaunchBuildsPlanAndStartsDetachedProcess(t *testing.T) {
 	}
 }
 
+func TestRunnerVersionRendersWithoutRepositories(t *testing.T) {
+	result := cli.Runner{}.Run([]string{"--version"})
+	assertResult(t, result, cli.ExitSuccess, "devctx dev\n", "")
+}
+
 func TestRunnerRootLaunchWritesLifecycleEvents(t *testing.T) {
 	fixture := newRunnerFixture(t)
 	context := testCLIContext("personal", "Personal")

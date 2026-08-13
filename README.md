@@ -61,6 +61,24 @@ Build a production desktop package:
 wails build
 ```
 
+Build a release artifact with CLI version metadata:
+
+```bash
+scripts/build-release.sh 1.0.0
+```
+
+The built `devctx` executable also acts as the desktop entry point. `devctx --version` prints the installed version without initializing local storage.
+
+## Release Checks
+
+Run startup benchmarks:
+
+```bash
+scripts/benchmark-startup.sh
+```
+
+Release evidence templates live in [`docs/release`](docs/release).
+
 ## Contributing
 
 Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening larger changes.

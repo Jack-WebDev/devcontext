@@ -3,6 +3,8 @@
   "scripts": {
     "dev": "wails dev -tags webkit2_41",
     "build": "wails build -tags webkit2_41",
+    "release:build": "scripts/build-release.sh",
+    "benchmark:startup": "scripts/benchmark-startup.sh",
     "test": "go test ./..."
   }
 }

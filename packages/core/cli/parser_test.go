@@ -151,6 +151,16 @@ func TestParseProjectCommandFormsListedInPRD(t *testing.T) {
 	}
 }
 
+func TestParseVersionCommand(t *testing.T) {
+	command, err := cli.Parse([]string{"--version"})
+	if err != nil {
+		t.Fatalf("parse command: %v", err)
+	}
+	if command.Kind != cli.CommandVersion {
+		t.Fatalf("kind = %q, want %q", command.Kind, cli.CommandVersion)
+	}
+}
+
 func TestParseRejectsUnknownSubcommandsClearly(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -232,6 +242,11 @@ func TestParseRejectsInvalidCommandShapes(t *testing.T) {
 			name:        "project unbind extra argument",
 			args:        []string{"project", "unbind", "extra"},
 			wantMessage: "project unbind accepts no arguments",
+		},
+		{
+			name:        "version extra argument",
+			args:        []string{"--version", "extra"},
+			wantMessage: "--version accepts no arguments",
 		},
 	}
 

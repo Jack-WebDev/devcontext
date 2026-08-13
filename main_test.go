@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestShouldRunCLIRoutesManagementAndDirectLaunchCommands(t *testing.T) {
 	tests := []struct {
@@ -29,6 +33,11 @@ func TestShouldRunCLIRoutesManagementAndDirectLaunchCommands(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "version command",
+			args: []string{"--version"},
+			want: true,
+		},
+		{
 			name: "generic direct launch",
 			args: []string{"--context", "personal", "."},
 			want: true,
@@ -51,5 +60,22 @@ func TestShouldRunCLIRoutesManagementAndDirectLaunchCommands(t *testing.T) {
 				t.Fatalf("shouldRunCLI(%#v) = %v, want %v", tt.args, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestRunCLIVersionDoesNotInitializeStorage(t *testing.T) {
+	root := t.TempDir()
+	homeFile := filepath.Join(root, "home-is-a-file")
+	if err := os.WriteFile(homeFile, []byte("not a directory"), 0o600); err != nil {
+		t.Fatalf("write home fixture: %v", err)
+	}
+	t.Setenv("HOME", homeFile)
+	t.Setenv("USERPROFILE", homeFile)
+
+	if got := runCLI([]string{"--version"}); got != 0 {
+		t.Fatalf("exit code = %d, want 0", got)
+	}
+	if _, err := os.Stat(filepath.Join(homeFile, ".devctx")); err == nil {
+		t.Fatalf("version command initialized storage, stat error = %v", err)
 	}
 }

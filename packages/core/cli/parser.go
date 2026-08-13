@@ -26,6 +26,9 @@ const (
 
 	// CommandProject identifies project binding commands.
 	CommandProject CommandKind = "project"
+
+	// CommandVersion identifies "devctx --version".
+	CommandVersion CommandKind = "version"
 )
 
 // ContextSubcommand identifies a context command.
@@ -90,6 +93,11 @@ func Parse(args []string) (Command, error) {
 	}
 
 	switch args[0] {
+	case "--version":
+		if len(args) != 1 {
+			return Command{}, fmt.Errorf("%w: --version accepts no arguments", ErrInvalidCommand)
+		}
+		return Command{Kind: CommandVersion}, nil
 	case string(CommandContext):
 		return parseContextCommand(args[1:])
 	case string(CommandProject):
