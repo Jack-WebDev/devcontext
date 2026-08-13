@@ -200,7 +200,16 @@ jobs:
       - name: Install Windows installer dependencies
         if: runner.os == 'Windows'
         shell: powershell
-        run: choco install nsis -y --no-progress
+        run: |
+          choco install nsis -y --no-progress
+
+          $nsisPath = "C:\Program Files (x86)\NSIS"
+
+          if (-not (Test-Path "$nsisPath\makensis.exe")) {
+            throw "makensis.exe was not found at $nsisPath"
+          }
+
+          echo "$nsisPath" >> $env:GITHUB_PATH
 
       - name: Verify NSIS installation
         if: runner.os == 'Windows'
