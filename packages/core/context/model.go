@@ -1,6 +1,10 @@
 package context
 
-import "time"
+import (
+	"time"
+
+	"devctx/packages/core/provider"
+)
 
 // EditorType identifies the editor a context intends to launch.
 type EditorType string
@@ -9,17 +13,6 @@ type EditorType string
 type EditorConfig struct {
 	Type EditorType
 }
-
-// ProviderID identifies a provider configuration within a context.
-type ProviderID string
-
-// ProviderConfig describes whether a provider should participate in a context.
-type ProviderConfig struct {
-	Enabled bool
-}
-
-// ProviderConfigs stores provider intent keyed by provider identifier.
-type ProviderConfigs map[ProviderID]ProviderConfig
 
 // Metadata stores non-sensitive context annotations.
 type Metadata map[string]string
@@ -32,7 +25,7 @@ type Context struct {
 	Name string
 
 	Editor    EditorConfig
-	Providers ProviderConfigs
+	Providers provider.Configs
 	Metadata  Metadata
 	CreatedAt time.Time
 }

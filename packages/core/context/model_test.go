@@ -5,6 +5,7 @@ import (
 	"time"
 
 	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/provider"
 )
 
 func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
@@ -15,7 +16,8 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 		context           devcontext.Context
 		wantID            devcontext.ID
 		wantDisplayName   string
-		wantProviderState map[devcontext.ProviderID]bool
+		wantProviderState map[provider.ID]bool
+		wantProviderOpts  map[provider.ID]provider.Options
 		wantMetadata      devcontext.Metadata
 	}{
 		{
@@ -26,7 +28,7 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 				Editor: devcontext.EditorConfig{
 					Type: "vscode",
 				},
-				Providers: map[devcontext.ProviderID]devcontext.ProviderConfig{
+				Providers: provider.Configs{
 					"claude": {Enabled: true},
 					"codex":  {Enabled: true},
 				},
@@ -37,7 +39,7 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 			},
 			wantID:          devcontext.MustID("personal"),
 			wantDisplayName: "Personal",
-			wantProviderState: map[devcontext.ProviderID]bool{
+			wantProviderState: map[provider.ID]bool{
 				"claude": true,
 				"codex":  true,
 			},
@@ -53,7 +55,7 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 				Editor: devcontext.EditorConfig{
 					Type: "vscode",
 				},
-				Providers: map[devcontext.ProviderID]devcontext.ProviderConfig{
+				Providers: provider.Configs{
 					"claude": {Enabled: true},
 					"codex":  {Enabled: true},
 				},
@@ -64,7 +66,7 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 			},
 			wantID:          devcontext.MustID("company"),
 			wantDisplayName: "Company",
-			wantProviderState: map[devcontext.ProviderID]bool{
+			wantProviderState: map[provider.ID]bool{
 				"claude": true,
 				"codex":  true,
 			},
@@ -80,10 +82,20 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 				Editor: devcontext.EditorConfig{
 					Type: "vscode",
 				},
-				Providers: map[devcontext.ProviderID]devcontext.ProviderConfig{
-					"claude":          {Enabled: true},
-					"codex":           {Enabled: false},
-					"future-provider": {Enabled: true},
+				Providers: provider.Configs{
+					"claude": {
+						Enabled: true,
+						Options: provider.Options{
+							"profile": "client-a",
+						},
+					},
+					"codex": {Enabled: false},
+					"future-provider": {
+						Enabled: true,
+						Options: provider.Options{
+							"mode": "sandbox",
+						},
+					},
 				},
 				Metadata: devcontext.Metadata{
 					"owner": "client-a",
@@ -92,10 +104,18 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 			},
 			wantID:          devcontext.MustID("client-a"),
 			wantDisplayName: "Client A",
-			wantProviderState: map[devcontext.ProviderID]bool{
+			wantProviderState: map[provider.ID]bool{
 				"claude":          true,
 				"codex":           false,
 				"future-provider": true,
+			},
+			wantProviderOpts: map[provider.ID]provider.Options{
+				"claude": {
+					"profile": "client-a",
+				},
+				"future-provider": {
+					"mode": "sandbox",
+				},
 			},
 			wantMetadata: devcontext.Metadata{
 				"owner": "client-a",
@@ -118,12 +138,23 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 				t.Fatalf("provider count = %d, want %d", len(tt.context.Providers), len(tt.wantProviderState))
 			}
 			for providerID, wantEnabled := range tt.wantProviderState {
-				provider, ok := tt.context.Providers[providerID]
+				providerConfig, ok := tt.context.Providers[providerID]
 				if !ok {
 					t.Fatalf("provider %q is missing", providerID)
 				}
-				if provider.Enabled != wantEnabled {
-					t.Fatalf("provider %q enabled = %t, want %t", providerID, provider.Enabled, wantEnabled)
+				if providerConfig.Enabled != wantEnabled {
+					t.Fatalf("provider %q enabled = %t, want %t", providerID, providerConfig.Enabled, wantEnabled)
+				}
+			}
+			for providerID, wantOptions := range tt.wantProviderOpts {
+				providerConfig := tt.context.Providers[providerID]
+				if len(providerConfig.Options) != len(wantOptions) {
+					t.Fatalf("provider %q option count = %d, want %d", providerID, len(providerConfig.Options), len(wantOptions))
+				}
+				for key, wantValue := range wantOptions {
+					if providerConfig.Options[key] != wantValue {
+						t.Fatalf("provider %q option %q = %q, want %q", providerID, key, providerConfig.Options[key], wantValue)
+					}
 				}
 			}
 			if len(tt.context.Metadata) != len(tt.wantMetadata) {

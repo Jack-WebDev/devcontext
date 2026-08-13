@@ -1,6 +1,6 @@
 // Package provider owns AI and developer-tool provider abstractions.
 //
-// Future phases add generic provider configuration, provider interfaces,
-// Claude and Codex environment contributions, and provider status detection
-// here without hardcoding provider behavior into context models.
+// It contains generic provider configuration without Claude, Codex, or future
+// provider-specific branches. Future phases add provider interfaces,
+// environment contributions, and provider status detection here.
 package provider
