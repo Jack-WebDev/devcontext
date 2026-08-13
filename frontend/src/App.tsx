@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { ContextCard } from "./components/selector/ContextCard";
-import { ProjectIdentity } from "./components/selector/ProjectIdentity";
+import { SelectorView } from "./components/selector/SelectorView";
 import { devContextApi, type DisplayError, type LaunchState } from "./lib/devctx-api";
 
 type LaunchStateLoad =
@@ -71,19 +70,7 @@ function renderSelectorContent(launchState: LaunchStateLoad) {
   }
 
   return (
-    <div className="space-y-8">
-      <ProjectIdentity project={launchState.data.project} />
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        {launchState.data.contexts.map((context) => (
-          <ContextCard
-            key={context.id}
-            context={context}
-            selected={launchState.data.selectedContextId === context.id}
-          />
-        ))}
-      </div>
-    </div>
+    <SelectorView launchState={launchState.data} />
   );
 }
 

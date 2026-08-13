@@ -11,6 +11,7 @@
   },
   "include": [
     "src/lib/devctx-api.ts",
-    "src/components/selector/*.tsx"
+    "src/components/selector/*.tsx",
+    "src/components/selector/*.ts"
   ]
 }
