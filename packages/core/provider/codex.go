@@ -4,12 +4,17 @@ const (
 	// CodexID identifies the Codex provider configuration.
 	CodexID ID = "codex"
 
+	// CodexCommand is the executable name used to detect local Codex presence.
+	CodexCommand = "codex"
+
 	// CodexHomeEnvVar is the environment variable Codex uses for its home.
 	CodexHomeEnvVar = "CODEX_HOME"
 )
 
 // CodexProvider contributes isolated Codex process configuration.
-type CodexProvider struct{}
+type CodexProvider struct {
+	Probe StatusProbe
+}
 
 var _ Provider = CodexProvider{}
 
@@ -31,6 +36,6 @@ func (CodexProvider) BuildEnvironment(ctx RuntimeContext) (EnvironmentContributi
 }
 
 // Status returns local provider readiness.
-func (CodexProvider) Status(RuntimeContext) (Status, error) {
-	return UnavailableStatus("Codex local status detection is not implemented"), nil
+func (p CodexProvider) Status(ctx RuntimeContext) (Status, error) {
+	return detectLocalStatus(p.Probe, CodexCommand, p.DisplayName(), ctx.Paths.CodexDir)
 }

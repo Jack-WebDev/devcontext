@@ -4,13 +4,19 @@ const (
 	// ClaudeID identifies the Claude provider configuration.
 	ClaudeID ID = "claude"
 
+	// ClaudeCommand is the executable name used to detect local Claude Code
+	// presence.
+	ClaudeCommand = "claude"
+
 	// ClaudeConfigDirEnvVar is the environment variable Claude Code uses for
 	// its configuration directory.
 	ClaudeConfigDirEnvVar = "CLAUDE_CONFIG_DIR"
 )
 
 // ClaudeProvider contributes isolated Claude Code process configuration.
-type ClaudeProvider struct{}
+type ClaudeProvider struct {
+	Probe StatusProbe
+}
 
 var _ Provider = ClaudeProvider{}
 
@@ -33,6 +39,6 @@ func (ClaudeProvider) BuildEnvironment(ctx RuntimeContext) (EnvironmentContribut
 }
 
 // Status returns local provider readiness.
-func (ClaudeProvider) Status(RuntimeContext) (Status, error) {
-	return UnavailableStatus("Claude local status detection is not implemented"), nil
+func (p ClaudeProvider) Status(ctx RuntimeContext) (Status, error) {
+	return detectLocalStatus(p.Probe, ClaudeCommand, p.DisplayName(), ctx.Paths.ClaudeDir)
 }
