@@ -185,7 +185,7 @@ async function callBinding<T>(
   normalize: (value: unknown) => T,
 ): Promise<ApiResult<T>> {
   try {
-    const value = await operation();
+    const value = unwrapBindingValue(await operation());
     if (isApplicationError(value)) {
       return { ok: false, error: normalizeApplicationError(value) };
     }
@@ -193,6 +193,21 @@ async function callBinding<T>(
   } catch (error) {
     return { ok: false, error: normalizeRejectedError(error) };
   }
+}
+
+function unwrapBindingValue(value: unknown): unknown {
+  if (!Array.isArray(value) || value.length !== 2) {
+    return value;
+  }
+
+  const [result, error] = value;
+  if (isApplicationError(error)) {
+    return error;
+  }
+  if (error === undefined || error === null) {
+    return result;
+  }
+  return error;
 }
 
 function normalizeLaunchState(value: unknown): LaunchState {
