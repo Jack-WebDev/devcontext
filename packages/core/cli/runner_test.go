@@ -129,8 +129,8 @@ func TestRunnerProjectBindReturnsValidationErrors(t *testing.T) {
 		if result.Code != cli.ExitValidationError {
 			t.Fatalf("exit code = %d, want %d; stderr = %q", result.Code, cli.ExitValidationError, result.Stderr)
 		}
-		if !strings.Contains(result.Stderr, "invalid context ID") {
-			t.Fatalf("stderr = %q, want invalid context ID", result.Stderr)
+		if !strings.Contains(result.Stderr, "Unable to use context ID") {
+			t.Fatalf("stderr = %q, want context ID guidance", result.Stderr)
 		}
 	})
 
@@ -141,8 +141,8 @@ func TestRunnerProjectBindReturnsValidationErrors(t *testing.T) {
 		if result.Code != cli.ExitValidationError {
 			t.Fatalf("exit code = %d, want %d; stderr = %q", result.Code, cli.ExitValidationError, result.Stderr)
 		}
-		if !strings.Contains(result.Stderr, "context not found") {
-			t.Fatalf("stderr = %q, want missing context", result.Stderr)
+		if !strings.Contains(result.Stderr, "Unable to find context") {
+			t.Fatalf("stderr = %q, want missing context guidance", result.Stderr)
 		}
 	})
 }
@@ -207,8 +207,8 @@ func TestRunnerReturnsUsageExitCodeForInvalidCommandShapes(t *testing.T) {
 	if result.Code != cli.ExitUsageError {
 		t.Fatalf("exit code = %d, want %d; stderr = %q", result.Code, cli.ExitUsageError, result.Stderr)
 	}
-	if !strings.Contains(result.Stderr, "project bind requires exactly one context ID") {
-		t.Fatalf("stderr = %q, want usage message", result.Stderr)
+	if !strings.Contains(result.Stderr, "Unable to parse command") {
+		t.Fatalf("stderr = %q, want usage guidance", result.Stderr)
 	}
 }
 

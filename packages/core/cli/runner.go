@@ -38,13 +38,14 @@ type Runner struct {
 	Projects         project.Repository
 	WorkingDirectory string
 	Now              func() time.Time
+	Debug            bool
 }
 
 // Run parses and executes one CLI command.
 func (r Runner) Run(args []string) Result {
 	command, err := Parse(args)
 	if err != nil {
-		return errorResult(err)
+		return r.errorResult(err)
 	}
 
 	switch command.Kind {
@@ -53,7 +54,7 @@ func (r Runner) Run(args []string) Result {
 	case CommandProject:
 		return r.runProject(command.Project)
 	default:
-		return errorResult(fmt.Errorf("%w: root launch execution is not implemented in this adapter", ErrInvalidCommand))
+		return r.errorResult(fmt.Errorf("%w: root launch execution is not implemented in this adapter", ErrInvalidCommand))
 	}
 }
 
@@ -62,11 +63,11 @@ func (r Runner) runContext(command ContextCommand) Result {
 	case ContextList:
 		contexts, err := r.Contexts.List()
 		if err != nil {
-			return errorResult(err)
+			return r.errorResult(err)
 		}
 		return successResult(renderContextList(contexts))
 	default:
-		return errorResult(fmt.Errorf("%w: context %s is not implemented", ErrInvalidCommand, command.Subcommand))
+		return r.errorResult(fmt.Errorf("%w: context %s is not implemented", ErrInvalidCommand, command.Subcommand))
 	}
 }
 
@@ -75,31 +76,31 @@ func (r Runner) runProject(command ProjectCommand) Result {
 	case ProjectShow:
 		lookup, err := r.projectLookup()
 		if err != nil {
-			return errorResult(err)
+			return r.errorResult(err)
 		}
 		return successResult(renderProjectLookup(lookup))
 	case ProjectBind:
 		contextID, err := devcontext.NewID(command.ContextID)
 		if err != nil {
-			return errorResult(err)
+			return r.errorResult(err)
 		}
 
 		binding, err := r.Projects.Bind(".", project.Path(r.WorkingDirectory), contextID, r.Contexts, r.now())
 		if err != nil {
-			return errorResult(err)
+			return r.errorResult(err)
 		}
 		return successResult(renderProjectBind(binding))
 	case ProjectUnbind:
 		if _, err := r.projectLookup(); err != nil {
-			return errorResult(err)
+			return r.errorResult(err)
 		}
 		result, err := r.Projects.Unbind(".", project.Path(r.WorkingDirectory))
 		if err != nil {
-			return errorResult(err)
+			return r.errorResult(err)
 		}
 		return successResult(renderProjectUnbind(result))
 	default:
-		return errorResult(fmt.Errorf("%w: project %s is not implemented", ErrInvalidCommand, command.Subcommand))
+		return r.errorResult(fmt.Errorf("%w: project %s is not implemented", ErrInvalidCommand, command.Subcommand))
 	}
 }
 
@@ -128,10 +129,10 @@ func successResult(output string) Result {
 	}
 }
 
-func errorResult(err error) Result {
+func (r Runner) errorResult(err error) Result {
 	return Result{
 		Code:   ExitCodeForError(err),
-		Stderr: err.Error() + "\n",
+		Stderr: RenderError(err, r.Debug),
 	}
 }
 

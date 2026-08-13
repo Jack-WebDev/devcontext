@@ -3,9 +3,11 @@ package cli_test
 import (
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	"devctx/packages/core/cli"
+	"devctx/packages/core/config"
 	"devctx/packages/core/project"
 )
 
@@ -33,6 +35,16 @@ func TestExitCodeForErrorMapsStableCLIOutcomes(t *testing.T) {
 		{
 			name: "validation",
 			err:  fmt.Errorf("validate project: %w", project.ErrProjectDirectoryNotFound),
+			want: cli.ExitValidationError,
+		},
+		{
+			name: "config validation",
+			err:  fmt.Errorf("load config: %w", config.ErrInvalidGlobalConfig),
+			want: cli.ExitValidationError,
+		},
+		{
+			name: "permission",
+			err:  fmt.Errorf("open storage: %w", os.ErrPermission),
 			want: cli.ExitValidationError,
 		},
 		{

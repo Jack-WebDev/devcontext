@@ -56,20 +56,20 @@ func shouldRunCLI(args []string) bool {
 
 func runCLI(args []string) cli.ExitCode {
 	if _, err := cli.Parse(args); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprint(os.Stderr, cli.RenderError(err, false))
 		return cli.ExitCodeForError(err)
 	}
 
 	paths := filesystem.NewDefaultPlatformPaths()
 	layout, err := config.InitializeDevContextHome(paths)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprint(os.Stderr, cli.RenderError(err, false))
 		return cli.ExitCodeForError(err)
 	}
 
 	workingDirectory, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprint(os.Stderr, cli.RenderError(err, false))
 		return cli.ExitInternalError
 	}
 
@@ -80,7 +80,7 @@ func runCLI(args []string) cli.ExitCode {
 	}
 	result := runner.Run(args)
 	if err := result.Write(os.Stdout, os.Stderr); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprint(os.Stderr, cli.RenderError(err, false))
 		return cli.ExitInternalError
 	}
 	return result.Code
