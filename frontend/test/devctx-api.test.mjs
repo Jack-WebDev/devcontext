@@ -67,10 +67,6 @@ test("adapter normalizes successful Wails calls", async () => {
         dangling: false,
       };
     },
-    async greet(name) {
-      calls.push(["greet", name]);
-      return `Hello ${name}`;
-    },
   });
 
   assert.deepEqual(await api.getLaunchState({projectPath: "/work/api"}), {
@@ -146,11 +142,6 @@ test("adapter normalizes successful Wails calls", async () => {
       recovery: undefined,
     },
   });
-  assert.deepEqual(await api.greet("Alex"), {
-    ok: true,
-    data: "Hello Alex",
-  });
-
   assert.deepEqual(calls, [
     ["getLaunchState", {projectPath: "/work/api"}],
     [
@@ -163,7 +154,6 @@ test("adapter normalizes successful Wails calls", async () => {
     ],
     ["bindProject", {projectPath: "/work/api", contextId: "personal"}],
     ["unbindProject", {projectPath: "/work/api"}],
-    ["greet", "Alex"],
   ]);
 });
 
@@ -192,9 +182,6 @@ test("adapter normalizes resolved application errors", async () => {
       };
     },
     async unbindProject() {
-      throw new Error("not used");
-    },
-    async greet() {
       throw new Error("not used");
     },
   });
@@ -241,9 +228,6 @@ test("adapter normalizes rejected promises into displayable errors", async () =>
     },
     async unbindProject() {
       throw null;
-    },
-    async greet() {
-      throw new Error("not used");
     },
   });
 

@@ -106,7 +106,6 @@ export interface DevContextApi {
   launchProject(request: LaunchProjectRequest): Promise<ApiResult<LaunchProjectResult>>;
   bindProject(request: BindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
   unbindProject(request?: UnbindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
-  greet(name: string): Promise<ApiResult<string>>;
 }
 
 export interface WailsBindings {
@@ -114,7 +113,6 @@ export interface WailsBindings {
   launchProject(request: LaunchProjectRequest): Promise<unknown>;
   bindProject(request: BindProjectRequest): Promise<unknown>;
   unbindProject(request: UnbindProjectRequest): Promise<unknown>;
-  greet(name: string): Promise<unknown>;
 }
 
 export function createDevContextApi(bindings: WailsBindings = generatedBindings): DevContextApi {
@@ -138,9 +136,6 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
     unbindProject(request = {}) {
       return callBinding(() => bindings.unbindProject(request), normalizeProjectBindingState);
     },
-    greet(name) {
-      return callBinding(() => bindings.greet(name), normalizeString);
-    },
   };
 }
 
@@ -163,10 +158,6 @@ const generatedBindings: WailsBindings = {
   async unbindProject(request) {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
     return bindings.UnbindProject(request);
-  },
-  async greet(name) {
-    const bindings = await import("../../wailsjs/go/wailsapp/App");
-    return bindings.Greet(name);
   },
 };
 
@@ -268,10 +259,6 @@ function normalizeResolutionWarning(value: unknown): ResolutionWarning {
     boundContextId: optionalString(object.boundContextId),
     requestedContextId: optionalString(object.requestedContextId),
   };
-}
-
-function normalizeString(value: unknown): string {
-  return stringValue(value);
 }
 
 function normalizeApplicationError(value: ApplicationErrorLike): DisplayError {

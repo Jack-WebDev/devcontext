@@ -92,11 +92,6 @@ func NewServiceWithDependencies(dependencies Dependencies) *Service {
 	}
 }
 
-// Greet returns a greeting for the current starter UI.
-func (s *Service) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
-}
-
 func (s *Service) launchPlanBuilder() launcher.LaunchPlanBuilder {
 	return launcher.LaunchPlanBuilder{
 		Resolver:          launcher.NewResolver(s.dependencies.Contexts, s.dependencies.Projects),

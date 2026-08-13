@@ -10,10 +10,6 @@ export function GetLaunchState(arg1) {
   return window['go']['wailsapp']['App']['GetLaunchState'](arg1);
 }
 
-export function Greet(arg1) {
-  return window['go']['wailsapp']['App']['Greet'](arg1);
-}
-
 export function LaunchProject(arg1) {
   return window['go']['wailsapp']['App']['LaunchProject'](arg1);
 }

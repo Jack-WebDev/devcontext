@@ -10,6 +10,9 @@
     "tsBuildInfoFile": ".tmp-test/tsconfig.test.tsbuildinfo"
   },
   "include": [
-    "src/lib/devctx-api.ts"
+    "src/lib/devctx-api.ts",
+    "src/lib/devctx-window.ts",
+    "src/components/selector/*.tsx",
+    "src/components/selector/*.ts"
   ]
 }
