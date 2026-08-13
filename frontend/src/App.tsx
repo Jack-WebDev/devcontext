@@ -18,7 +18,9 @@ type LaunchStateLoad =
   | { status: "error"; error: DisplayError };
 
 function App() {
-  const [launchState, setLaunchState] = useState<LaunchStateLoad>({ status: "loading" });
+  const [launchState, setLaunchState] = useState<LaunchStateLoad>({
+    status: "loading",
+  });
 
   useEffect(() => {
     let active = true;
@@ -41,10 +43,13 @@ function App() {
     };
   }, []);
 
-  async function handleCreateContext(contextId: string): Promise<ApiResult<CreateContextResult>> {
+  async function handleCreateContext(
+    contextId: string,
+  ): Promise<ApiResult<CreateContextResult>> {
     const result = await createOnboardingContextAndRefresh({
       contextId,
-      createContext: (requestedContextId) => devContextApi.createContext({ contextId: requestedContextId }),
+      createContext: (requestedContextId) =>
+        devContextApi.createContext({ contextId: requestedContextId }),
       getLaunchState: () => devContextApi.getLaunchState(),
     });
     if (result.ok) {
@@ -64,9 +69,15 @@ function App() {
       </header>
 
       <div className="mx-auto max-w-5xl px-6 py-8">
-        <section aria-labelledby="context-selector-heading" className="space-y-6">
+        <section
+          aria-labelledby="context-selector-heading"
+          className="space-y-6"
+        >
           <div>
-            <h2 id="context-selector-heading" className="text-2xl font-semibold">
+            <h2
+              id="context-selector-heading"
+              className="text-2xl font-semibold"
+            >
               Context selector
             </h2>
           </div>
@@ -80,7 +91,9 @@ function App() {
 
 function renderSelectorContent(
   launchState: LaunchStateLoad,
-  onCreateContext: (contextId: string) => Promise<ApiResult<CreateContextResult>>,
+  onCreateContext: (
+    contextId: string,
+  ) => Promise<ApiResult<CreateContextResult>>,
 ) {
   if (launchState.status === "loading") {
     return <p className="text-sm text-muted-foreground">Loading selector...</p>;
