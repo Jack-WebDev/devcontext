@@ -5,6 +5,7 @@ import (
 	"time"
 
 	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/editor"
 	"devctx/packages/core/provider"
 )
 
@@ -23,11 +24,9 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 		{
 			name: "personal",
 			context: devcontext.Context{
-				ID:   devcontext.MustID("personal"),
-				Name: "Personal",
-				Editor: devcontext.EditorConfig{
-					Type: "vscode",
-				},
+				ID:     devcontext.MustID("personal"),
+				Name:   "Personal",
+				Editor: editor.DefaultConfig(),
 				Providers: provider.Configs{
 					"claude": {Enabled: true},
 					"codex":  {Enabled: true},
@@ -50,11 +49,9 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 		{
 			name: "company",
 			context: devcontext.Context{
-				ID:   devcontext.MustID("company"),
-				Name: "Company",
-				Editor: devcontext.EditorConfig{
-					Type: "vscode",
-				},
+				ID:     devcontext.MustID("company"),
+				Name:   "Company",
+				Editor: editor.DefaultConfig(),
 				Providers: provider.Configs{
 					"claude": {Enabled: true},
 					"codex":  {Enabled: true},
@@ -77,11 +74,9 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 		{
 			name: "client",
 			context: devcontext.Context{
-				ID:   devcontext.MustID("client-a"),
-				Name: "Client A",
-				Editor: devcontext.EditorConfig{
-					Type: "vscode",
-				},
+				ID:     devcontext.MustID("client-a"),
+				Name:   "Client A",
+				Editor: editor.DefaultConfig(),
 				Providers: provider.Configs{
 					"claude": {
 						Enabled: true,
@@ -131,8 +126,8 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 			if tt.context.Name != tt.wantDisplayName {
 				t.Fatalf("context name = %q, want %q", tt.context.Name, tt.wantDisplayName)
 			}
-			if tt.context.Editor.Type != "vscode" {
-				t.Fatalf("editor type = %q, want %q", tt.context.Editor.Type, "vscode")
+			if tt.context.Editor.Type != editor.TypeVSCode {
+				t.Fatalf("editor type = %q, want %q", tt.context.Editor.Type, editor.TypeVSCode)
 			}
 			if len(tt.context.Providers) != len(tt.wantProviderState) {
 				t.Fatalf("provider count = %d, want %d", len(tt.context.Providers), len(tt.wantProviderState))
