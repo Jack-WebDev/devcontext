@@ -16,6 +16,7 @@ import (
 	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
+	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
 	"devctx/packages/core/provider"
 )
@@ -263,6 +264,132 @@ func TestRunnerRootLaunchBuildsPlanAndStartsDetachedProcess(t *testing.T) {
 	}
 	if !reflect.DeepEqual(launchEditor.requests, []editor.CommandRequest{wantEditorRequest}) {
 		t.Fatalf("editor requests = %#v, want %#v", launchEditor.requests, []editor.CommandRequest{wantEditorRequest})
+	}
+}
+
+func TestRunnerRootLaunchWritesLifecycleEvents(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	context := testCLIContext("personal", "Personal")
+	context.Providers = provider.Configs{
+		"missing-provider": {Enabled: true},
+	}
+	fixture.writeContext(t, context)
+
+	runner := fixture.runner()
+	runner.Editor = &recordingCLIEditor{}
+	runner.ProcessLauncher = &recordingProcessLauncher{}
+	runner.ParentEnvironment = []string{"PATH=/usr/local/bin"}
+	runner.Logger = devlog.NewLocalLogger(filepath.Join(fixture.root, "logs"), filesystem.NewDefaultStoragePermissions(), func() time.Time {
+		return fixture.now
+	})
+
+	result := runner.Run([]string{"--context", "personal", "."})
+	assertResult(t, result, cli.ExitSuccess, "Project:\n"+fixture.workingDir+"\n\nContext:\npersonal\n\nStatus:\nlaunched\n", "")
+
+	events := readLaunchLogEvents(t, filepath.Join(fixture.root, "logs", devlog.DefaultFileName))
+	wantNames := []devlog.EventName{
+		devlog.EventContextResolution,
+		devlog.EventLaunchProviderMissing,
+		devlog.EventLaunchSucceeded,
+	}
+	if got := eventNames(events); !reflect.DeepEqual(got, wantNames) {
+		t.Fatalf("event names = %#v, want %#v", got, wantNames)
+	}
+	for _, event := range events {
+		if event.ProjectPath != fixture.workingDir {
+			t.Fatalf("event project path = %q, want %q", event.ProjectPath, fixture.workingDir)
+		}
+		if event.ContextID != "personal" {
+			t.Fatalf("event context ID = %q, want personal", event.ContextID)
+		}
+	}
+	if events[1].ErrorCategory != devlog.ErrorCategoryProvider {
+		t.Fatalf("provider event category = %q, want %q", events[1].ErrorCategory, devlog.ErrorCategoryProvider)
+	}
+}
+
+func TestRunnerRootLaunchIgnoresLoggingFailures(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	fixture.writeContext(t, testCLIContext("personal", "Personal"))
+
+	runner := fixture.runner()
+	runner.Editor = &recordingCLIEditor{}
+	runner.ProcessLauncher = &recordingProcessLauncher{}
+	runner.ParentEnvironment = []string{"PATH=/usr/local/bin"}
+	runner.Logger = failingLogger{}
+
+	result := runner.Run([]string{"--context", "personal", "."})
+	assertResult(t, result, cli.ExitSuccess, "Project:\n"+fixture.workingDir+"\n\nContext:\npersonal\n\nStatus:\nlaunched\n", "")
+}
+
+func TestRunnerRootLaunchDebugOutputRedactsSensitiveEnvironment(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	fixture.writeContext(t, testCLIContext("personal", "Personal"))
+
+	runner := fixture.runner()
+	runner.Editor = &recordingCLIEditor{}
+	runner.ProcessLauncher = &recordingProcessLauncher{}
+	runner.ParentEnvironment = []string{
+		"PATH=/usr/local/bin",
+		"API_TOKEN=top-secret-token",
+	}
+
+	result := runner.Run([]string{"--debug", "--context", "personal", "."})
+	if result.Code != cli.ExitSuccess {
+		t.Fatalf("exit code = %d, want %d; stderr = %q", result.Code, cli.ExitSuccess, result.Stderr)
+	}
+	for _, want := range []string{
+		"Debug:\n",
+		"resolution_source: explicit\n",
+		"editor_id: vscode\n",
+		"editor_executable: /recording/code\n",
+		"context_directories:\n",
+		"arguments:\n",
+		"environment:\n",
+		"API_TOKEN=<redacted>\n",
+	} {
+		if !strings.Contains(result.Stdout, want) {
+			t.Fatalf("stdout = %q, want containing %q", result.Stdout, want)
+		}
+	}
+	if strings.Contains(result.Stdout, "top-secret-token") {
+		t.Fatalf("debug output leaked sensitive environment value: %q", result.Stdout)
+	}
+}
+
+func TestRunnerRootLaunchLogsSanitizedProcessFailure(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	fixture.writeContext(t, testCLIContext("personal", "Personal"))
+
+	processErr := &launcher.ProcessLaunchError{
+		Executable:       "/recording/code",
+		WorkingDirectory: launcher.WorkingDirectory(fixture.workingDir),
+		Err:              launcher.ErrProcessStartFailed,
+		Cause:            fmt.Errorf("API_TOKEN=top-secret-token authorization: Bearer bearer-secret"),
+	}
+	runner := fixture.runner()
+	runner.Editor = &recordingCLIEditor{}
+	runner.ProcessLauncher = &recordingProcessLauncher{err: processErr}
+	runner.ParentEnvironment = []string{"API_TOKEN=top-secret-token"}
+	runner.Logger = devlog.NewLocalLogger(filepath.Join(fixture.root, "logs"), filesystem.NewDefaultStoragePermissions(), func() time.Time {
+		return fixture.now
+	})
+
+	result := runner.Run([]string{"--context", "personal", "."})
+	if result.Code != cli.ExitLaunchFailure {
+		t.Fatalf("exit code = %d, want %d; stderr = %q", result.Code, cli.ExitLaunchFailure, result.Stderr)
+	}
+
+	events := readLaunchLogEvents(t, filepath.Join(fixture.root, "logs", devlog.DefaultFileName))
+	if got := eventNames(events); !reflect.DeepEqual(got, []devlog.EventName{devlog.EventContextResolution, devlog.EventLaunchProcessFailure}) {
+		t.Fatalf("event names = %#v", got)
+	}
+	failure := events[1]
+	if failure.ErrorCategory != devlog.ErrorCategoryProcess {
+		t.Fatalf("error category = %q, want %q", failure.ErrorCategory, devlog.ErrorCategoryProcess)
+	}
+	if strings.Contains(failure.Error, "top-secret-token") || strings.Contains(failure.Error, "bearer-secret") {
+		t.Fatalf("log event leaked sensitive error: %#v", failure)
 	}
 }
 
@@ -570,8 +697,45 @@ func assertResult(t *testing.T, got cli.Result, wantCode cli.ExitCode, wantStdou
 	}
 }
 
+func readLaunchLogEvents(t *testing.T, path string) []devlog.Event {
+	t.Helper()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read launch log %q: %v", path, err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	events := make([]devlog.Event, 0, len(lines))
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		var event devlog.Event
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			t.Fatalf("decode launch log record %q: %v", line, err)
+		}
+		events = append(events, event)
+	}
+	return events
+}
+
+func eventNames(events []devlog.Event) []devlog.EventName {
+	names := make([]devlog.EventName, len(events))
+	for i, event := range events {
+		names[i] = event.Name
+	}
+	return names
+}
+
 type recordingCLIEditor struct {
 	requests []editor.CommandRequest
+}
+
+type failingLogger struct{}
+
+func (failingLogger) Record(devlog.Event) error {
+	return fmt.Errorf("logging unavailable")
 }
 
 func (e *recordingCLIEditor) ID() editor.ID {

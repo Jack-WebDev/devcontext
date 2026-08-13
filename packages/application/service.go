@@ -11,6 +11,7 @@ import (
 	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
+	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
 	"devctx/packages/core/provider"
 )
@@ -28,6 +29,7 @@ type Dependencies struct {
 	WorkingDirectory   string
 	DetachMode         launcher.DetachMode
 	Now                func() time.Time
+	Logger             devlog.Logger
 }
 
 // DefaultOptions contains host-provided values needed to construct the default
@@ -82,6 +84,7 @@ func NewDefaultService(options DefaultOptions) (*Service, error) {
 		WorkingDirectory:   workingDirectory,
 		DetachMode:         launcher.DetachModeDetached,
 		Now:                options.Now,
+		Logger:             devlog.NewLocalLogger(layout.LogsDir, filesystem.NewDefaultStoragePermissions(), options.Now),
 	}), nil
 }
 
@@ -112,6 +115,10 @@ func (s *Service) now() time.Time {
 	return s.dependencies.Now()
 }
 
+func (s *Service) logger() devlog.Logger {
+	return s.dependencies.Logger
+}
+
 func normalizeDependencies(dependencies Dependencies) Dependencies {
 	if dependencies.Paths == nil {
 		dependencies.Paths = filesystem.NewDefaultPlatformPaths()
@@ -138,6 +145,9 @@ func normalizeDependencies(dependencies Dependencies) Dependencies {
 	}
 	if dependencies.Now == nil {
 		dependencies.Now = time.Now
+	}
+	if dependencies.Logger == nil {
+		dependencies.Logger = devlog.NoopLogger{}
 	}
 	return dependencies
 }

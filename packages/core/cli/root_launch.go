@@ -14,11 +14,13 @@ const (
 	contextFlag  = "--context"
 	personalFlag = "--personal"
 	companyFlag  = "--company"
+	debugFlag    = "--debug"
 )
 
 type rootLaunchArguments struct {
 	projectPath      string
 	requestedContext *devcontext.ID
+	debug            bool
 }
 
 // ParseLaunchRequest converts root launch command arguments into an application
@@ -91,6 +93,8 @@ func parseRootLaunchArguments(args []string) (rootLaunchArguments, error) {
 			if err := parsed.setRequestedContext(companyFlag, "company"); err != nil {
 				return rootLaunchArguments{}, err
 			}
+		case arg == debugFlag:
+			parsed.debug = true
 		case strings.HasPrefix(arg, "-"):
 			return rootLaunchArguments{}, fmt.Errorf("%w: unknown root option %q", ErrInvalidCommand, arg)
 		default:

@@ -9,6 +9,7 @@ import (
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
+	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
 	"devctx/packages/core/provider"
 )
@@ -169,12 +170,30 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 		Source:               launcher.InvocationSourceGUI,
 	})
 	if err != nil {
+		s.recordLaunchEvent(devlog.NewEvent(devlog.EventInput{
+			Name:             devlog.LaunchEventNameForError(err),
+			Timestamp:        s.now(),
+			ProjectPath:      string(projectPath),
+			ContextID:        contextID.String(),
+			Err:              err,
+			KnownEnvironment: s.dependencies.ParentEnvironment,
+		}))
 		return LaunchProjectResult{}, err
 	}
 
+	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventContextResolution, plan, nil, s.now()))
+	for range plan.MissingProviderIDs {
+		event := eventFromLaunchPlan(devlog.EventLaunchProviderMissing, plan, nil, s.now())
+		event.ErrorCategory = devlog.ErrorCategoryProvider
+		s.recordLaunchEvent(event)
+	}
+
 	if err := s.processLauncher().Launch(processRequestFromLaunchPlan(plan, s.dependencies.DetachMode)); err != nil {
+		s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchProcessFailure, plan, err, s.now()))
 		return LaunchProjectResult{}, err
 	}
+
+	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchSucceeded, plan, nil, s.now()))
 
 	return LaunchProjectResult{
 		Project:  projectState(plan.ProjectPath),
@@ -318,6 +337,23 @@ func cloneLaunchEnvironment(environment launcher.Environment) launcher.Environme
 		cloned[key] = value
 	}
 	return cloned
+}
+
+func (s *Service) recordLaunchEvent(event devlog.Event) {
+	_ = s.logger().Record(event)
+}
+
+func eventFromLaunchPlan(name devlog.EventName, plan launcher.LaunchPlan, err error, timestamp time.Time) devlog.Event {
+	return devlog.NewEvent(devlog.EventInput{
+		Name:             name,
+		Timestamp:        timestamp,
+		ProjectPath:      string(plan.ProjectPath),
+		ContextID:        plan.Context.ID.String(),
+		EditorID:         string(plan.Editor.Type),
+		ResolutionSource: string(plan.ResolutionSource),
+		Err:              err,
+		KnownEnvironment: plan.Environment.Environ(),
+	})
 }
 
 func projectState(projectPath project.Path) ProjectState {

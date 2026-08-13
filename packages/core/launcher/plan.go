@@ -3,7 +3,9 @@ package launcher
 import (
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/editor"
+	"devctx/packages/core/filesystem"
 	"devctx/packages/core/project"
+	"devctx/packages/core/provider"
 )
 
 // Executable identifies the editor executable to start.
@@ -20,13 +22,15 @@ type WorkingDirectory string
 
 // LaunchPlan represents the deterministic operation needed to launch an editor.
 type LaunchPlan struct {
-	ProjectPath      project.Path
-	Context          devcontext.Context
-	Editor           editor.Config
-	Executable       Executable
-	Arguments        Arguments
-	WorkingDirectory WorkingDirectory
-	Environment      Environment
-	Warnings         []ResolutionWarning
-	ResolutionSource ResolutionSource
+	ProjectPath        project.Path
+	Context            devcontext.Context
+	Editor             editor.Config
+	Executable         Executable
+	Arguments          Arguments
+	WorkingDirectory   WorkingDirectory
+	Environment        Environment
+	ContextPaths       filesystem.ContextPaths
+	Warnings           []ResolutionWarning
+	ResolutionSource   ResolutionSource
+	MissingProviderIDs []provider.ID
 }

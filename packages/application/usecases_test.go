@@ -11,6 +11,7 @@ import (
 	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
+	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
 	"devctx/packages/core/provider"
 )
@@ -320,6 +321,37 @@ func TestLaunchProjectBuildsPlanAndStartsProcess(t *testing.T) {
 	}
 }
 
+func TestLaunchProjectRecordsLifecycleEvents(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	logger := &applicationRecordingLogger{}
+	fixture.logger = logger
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+	_, appErr := fixture.service().LaunchProject(LaunchProjectRequest{
+		ProjectPath: fixture.projectDir,
+		ContextID:   "personal",
+	})
+	if appErr != nil {
+		t.Fatalf("launch project: %v", appErr)
+	}
+
+	wantNames := []devlog.EventName{
+		devlog.EventContextResolution,
+		devlog.EventLaunchSucceeded,
+	}
+	if got := applicationEventNames(logger.events); !reflect.DeepEqual(got, wantNames) {
+		t.Fatalf("event names = %#v, want %#v", got, wantNames)
+	}
+	for _, event := range logger.events {
+		if event.ProjectPath != fixture.projectDir {
+			t.Fatalf("event project path = %q, want %q", event.ProjectPath, fixture.projectDir)
+		}
+		if event.ContextID != "personal" {
+			t.Fatalf("event context ID = %q, want personal", event.ContextID)
+		}
+	}
+}
+
 func TestLaunchProjectRequiresMismatchConfirmation(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.writeContext(t, fixture.context("personal", "Personal"))
@@ -515,6 +547,7 @@ type applicationFixture struct {
 	editor             *applicationFakeEditor
 	process            *applicationFakeProcessLauncher
 	storagePermissions filesystem.StoragePermissions
+	logger             devlog.Logger
 }
 
 func newApplicationFixture(t *testing.T) applicationFixture {
@@ -558,6 +591,7 @@ func (f applicationFixture) service() *Service {
 		ParentEnvironment:  []string{"PATH=/fixture/bin"},
 		WorkingDirectory:   f.projectDir,
 		DetachMode:         launcher.DetachModeAttached,
+		Logger:             f.logger,
 		Now: func() time.Time {
 			return f.now
 		},
@@ -618,4 +652,21 @@ func writeFile(t *testing.T, path string, data []byte) {
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatalf("write file %q: %v", path, err)
 	}
+}
+
+type applicationRecordingLogger struct {
+	events []devlog.Event
+}
+
+func (l *applicationRecordingLogger) Record(event devlog.Event) error {
+	l.events = append(l.events, event)
+	return nil
+}
+
+func applicationEventNames(events []devlog.Event) []devlog.EventName {
+	names := make([]devlog.EventName, len(events))
+	for i, event := range events {
+		names[i] = event.Name
+	}
+	return names
 }
