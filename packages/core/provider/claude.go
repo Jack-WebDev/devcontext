@@ -34,5 +34,5 @@ func (ClaudeProvider) BuildEnvironment(ctx RuntimeContext) (EnvironmentContribut
 
 // Status returns local provider readiness.
 func (ClaudeProvider) Status(RuntimeContext) (Status, error) {
-	return Status{}, nil
+	return UnavailableStatus("Claude local status detection is not implemented"), nil
 }

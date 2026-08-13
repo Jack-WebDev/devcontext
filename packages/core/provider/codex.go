@@ -32,5 +32,5 @@ func (CodexProvider) BuildEnvironment(ctx RuntimeContext) (EnvironmentContributi
 
 // Status returns local provider readiness.
 func (CodexProvider) Status(RuntimeContext) (Status, error) {
-	return Status{}, nil
+	return UnavailableStatus("Codex local status detection is not implemented"), nil
 }

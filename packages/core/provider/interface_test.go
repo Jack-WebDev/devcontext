@@ -28,9 +28,9 @@ func (fakeProvider) BuildEnvironment(ctx provider.RuntimeContext) (provider.Envi
 
 func (fakeProvider) Status(ctx provider.RuntimeContext) (provider.Status, error) {
 	if !ctx.Config.Enabled {
-		return provider.Status{Message: "disabled"}, nil
+		return provider.NotConfiguredStatus("disabled"), nil
 	}
-	return provider.Status{Message: "configured"}, nil
+	return provider.ReadyStatus(), nil
 }
 
 func TestProviderInterfaceAllowsGenericProviderUse(t *testing.T) {
@@ -68,7 +68,7 @@ func TestProviderInterfaceAllowsGenericProviderUse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
-	if status.Message != "configured" {
-		t.Fatalf("status message = %q, want %q", status.Message, "configured")
+	if status.State != provider.StatusReady {
+		t.Fatalf("status state = %q, want %q", status.State, provider.StatusReady)
 	}
 }

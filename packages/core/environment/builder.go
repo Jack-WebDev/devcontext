@@ -1,10 +1,23 @@
 package environment
 
 import (
+	"errors"
 	"sort"
 	"strings"
 
+	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/provider"
+)
+
+const (
+	// ActiveContextEnvVar identifies the selected Dev Context to launched tools.
+	ActiveContextEnvVar = "DEVCTX_CONTEXT"
+)
+
+var (
+	// ErrMissingContextID identifies attempts to build a context environment
+	// without a resolved context ID.
+	ErrMissingContextID = errors.New("missing active context ID")
 )
 
 // Variables stores process environment values by variable name.
@@ -34,6 +47,18 @@ func Build(parent []string, contributions ...provider.EnvironmentContribution) V
 		variables.Apply(contribution)
 	}
 	return variables
+}
+
+// BuildForContext copies the parent environment, applies provider
+// contributions, and marks the selected Dev Context.
+func BuildForContext(parent []string, contextID devcontext.ID, contributions ...provider.EnvironmentContribution) (Variables, error) {
+	if contextID.String() == "" {
+		return nil, ErrMissingContextID
+	}
+
+	variables := Build(parent, contributions...)
+	variables[ActiveContextEnvVar] = contextID.String()
+	return variables, nil
 }
 
 // Apply overlays one provider environment contribution onto the variables.

@@ -34,11 +34,3 @@ type ContextPaths struct {
 
 // EnvironmentContribution stores environment variables owned by one provider.
 type EnvironmentContribution map[string]string
-
-// Status is the provider's non-sensitive local readiness summary.
-//
-// Later phases define the bounded readiness states. For now this type gives the
-// provider interface a stable, typed return value.
-type Status struct {
-	Message string
-}

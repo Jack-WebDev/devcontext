@@ -2,6 +2,6 @@
 // development contexts.
 //
 // It preserves the parent process environment before applying provider-owned
-// context overrides. Future phases add active-context markers and redaction
-// here.
+// context overrides, marks the selected context, and provides a redacted view
+// for diagnostics.
 package environment
