@@ -16,9 +16,17 @@ commit="$(git rev-parse --short=12 HEAD)"
 date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 platform="${DEVCTX_WAILS_PLATFORM:-}"
 package_flag=()
+nsis_flag=()
+webview2_flag=()
 
 if [[ "${DEVCTX_WAILS_NOPACKAGE:-0}" == "1" ]]; then
   package_flag=(-nopackage)
+fi
+if [[ "${DEVCTX_WAILS_NSIS:-0}" == "1" ]]; then
+  nsis_flag=(-nsis)
+fi
+if [[ -n "${DEVCTX_WAILS_WEBVIEW2:-}" ]]; then
+  webview2_flag=(-webview2 "${DEVCTX_WAILS_WEBVIEW2}")
 fi
 
 ldflags="-X devctx/packages/core/version.Version=${version} -X devctx/packages/core/version.Commit=${commit} -X devctx/packages/core/version.Date=${date}"
@@ -28,6 +36,8 @@ if [[ -n "${platform}" ]]; then
   args+=(-platform "${platform}")
 fi
 args+=("${package_flag[@]}")
+args+=("${nsis_flag[@]}")
+args+=("${webview2_flag[@]}")
 
 wails "${args[@]}"
 

@@ -33,21 +33,22 @@ Download the latest Dev Context release from [GitHub Releases](https://github.co
 
 Windows:
 
-1. Download the Windows installer from the latest release.
+1. Download `devctx_<version>_windows_amd64_installer.exe`.
 2. Run the installer.
 3. Open Dev Context from the Start menu, or run `devctx.exe` from a terminal if the installer added it to `PATH`.
 
 macOS:
 
-1. Download the macOS artifact from the latest release.
-2. Move Dev Context to `/Applications`.
+1. Download `devctx_<version>_macos_universal.zip`.
+2. Unzip it and move Dev Context to `/Applications`.
 3. Open Dev Context from Applications, or add a shell shim/symlink to the bundled `devctx` executable if you want terminal access.
 
 Linux:
 
-1. Download the Linux artifact from the latest release.
-2. Install it using the package format provided by the release, or place the `devctx` binary somewhere on `PATH`.
-3. Run `devctx` from a terminal or your app launcher.
+1. Download `devctx_<version>_linux_amd64.tar.gz`.
+2. Extract it.
+3. Move the `devctx` binary somewhere on `PATH`.
+4. Run `devctx` from a terminal.
 
 Verify the install:
 
@@ -77,7 +78,9 @@ brew install --cask <cask-name>
 
 Those commands require published package manifests that point at signed release artifacts. Until those manifests exist, use GitHub Releases.
 
-### For Contributors
+## Develop from Source
+
+These tools are only required to build or develop Dev Context from source. End users do not need them.
 
 Requirements:
 
@@ -85,8 +88,6 @@ Requirements:
 - Node.js 22 or newer
 - npm
 - Wails CLI v2
-
-These tools are only required to build or develop Dev Context from source.
 
 Install frontend dependencies:
 
@@ -107,6 +108,26 @@ Build a local production app:
 ```bash
 npm run build
 ```
+
+## Publish a Release
+
+Releases are built by GitHub Actions when a version tag is pushed.
+
+Create a release:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The release workflow builds and uploads:
+
+- `devctx_<version>_windows_amd64_installer.exe`
+- `devctx_<version>_macos_universal.zip`
+- `devctx_<version>_linux_amd64.tar.gz`
+- `SHA256SUMS.txt`
+
+After the GitHub Release is published, users can install from the release page without Go, Node.js, npm, or Wails.
 
 Build a release binary with version metadata:
 
