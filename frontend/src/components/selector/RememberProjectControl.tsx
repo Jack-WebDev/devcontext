@@ -32,7 +32,7 @@ function RememberProjectControl({
     <label className="flex items-start gap-3 border border-border p-3 text-sm">
       <input
         type="checkbox"
-        className="mt-0.5 size-4"
+        className="mt-0.5 size-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed"
         checked={rememberProject}
         disabled={disabled}
         readOnly={onRememberProjectChange === undefined}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import type {
   ApiResult,
@@ -17,7 +17,14 @@ import { RememberProjectControl } from "./RememberProjectControl";
 import { SelectorActions } from "./SelectorActions";
 import { cancelSelector } from "./cancel-action";
 import { createLaunchRequestGuard, launchSelectedContext } from "./launch-action";
-import { initialSelectedContextId, nextSelectedContextId } from "./selection-state";
+import {
+  initialRovingContextId,
+  initialSelectedContextId,
+  nextKeyboardContextId,
+  nextSelectedContextId,
+  type ContextNavigationDirection,
+} from "./selection-state";
+import { canLaunchSelectedContextFromKeyboard, escapeKeyboardAction } from "./selector-keyboard";
 
 interface SelectorViewProps {
   launchState: LaunchState;
@@ -30,20 +37,87 @@ function SelectorView({ launchState, onBindProject, onLaunchProject, onCancel }:
   const [selectedContextId, setSelectedContextId] = useState<string | undefined>(() =>
     initialSelectedContextId(launchState),
   );
+  const [rovingContextId, setRovingContextId] = useState<string | undefined>(() =>
+    initialRovingContextId(launchState),
+  );
   const [rememberProject, setRememberProject] = useState(false);
   const [launchPending, setLaunchPending] = useState(false);
   const [launchError, setLaunchError] = useState<DisplayError | undefined>(undefined);
   const [mismatchError, setMismatchError] = useState<DisplayError | undefined>(undefined);
+  const contextButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const launchGuard = useRef(createLaunchRequestGuard());
+  const mismatchDialogOpen = mismatchError?.contextMismatch !== undefined;
+  const keyboardLaunchAvailable = canLaunchSelectedContextFromKeyboard({
+    selectedContextId,
+    launchPending,
+    mismatchDialogOpen,
+  });
 
   useEffect(() => {
     setSelectedContextId(initialSelectedContextId(launchState));
+    setRovingContextId(initialRovingContextId(launchState));
     setRememberProject(false);
     setLaunchPending(false);
     setLaunchError(undefined);
     setMismatchError(undefined);
     launchGuard.current = createLaunchRequestGuard();
   }, [launchState]);
+
+  function setContextButtonRef(contextId: string) {
+    return (button: HTMLButtonElement | null) => {
+      if (button) {
+        contextButtonRefs.current.set(contextId, button);
+      } else {
+        contextButtonRefs.current.delete(contextId);
+      }
+    };
+  }
+
+  function handleSelectContext(contextId: string) {
+    const nextContextId = nextSelectedContextId(launchState.contexts, contextId);
+    setSelectedContextId(nextContextId);
+    setRovingContextId(nextContextId);
+  }
+
+  function handleContextNavigation(contextId: string, direction: ContextNavigationDirection) {
+    if (launchPending) {
+      return;
+    }
+
+    const nextContextId = nextKeyboardContextId(launchState.contexts, contextId, direction);
+    if (nextContextId === undefined) {
+      return;
+    }
+
+    setSelectedContextId(nextContextId);
+    setRovingContextId(nextContextId);
+    contextButtonRefs.current.get(nextContextId)?.focus();
+  }
+
+  function handleSelectorKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Escape") {
+      return;
+    }
+
+    const action = escapeKeyboardAction({
+      selectedContextId,
+      launchPending,
+      mismatchDialogOpen,
+    });
+    if (action === "none") {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (action === "close-dialog") {
+      setMismatchError(undefined);
+      return;
+    }
+
+    void cancelSelector({ closeSelector: onCancel });
+  }
 
   async function handleLaunch(confirmContextMismatch = false) {
     await launchGuard.current.run(async () => {
@@ -77,7 +151,7 @@ function SelectorView({ launchState, onBindProject, onLaunchProject, onCancel }:
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" onKeyDown={handleSelectorKeyDown}>
       <ProjectIdentity project={launchState.project} />
 
       <div className="space-y-3">
@@ -85,14 +159,18 @@ function SelectorView({ launchState, onBindProject, onLaunchProject, onCancel }:
           <p className="text-sm text-muted-foreground">No context selected</p>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="Available contexts">
           {launchState.contexts.map((context) => (
             <ContextCard
               key={context.id}
               context={context}
               selected={selectedContextId === context.id}
               disabled={launchPending}
-              onSelect={(contextId) => setSelectedContextId(nextSelectedContextId(launchState.contexts, contextId))}
+              tabIndex={rovingContextId === context.id ? 0 : -1}
+              buttonRef={setContextButtonRef(context.id)}
+              onSelect={handleSelectContext}
+              onNavigate={handleContextNavigation}
+              onLaunchSelected={keyboardLaunchAvailable ? () => void handleLaunch() : undefined}
             />
           ))}
         </div>

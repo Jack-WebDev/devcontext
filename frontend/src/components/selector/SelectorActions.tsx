@@ -10,7 +10,7 @@ function SelectorActions({ launchDisabled, launchPending, onLaunch, onCancel }: 
     <div className="flex justify-end gap-3 border-t border-border pt-4">
       <button
         type="button"
-        className="border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-foreground/30"
+        className="border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-foreground/30 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
         disabled={launchPending}
         onClick={onCancel}
       >
@@ -18,7 +18,7 @@ function SelectorActions({ launchDisabled, launchPending, onLaunch, onCancel }: 
       </button>
       <button
         type="button"
-        className="bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+        className="bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
         disabled={launchDisabled || launchPending}
         onClick={onLaunch}
       >
