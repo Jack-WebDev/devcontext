@@ -27,21 +27,27 @@ func NewResolver(contexts devcontext.Repository, projects project.Repository) Re
 // contexts and marks user selection as required.
 func (r Resolver) Resolve(request LaunchRequest) (ResolutionResult, error) {
 	if request.RequestedContext != nil {
-		return r.resolveExplicitContext(*request.RequestedContext)
+		return r.resolveExplicitContext(request)
 	}
 
 	return r.resolveProjectBindingOrSelection(request)
 }
 
-func (r Resolver) resolveExplicitContext(contextID devcontext.ID) (ResolutionResult, error) {
-	ctx, err := r.Contexts.Get(contextID)
+func (r Resolver) resolveExplicitContext(request LaunchRequest) (ResolutionResult, error) {
+	ctx, err := r.Contexts.Get(*request.RequestedContext)
+	if err != nil {
+		return ResolutionResult{}, err
+	}
+
+	lookup, err := r.Projects.LookupWithContextValidation(string(request.ProjectPath), request.ProjectPath, r.Contexts)
 	if err != nil {
 		return ResolutionResult{}, err
 	}
 
 	return ResolutionResult{
-		Context: &ctx,
-		Source:  ResolutionSourceExplicit,
+		Context:  &ctx,
+		Source:   ResolutionSourceExplicit,
+		Warnings: explicitContextWarnings(request, lookup),
 	}, nil
 }
 
@@ -83,7 +89,9 @@ func danglingBindingWarnings(lookup project.BindingLookup) []ResolutionWarning {
 
 	return []ResolutionWarning{
 		{
-			Code: WarningDanglingProjectBinding,
+			Code:           WarningDanglingProjectBinding,
+			ProjectPath:    lookup.ProjectPath,
+			BoundContextID: lookup.MissingContextID,
 			Message: fmt.Sprintf(
 				"Project binding points to missing context %q; %s.",
 				lookup.MissingContextID.String(),
@@ -91,4 +99,29 @@ func danglingBindingWarnings(lookup project.BindingLookup) []ResolutionWarning {
 			),
 		},
 	}
+}
+
+func explicitContextWarnings(request LaunchRequest, lookup project.BindingLookup) []ResolutionWarning {
+	warnings := danglingBindingWarnings(lookup)
+	if !lookup.Bound {
+		return warnings
+	}
+
+	requestedContextID := *request.RequestedContext
+	if lookup.Binding.ContextID == requestedContextID {
+		return warnings
+	}
+
+	return append(warnings, ResolutionWarning{
+		Code:               WarningContextMismatch,
+		ProjectPath:        lookup.ProjectPath,
+		BoundContextID:     lookup.Binding.ContextID,
+		RequestedContextID: requestedContextID,
+		Message: fmt.Sprintf(
+			"Requested context %q differs from project binding %q for %q.",
+			requestedContextID.String(),
+			lookup.Binding.ContextID.String(),
+			lookup.ProjectPath,
+		),
+	})
 }

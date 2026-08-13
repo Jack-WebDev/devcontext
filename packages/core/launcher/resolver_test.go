@@ -151,6 +151,115 @@ func TestResolverRequiresSelectionForDanglingProjectBinding(t *testing.T) {
 	}
 }
 
+func TestResolverEnforcesContextResolutionPrecedence(t *testing.T) {
+	tests := []struct {
+		name               string
+		requestedContextID string
+		boundContextID     string
+		wantContextID      string
+		wantSource         launcher.ResolutionSource
+		wantSelection      bool
+		wantWarningCodes   []launcher.WarningCode
+	}{
+		{
+			name:          "no explicit context and no binding requires selection",
+			wantSource:    launcher.ResolutionSourceUserSelection,
+			wantSelection: true,
+		},
+		{
+			name:           "no explicit context uses project binding",
+			boundContextID: "personal",
+			wantContextID:  "personal",
+			wantSource:     launcher.ResolutionSourceProjectBinding,
+		},
+		{
+			name:             "no explicit context requires selection for dangling binding",
+			boundContextID:   "client-a",
+			wantSource:       launcher.ResolutionSourceUserSelection,
+			wantSelection:    true,
+			wantWarningCodes: []launcher.WarningCode{launcher.WarningDanglingProjectBinding},
+		},
+		{
+			name:               "explicit context wins without binding",
+			requestedContextID: "company",
+			wantContextID:      "company",
+			wantSource:         launcher.ResolutionSourceExplicit,
+		},
+		{
+			name:               "explicit context wins over matching binding without warning",
+			requestedContextID: "company",
+			boundContextID:     "company",
+			wantContextID:      "company",
+			wantSource:         launcher.ResolutionSourceExplicit,
+		},
+		{
+			name:               "explicit context wins over conflicting binding with mismatch warning",
+			requestedContextID: "company",
+			boundContextID:     "personal",
+			wantContextID:      "company",
+			wantSource:         launcher.ResolutionSourceExplicit,
+			wantWarningCodes:   []launcher.WarningCode{launcher.WarningContextMismatch},
+		},
+		{
+			name:               "explicit context wins over dangling binding with dangling warning",
+			requestedContextID: "company",
+			boundContextID:     "client-a",
+			wantContextID:      "company",
+			wantSource:         launcher.ResolutionSourceExplicit,
+			wantWarningCodes:   []launcher.WarningCode{launcher.WarningDanglingProjectBinding},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newResolverFixture(t)
+			company := testContext("company", "Company")
+			personal := testContext("personal", "Personal")
+			fixture.writeContexts(t, personal, company)
+			if tt.boundContextID != "" {
+				fixture.writeBindings(t, project.Binding{
+					ProjectPath: project.Path(fixture.projectDir),
+					ContextID:   devcontext.MustID(tt.boundContextID),
+					CreatedAt:   testResolverTime(10, 0),
+				})
+			}
+
+			request := launcher.LaunchRequest{
+				ProjectPath: project.Path(fixture.projectDir),
+				Interactive: tt.requestedContextID == "",
+				Source:      launcher.InvocationSourceCLI,
+			}
+			if tt.requestedContextID != "" {
+				contextID := devcontext.MustID(tt.requestedContextID)
+				request.RequestedContext = &contextID
+			}
+
+			result, err := fixture.resolver.Resolve(request)
+			if err != nil {
+				t.Fatalf("resolve context: %v", err)
+			}
+
+			if result.Source != tt.wantSource {
+				t.Fatalf("source = %q, want %q", result.Source, tt.wantSource)
+			}
+			if result.SelectionRequired != tt.wantSelection {
+				t.Fatalf("selection required = %t, want %t", result.SelectionRequired, tt.wantSelection)
+			}
+			if tt.wantSelection {
+				assertSelectionRequired(t, result, []devcontext.Context{company, personal})
+			} else {
+				if result.Context == nil {
+					t.Fatal("context is nil")
+				}
+				if result.Context.ID != devcontext.MustID(tt.wantContextID) {
+					t.Fatalf("context ID = %q, want %q", result.Context.ID, tt.wantContextID)
+				}
+			}
+			assertResolutionWarnings(t, result.Warnings, tt.wantWarningCodes, request, tt.boundContextID)
+		})
+	}
+}
+
 type resolverFixture struct {
 	resolver     launcher.Resolver
 	contexts     devcontext.Repository
@@ -245,6 +354,43 @@ func assertSelectionRequired(t *testing.T, result launcher.ResolutionResult, wan
 	}
 	if !reflect.DeepEqual(result.AvailableContexts, wantContexts) {
 		t.Fatalf("available contexts = %#v, want %#v", result.AvailableContexts, wantContexts)
+	}
+}
+
+func assertResolutionWarnings(
+	t *testing.T,
+	warnings []launcher.ResolutionWarning,
+	wantCodes []launcher.WarningCode,
+	request launcher.LaunchRequest,
+	boundContextID string,
+) {
+	t.Helper()
+
+	if len(warnings) != len(wantCodes) {
+		t.Fatalf("warning count = %d, want %d: %#v", len(warnings), len(wantCodes), warnings)
+	}
+	for index, wantCode := range wantCodes {
+		warning := warnings[index]
+		if warning.Code != wantCode {
+			t.Fatalf("warning[%d] code = %q, want %q", index, warning.Code, wantCode)
+		}
+		if warning.ProjectPath != request.ProjectPath {
+			t.Fatalf("warning[%d] project path = %q, want %q", index, warning.ProjectPath, request.ProjectPath)
+		}
+		if warning.BoundContextID != devcontext.MustID(boundContextID) {
+			t.Fatalf("warning[%d] bound context = %q, want %q", index, warning.BoundContextID, boundContextID)
+		}
+		if wantCode == launcher.WarningContextMismatch {
+			if request.RequestedContext == nil {
+				t.Fatal("mismatch warning without requested context")
+			}
+			if warning.RequestedContextID != *request.RequestedContext {
+				t.Fatalf("warning[%d] requested context = %q, want %q", index, warning.RequestedContextID, *request.RequestedContext)
+			}
+			if !strings.Contains(warning.Message, boundContextID) || !strings.Contains(warning.Message, request.RequestedContext.String()) {
+				t.Fatalf("warning[%d] message = %q, want bound and requested contexts", index, warning.Message)
+			}
+		}
 	}
 }
 

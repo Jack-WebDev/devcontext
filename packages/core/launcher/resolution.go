@@ -1,6 +1,9 @@
 package launcher
 
-import devcontext "devctx/packages/core/context"
+import (
+	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/project"
+)
 
 // ResolutionSource explains why a context was selected.
 type ResolutionSource string
@@ -22,6 +25,10 @@ const (
 type WarningCode string
 
 const (
+	// WarningContextMismatch identifies an explicit context that differs from
+	// the project's stored binding.
+	WarningContextMismatch WarningCode = "context_mismatch"
+
 	// WarningDanglingProjectBinding identifies a project binding whose stored
 	// context no longer exists.
 	WarningDanglingProjectBinding WarningCode = "dangling_project_binding"
@@ -29,8 +36,11 @@ const (
 
 // ResolutionWarning is a non-fatal issue discovered during context resolution.
 type ResolutionWarning struct {
-	Code    WarningCode
-	Message string
+	Code               WarningCode
+	Message            string
+	ProjectPath        project.Path
+	BoundContextID     devcontext.ID
+	RequestedContextID devcontext.ID
 }
 
 // ResolutionResult represents the outcome of context resolution.
