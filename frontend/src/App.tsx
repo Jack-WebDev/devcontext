@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
 import { SelectorView } from "./components/selector/SelectorView";
+import { createOnboardingContextAndRefresh } from "./components/selector/onboarding-action";
 import {
   devContextApi,
   type ApiResult,
@@ -41,19 +42,17 @@ function App() {
   }, []);
 
   async function handleCreateContext(contextId: string): Promise<ApiResult<CreateContextResult>> {
-    const result = await devContextApi.createContext({ contextId });
-    if (!result.ok) {
-      return result;
+    const result = await createOnboardingContextAndRefresh({
+      contextId,
+      createContext: (requestedContextId) => devContextApi.createContext({ contextId: requestedContextId }),
+      getLaunchState: () => devContextApi.getLaunchState(),
+    });
+    if (result.ok) {
+      setLaunchState({ status: "loaded", data: result.launchState });
+      return { ok: true, data: result.created };
     }
 
-    const refreshed = await devContextApi.getLaunchState();
-    if (refreshed.ok) {
-      setLaunchState({ status: "loaded", data: refreshed.data });
-    } else {
-      setLaunchState({ status: "error", error: refreshed.error });
-    }
-
-    return result;
+    return { ok: false, error: result.error };
   }
 
   return (
