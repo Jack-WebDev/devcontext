@@ -28,8 +28,8 @@ func defaultContextSeed(id ID, name string, createdAt time.Time) Context {
 		Name:   name,
 		Editor: editor.DefaultConfig(),
 		Providers: provider.Configs{
-			"claude": {Enabled: true},
-			"codex":  {Enabled: true},
+			provider.ClaudeID: {Enabled: true},
+			provider.CodexID:  {Enabled: true},
 		},
 		CreatedAt: createdAt.UTC(),
 	}
