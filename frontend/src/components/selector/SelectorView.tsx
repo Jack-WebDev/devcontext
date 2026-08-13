@@ -11,6 +11,7 @@ import type {
 } from "../../lib/devctx-api";
 import { ContextMismatchDialog } from "./ContextMismatchDialog";
 import { ContextCard } from "./ContextCard";
+import { FirstRunWelcome, shouldRenderFirstRunWelcome } from "./FirstRunWelcome";
 import { GuiErrorNotice } from "./GuiErrorNotice";
 import { ProjectIdentity } from "./ProjectIdentity";
 import { RememberProjectControl } from "./RememberProjectControl";
@@ -31,9 +32,18 @@ interface SelectorViewProps {
   onBindProject: (request: BindProjectRequest) => Promise<ApiResult<ProjectBindingState>>;
   onLaunchProject: (request: LaunchProjectRequest) => Promise<ApiResult<LaunchProjectResult>>;
   onCancel: () => Promise<void> | void;
+  onCreatePersonalContext?: () => void;
+  onCreateCompanyContext?: () => void;
 }
 
-function SelectorView({ launchState, onBindProject, onLaunchProject, onCancel }: SelectorViewProps) {
+function SelectorView({
+  launchState,
+  onBindProject,
+  onLaunchProject,
+  onCancel,
+  onCreatePersonalContext,
+  onCreateCompanyContext,
+}: SelectorViewProps) {
   const [selectedContextId, setSelectedContextId] = useState<string | undefined>(() =>
     initialSelectedContextId(launchState),
   );
@@ -154,61 +164,69 @@ function SelectorView({ launchState, onBindProject, onLaunchProject, onCancel }:
     <div className="space-y-8" onKeyDown={handleSelectorKeyDown}>
       <ProjectIdentity project={launchState.project} />
 
-      <div className="space-y-3">
-        {selectedContextId === undefined ? (
-          <p className="text-sm text-muted-foreground">No context selected</p>
-        ) : null}
+      {shouldRenderFirstRunWelcome(launchState) ? (
+        <FirstRunWelcome
+          launchState={launchState}
+          onCreatePersonal={onCreatePersonalContext}
+          onCreateCompany={onCreateCompanyContext}
+        />
+      ) : (
+        <div className="space-y-3">
+          {selectedContextId === undefined ? (
+            <p className="text-sm text-muted-foreground">No context selected</p>
+          ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="Available contexts">
-          {launchState.contexts.map((context) => (
-            <ContextCard
-              key={context.id}
-              context={context}
-              selected={selectedContextId === context.id}
-              disabled={launchPending}
-              tabIndex={rovingContextId === context.id ? 0 : -1}
-              buttonRef={setContextButtonRef(context.id)}
-              onSelect={handleSelectContext}
-              onNavigate={handleContextNavigation}
-              onLaunchSelected={keyboardLaunchAvailable ? () => void handleLaunch() : undefined}
+          <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="Available contexts">
+            {launchState.contexts.map((context) => (
+              <ContextCard
+                key={context.id}
+                context={context}
+                selected={selectedContextId === context.id}
+                disabled={launchPending}
+                tabIndex={rovingContextId === context.id ? 0 : -1}
+                buttonRef={setContextButtonRef(context.id)}
+                onSelect={handleSelectContext}
+                onNavigate={handleContextNavigation}
+                onLaunchSelected={keyboardLaunchAvailable ? () => void handleLaunch() : undefined}
+              />
+            ))}
+          </div>
+
+          {launchPending ? (
+            <p className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground" role="status">
+              Launching selected context...
+            </p>
+          ) : null}
+
+          {launchError ? <GuiErrorNotice error={launchError} /> : null}
+
+          {mismatchError?.contextMismatch ? (
+            <ContextMismatchDialog
+              mismatch={mismatchError.contextMismatch}
+              contexts={launchState.contexts}
+              launchPending={launchPending}
+              onCancel={() => setMismatchError(undefined)}
+              onOpenAnyway={() => void handleLaunch(true)}
             />
-          ))}
-        </div>
+          ) : null}
 
-        {launchPending ? (
-          <p className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground" role="status">
-            Launching selected context...
-          </p>
-        ) : null}
-
-        {launchError ? <GuiErrorNotice error={launchError} /> : null}
-
-        {mismatchError?.contextMismatch ? (
-          <ContextMismatchDialog
-            mismatch={mismatchError.contextMismatch}
+          <RememberProjectControl
+            binding={launchState.binding}
             contexts={launchState.contexts}
-            launchPending={launchPending}
-            onCancel={() => setMismatchError(undefined)}
-            onOpenAnyway={() => void handleLaunch(true)}
+            rememberProject={rememberProject}
+            selectedContextId={selectedContextId}
+            disabled={launchPending}
+            onRememberProjectChange={setRememberProject}
           />
-        ) : null}
 
-        <RememberProjectControl
-          binding={launchState.binding}
-          contexts={launchState.contexts}
-          rememberProject={rememberProject}
-          selectedContextId={selectedContextId}
-          disabled={launchPending}
-          onRememberProjectChange={setRememberProject}
-        />
-
-        <SelectorActions
-          launchDisabled={selectedContextId === undefined}
-          launchPending={launchPending}
-          onLaunch={() => void handleLaunch()}
-          onCancel={() => void cancelSelector({ closeSelector: onCancel })}
-        />
-      </div>
+          <SelectorActions
+            launchDisabled={selectedContextId === undefined}
+            launchPending={launchPending}
+            onLaunch={() => void handleLaunch()}
+            onCancel={() => void cancelSelector({ closeSelector: onCancel })}
+          />
+        </div>
+      )}
     </div>
   );
 }

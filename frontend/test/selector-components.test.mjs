@@ -5,6 +5,10 @@ import {renderToStaticMarkup} from "react-dom/server";
 
 import {ContextMismatchDialog} from "../.tmp-test/src/components/selector/ContextMismatchDialog.js";
 import {ContextCard} from "../.tmp-test/src/components/selector/ContextCard.js";
+import {
+  FirstRunWelcome,
+  shouldRenderFirstRunWelcome,
+} from "../.tmp-test/src/components/selector/FirstRunWelcome.js";
 import {GuiErrorNotice} from "../.tmp-test/src/components/selector/GuiErrorNotice.js";
 import {ProjectIdentity} from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import {
@@ -58,6 +62,54 @@ test("project identity preserves full project names and paths", () => {
     assert.ok(html.includes(project.name));
     assert.ok(html.includes(project.path));
   }
+});
+
+test("first-run welcome explains local identity boundaries and setup choices", () => {
+  const state = launchStateFixture({
+    contexts: [],
+    firstRun: true,
+  });
+  const html = renderToStaticMarkup(
+    FirstRunWelcome({
+      launchState: state,
+      onCreatePersonal: () => {},
+      onCreateCompany: () => {},
+    }),
+  );
+
+  assert.ok(html.includes("Create your first development context"));
+  assert.ok(html.includes("Local first"));
+  assert.ok(html.includes("Nothing is synced or uploaded by Dev Context."));
+  assert.ok(html.includes("Isolated tools"));
+  assert.ok(html.includes("Separate authentication"));
+  assert.ok(html.includes("does not store passwords, tokens, or cloud accounts"));
+  assert.ok(html.includes("Create Personal"));
+  assert.ok(html.includes("Create Company"));
+  assert.ok(html.includes(state.project.path));
+  assert.doesNotMatch(html, /disabled=""/);
+});
+
+test("first-run welcome disables setup actions until handlers are wired", () => {
+  const state = launchStateFixture({
+    contexts: [],
+    firstRun: true,
+  });
+  const html = renderToStaticMarkup(FirstRunWelcome({launchState: state}));
+
+  assert.match(html, /disabled=""/);
+});
+
+test("first-run predicate separates new and returning users", () => {
+  assert.equal(
+    shouldRenderFirstRunWelcome(
+      launchStateFixture({
+        contexts: [],
+        firstRun: true,
+      }),
+    ),
+    true,
+  );
+  assert.equal(shouldRenderFirstRunWelcome(launchStateFixture()), false);
 });
 
 test("context card renders generic context names and ids", () => {
