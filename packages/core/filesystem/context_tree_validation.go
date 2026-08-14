@@ -18,11 +18,9 @@ var ErrContextStorageIncomplete = errors.New("context storage is incomplete")
 type ContextDirectoryKind string
 
 const (
-	ContextDirectoryRoot           ContextDirectoryKind = "context"
-	ContextDirectoryClaude         ContextDirectoryKind = "claude"
-	ContextDirectoryCodex          ContextDirectoryKind = "codex"
-	ContextDirectoryVSCode         ContextDirectoryKind = "vscode"
-	ContextDirectoryVSCodeUserData ContextDirectoryKind = "vscode_user_data"
+	ContextDirectoryRoot   ContextDirectoryKind = "context"
+	ContextDirectoryClaude ContextDirectoryKind = "claude"
+	ContextDirectoryCodex  ContextDirectoryKind = "codex"
 )
 
 // MissingContextDirectory describes one absent or non-directory context path.
@@ -109,8 +107,6 @@ func expectedContextDirectories(paths ContextPaths) []expectedContextDirectory {
 		{Kind: ContextDirectoryRoot, Path: paths.RootDir},
 		{Kind: ContextDirectoryClaude, Path: paths.ClaudeDir},
 		{Kind: ContextDirectoryCodex, Path: paths.CodexDir},
-		{Kind: ContextDirectoryVSCode, Path: paths.VSCodeDir},
-		{Kind: ContextDirectoryVSCodeUserData, Path: paths.VSCodeUserDataDir},
 	}
 }
 

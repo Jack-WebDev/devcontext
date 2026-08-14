@@ -143,7 +143,5 @@ func contextTreeDirectories(paths ContextPaths) []string {
 		paths.RootDir,
 		paths.ClaudeDir,
 		paths.CodexDir,
-		paths.VSCodeDir,
-		paths.VSCodeUserDataDir,
 	}
 }

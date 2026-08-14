@@ -28,11 +28,7 @@ func TestProcessLauncherInterfaceRecordsCompleteProcessRequest(t *testing.T) {
 	processLauncher := &recordingProcessLauncher{}
 	request := launcher.ProcessRequest{
 		Executable: launcher.Executable("/usr/local/bin/code"),
-		Arguments: launcher.Arguments{
-			"--user-data-dir",
-			"/home/alex/.devctx/contexts/client-a/vscode/user-data",
-			"/work/client-a/api",
-		},
+		Arguments:  launcher.Arguments{"/work/client-a/api"},
 		Environment: launcher.Environment{
 			"CLAUDE_CONFIG_DIR": "/home/alex/.devctx/contexts/client-a/claude",
 			"CODEX_HOME":        "/home/alex/.devctx/contexts/client-a/codex",
