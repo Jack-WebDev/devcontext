@@ -213,10 +213,6 @@ func claudeSettingsPath(homeDir string) string {
 	return joinPlatformPath(joinPlatformPath(homeDir, globalClaudeDirectoryName), claudeSettingsFileName)
 }
 
-type codexAuthFile struct {
-	IDToken string `json:"id_token"`
-}
-
 type codexIDTokenClaims struct {
 	Email            string `json:"email"`
 	ChatGPTPlanType  string `json:"chatgpt_plan_type"`
@@ -229,11 +225,15 @@ func readCodexCredentialMetadata(path string) (CodexCredentialMetadata, bool) {
 		return CodexCredentialMetadata{}, false
 	}
 
-	var auth codexAuthFile
+	var auth any
 	if err := json.Unmarshal(data, &auth); err != nil {
 		return CodexCredentialMetadata{}, false
 	}
-	payload, ok := decodeJWTPayload(auth.IDToken)
+	idToken, ok := findJSONFieldString(auth, "id_token", "idToken")
+	if !ok {
+		return CodexCredentialMetadata{}, false
+	}
+	payload, ok := decodeJWTPayload(idToken)
 	if !ok {
 		return CodexCredentialMetadata{}, false
 	}
@@ -249,6 +249,29 @@ func readCodexCredentialMetadata(path string) (CodexCredentialMetadata, bool) {
 		ChatGPTAccountID: claims.ChatGPTAccountID,
 	}
 	return metadata, metadata != (CodexCredentialMetadata{})
+}
+
+func findJSONFieldString(value any, fieldNames ...string) (string, bool) {
+	switch typed := value.(type) {
+	case map[string]any:
+		for _, fieldName := range fieldNames {
+			if value, ok := typed[fieldName].(string); ok && value != "" {
+				return value, true
+			}
+		}
+		for _, nested := range typed {
+			if value, ok := findJSONFieldString(nested, fieldNames...); ok {
+				return value, true
+			}
+		}
+	case []any:
+		for _, nested := range typed {
+			if value, ok := findJSONFieldString(nested, fieldNames...); ok {
+				return value, true
+			}
+		}
+	}
+	return "", false
 }
 
 func decodeJWTPayload(token string) ([]byte, bool) {

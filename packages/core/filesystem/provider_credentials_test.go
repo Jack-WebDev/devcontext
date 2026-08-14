@@ -173,6 +173,48 @@ func TestDetectProviderCredentialSessionsReturnsOnlySafeMetadata(t *testing.T) {
 	}
 }
 
+func TestDetectProviderCredentialSessionsReadsNestedCodexIDToken(t *testing.T) {
+	homeDir := t.TempDir()
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return homeDir, nil
+	})
+	codexToken := testJWT(t, map[string]string{
+		"email":              "work@example.com",
+		"chatgpt_plan_type":  "team",
+		"chatgpt_account_id": "acct-work",
+	})
+	writeJSONCredentialFixture(t, filepath.Join(homeDir, ".codex", "auth.json"), map[string]any{
+		"tokens": map[string]string{
+			"id_token":     codexToken,
+			"access_token": "codex-access-token",
+		},
+	})
+
+	sessions, err := filesystem.DetectProviderCredentialSessions(platformPaths)
+	if err != nil {
+		t.Fatalf("detect provider credential sessions: %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("session count = %d, want 1: %#v", len(sessions), sessions)
+	}
+	codex := sessions[0]
+	if codex.ProviderID != "codex" || !codex.MetadataAvailable {
+		t.Fatalf("codex session = %#v, want available codex metadata", codex)
+	}
+	if codex.Codex.Email != "work@example.com" ||
+		codex.Codex.ChatGPTPlanType != "team" ||
+		codex.Codex.ChatGPTAccountID != "acct-work" {
+		t.Fatalf("codex metadata = %#v", codex.Codex)
+	}
+
+	rendered := fmt.Sprintf("%#v", sessions)
+	for _, secret := range []string{codexToken, "codex-access-token"} {
+		if strings.Contains(rendered, secret) {
+			t.Fatalf("detected sessions exposed credential value %q: %#v", secret, sessions)
+		}
+	}
+}
+
 func TestCreateContextDirectoryTreeWithProviderCredentialsKeepsContextsIsolated(t *testing.T) {
 	homeDir := t.TempDir()
 	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
