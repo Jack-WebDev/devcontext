@@ -15,9 +15,9 @@ func TestProviderStatusVariantsSerialize(t *testing.T) {
 		want   string
 	}{
 		{
-			name:   "ready",
-			status: provider.ReadyStatus(),
-			want:   `{"state":"ready"}`,
+			name:   "configured",
+			status: provider.ConfiguredStatus(),
+			want:   `{"state":"configured"}`,
 		},
 		{
 			name:   "not configured",
@@ -31,8 +31,8 @@ func TestProviderStatusVariantsSerialize(t *testing.T) {
 		},
 		{
 			name:   "unavailable",
-			status: provider.UnavailableStatus("provider command was not found"),
-			want:   `{"state":"unavailable","explanation":"provider command was not found"}`,
+			status: provider.UnavailableStatus("provider status could not be inspected"),
+			want:   `{"state":"unavailable","explanation":"provider status could not be inspected"}`,
 		},
 	}
 
@@ -58,6 +58,15 @@ func TestProviderStatusVariantsSerialize(t *testing.T) {
 				t.Fatalf("decoded status = %#v, want %#v", decoded, tt.status)
 			}
 		})
+	}
+}
+
+func TestReadyStatusIsConfiguredCompatibilityAlias(t *testing.T) {
+	if provider.ReadyStatus() != provider.ConfiguredStatus() {
+		t.Fatalf("ready status = %#v, want configured status", provider.ReadyStatus())
+	}
+	if provider.StatusReady != provider.StatusConfigured {
+		t.Fatalf("ready state = %q, want %q", provider.StatusReady, provider.StatusConfigured)
 	}
 }
 

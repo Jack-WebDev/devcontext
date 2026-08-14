@@ -160,7 +160,7 @@ function providerAuthenticationGuidance(context: ContextState, provider: Provide
   switch (provider.id) {
     case "claude":
     case "codex":
-      return `${provider.name} is enabled for ${context.name} but is not signed in yet. Open ${context.name}, then sign in with ${provider.name} inside that tool. Dev Context will not copy credentials or ask for passwords or tokens.`;
+      return `${provider.name} is enabled for ${context.name} but no isolated provider state was found. Open ${context.name}, then sign in with the ${provider.name} VS Code extension.`;
     default:
       return undefined;
   }
@@ -168,8 +168,10 @@ function providerAuthenticationGuidance(context: ContextState, provider: Provide
 
 function providerStatusPresentation(state: string): { label: string; indicatorClassName: string } {
   switch (state) {
+    case "configured":
+      return { label: "Configured", indicatorClassName: "bg-emerald-600" };
     case "ready":
-      return { label: "Ready", indicatorClassName: "bg-emerald-600" };
+      return { label: "Configured", indicatorClassName: "bg-emerald-600" };
     case "not_configured":
       return { label: "Not configured", indicatorClassName: "bg-amber-500" };
     case "directory_missing":

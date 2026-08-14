@@ -37,5 +37,5 @@ func (CodexProvider) BuildEnvironment(ctx RuntimeContext) (EnvironmentContributi
 
 // Status returns local provider readiness.
 func (p CodexProvider) Status(ctx RuntimeContext) (Status, error) {
-	return detectLocalStatus(p.Probe, CodexCommand, p.DisplayName(), ctx.Paths.CodexDir)
+	return detectLocalStatus(p.Probe, p.DisplayName(), ctx.Paths.CodexDir)
 }

@@ -438,9 +438,8 @@ Personal Context  ->  ~/.devctx/contexts/personal/{claude,codex}
 Company Context   ->  ~/.devctx/contexts/company/{claude,codex}
 ```
 
-Dev Context considers a provider ready when:
+Dev Context considers a provider configured when:
 
-* The provider command exists on `PATH`
 * The context-owned provider directory exists
 * The context-owned provider directory contains provider state
 

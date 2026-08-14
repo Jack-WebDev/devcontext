@@ -114,6 +114,51 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 	}
 }
 
+func TestLaunchPlanBuilderDoesNotRequireProviderCLICommands(t *testing.T) {
+	projectDir := t.TempDir()
+	context := devcontext.DefaultPersonalContext(time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC))
+	platformPaths := fakePlanPlatformPaths{
+		devContextHome: filepath.Join(t.TempDir(), ".devctx"),
+	}
+	contextPaths, err := filesystem.DeriveContextPaths(platformPaths, context.ID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	createContextDirectories(t, contextPaths)
+
+	builder := launcher.LaunchPlanBuilder{
+		Resolver: fakePlanResolver{
+			result: launcher.ResolutionResult{
+				Context: &context,
+				Source:  launcher.ResolutionSourceExplicit,
+			},
+		},
+		PlatformPaths: platformPaths,
+		Providers: []provider.Provider{
+			provider.ClaudeProvider{},
+			provider.CodexProvider{},
+		},
+		Editor:            &builderFakeEditor{},
+		ParentEnvironment: []string{"PATH=/path/without/provider-clis"},
+	}
+
+	plan, err := builder.Build(launcher.LaunchRequest{
+		ProjectPath:      project.Path(projectDir),
+		RequestedContext: &context.ID,
+		Source:           launcher.InvocationSourceCLI,
+	})
+	if err != nil {
+		t.Fatalf("build launch plan: %v", err)
+	}
+
+	if plan.Environment[provider.CodexHomeEnvVar] != contextPaths.CodexDir {
+		t.Fatalf("CODEX_HOME = %q, want %q", plan.Environment[provider.CodexHomeEnvVar], contextPaths.CodexDir)
+	}
+	if plan.Environment[provider.ClaudeConfigDirEnvVar] != contextPaths.ClaudeDir {
+		t.Fatalf("CLAUDE_CONFIG_DIR = %q, want %q", plan.Environment[provider.ClaudeConfigDirEnvVar], contextPaths.ClaudeDir)
+	}
+}
+
 func createContextDirectories(t *testing.T, paths filesystem.ContextPaths) {
 	t.Helper()
 

@@ -1,7 +1,6 @@
 package provider_test
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,41 +12,31 @@ import (
 func TestCodexProviderDetectsLocalStatus(t *testing.T) {
 	paths := localStatusFixture(t)
 	tests := []struct {
-		name          string
-		toolAvailable bool
-		directory     string
-		wantState     provider.StatusState
+		name      string
+		directory string
+		wantState provider.StatusState
 	}{
 		{
-			name:          "missing tool",
-			toolAvailable: false,
-			directory:     paths.configuredDir,
-			wantState:     provider.StatusUnavailable,
+			name:      "missing directory",
+			directory: paths.missingDir,
+			wantState: provider.StatusNotConfigured,
 		},
 		{
-			name:          "missing directory",
-			toolAvailable: true,
-			directory:     paths.missingDir,
-			wantState:     provider.StatusDirectoryMissing,
+			name:      "empty directory",
+			directory: paths.emptyDir,
+			wantState: provider.StatusNotConfigured,
 		},
 		{
-			name:          "empty directory",
-			toolAvailable: true,
-			directory:     paths.emptyDir,
-			wantState:     provider.StatusNotConfigured,
-		},
-		{
-			name:          "configured fixture",
-			toolAvailable: true,
-			directory:     paths.configuredDir,
-			wantState:     provider.StatusReady,
+			name:      "configured fixture without CLI detection",
+			directory: paths.configuredDir,
+			wantState: provider.StatusConfigured,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			integration := provider.CodexProvider{
-				Probe: testStatusProbe{toolAvailable: tt.toolAvailable},
+				Probe: testStatusProbe{},
 			}
 			status, err := integration.Status(provider.RuntimeContext{
 				Paths: provider.ContextPaths{
@@ -67,41 +56,31 @@ func TestCodexProviderDetectsLocalStatus(t *testing.T) {
 func TestClaudeProviderDetectsLocalStatus(t *testing.T) {
 	paths := localStatusFixture(t)
 	tests := []struct {
-		name          string
-		toolAvailable bool
-		directory     string
-		wantState     provider.StatusState
+		name      string
+		directory string
+		wantState provider.StatusState
 	}{
 		{
-			name:          "missing tool",
-			toolAvailable: false,
-			directory:     paths.configuredDir,
-			wantState:     provider.StatusUnavailable,
+			name:      "missing directory",
+			directory: paths.missingDir,
+			wantState: provider.StatusNotConfigured,
 		},
 		{
-			name:          "missing directory",
-			toolAvailable: true,
-			directory:     paths.missingDir,
-			wantState:     provider.StatusDirectoryMissing,
+			name:      "empty directory",
+			directory: paths.emptyDir,
+			wantState: provider.StatusNotConfigured,
 		},
 		{
-			name:          "empty directory",
-			toolAvailable: true,
-			directory:     paths.emptyDir,
-			wantState:     provider.StatusNotConfigured,
-		},
-		{
-			name:          "configured fixture",
-			toolAvailable: true,
-			directory:     paths.configuredDir,
-			wantState:     provider.StatusReady,
+			name:      "configured fixture without CLI detection",
+			directory: paths.configuredDir,
+			wantState: provider.StatusConfigured,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			integration := provider.ClaudeProvider{
-				Probe: testStatusProbe{toolAvailable: tt.toolAvailable},
+				Probe: testStatusProbe{},
 			}
 			status, err := integration.Status(provider.RuntimeContext{
 				Paths: provider.ContextPaths{
@@ -152,16 +131,7 @@ func localStatusFixture(t *testing.T) statusFixturePaths {
 	}
 }
 
-type testStatusProbe struct {
-	toolAvailable bool
-}
-
-func (p testStatusProbe) LookPath(file string) (string, error) {
-	if !p.toolAvailable {
-		return "", errors.New("tool not found")
-	}
-	return filepath.Join("/usr/local/bin", file), nil
-}
+type testStatusProbe struct{}
 
 func (testStatusProbe) ReadDir(path string) ([]os.DirEntry, error) {
 	return os.ReadDir(path)

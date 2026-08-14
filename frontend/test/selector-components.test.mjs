@@ -188,29 +188,29 @@ test("context card renders as a selectable control when wired", () => {
 
 test("context card renders enabled provider status variants with accessible names", () => {
   const context = contextFixture("personal", "Personal", [
-    providerFixture("claude-ready", "Claude", true, "ready"),
-    providerFixture("codex-not-configured", "Codex", true, "not_configured", "Codex context directory is empty"),
+    providerFixture("claude-configured", "Claude", true, "configured"),
+    providerFixture("codex-not-configured", "Codex", true, "not_configured", "Codex isolated provider state was not found"),
     providerFixture("claude-missing", "Claude", true, "directory_missing", "Claude context directory is missing"),
-    providerFixture("codex-unavailable", "Codex", true, "unavailable", "Codex command was not found"),
-    providerFixture("disabled", "Disabled Provider", false, "ready"),
+    providerFixture("codex-unavailable", "Codex", true, "unavailable", "Codex context directory could not be inspected"),
+    providerFixture("disabled", "Disabled Provider", false, "configured"),
   ]);
   const html = renderToStaticMarkup(ContextCard({context}));
 
-  assert.match(html, /Claude local status: Ready/);
+  assert.match(html, /Claude local status: Configured/);
   assert.match(html, /Codex local status: Not configured/);
   assert.match(html, /Claude local status: Directory missing/);
   assert.match(html, /Codex local status: Unavailable/);
-  assert.ok(html.includes("Codex context directory is empty"));
+  assert.ok(html.includes("Codex isolated provider state was not found"));
   assert.ok(!html.includes("Disabled Provider"));
 });
 
 test("context card attaches authentication guidance to not configured Claude and Codex providers", () => {
   const personal = contextFixture("personal", "Personal", [
-    providerFixture("codex", "Codex", true, "not_configured", "Codex context directory is empty"),
-    providerFixture("claude", "Claude", true, "ready"),
+    providerFixture("codex", "Codex", true, "not_configured", "Codex isolated provider state was not found"),
+    providerFixture("claude", "Claude", true, "configured"),
   ]);
   const company = contextFixture("company", "Company", [
-    providerFixture("codex", "Codex", true, "ready"),
+    providerFixture("codex", "Codex", true, "configured"),
     providerFixture("internal", "Internal Tool", true, "not_configured"),
   ]);
   const html = [
@@ -218,9 +218,8 @@ test("context card attaches authentication guidance to not configured Claude and
     renderToStaticMarkup(ContextCard({context: company})),
   ].join("");
 
-  assert.ok(html.includes("Codex is enabled for Personal but is not signed in yet."));
-  assert.ok(html.includes("Open Personal, then sign in with Codex inside that tool."));
-  assert.ok(html.includes("Dev Context will not copy credentials or ask for passwords or tokens."));
+  assert.ok(html.includes("Codex is enabled for Personal but no isolated provider state was found."));
+  assert.ok(html.includes("Open Personal, then sign in with the Codex VS Code extension."));
   assert.ok(!html.includes("Claude is enabled for Personal"));
   assert.ok(!html.includes("Codex is enabled for Company"));
   assert.ok(!html.includes("Internal Tool is enabled for Company"));
