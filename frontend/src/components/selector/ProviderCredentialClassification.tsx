@@ -24,7 +24,8 @@ function ProviderCredentialClassification({
       <div>
         <h4 className="text-sm font-semibold">Classify detected provider sessions</h4>
         <p className="mt-1 text-sm text-muted-foreground">
-          Dev Context found existing local sessions. Review the metadata and choose where each session belongs.
+          Dev Context found currently signed-in local sessions. Review the metadata and choose which context should
+          receive each session.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -58,10 +59,15 @@ function ProviderCredentialSessionCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h5 className="text-sm font-semibold">{session.name}</h5>
+          <p className="mt-1 text-xs text-muted-foreground">{providerSessionSourceLabel(session)}</p>
           <ProviderCredentialMetadata session={session} />
         </div>
         <p className="text-xs font-medium text-muted-foreground">
-          {assignment === undefined ? "Unassigned" : assignment === "personal" ? "Personal" : "Company"}
+          {assignment === undefined
+            ? "Unassigned"
+            : assignment === "personal"
+              ? "Will import to Personal"
+              : "Will import to Company"}
         </p>
       </div>
       <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label={`Classify ${session.name} session`}>
@@ -71,7 +77,7 @@ function ProviderCredentialSessionCard({
           disabled={disabled}
           onClick={() => onClassify(session.providerId, "personal")}
         >
-          Personal
+          Import to Personal
         </button>
         <button
           type="button"
@@ -79,7 +85,7 @@ function ProviderCredentialSessionCard({
           disabled={disabled}
           onClick={() => onClassify(session.providerId, "company")}
         >
-          Company
+          Import to Company
         </button>
       </div>
     </article>
@@ -90,7 +96,11 @@ function ProviderCredentialMetadata({ session }: { session: ProviderCredentialSe
   const rows = providerCredentialRows(session);
 
   if (!session.metadataAvailable || rows.length === 0) {
-    return <p className="mt-2 text-sm text-muted-foreground">Metadata unavailable</p>;
+    return (
+      <p className="mt-2 text-sm text-muted-foreground">
+        Account metadata unavailable. Refresh this provider sign-in, then reopen Dev Context to identify the session.
+      </p>
+    );
   }
 
   return (
@@ -124,6 +134,17 @@ function providerCredentialRows(session: ProviderCredentialSession): Array<{ lab
   }
 
   return [];
+}
+
+function providerSessionSourceLabel(session: ProviderCredentialSession): string {
+  switch (session.providerId) {
+    case "codex":
+      return "Current global Codex session";
+    case "claude":
+      return "Current global Claude session";
+    default:
+      return "Current global provider session";
+  }
 }
 
 function rowHasValue(row: { label: string; value?: string }): row is { label: string; value: string } {
