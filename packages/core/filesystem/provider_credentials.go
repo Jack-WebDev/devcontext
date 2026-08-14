@@ -43,6 +43,7 @@ type CodexCredentialMetadata struct {
 type ClaudeCredentialMetadata struct {
 	SubscriptionType string
 	OrganizationUUID string
+	OrganizationName string
 }
 
 // DetectProviderCredentialSessions reads supported global provider credential
@@ -291,27 +292,91 @@ func decodeJWTPayload(token string) ([]byte, bool) {
 	return payload, true
 }
 
-type claudeCredentialsFile struct {
-	SubscriptionType string `json:"subscriptionType"`
-	OrganizationUUID string `json:"organizationUuid"`
-}
-
 func readClaudeCredentialMetadata(path string) (ClaudeCredentialMetadata, bool) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ClaudeCredentialMetadata{}, false
 	}
 
-	var credentials claudeCredentialsFile
+	var credentials any
 	if err := json.Unmarshal(data, &credentials); err != nil {
 		return ClaudeCredentialMetadata{}, false
 	}
 
 	metadata := ClaudeCredentialMetadata{
-		SubscriptionType: credentials.SubscriptionType,
-		OrganizationUUID: credentials.OrganizationUUID,
+		SubscriptionType: firstJSONFieldString(credentials, "subscriptionType", "subscription_type"),
+		OrganizationUUID: firstJSONFieldString(credentials, "organizationUuid", "organizationUUID", "organization_uuid"),
+		OrganizationName: claudeOrganizationName(credentials),
 	}
 	return metadata, metadata != (ClaudeCredentialMetadata{})
+}
+
+func firstJSONFieldString(value any, fieldNames ...string) string {
+	found, ok := findJSONFieldString(value, fieldNames...)
+	if !ok {
+		return ""
+	}
+	return found
+}
+
+func claudeOrganizationName(credentials any) string {
+	if name := firstJSONFieldString(
+		credentials,
+		"organizationName",
+		"organizationDisplayName",
+		"organization_name",
+		"organization_display_name",
+		"orgName",
+		"orgDisplayName",
+		"workspaceName",
+		"workspaceDisplayName",
+	); name != "" {
+		return name
+	}
+
+	return firstStringFieldInNamedJSONObject(
+		credentials,
+		[]string{"organization", "organizationInfo", "organization_info", "org", "workspace"},
+		[]string{"name", "displayName", "display_name"},
+	)
+}
+
+func firstStringFieldInNamedJSONObject(value any, objectNames []string, fieldNames []string) string {
+	switch typed := value.(type) {
+	case map[string]any:
+		for _, objectName := range objectNames {
+			if nested, ok := typed[objectName]; ok {
+				if found := firstStringField(nested, fieldNames); found != "" {
+					return found
+				}
+			}
+		}
+		for _, nested := range typed {
+			if found := firstStringFieldInNamedJSONObject(nested, objectNames, fieldNames); found != "" {
+				return found
+			}
+		}
+	case []any:
+		for _, nested := range typed {
+			if found := firstStringFieldInNamedJSONObject(nested, objectNames, fieldNames); found != "" {
+				return found
+			}
+		}
+	}
+	return ""
+}
+
+func firstStringField(value any, fieldNames []string) string {
+	object, ok := value.(map[string]any)
+	if !ok {
+		return ""
+	}
+	for _, fieldName := range fieldNames {
+		if found, ok := object[fieldName].(string); ok && found != "" {
+			return found
+		}
+	}
+	return ""
 }
 
 func regularFileExists(path string) (bool, error) {

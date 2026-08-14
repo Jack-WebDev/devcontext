@@ -128,6 +128,7 @@ export interface CodexCredentialSession {
 export interface ClaudeCredentialSession {
   subscriptionType?: string;
   organizationUuid?: string;
+  organizationName?: string;
 }
 
 export interface DevContextApi {
@@ -330,6 +331,7 @@ function normalizeClaudeCredentialSession(value: unknown): ClaudeCredentialSessi
   return {
     subscriptionType: optionalString(object.subscriptionType),
     organizationUuid: optionalString(object.organizationUuid),
+    organizationName: optionalString(object.organizationName),
   };
 }
 

@@ -95,6 +95,7 @@ type CodexCredentialSessionState struct {
 type ClaudeCredentialSessionState struct {
 	SubscriptionType string `json:"subscriptionType,omitempty"`
 	OrganizationUUID string `json:"organizationUuid,omitempty"`
+	OrganizationName string `json:"organizationName,omitempty"`
 }
 
 // ResolutionWarning is a presentation-safe launch warning.

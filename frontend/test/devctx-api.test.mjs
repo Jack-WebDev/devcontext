@@ -54,6 +54,7 @@ test("adapter normalizes successful Wails calls", async () => {
             claude: {
               subscriptionType: "Pro",
               organizationUuid: "e783",
+              organizationName: "Jishin Labs",
             },
           },
         ],
@@ -155,6 +156,7 @@ test("adapter normalizes successful Wails calls", async () => {
           claude: {
             subscriptionType: "Pro",
             organizationUuid: "e783",
+            organizationName: "Jishin Labs",
           },
         },
       ],

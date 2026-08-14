@@ -303,6 +303,7 @@ func (s *Service) providerCredentialSessionStates() ([]ProviderCredentialSession
 			state.Claude = &ClaudeCredentialSessionState{
 				SubscriptionType: session.Claude.SubscriptionType,
 				OrganizationUUID: session.Claude.OrganizationUUID,
+				OrganizationName: session.Claude.OrganizationName,
 			}
 		default:
 			continue
