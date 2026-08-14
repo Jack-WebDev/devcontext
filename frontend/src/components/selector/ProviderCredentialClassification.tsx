@@ -129,7 +129,8 @@ function providerCredentialRows(session: ProviderCredentialSession): Array<{ lab
   if (session.providerId === "claude" && session.claude) {
     return [
       { label: "Subscription", value: session.claude.subscriptionType },
-      { label: "Organization", value: session.claude.organizationUuid },
+      { label: "Organization", value: session.claude.organizationName },
+      { label: "Organization ID", value: session.claude.organizationUuid },
     ].filter(rowHasValue);
   }
 

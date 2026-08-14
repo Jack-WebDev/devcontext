@@ -138,6 +138,8 @@ test("first-run welcome requires detected provider sessions to be classified bef
   assert.ok(unassigned.includes("Subscription:"));
   assert.ok(unassigned.includes("Pro"));
   assert.ok(unassigned.includes("Organization:"));
+  assert.ok(unassigned.includes("Jishin Labs"));
+  assert.ok(unassigned.includes("Organization ID:"));
   assert.ok(unassigned.includes("e783"));
   assert.match(unassigned, /disabled=""/);
   assert.doesNotMatch(assigned, /disabled=""/);
@@ -176,6 +178,7 @@ test("provider credential classification renders only safe metadata fields", () 
   assert.ok(html.includes("Business"));
   assert.ok(html.includes("acct_123"));
   assert.ok(html.includes("Pro"));
+  assert.ok(html.includes("Jishin Labs"));
   assert.ok(html.includes("e783"));
   assert.doesNotMatch(html, /access-token-secret/);
   assert.doesNotMatch(html, /refresh-token-secret/);
@@ -1029,6 +1032,7 @@ function providerCredentialSessionsFixture() {
       claude: {
         subscriptionType: "Pro",
         organizationUuid: "e783",
+        organizationName: "Jishin Labs",
       },
     },
   ];

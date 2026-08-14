@@ -129,6 +129,7 @@ func TestDetectProviderCredentialSessionsReturnsOnlySafeMetadata(t *testing.T) {
 	writeJSONCredentialFixture(t, filepath.Join(homeDir, ".claude", ".credentials.json"), map[string]string{
 		"subscriptionType": "Pro",
 		"organizationUuid": "e783-organization",
+		"organizationName": "Jishin Labs",
 		"accessToken":      "claude-access-token",
 		"refreshToken":     "claude-refresh-token",
 	})
@@ -155,7 +156,9 @@ func TestDetectProviderCredentialSessionsReturnsOnlySafeMetadata(t *testing.T) {
 	if claude.ProviderID != "claude" || !claude.MetadataAvailable {
 		t.Fatalf("claude session = %#v, want available claude metadata", claude)
 	}
-	if claude.Claude.SubscriptionType != "Pro" || claude.Claude.OrganizationUUID != "e783-organization" {
+	if claude.Claude.SubscriptionType != "Pro" ||
+		claude.Claude.OrganizationUUID != "e783-organization" ||
+		claude.Claude.OrganizationName != "Jishin Labs" {
 		t.Fatalf("claude metadata = %#v", claude.Claude)
 	}
 
@@ -170,6 +173,47 @@ func TestDetectProviderCredentialSessionsReturnsOnlySafeMetadata(t *testing.T) {
 		if contains := strings.Contains(rendered, secret); contains {
 			t.Fatalf("detected sessions exposed credential value %q: %#v", secret, sessions)
 		}
+	}
+}
+
+func TestDetectProviderCredentialSessionsReadsNestedClaudeOrganizationName(t *testing.T) {
+	homeDir := t.TempDir()
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return homeDir, nil
+	})
+	writeJSONCredentialFixture(t, filepath.Join(homeDir, ".claude", ".credentials.json"), map[string]any{
+		"account": map[string]any{
+			"organization": map[string]string{
+				"uuid":        "ignored-uuid-field",
+				"displayName": "Acme Research",
+			},
+		},
+		"subscriptionType":  "Team",
+		"organization_uuid": "e783-organization",
+		"accessToken":       "claude-access-token",
+	})
+
+	sessions, err := filesystem.DetectProviderCredentialSessions(platformPaths)
+	if err != nil {
+		t.Fatalf("detect provider credential sessions: %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("session count = %d, want 1: %#v", len(sessions), sessions)
+	}
+
+	claude := sessions[0]
+	if claude.ProviderID != "claude" || !claude.MetadataAvailable {
+		t.Fatalf("claude session = %#v, want available claude metadata", claude)
+	}
+	if claude.Claude.SubscriptionType != "Team" ||
+		claude.Claude.OrganizationUUID != "e783-organization" ||
+		claude.Claude.OrganizationName != "Acme Research" {
+		t.Fatalf("claude metadata = %#v", claude.Claude)
+	}
+
+	rendered := fmt.Sprintf("%#v", sessions)
+	if strings.Contains(rendered, "claude-access-token") {
+		t.Fatalf("detected sessions exposed credential value: %#v", sessions)
 	}
 }
 

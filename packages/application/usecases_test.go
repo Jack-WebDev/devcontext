@@ -97,6 +97,7 @@ func TestGetLaunchStateDetectsProviderCredentialSessionsForContextCreation(t *te
 	writeApplicationJSONFixture(t, filepath.Join(fixture.homeDir, ".claude", ".credentials.json"), map[string]string{
 		"subscriptionType": "Pro",
 		"organizationUuid": "e783",
+		"organizationName": "Jishin Labs",
 		"accessToken":      "not-presented",
 	})
 
@@ -114,7 +115,8 @@ func TestGetLaunchStateDetectsProviderCredentialSessionsForContextCreation(t *te
 	}
 	if session.Claude == nil ||
 		session.Claude.SubscriptionType != "Pro" ||
-		session.Claude.OrganizationUUID != "e783" {
+		session.Claude.OrganizationUUID != "e783" ||
+		session.Claude.OrganizationName != "Jishin Labs" {
 		t.Fatalf("claude metadata = %#v", session.Claude)
 	}
 	if rendered := fmt.Sprintf("%#v", state.ProviderCredentialSessions); strings.Contains(rendered, "not-presented") {
