@@ -1,7 +1,6 @@
 package application
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -116,7 +115,7 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 		return CreateContextResult{}, err
 	}
 
-	ctx, err := defaultContextForID(contextID, s.now())
+	ctx, err := devcontext.DefaultContextForID(contextID, s.now())
 	if err != nil {
 		return CreateContextResult{}, err
 	}
@@ -125,7 +124,8 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 	if err != nil {
 		return CreateContextResult{}, err
 	}
-	if err := filesystem.CreateContextDirectoryTreeWithPermissions(
+	if err := filesystem.CreateContextDirectoryTreeWithProviderCredentialsAndPermissions(
+		s.dependencies.Paths,
 		contextPaths,
 		ctx,
 		s.dependencies.StoragePermissions,
@@ -134,17 +134,6 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 	}
 
 	return CreateContextResult{Context: s.contextState(ctx)}, nil
-}
-
-func defaultContextForID(contextID devcontext.ID, createdAt time.Time) (devcontext.Context, error) {
-	switch contextID.String() {
-	case "personal":
-		return devcontext.DefaultPersonalContext(createdAt), nil
-	case "company":
-		return devcontext.DefaultCompanyContext(createdAt), nil
-	default:
-		return devcontext.Context{}, fmt.Errorf("%w: unsupported default context %q", devcontext.ErrContextNotFound, contextID.String())
-	}
 }
 
 func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResult, error) {

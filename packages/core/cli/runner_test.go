@@ -42,6 +42,29 @@ func TestRunnerContextListRendersEmptyAndPopulatedContexts(t *testing.T) {
 		"Personal  personal\n", "")
 }
 
+func TestRunnerContextCreateImportsProviderCredentials(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	writeCLICredentialFixture(t, filepath.Join(fixture.homeDir, ".codex", "auth.json"), []byte("codex-auth-fixture"))
+	writeCLICredentialFixture(t, filepath.Join(fixture.homeDir, ".claude", ".credentials.json"), []byte("claude-credentials-fixture"))
+	writeCLICredentialFixture(t, filepath.Join(fixture.homeDir, ".claude", "settings.json"), []byte("claude-settings-fixture"))
+
+	result := fixture.runner().Run([]string{"context", "create", "personal"})
+	assertResult(t, result, cli.ExitSuccess, "Context:\npersonal\n\nStatus:\ncreated\n", "")
+
+	stored, err := devcontext.NewRepository(fixture.contextsDir).Get(devcontext.MustID("personal"))
+	if err != nil {
+		t.Fatalf("get created context: %v", err)
+	}
+	if !reflect.DeepEqual(stored, devcontext.DefaultPersonalContext(fixture.now)) {
+		t.Fatalf("stored context = %#v, want default personal", stored)
+	}
+
+	contextRoot := filepath.Join(fixture.homeDir, ".devctx", "contexts", "personal")
+	assertCLIFileBytes(t, filepath.Join(contextRoot, "codex", "auth.json"), []byte("codex-auth-fixture"))
+	assertCLIFileBytes(t, filepath.Join(contextRoot, "claude", ".credentials.json"), []byte("claude-credentials-fixture"))
+	assertCLIFileBytes(t, filepath.Join(contextRoot, "claude", "settings.json"), []byte("claude-settings-fixture"))
+}
+
 func TestRunnerProjectShowRendersBoundUnboundAndDanglingStates(t *testing.T) {
 	t.Run("unbound", func(t *testing.T) {
 		fixture := newRunnerFixture(t)
@@ -773,6 +796,29 @@ func assertResult(t *testing.T, got cli.Result, wantCode cli.ExitCode, wantStdou
 	}
 	if got.Stderr != wantStderr {
 		t.Fatalf("stderr = %q, want %q", got.Stderr, wantStderr)
+	}
+}
+
+func writeCLICredentialFixture(t *testing.T, path string, data []byte) {
+	t.Helper()
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatalf("create credential fixture directory %q: %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("write credential fixture %q: %v", path, err)
+	}
+}
+
+func assertCLIFileBytes(t *testing.T, path string, want []byte) {
+	t.Helper()
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read file %q: %v", path, err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("file %q = %q, want %q", path, string(got), string(want))
 	}
 }
 

@@ -43,18 +43,19 @@ func (r Result) Write(stdout io.Writer, stderr io.Writer) error {
 
 // Runner executes implemented CLI commands against core repositories.
 type Runner struct {
-	Contexts          devcontext.Repository
-	Projects          project.Repository
-	WorkingDirectory  string
-	Paths             filesystem.PlatformPaths
-	Providers         []provider.Provider
-	Editor            editor.Editor
-	ProcessLauncher   launcher.ProcessLauncher
-	ParentEnvironment []string
-	DetachMode        launcher.DetachMode
-	Now               func() time.Time
-	Debug             bool
-	Logger            devlog.Logger
+	Contexts           devcontext.Repository
+	Projects           project.Repository
+	WorkingDirectory   string
+	Paths              filesystem.PlatformPaths
+	Providers          []provider.Provider
+	Editor             editor.Editor
+	ProcessLauncher    launcher.ProcessLauncher
+	ParentEnvironment  []string
+	DetachMode         launcher.DetachMode
+	StoragePermissions filesystem.StoragePermissions
+	Now                func() time.Time
+	Debug              bool
+	Logger             devlog.Logger
 }
 
 // Run parses and executes one CLI command.
@@ -145,6 +146,24 @@ func (r Runner) runContext(command ContextCommand) Result {
 			return r.errorResult(err)
 		}
 		return successResult(renderContextList(contexts))
+	case ContextCreate:
+		contextID, err := devcontext.NewID(command.ContextID)
+		if err != nil {
+			return r.errorResult(err)
+		}
+		ctx, err := devcontext.DefaultContextForID(contextID, r.now())
+		if err != nil {
+			return r.errorResult(err)
+		}
+		paths := r.paths()
+		contextPaths, err := filesystem.DeriveContextPaths(paths, contextID)
+		if err != nil {
+			return r.errorResult(err)
+		}
+		if err := filesystem.CreateContextDirectoryTreeWithProviderCredentialsAndPermissions(paths, contextPaths, ctx, r.storagePermissions()); err != nil {
+			return r.errorResult(err)
+		}
+		return successResult(renderContextCreate(ctx))
 	default:
 		return r.errorResult(fmt.Errorf("%w: context %s is not implemented", ErrInvalidCommand, command.Subcommand))
 	}
@@ -246,6 +265,13 @@ func (r Runner) detachMode() launcher.DetachMode {
 	return launcher.DetachModeDetached
 }
 
+func (r Runner) storagePermissions() filesystem.StoragePermissions {
+	if r.StoragePermissions != nil {
+		return r.StoragePermissions
+	}
+	return filesystem.NewDefaultStoragePermissions()
+}
+
 func (r Runner) logger() devlog.Logger {
 	if r.Logger != nil {
 		return r.Logger
@@ -322,6 +348,10 @@ func renderContextList(contexts []devcontext.Context) string {
 		fmt.Fprintf(&builder, "%-*s  %s\n", nameWidth, ctx.Name, ctx.ID.String())
 	}
 	return builder.String()
+}
+
+func renderContextCreate(ctx devcontext.Context) string {
+	return fmt.Sprintf("Context:\n%s\n\nStatus:\ncreated\n", ctx.ID.String())
 }
 
 func renderProjectLookup(lookup project.BindingLookup) string {

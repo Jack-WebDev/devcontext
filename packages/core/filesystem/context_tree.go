@@ -14,9 +14,29 @@ func CreateContextDirectoryTree(paths ContextPaths, ctx devcontext.Context) erro
 	return CreateContextDirectoryTreeWithPermissions(paths, ctx, NewDefaultStoragePermissions())
 }
 
+// CreateContextDirectoryTreeWithProviderCredentials creates the isolated
+// storage tree for one context and imports supported global provider credential
+// files into it.
+func CreateContextDirectoryTreeWithProviderCredentials(platformPaths PlatformPaths, paths ContextPaths, ctx devcontext.Context) error {
+	return CreateContextDirectoryTreeWithProviderCredentialsAndPermissions(platformPaths, paths, ctx, NewDefaultStoragePermissions())
+}
+
+// CreateContextDirectoryTreeWithProviderCredentialsAndPermissions creates the
+// isolated storage tree for one context, imports supported global provider
+// credential files, and uses the supplied storage permission policy.
+func CreateContextDirectoryTreeWithProviderCredentialsAndPermissions(platformPaths PlatformPaths, paths ContextPaths, ctx devcontext.Context, permissions StoragePermissions) error {
+	return createContextDirectoryTree(paths, ctx, permissions, func() error {
+		return ImportProviderCredentialsWithPermissions(platformPaths, paths, permissions)
+	})
+}
+
 // CreateContextDirectoryTreeWithPermissions creates the isolated storage tree
 // for one context using the supplied storage permission policy.
 func CreateContextDirectoryTreeWithPermissions(paths ContextPaths, ctx devcontext.Context, permissions StoragePermissions) error {
+	return createContextDirectoryTree(paths, ctx, permissions, nil)
+}
+
+func createContextDirectoryTree(paths ContextPaths, ctx devcontext.Context, permissions StoragePermissions, importProviderCredentials func() error) error {
 	if permissions == nil {
 		permissions = NewDefaultStoragePermissions()
 	}
@@ -36,6 +56,12 @@ func CreateContextDirectoryTreeWithPermissions(paths ContextPaths, ctx devcontex
 		}
 		if err := permissions.ApplyDirectory(dir); err != nil {
 			return err
+		}
+	}
+
+	if importProviderCredentials != nil {
+		if err := importProviderCredentials(); err != nil {
+			return fmt.Errorf("import provider credentials for context %q: %w", ctx.ID.String(), err)
 		}
 	}
 
@@ -106,7 +132,7 @@ func bootstrapDefaultContext(paths PlatformPaths, ctx devcontext.Context, permis
 	if err != nil {
 		return devcontext.Context{}, err
 	}
-	if err := CreateContextDirectoryTreeWithPermissions(contextPaths, ctx, permissions); err != nil {
+	if err := CreateContextDirectoryTreeWithProviderCredentialsAndPermissions(paths, contextPaths, ctx, permissions); err != nil {
 		return devcontext.Context{}, err
 	}
 	return ctx, nil

@@ -398,9 +398,9 @@ Project bindings reduce the chance of selecting the wrong identity for projects 
 
 ## Claude Code and Codex
 
-Creating a Dev Context does not automatically make an existing Claude or Codex session available inside it.
-
-This is intentional.
+When a Dev Context is created, Dev Context imports supported existing local
+Claude and Codex session files from the user's global provider directories into
+that new context.
 
 Each context owns separate provider directories:
 
@@ -414,26 +414,28 @@ and:
 ~/.devctx/contexts/<context-id>/codex
 ```
 
-When a new context is created, launch it and authenticate with the appropriate account from inside that context.
-
-For example:
+The imported files are copied to:
 
 ```text
-Personal Context
-    ↓
-Sign into personal Claude
-    ↓
-Sign into personal Codex
+~/.devctx/contexts/<context-id>/claude/.credentials.json
+~/.devctx/contexts/<context-id>/claude/settings.json
+~/.devctx/contexts/<context-id>/codex/auth.json
 ```
 
-and separately:
+Credential files are treated as opaque files. Dev Context does not inspect,
+parse, log, display, upload, or transmit credential contents.
+
+Import happens only while explicitly creating a context. Dev Context does not
+overwrite an existing context's provider credentials during normal launch.
+
+If a global credential file is missing, that provider directory is left empty
+and the provider can authenticate normally from inside the context.
+
+For example, after creating both default contexts:
 
 ```text
-Company Context
-    ↓
-Sign into company Claude
-    ↓
-Sign into company Codex
+Personal Context  ->  ~/.devctx/contexts/personal/{claude,codex}
+Company Context   ->  ~/.devctx/contexts/company/{claude,codex}
 ```
 
 Dev Context considers a provider ready when:
@@ -441,8 +443,6 @@ Dev Context considers a provider ready when:
 * The provider command exists on `PATH`
 * The context-owned provider directory exists
 * The context-owned provider directory contains provider state
-
-Dev Context does not use one context's provider state to initialize another.
 
 ---
 
@@ -475,7 +475,7 @@ The isolation boundary is established locally on your machine.
 
 ## Security Model
 
-Dev Context manages **separation**, not credential synchronization.
+Dev Context manages **separation**, not ongoing credential synchronization.
 
 It does not intentionally:
 
@@ -484,7 +484,8 @@ It does not intentionally:
 * Copy Claude credentials between contexts
 * Copy Codex credentials between contexts
 * Merge provider configuration directories
-* Automatically import global provider credentials into a context
+* Re-import global provider credentials during launch
+* Overwrite existing isolated provider credentials
 
 Authentication remains the responsibility of each provider.
 
