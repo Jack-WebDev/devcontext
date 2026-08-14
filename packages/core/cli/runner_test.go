@@ -42,7 +42,7 @@ func TestRunnerContextListRendersEmptyAndPopulatedContexts(t *testing.T) {
 		"Personal  personal\n", "")
 }
 
-func TestRunnerContextCreateImportsProviderCredentials(t *testing.T) {
+func TestRunnerContextCreateDoesNotImportUnclassifiedProviderCredentials(t *testing.T) {
 	fixture := newRunnerFixture(t)
 	writeCLICredentialFixture(t, filepath.Join(fixture.homeDir, ".codex", "auth.json"), []byte("codex-auth-fixture"))
 	writeCLICredentialFixture(t, filepath.Join(fixture.homeDir, ".claude", ".credentials.json"), []byte("claude-credentials-fixture"))
@@ -60,9 +60,8 @@ func TestRunnerContextCreateImportsProviderCredentials(t *testing.T) {
 	}
 
 	contextRoot := filepath.Join(fixture.homeDir, ".devctx", "contexts", "personal")
-	assertCLIFileBytes(t, filepath.Join(contextRoot, "codex", "auth.json"), []byte("codex-auth-fixture"))
-	assertCLIFileBytes(t, filepath.Join(contextRoot, "claude", ".credentials.json"), []byte("claude-credentials-fixture"))
-	assertCLIFileBytes(t, filepath.Join(contextRoot, "claude", "settings.json"), []byte("claude-settings-fixture"))
+	assertCLIDirectoryEmpty(t, filepath.Join(contextRoot, "codex"))
+	assertCLIDirectoryEmpty(t, filepath.Join(contextRoot, "claude"))
 }
 
 func TestRunnerProjectShowRendersBoundUnboundAndDanglingStates(t *testing.T) {
@@ -794,15 +793,15 @@ func writeCLICredentialFixture(t *testing.T, path string, data []byte) {
 	}
 }
 
-func assertCLIFileBytes(t *testing.T, path string, want []byte) {
+func assertCLIDirectoryEmpty(t *testing.T, path string) {
 	t.Helper()
 
-	got, err := os.ReadFile(path)
+	entries, err := os.ReadDir(path)
 	if err != nil {
-		t.Fatalf("read file %q: %v", path, err)
+		t.Fatalf("read directory %q: %v", path, err)
 	}
-	if string(got) != string(want) {
-		t.Fatalf("file %q = %q, want %q", path, string(got), string(want))
+	if len(entries) != 0 {
+		t.Fatalf("directory %q entries = %#v, want empty", path, entries)
 	}
 }
 

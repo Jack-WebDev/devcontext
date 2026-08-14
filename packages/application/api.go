@@ -8,14 +8,15 @@ type GetLaunchStateRequest struct {
 // LaunchState contains everything the GUI needs to render the selector for one
 // project.
 type LaunchState struct {
-	Project           ProjectState        `json:"project"`
-	Contexts          []ContextState      `json:"contexts"`
-	Binding           ProjectBindingState `json:"binding"`
-	SelectedContextID string              `json:"selectedContextId,omitempty"`
-	SelectionRequired bool                `json:"selectionRequired"`
-	ResolutionSource  string              `json:"resolutionSource,omitempty"`
-	Warnings          []ResolutionWarning `json:"warnings,omitempty"`
-	FirstRun          bool                `json:"firstRun"`
+	Project                    ProjectState                     `json:"project"`
+	Contexts                   []ContextState                   `json:"contexts"`
+	Binding                    ProjectBindingState              `json:"binding"`
+	SelectedContextID          string                           `json:"selectedContextId,omitempty"`
+	SelectionRequired          bool                             `json:"selectionRequired"`
+	ResolutionSource           string                           `json:"resolutionSource,omitempty"`
+	Warnings                   []ResolutionWarning              `json:"warnings,omitempty"`
+	FirstRun                   bool                             `json:"firstRun"`
+	ProviderCredentialSessions []ProviderCredentialSessionState `json:"providerCredentialSessions,omitempty"`
 }
 
 // ProjectState is the presentation-safe identity of one project.
@@ -62,12 +63,38 @@ type ProjectBindingState struct {
 
 // CreateContextRequest asks the service to create one default context.
 type CreateContextRequest struct {
-	ContextID string `json:"contextId"`
+	ContextID         string   `json:"contextId"`
+	ImportProviderIDs []string `json:"importProviderIds,omitempty"`
 }
 
 // CreateContextResult describes a newly created context.
 type CreateContextResult struct {
 	Context ContextState `json:"context"`
+}
+
+// ProviderCredentialSessionState describes a detected global provider session
+// using only non-secret metadata that helps the user classify the session.
+type ProviderCredentialSessionState struct {
+	ProviderID        string                        `json:"providerId"`
+	Name              string                        `json:"name"`
+	MetadataAvailable bool                          `json:"metadataAvailable"`
+	Codex             *CodexCredentialSessionState  `json:"codex,omitempty"`
+	Claude            *ClaudeCredentialSessionState `json:"claude,omitempty"`
+}
+
+// CodexCredentialSessionState is safe Codex identity metadata decoded from the
+// id_token payload.
+type CodexCredentialSessionState struct {
+	Email            string `json:"email,omitempty"`
+	ChatGPTPlanType  string `json:"chatgptPlanType,omitempty"`
+	ChatGPTAccountID string `json:"chatgptAccountId,omitempty"`
+}
+
+// ClaudeCredentialSessionState is safe Claude identity metadata decoded from
+// the global credentials file.
+type ClaudeCredentialSessionState struct {
+	SubscriptionType string `json:"subscriptionType,omitempty"`
+	OrganizationUUID string `json:"organizationUuid,omitempty"`
 }
 
 // ResolutionWarning is a presentation-safe launch warning.

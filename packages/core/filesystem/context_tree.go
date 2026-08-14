@@ -17,16 +17,16 @@ func CreateContextDirectoryTree(paths ContextPaths, ctx devcontext.Context) erro
 // CreateContextDirectoryTreeWithProviderCredentials creates the isolated
 // storage tree for one context and imports supported global provider credential
 // files into it.
-func CreateContextDirectoryTreeWithProviderCredentials(platformPaths PlatformPaths, paths ContextPaths, ctx devcontext.Context) error {
-	return CreateContextDirectoryTreeWithProviderCredentialsAndPermissions(platformPaths, paths, ctx, NewDefaultStoragePermissions())
+func CreateContextDirectoryTreeWithProviderCredentials(platformPaths PlatformPaths, paths ContextPaths, ctx devcontext.Context, providerIDs []string) error {
+	return CreateContextDirectoryTreeWithProviderCredentialsAndPermissions(platformPaths, paths, ctx, providerIDs, NewDefaultStoragePermissions())
 }
 
 // CreateContextDirectoryTreeWithProviderCredentialsAndPermissions creates the
 // isolated storage tree for one context, imports supported global provider
 // credential files, and uses the supplied storage permission policy.
-func CreateContextDirectoryTreeWithProviderCredentialsAndPermissions(platformPaths PlatformPaths, paths ContextPaths, ctx devcontext.Context, permissions StoragePermissions) error {
+func CreateContextDirectoryTreeWithProviderCredentialsAndPermissions(platformPaths PlatformPaths, paths ContextPaths, ctx devcontext.Context, providerIDs []string, permissions StoragePermissions) error {
 	return createContextDirectoryTree(paths, ctx, permissions, func() error {
-		return ImportProviderCredentialsWithPermissions(platformPaths, paths, permissions)
+		return ImportProviderCredentialsWithPermissions(platformPaths, paths, providerIDs, permissions)
 	})
 }
 
@@ -132,7 +132,7 @@ func bootstrapDefaultContext(paths PlatformPaths, ctx devcontext.Context, permis
 	if err != nil {
 		return devcontext.Context{}, err
 	}
-	if err := CreateContextDirectoryTreeWithProviderCredentialsAndPermissions(paths, contextPaths, ctx, permissions); err != nil {
+	if err := CreateContextDirectoryTreeWithPermissions(contextPaths, ctx, permissions); err != nil {
 		return devcontext.Context{}, err
 	}
 	return ctx, nil

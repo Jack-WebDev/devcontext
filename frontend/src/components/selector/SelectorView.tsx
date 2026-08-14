@@ -8,12 +8,14 @@ import type {
   LaunchProjectRequest,
   LaunchProjectResult,
   LaunchState,
+  ProviderCredentialSession,
   ProjectBindingState,
 } from "../../lib/devctx-api";
 import { ContextMismatchDialog } from "./ContextMismatchDialog";
 import { ContextCard } from "./ContextCard";
 import { FirstRunWelcome, shouldRenderFirstRunWelcome } from "./FirstRunWelcome";
 import { GuiErrorNotice } from "./GuiErrorNotice";
+import { ProviderCredentialClassification, type ProviderSessionAssignments } from "./ProviderCredentialClassification.js";
 import { ProjectIdentity } from "./ProjectIdentity";
 import { RememberProjectControl } from "./RememberProjectControl";
 import { SelectorActions } from "./SelectorActions";
@@ -34,8 +36,8 @@ interface SelectorViewProps {
   onBindProject: (request: BindProjectRequest) => Promise<ApiResult<ProjectBindingState>>;
   onLaunchProject: (request: LaunchProjectRequest) => Promise<ApiResult<LaunchProjectResult>>;
   onCancel: () => Promise<void> | void;
-  onCreatePersonalContext?: () => Promise<ApiResult<CreateContextResult>>;
-  onCreateCompanyContext?: () => Promise<ApiResult<CreateContextResult>>;
+  onCreatePersonalContext?: (importProviderIds: string[]) => Promise<ApiResult<CreateContextResult>>;
+  onCreateCompanyContext?: (importProviderIds: string[]) => Promise<ApiResult<CreateContextResult>>;
 }
 
 function SelectorView({
@@ -58,6 +60,7 @@ function SelectorView({
   const [mismatchError, setMismatchError] = useState<DisplayError | undefined>(undefined);
   const [onboardingPendingContextId, setOnboardingPendingContextId] = useState<string | undefined>(undefined);
   const [onboardingError, setOnboardingError] = useState<DisplayError | undefined>(undefined);
+  const [providerSessionAssignments, setProviderSessionAssignments] = useState<ProviderSessionAssignments>({});
   const contextButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const launchGuard = useRef(createLaunchRequestGuard());
   const mismatchDialogOpen = mismatchError?.contextMismatch !== undefined;
@@ -76,6 +79,7 @@ function SelectorView({
     setMismatchError(undefined);
     setOnboardingPendingContextId(undefined);
     setOnboardingError(undefined);
+    setProviderSessionAssignments({});
     launchGuard.current = createLaunchRequestGuard();
   }, [launchState]);
 
@@ -166,12 +170,28 @@ function SelectorView({
     });
   }
 
-  async function handleCreateContext(contextId: string, createContext: () => Promise<ApiResult<CreateContextResult>>) {
+  function handleClassifyProviderSession(providerId: string, contextId: "personal" | "company") {
+    setProviderSessionAssignments((current) => ({
+      ...current,
+      [providerId]: contextId,
+    }));
+  }
+
+  function importProviderIdsForContext(contextId: "personal" | "company"): string[] {
+    return launchState.providerCredentialSessions
+      .filter((session) => providerSessionAssignments[session.providerId] === contextId)
+      .map((session) => session.providerId);
+  }
+
+  async function handleCreateContext(
+    contextId: "personal" | "company",
+    createContext: (importProviderIds: string[]) => Promise<ApiResult<CreateContextResult>>,
+  ) {
     setOnboardingPendingContextId(contextId);
     setOnboardingError(undefined);
 
     try {
-      const result = await createContext();
+      const result = await createContext(importProviderIdsForContext(contextId));
       if (!result.ok) {
         setOnboardingError(result.error);
       }
@@ -187,8 +207,11 @@ function SelectorView({
       {shouldRenderFirstRunWelcome(launchState) ? (
         <FirstRunWelcome
           launchState={launchState}
+          providerCredentialSessions={launchState.providerCredentialSessions}
+          providerSessionAssignments={providerSessionAssignments}
           pendingContextId={onboardingPendingContextId}
           error={onboardingError}
+          onClassifyProviderSession={handleClassifyProviderSession}
           onCreatePersonal={
             onCreatePersonalContext
               ? () => void handleCreateContext("personal", onCreatePersonalContext)
@@ -224,8 +247,11 @@ function SelectorView({
 
           <MissingDefaultContextActions
             launchState={launchState}
+            providerCredentialSessions={launchState.providerCredentialSessions}
+            providerSessionAssignments={providerSessionAssignments}
             pendingContextId={onboardingPendingContextId}
             error={onboardingError}
+            onClassifyProviderSession={handleClassifyProviderSession}
             onCreatePersonal={
               onCreatePersonalContext
                 ? () => void handleCreateContext("personal", onCreatePersonalContext)
@@ -279,14 +305,20 @@ function SelectorView({
 
 function MissingDefaultContextActions({
   launchState,
+  providerCredentialSessions,
+  providerSessionAssignments,
   pendingContextId,
   error,
+  onClassifyProviderSession,
   onCreatePersonal,
   onCreateCompany,
 }: {
   launchState: LaunchState;
+  providerCredentialSessions: ProviderCredentialSession[];
+  providerSessionAssignments: ProviderSessionAssignments;
   pendingContextId?: string;
   error?: DisplayError;
+  onClassifyProviderSession: (providerId: string, contextId: "personal" | "company") => void;
   onCreatePersonal?: () => void;
   onCreateCompany?: () => void;
 }) {
@@ -294,6 +326,9 @@ function MissingDefaultContextActions({
   const missingPersonal = missingDefaults.includes("personal");
   const missingCompany = missingDefaults.includes("company");
   const pending = pendingContextId !== undefined;
+  const classificationComplete = providerCredentialSessions.every(
+    (session) => providerSessionAssignments[session.providerId] !== undefined,
+  );
 
   if (!missingPersonal && !missingCompany) {
     return null;
@@ -313,7 +348,7 @@ function MissingDefaultContextActions({
             <button
               type="button"
               className="border border-border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={pending || onCreatePersonal === undefined}
+              disabled={pending || !classificationComplete || onCreatePersonal === undefined}
               onClick={onCreatePersonal}
             >
               {pendingContextId === "personal" ? "Creating..." : "Add Personal"}
@@ -323,7 +358,7 @@ function MissingDefaultContextActions({
             <button
               type="button"
               className="border border-border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={pending || onCreateCompany === undefined}
+              disabled={pending || !classificationComplete || onCreateCompany === undefined}
               onClick={onCreateCompany}
             >
               {pendingContextId === "company" ? "Creating..." : "Add Company"}
@@ -331,6 +366,12 @@ function MissingDefaultContextActions({
           ) : null}
         </div>
       </div>
+      <ProviderCredentialClassification
+        sessions={providerCredentialSessions}
+        assignments={providerSessionAssignments}
+        disabled={pending}
+        onClassify={onClassifyProviderSession}
+      />
       {pendingContextId ? (
         <p className="mt-3 text-sm text-muted-foreground" role="status">
           Creating {pendingContextId === "personal" ? "Personal" : "Company"} context...

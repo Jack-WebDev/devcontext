@@ -79,7 +79,7 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	if !reflect.DeepEqual(contextResult, service.createContextResult) {
 		t.Fatalf("create context result = %#v, want %#v", contextResult, service.createContextResult)
 	}
-	if service.createContextRequest != createContextRequest {
+	if !reflect.DeepEqual(service.createContextRequest, createContextRequest) {
 		t.Fatalf("create context request = %#v, want %#v", service.createContextRequest, createContextRequest)
 	}
 }

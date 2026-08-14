@@ -1,12 +1,18 @@
 package filesystem
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 const (
+	providerIDCodex  = "codex"
+	providerIDClaude = "claude"
+
 	globalCodexDirectoryName  = ".codex"
 	globalClaudeDirectoryName = ".claude"
 
@@ -15,16 +21,71 @@ const (
 	claudeSettingsFileName    = "settings.json"
 )
 
+// DetectedProviderCredentialSession contains only non-secret metadata that can
+// help a user recognize a globally authenticated provider session.
+type DetectedProviderCredentialSession struct {
+	ProviderID        string
+	MetadataAvailable bool
+	Codex             CodexCredentialMetadata
+	Claude            ClaudeCredentialMetadata
+}
+
+// CodexCredentialMetadata contains safe identity claims decoded from the Codex
+// id_token JWT payload.
+type CodexCredentialMetadata struct {
+	Email            string
+	ChatGPTPlanType  string
+	ChatGPTAccountID string
+}
+
+// ClaudeCredentialMetadata contains safe identity fields decoded from Claude
+// credentials.
+type ClaudeCredentialMetadata struct {
+	SubscriptionType string
+	OrganizationUUID string
+}
+
+// DetectProviderCredentialSessions reads supported global provider credential
+// files and returns only safe metadata for user classification.
+func DetectProviderCredentialSessions(paths PlatformPaths) ([]DetectedProviderCredentialSession, error) {
+	if paths == nil {
+		return nil, ErrUserHomeUnavailable
+	}
+
+	homeDir, err := paths.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("resolve provider credential source directory: %w", err)
+	}
+
+	sessions := make([]DetectedProviderCredentialSession, 0, 2)
+	codexSession, ok, err := detectCodexCredentialSession(homeDir)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		sessions = append(sessions, codexSession)
+	}
+
+	claudeSession, ok, err := detectClaudeCredentialSession(homeDir)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		sessions = append(sessions, claudeSession)
+	}
+	return sessions, nil
+}
+
 // ImportProviderCredentials copies supported global provider credential files
 // into one context-owned provider tree. Credential files are treated as opaque
 // bytes and existing isolated files are never overwritten.
-func ImportProviderCredentials(paths PlatformPaths, contextPaths ContextPaths) error {
-	return ImportProviderCredentialsWithPermissions(paths, contextPaths, NewDefaultStoragePermissions())
+func ImportProviderCredentials(paths PlatformPaths, contextPaths ContextPaths, providerIDs []string) error {
+	return ImportProviderCredentialsWithPermissions(paths, contextPaths, providerIDs, NewDefaultStoragePermissions())
 }
 
 // ImportProviderCredentialsWithPermissions copies supported global provider
 // credential files using the supplied storage permission policy.
-func ImportProviderCredentialsWithPermissions(paths PlatformPaths, contextPaths ContextPaths, permissions StoragePermissions) error {
+func ImportProviderCredentialsWithPermissions(paths PlatformPaths, contextPaths ContextPaths, providerIDs []string, permissions StoragePermissions) error {
 	if paths == nil {
 		return ErrUserHomeUnavailable
 	}
@@ -37,17 +98,58 @@ func ImportProviderCredentialsWithPermissions(paths PlatformPaths, contextPaths 
 		return fmt.Errorf("resolve provider credential source directory: %w", err)
 	}
 
-	if err := importCodexCredentials(homeDir, contextPaths, permissions); err != nil {
-		return err
+	selected := selectedProviderIDs(providerIDs)
+	if selected[providerIDCodex] {
+		if err := importCodexCredentials(homeDir, contextPaths, permissions); err != nil {
+			return err
+		}
 	}
-	if err := importClaudeCredentials(homeDir, contextPaths, permissions); err != nil {
-		return err
+	if selected[providerIDClaude] {
+		if err := importClaudeCredentials(homeDir, contextPaths, permissions); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
+func detectCodexCredentialSession(homeDir string) (DetectedProviderCredentialSession, bool, error) {
+	source := codexAuthPath(homeDir)
+	exists, err := regularFileExists(source)
+	if err != nil {
+		return DetectedProviderCredentialSession{}, false, err
+	}
+	if !exists {
+		return DetectedProviderCredentialSession{}, false, nil
+	}
+
+	metadata, available := readCodexCredentialMetadata(source)
+	return DetectedProviderCredentialSession{
+		ProviderID:        providerIDCodex,
+		MetadataAvailable: available,
+		Codex:             metadata,
+	}, true, nil
+}
+
+func detectClaudeCredentialSession(homeDir string) (DetectedProviderCredentialSession, bool, error) {
+	source := claudeCredentialsPath(homeDir)
+	exists, err := regularFileExists(source)
+	if err != nil {
+		return DetectedProviderCredentialSession{}, false, err
+	}
+	if !exists {
+		return DetectedProviderCredentialSession{}, false, nil
+	}
+
+	metadata, available := readClaudeCredentialMetadata(source)
+	return DetectedProviderCredentialSession{
+		ProviderID:        providerIDClaude,
+		MetadataAvailable: available,
+		Claude:            metadata,
+	}, true, nil
+}
+
 func importCodexCredentials(homeDir string, paths ContextPaths, permissions StoragePermissions) error {
-	source := joinPlatformPath(joinPlatformPath(homeDir, globalCodexDirectoryName), codexAuthFileName)
+	source := codexAuthPath(homeDir)
 	exists, err := regularFileExists(source)
 	if err != nil {
 		return err
@@ -60,8 +162,7 @@ func importCodexCredentials(homeDir string, paths ContextPaths, permissions Stor
 }
 
 func importClaudeCredentials(homeDir string, paths ContextPaths, permissions StoragePermissions) error {
-	globalClaudeDir := joinPlatformPath(homeDir, globalClaudeDirectoryName)
-	credentialsSource := joinPlatformPath(globalClaudeDir, claudeCredentialsFileName)
+	credentialsSource := claudeCredentialsPath(homeDir)
 	exists, err := regularFileExists(credentialsSource)
 	if err != nil {
 		return err
@@ -75,7 +176,7 @@ func importClaudeCredentials(homeDir string, paths ContextPaths, permissions Sto
 		return err
 	}
 
-	settingsSource := joinPlatformPath(globalClaudeDir, claudeSettingsFileName)
+	settingsSource := claudeSettingsPath(homeDir)
 	exists, err = regularFileExists(settingsSource)
 	if err != nil {
 		return err
@@ -85,6 +186,109 @@ func importClaudeCredentials(homeDir string, paths ContextPaths, permissions Sto
 	}
 	settingsDestination := joinPlatformPath(paths.ClaudeDir, claudeSettingsFileName)
 	return copyOpaqueCredentialFile(settingsSource, settingsDestination, permissions)
+}
+
+func selectedProviderIDs(providerIDs []string) map[string]bool {
+	selected := make(map[string]bool, len(providerIDs))
+	for _, providerID := range providerIDs {
+		switch strings.TrimSpace(providerID) {
+		case providerIDCodex:
+			selected[providerIDCodex] = true
+		case providerIDClaude:
+			selected[providerIDClaude] = true
+		}
+	}
+	return selected
+}
+
+func codexAuthPath(homeDir string) string {
+	return joinPlatformPath(joinPlatformPath(homeDir, globalCodexDirectoryName), codexAuthFileName)
+}
+
+func claudeCredentialsPath(homeDir string) string {
+	return joinPlatformPath(joinPlatformPath(homeDir, globalClaudeDirectoryName), claudeCredentialsFileName)
+}
+
+func claudeSettingsPath(homeDir string) string {
+	return joinPlatformPath(joinPlatformPath(homeDir, globalClaudeDirectoryName), claudeSettingsFileName)
+}
+
+type codexAuthFile struct {
+	IDToken string `json:"id_token"`
+}
+
+type codexIDTokenClaims struct {
+	Email            string `json:"email"`
+	ChatGPTPlanType  string `json:"chatgpt_plan_type"`
+	ChatGPTAccountID string `json:"chatgpt_account_id"`
+}
+
+func readCodexCredentialMetadata(path string) (CodexCredentialMetadata, bool) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return CodexCredentialMetadata{}, false
+	}
+
+	var auth codexAuthFile
+	if err := json.Unmarshal(data, &auth); err != nil {
+		return CodexCredentialMetadata{}, false
+	}
+	payload, ok := decodeJWTPayload(auth.IDToken)
+	if !ok {
+		return CodexCredentialMetadata{}, false
+	}
+
+	var claims codexIDTokenClaims
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return CodexCredentialMetadata{}, false
+	}
+
+	metadata := CodexCredentialMetadata{
+		Email:            claims.Email,
+		ChatGPTPlanType:  claims.ChatGPTPlanType,
+		ChatGPTAccountID: claims.ChatGPTAccountID,
+	}
+	return metadata, metadata != (CodexCredentialMetadata{})
+}
+
+func decodeJWTPayload(token string) ([]byte, bool) {
+	parts := strings.Split(token, ".")
+	if len(parts) < 2 {
+		return nil, false
+	}
+
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err == nil {
+		return payload, true
+	}
+	payload, err = base64.URLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, false
+	}
+	return payload, true
+}
+
+type claudeCredentialsFile struct {
+	SubscriptionType string `json:"subscriptionType"`
+	OrganizationUUID string `json:"organizationUuid"`
+}
+
+func readClaudeCredentialMetadata(path string) (ClaudeCredentialMetadata, bool) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ClaudeCredentialMetadata{}, false
+	}
+
+	var credentials claudeCredentialsFile
+	if err := json.Unmarshal(data, &credentials); err != nil {
+		return ClaudeCredentialMetadata{}, false
+	}
+
+	metadata := ClaudeCredentialMetadata{
+		SubscriptionType: credentials.SubscriptionType,
+		OrganizationUUID: credentials.OrganizationUUID,
+	}
+	return metadata, metadata != (ClaudeCredentialMetadata{})
 }
 
 func regularFileExists(path string) (bool, error) {

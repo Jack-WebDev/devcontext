@@ -36,6 +36,27 @@ test("adapter normalizes successful Wails calls", async () => {
         selectionRequired: false,
         resolutionSource: "project_binding",
         firstRun: false,
+        providerCredentialSessions: [
+          {
+            providerId: "codex",
+            name: "Codex",
+            metadataAvailable: true,
+            codex: {
+              email: "user@company.com",
+              chatgptPlanType: "Business",
+              chatgptAccountId: "acct_123",
+            },
+          },
+          {
+            providerId: "claude",
+            name: "Claude",
+            metadataAvailable: true,
+            claude: {
+              subscriptionType: "Pro",
+              organizationUuid: "e783",
+            },
+          },
+        ],
       };
     },
     async launchProject(request) {
@@ -114,6 +135,29 @@ test("adapter normalizes successful Wails calls", async () => {
       resolutionSource: "project_binding",
       warnings: [],
       firstRun: false,
+      providerCredentialSessions: [
+        {
+          providerId: "codex",
+          name: "Codex",
+          metadataAvailable: true,
+          codex: {
+            email: "user@company.com",
+            chatgptPlanType: "Business",
+            chatgptAccountId: "acct_123",
+          },
+          claude: undefined,
+        },
+        {
+          providerId: "claude",
+          name: "Claude",
+          metadataAvailable: true,
+          codex: undefined,
+          claude: {
+            subscriptionType: "Pro",
+            organizationUuid: "e783",
+          },
+        },
+      ],
     },
   });
 
@@ -153,7 +197,7 @@ test("adapter normalizes successful Wails calls", async () => {
       recovery: undefined,
     },
   });
-  assert.deepEqual(await api.createContext({contextId: "personal"}), {
+  assert.deepEqual(await api.createContext({contextId: "personal", importProviderIds: ["codex"]}), {
     ok: true,
     data: {
       context: {
@@ -177,7 +221,7 @@ test("adapter normalizes successful Wails calls", async () => {
     ],
     ["bindProject", {projectPath: "/work/api", contextId: "personal"}],
     ["unbindProject", {projectPath: "/work/api"}],
-    ["createContext", {contextId: "personal"}],
+    ["createContext", {contextId: "personal", importProviderIds: ["codex"]}],
   ]);
 });
 
@@ -309,6 +353,7 @@ test("adapter unwraps tuple-shaped Wails responses", async () => {
       resolutionSource: undefined,
       warnings: [],
       firstRun: true,
+      providerCredentialSessions: [],
     },
   });
 
