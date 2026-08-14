@@ -373,11 +373,7 @@ func (e *applicationFakeEditor) BuildLaunchCommand(request editor.CommandRequest
 	e.requests = append(e.requests, request)
 	return editor.Command{
 		Executable: request.Executable,
-		Arguments: editor.Arguments{
-			editor.VSCodeUserDataDirFlag,
-			request.Paths.UserDataDir,
-			request.ProjectPath,
-		},
+		Arguments:  editor.Arguments{request.ProjectPath},
 	}, nil
 }
 

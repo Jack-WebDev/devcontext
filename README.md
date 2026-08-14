@@ -14,7 +14,7 @@ open it through Dev Context:
 devctx .
 ```
 
-Dev Context asks **who you are working as**, then launches Visual Studio Code inside the corresponding isolated development context.
+Dev Context asks **who you are working as**, then launches Visual Studio Code with that context's isolated tool environment.
 
 ```text
 devctx
@@ -23,7 +23,7 @@ Who am I working as?
    ↓
 Personal / Company / Custom Context
    ↓
-VS Code + tools + configuration for that identity
+VS Code + isolated Codex/Claude configuration for that identity
 ```
 
 The initial use case is preventing accidental crossover between personal and company AI subscriptions, but Dev Context is built around the broader concept of **development identity** rather than any individual tool or provider.
@@ -40,7 +40,6 @@ That computer may simultaneously contain:
 * A company Claude subscription
 * A personal OpenAI/Codex subscription
 * A company OpenAI/Codex subscription
-* Personal and company VS Code configuration
 * Different Git identities
 * Different cloud accounts
 
@@ -76,40 +75,36 @@ For example:
 
 ```text
 Personal Context
-├── Personal VS Code state
 ├── Personal Claude configuration
 ├── Personal Codex configuration
-└── Personal environment
+└── Personal tool environment
 ```
 
 and:
 
 ```text
 Company Context
-├── Company VS Code state
 ├── Company Claude configuration
 ├── Company Codex configuration
-└── Company environment
+└── Company tool environment
 ```
 
-Each context owns its own local state.
+Each context owns its own provider state.
 
 Dev Context currently isolates:
 
-* VS Code user data
 * Claude Code configuration
 * Codex home directory
 * The `DEVCTX_CONTEXT` environment variable
 
-Dev Context does **not** copy credentials from one context into another.
-
-Instead, each context is initialized independently.
+Dev Context does not isolate VS Code itself. VS Code keeps using the user's
+normal profile, settings, extensions, and Microsoft/GitHub sign-in state.
 
 ---
 
 ## Multiple Contexts at the Same Time
 
-Contexts are isolated per VS Code instance, so multiple identities can be active simultaneously.
+Contexts are isolated through per-window provider environment variables, so multiple identities can be active simultaneously.
 
 For example:
 
@@ -183,7 +178,6 @@ Everything else follows.
 ## Features
 
 * Separate personal and company development identities
-* Isolated VS Code user data
 * Isolated Claude Code configuration
 * Isolated Codex configuration
 * Multiple contexts running simultaneously
@@ -447,7 +441,7 @@ Dev Context considers a provider configured when:
 
 ## Isolation Model
 
-Dev Context separates development state by launching each VS Code instance with context-specific configuration.
+Dev Context separates provider state by launching VS Code with context-specific provider environment variables.
 
 Conceptually:
 
@@ -458,17 +452,17 @@ Conceptually:
                 │                 │
             Personal          Company
                 │                 │
-        ┌───────┼───────┐ ┌──────┼───────┐
-        │       │       │ │      │       │
-     VS Code  Claude  Codex    VS Code Claude Codex
-        │       │       │ │      │       │
-        └───────┴───────┘ └──────┴───────┘
-             isolated            isolated
+          ┌─────┴─────┐     ┌─────┴─────┐
+          │           │     │           │
+       Claude       Codex Claude       Codex
+          │           │     │           │
+          └─────┬─────┘     └─────┬─────┘
+              isolated providers
 ```
 
 Both sides can run simultaneously.
 
-The isolation boundary is established locally on your machine.
+VS Code itself uses the normal user profile in both cases.
 
 ---
 

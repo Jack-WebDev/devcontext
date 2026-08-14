@@ -117,6 +117,11 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 func TestLaunchPlanBuilderDoesNotRequireProviderCLICommands(t *testing.T) {
 	projectDir := t.TempDir()
 	context := devcontext.DefaultPersonalContext(time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC))
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatalf("resolve test executable: %v", err)
+	}
+	context.Editor.ExecutableOverride = executable
 	platformPaths := fakePlanPlatformPaths{
 		devContextHome: filepath.Join(t.TempDir(), ".devctx"),
 	}
@@ -138,7 +143,7 @@ func TestLaunchPlanBuilderDoesNotRequireProviderCLICommands(t *testing.T) {
 			provider.ClaudeProvider{},
 			provider.CodexProvider{},
 		},
-		Editor:            &builderFakeEditor{},
+		Editor:            editor.VSCodeEditor{},
 		ParentEnvironment: []string{"PATH=/path/without/provider-clis"},
 	}
 
@@ -151,6 +156,12 @@ func TestLaunchPlanBuilderDoesNotRequireProviderCLICommands(t *testing.T) {
 		t.Fatalf("build launch plan: %v", err)
 	}
 
+	if plan.Executable != launcher.Executable(executable) {
+		t.Fatalf("executable = %q, want %q", plan.Executable, executable)
+	}
+	if !reflect.DeepEqual(plan.Arguments, launcher.Arguments{projectDir}) {
+		t.Fatalf("arguments = %#v, want only project path", plan.Arguments)
+	}
 	if plan.Environment[provider.CodexHomeEnvVar] != contextPaths.CodexDir {
 		t.Fatalf("CODEX_HOME = %q, want %q", plan.Environment[provider.CodexHomeEnvVar], contextPaths.CodexDir)
 	}

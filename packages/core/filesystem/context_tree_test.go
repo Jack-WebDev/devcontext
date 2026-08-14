@@ -35,8 +35,6 @@ func TestCreateContextDirectoryTreeCreatesCompleteRestrictedTree(t *testing.T) {
 		contextPaths.RootDir,
 		contextPaths.ClaudeDir,
 		contextPaths.CodexDir,
-		contextPaths.VSCodeDir,
-		contextPaths.VSCodeUserDataDir,
 	} {
 		assertDirectoryExists(t, dir)
 		assertRestrictedMode(t, dir, filesystem.RestrictedDirectoryMode)
@@ -56,7 +54,8 @@ func TestCreateContextDirectoryTreeCreatesCompleteRestrictedTree(t *testing.T) {
 	assertRestrictedMode(t, contextPaths.ConfigPath, filesystem.RestrictedFileMode)
 	assertDirectoryEmpty(t, contextPaths.ClaudeDir)
 	assertDirectoryEmpty(t, contextPaths.CodexDir)
-	assertDirectoryEmpty(t, contextPaths.VSCodeUserDataDir)
+	assertPathMissing(t, contextPaths.VSCodeDir)
+	assertPathMissing(t, contextPaths.VSCodeUserDataDir)
 }
 
 func TestCreateContextDirectoryTreeRejectsMismatchedContextID(t *testing.T) {
@@ -137,12 +136,6 @@ func TestValidateContextDirectoryTreeReportsIncompleteStorage(t *testing.T) {
 	if err := os.RemoveAll(contextPaths.CodexDir); err != nil {
 		t.Fatalf("remove codex dir: %v", err)
 	}
-	if err := os.RemoveAll(contextPaths.VSCodeDir); err != nil {
-		t.Fatalf("remove vscode dir: %v", err)
-	}
-	if err := os.WriteFile(contextPaths.VSCodeDir, []byte("not a directory"), 0o600); err != nil {
-		t.Fatalf("write vscode file: %v", err)
-	}
 
 	err = filesystem.ValidateContextDirectoryTree(contextPaths)
 	if !errors.Is(err, filesystem.ErrContextStorageIncomplete) {
@@ -156,16 +149,6 @@ func TestValidateContextDirectoryTreeReportsIncompleteStorage(t *testing.T) {
 		{
 			Kind:   filesystem.ContextDirectoryCodex,
 			Path:   contextPaths.CodexDir,
-			Reason: "missing",
-		},
-		{
-			Kind:   filesystem.ContextDirectoryVSCode,
-			Path:   contextPaths.VSCodeDir,
-			Reason: "not a directory",
-		},
-		{
-			Kind:   filesystem.ContextDirectoryVSCodeUserData,
-			Path:   contextPaths.VSCodeUserDataDir,
 			Reason: "missing",
 		},
 	}
@@ -254,6 +237,16 @@ func assertDirectoryEmpty(t *testing.T, path string) {
 	}
 	if len(entries) != 0 {
 		t.Fatalf("directory %s entry count = %d, want 0", path, len(entries))
+	}
+}
+
+func assertPathMissing(t *testing.T, path string) {
+	t.Helper()
+
+	if _, err := os.Stat(path); err == nil {
+		t.Fatalf("path %s exists, want missing", path)
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat path %s: %v", path, err)
 	}
 }
 

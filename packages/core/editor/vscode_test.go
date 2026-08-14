@@ -7,9 +7,7 @@ import (
 	"testing"
 	"time"
 
-	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/editor"
-	"devctx/packages/core/filesystem"
 )
 
 func TestVSCodeEditorDetectsUnixExecutableFromSearchPath(t *testing.T) {
@@ -201,56 +199,6 @@ func TestVSCodeEditorReportsNonExecutableConfiguredExecutable(t *testing.T) {
 	}
 }
 
-func TestVSCodeUserDataArgumentsUseDerivedContextPaths(t *testing.T) {
-	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
-		return "/home/alex", nil
-	})
-
-	personalPaths, err := filesystem.DeriveContextPaths(platformPaths, devcontext.MustID("personal"))
-	if err != nil {
-		t.Fatalf("derive personal paths: %v", err)
-	}
-	companyPaths, err := filesystem.DeriveContextPaths(platformPaths, devcontext.MustID("company"))
-	if err != nil {
-		t.Fatalf("derive company paths: %v", err)
-	}
-
-	personalArgs, err := editor.VSCodeUserDataArguments(editor.ContextPaths{
-		RootDir:     personalPaths.RootDir,
-		DataDir:     personalPaths.VSCodeDir,
-		UserDataDir: personalPaths.VSCodeUserDataDir,
-	})
-	if err != nil {
-		t.Fatalf("personal user-data arguments: %v", err)
-	}
-	companyArgs, err := editor.VSCodeUserDataArguments(editor.ContextPaths{
-		RootDir:     companyPaths.RootDir,
-		DataDir:     companyPaths.VSCodeDir,
-		UserDataDir: companyPaths.VSCodeUserDataDir,
-	})
-	if err != nil {
-		t.Fatalf("company user-data arguments: %v", err)
-	}
-
-	wantPersonalArgs := editor.Arguments{
-		editor.VSCodeUserDataDirFlag,
-		"/home/alex/.devctx/contexts/personal/vscode/user-data",
-	}
-	if !reflect.DeepEqual(personalArgs, wantPersonalArgs) {
-		t.Fatalf("personal args = %#v, want %#v", personalArgs, wantPersonalArgs)
-	}
-	wantCompanyArgs := editor.Arguments{
-		editor.VSCodeUserDataDirFlag,
-		"/home/alex/.devctx/contexts/company/vscode/user-data",
-	}
-	if !reflect.DeepEqual(companyArgs, wantCompanyArgs) {
-		t.Fatalf("company args = %#v, want %#v", companyArgs, wantCompanyArgs)
-	}
-	if reflect.DeepEqual(personalArgs, companyArgs) {
-		t.Fatalf("personal and company args should differ: %#v", personalArgs)
-	}
-}
-
 func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -263,17 +211,10 @@ func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 				Config:      editor.DefaultConfig(),
 				Executable:  "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
 				ProjectPath: "/Users/Alex/Work/Client A/API",
-				Paths: editor.ContextPaths{
-					RootDir:     "/Users/Alex/.devctx/contexts/client-a",
-					DataDir:     "/Users/Alex/.devctx/contexts/client-a/vscode",
-					UserDataDir: "/Users/Alex/.devctx/contexts/client-a/vscode/user data",
-				},
 			},
 			want: editor.Command{
 				Executable: "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
 				Arguments: editor.Arguments{
-					editor.VSCodeUserDataDirFlag,
-					"/Users/Alex/.devctx/contexts/client-a/vscode/user data",
 					"/Users/Alex/Work/Client A/API",
 				},
 			},
@@ -284,17 +225,10 @@ func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 				Config:      editor.DefaultConfig(),
 				Executable:  `C:\Users\Alex\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd`,
 				ProjectPath: `C:\Users\Alex\Projects\Client A\API`,
-				Paths: editor.ContextPaths{
-					RootDir:     `C:\Users\Alex\.devctx\contexts\client-a`,
-					DataDir:     `C:\Users\Alex\.devctx\contexts\client-a\vscode`,
-					UserDataDir: `C:\Users\Alex\.devctx\contexts\client-a\vscode\user-data`,
-				},
 			},
 			want: editor.Command{
 				Executable: `C:\Users\Alex\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd`,
 				Arguments: editor.Arguments{
-					editor.VSCodeUserDataDirFlag,
-					`C:\Users\Alex\.devctx\contexts\client-a\vscode\user-data`,
 					`C:\Users\Alex\Projects\Client A\API`,
 				},
 			},
@@ -305,23 +239,16 @@ func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 				Config:      editor.DefaultConfig(),
 				Executable:  "/usr/local/bin/code",
 				ProjectPath: "/Users/Alex/équipe/Café Portal",
-				Paths: editor.ContextPaths{
-					RootDir:     "/Users/Alex/.devctx/contexts/cafe",
-					DataDir:     "/Users/Alex/.devctx/contexts/cafe/vscode",
-					UserDataDir: "/Users/Alex/.devctx/contexts/cafe/vscode/user-data",
-				},
 			},
 			want: editor.Command{
 				Executable: "/usr/local/bin/code",
 				Arguments: editor.Arguments{
-					editor.VSCodeUserDataDirFlag,
-					"/Users/Alex/.devctx/contexts/cafe/vscode/user-data",
 					"/Users/Alex/équipe/Café Portal",
 				},
 			},
 		},
 		{
-			name: "custom executable and distinct user data directory",
+			name: "custom executable",
 			request: editor.CommandRequest{
 				Config: editor.Config{
 					Type:               editor.TypeVSCode,
@@ -329,17 +256,10 @@ func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 				},
 				Executable:  "/opt/vscode-insiders/bin/code-insiders",
 				ProjectPath: "/work/app",
-				Paths: editor.ContextPaths{
-					RootDir:     "/home/alex/.devctx/contexts/company",
-					DataDir:     "/home/alex/.devctx/contexts/company/vscode",
-					UserDataDir: "/tmp/devctx-company-vscode-user-data",
-				},
 			},
 			want: editor.Command{
 				Executable: "/opt/vscode-insiders/bin/code-insiders",
 				Arguments: editor.Arguments{
-					editor.VSCodeUserDataDirFlag,
-					"/tmp/devctx-company-vscode-user-data",
 					"/work/app",
 				},
 			},
@@ -365,9 +285,6 @@ func TestVSCodeEditorBuildLaunchCommandRejectsMissingInputs(t *testing.T) {
 		Config:      editor.DefaultConfig(),
 		Executable:  "/usr/local/bin/code",
 		ProjectPath: "/work/client-a/api",
-		Paths: editor.ContextPaths{
-			UserDataDir: "/home/alex/.devctx/contexts/client-a/vscode/user-data",
-		},
 	}
 
 	tests := []struct {
@@ -392,15 +309,6 @@ func TestVSCodeEditorBuildLaunchCommandRejectsMissingInputs(t *testing.T) {
 				Paths:      validRequest.Paths,
 			},
 			wantErr: editor.ErrMissingProjectPath,
-		},
-		{
-			name: "missing user-data dir",
-			request: editor.CommandRequest{
-				Config:      validRequest.Config,
-				Executable:  validRequest.Executable,
-				ProjectPath: validRequest.ProjectPath,
-			},
-			wantErr: editor.ErrMissingUserDataDir,
 		},
 	}
 

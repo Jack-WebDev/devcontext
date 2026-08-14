@@ -18,22 +18,12 @@ var (
 	// that exists but cannot be used as an executable file.
 	ErrExecutableNotExecutable = errors.New("editor executable is not executable")
 
-	// ErrMissingUserDataDir identifies a VS Code command request without an
-	// isolated user-data directory.
-	ErrMissingUserDataDir = errors.New("missing VS Code user-data directory")
-
 	// ErrMissingExecutable identifies a command request without a resolved
 	// editor executable.
 	ErrMissingExecutable = errors.New("missing editor executable")
 
 	// ErrMissingProjectPath identifies a command request without a project path.
 	ErrMissingProjectPath = errors.New("missing project path")
-)
-
-const (
-	// VSCodeUserDataDirFlag identifies the VS Code CLI flag used to isolate
-	// runtime and user state.
-	VSCodeUserDataDirFlag = "--user-data-dir"
 )
 
 // ExecutableProbe finds executables and reads executable file metadata.
@@ -123,8 +113,7 @@ func (e VSCodeEditor) DetectExecutable(config Config) (Executable, error) {
 	}
 }
 
-// BuildLaunchCommand returns the structured VS Code command for one project and
-// context-owned user-data directory.
+// BuildLaunchCommand returns the structured VS Code command for one project.
 func (VSCodeEditor) BuildLaunchCommand(request CommandRequest) (Command, error) {
 	if strings.TrimSpace(string(request.Executable)) == "" {
 		return Command{}, ErrMissingExecutable
@@ -133,15 +122,9 @@ func (VSCodeEditor) BuildLaunchCommand(request CommandRequest) (Command, error) 
 		return Command{}, ErrMissingProjectPath
 	}
 
-	arguments, err := VSCodeUserDataArguments(request.Paths)
-	if err != nil {
-		return Command{}, err
-	}
-	arguments = append(append(Arguments(nil), arguments...), request.ProjectPath)
-
 	return Command{
 		Executable: request.Executable,
-		Arguments:  arguments,
+		Arguments:  Arguments{request.ProjectPath},
 	}, nil
 }
 
@@ -150,15 +133,6 @@ func (e VSCodeEditor) resolveProbe() ExecutableProbe {
 		return e.Probe
 	}
 	return defaultExecutableProbe{}
-}
-
-// VSCodeUserDataArguments returns the structured arguments that isolate VS Code
-// user data for one context.
-func VSCodeUserDataArguments(paths ContextPaths) (Arguments, error) {
-	if strings.TrimSpace(paths.UserDataDir) == "" {
-		return nil, ErrMissingUserDataDir
-	}
-	return Arguments{VSCodeUserDataDirFlag, paths.UserDataDir}, nil
 }
 
 func (e VSCodeEditor) resolveOperatingSystem() string {

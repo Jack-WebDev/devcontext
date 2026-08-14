@@ -397,8 +397,6 @@ func renderDebugLaunchPlan(plan launcher.LaunchPlan) string {
 	fmt.Fprintf(&builder, "  root: %s\n", plan.ContextPaths.RootDir)
 	fmt.Fprintf(&builder, "  claude: %s\n", plan.ContextPaths.ClaudeDir)
 	fmt.Fprintf(&builder, "  codex: %s\n", plan.ContextPaths.CodexDir)
-	fmt.Fprintf(&builder, "  vscode: %s\n", plan.ContextPaths.VSCodeDir)
-	fmt.Fprintf(&builder, "  vscode_user_data: %s\n", plan.ContextPaths.VSCodeUserDataDir)
 	builder.WriteString("arguments:\n")
 	for i, argument := range plan.Arguments {
 		fmt.Fprintf(&builder, "  %d: %s\n", i, argument)
