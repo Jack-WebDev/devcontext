@@ -1,6 +1,7 @@
 package context
 
 import (
+	"fmt"
 	"time"
 
 	"devctx/packages/core/editor"
@@ -20,6 +21,19 @@ func DefaultPersonalContext(createdAt time.Time) Context {
 // DefaultCompanyContext returns the built-in Company context seed.
 func DefaultCompanyContext(createdAt time.Time) Context {
 	return defaultContextSeed(MustID(companyContextID), "Company", createdAt)
+}
+
+// DefaultContextForID returns the built-in context seed for a supported default
+// context ID.
+func DefaultContextForID(id ID, createdAt time.Time) (Context, error) {
+	switch id.String() {
+	case personalContextID:
+		return DefaultPersonalContext(createdAt), nil
+	case companyContextID:
+		return DefaultCompanyContext(createdAt), nil
+	default:
+		return Context{}, fmt.Errorf("%w: unsupported default context %q", ErrContextNotFound, id.String())
+	}
 }
 
 func defaultContextSeed(id ID, name string, createdAt time.Time) Context {
