@@ -45,11 +45,13 @@ function App() {
 
   async function handleCreateContext(
     contextId: string,
+    importProviderIds: string[] = [],
   ): Promise<ApiResult<CreateContextResult>> {
     const result = await createOnboardingContextAndRefresh({
       contextId,
-      createContext: (requestedContextId) =>
-        devContextApi.createContext({ contextId: requestedContextId }),
+      importProviderIds,
+      createContext: (requestedContextId, requestedImportProviderIds) =>
+        devContextApi.createContext({ contextId: requestedContextId, importProviderIds: requestedImportProviderIds }),
       getLaunchState: () => devContextApi.getLaunchState(),
     });
     if (result.ok) {
@@ -93,6 +95,7 @@ function renderSelectorContent(
   launchState: LaunchStateLoad,
   onCreateContext: (
     contextId: string,
+    importProviderIds?: string[],
   ) => Promise<ApiResult<CreateContextResult>>,
 ) {
   if (launchState.status === "loading") {
@@ -109,8 +112,8 @@ function renderSelectorContent(
       onBindProject={(request) => devContextApi.bindProject(request)}
       onLaunchProject={(request) => devContextApi.launchProject(request)}
       onCancel={() => devContextWindow.closeSelector()}
-      onCreatePersonalContext={() => onCreateContext("personal")}
-      onCreateCompanyContext={() => onCreateContext("company")}
+      onCreatePersonalContext={(importProviderIds) => onCreateContext("personal", importProviderIds)}
+      onCreateCompanyContext={(importProviderIds) => onCreateContext("company", importProviderIds)}
     />
   );
 }

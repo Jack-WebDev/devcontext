@@ -10,6 +10,7 @@ import {
   shouldRenderFirstRunWelcome,
 } from "../.tmp-test/src/components/selector/FirstRunWelcome.js";
 import {GuiErrorNotice} from "../.tmp-test/src/components/selector/GuiErrorNotice.js";
+import {ProviderCredentialClassification} from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
 import {ProjectIdentity} from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import {
   boundContextName,
@@ -99,6 +100,86 @@ test("first-run welcome disables setup actions until handlers are wired", () => 
   const html = renderToStaticMarkup(FirstRunWelcome({launchState: state}));
 
   assert.match(html, /disabled=""/);
+});
+
+test("first-run welcome requires detected provider sessions to be classified before creation", () => {
+  const state = launchStateFixture({
+    contexts: [],
+    firstRun: true,
+    providerCredentialSessions: providerCredentialSessionsFixture(),
+  });
+
+  const unassigned = renderToStaticMarkup(
+    FirstRunWelcome({
+      launchState: state,
+      providerCredentialSessions: state.providerCredentialSessions,
+      providerSessionAssignments: {},
+      onCreatePersonal: () => {},
+      onCreateCompany: () => {},
+      onClassifyProviderSession: () => {},
+    }),
+  );
+  const assigned = renderToStaticMarkup(
+    FirstRunWelcome({
+      launchState: state,
+      providerCredentialSessions: state.providerCredentialSessions,
+      providerSessionAssignments: {codex: "company", claude: "personal"},
+      onCreatePersonal: () => {},
+      onCreateCompany: () => {},
+      onClassifyProviderSession: () => {},
+    }),
+  );
+
+  assert.ok(unassigned.includes("Classify detected provider sessions"));
+  assert.ok(unassigned.includes("Email:"));
+  assert.ok(unassigned.includes("user@company.com"));
+  assert.ok(unassigned.includes("Plan:"));
+  assert.ok(unassigned.includes("Business"));
+  assert.ok(unassigned.includes("Subscription:"));
+  assert.ok(unassigned.includes("Pro"));
+  assert.ok(unassigned.includes("Organization:"));
+  assert.ok(unassigned.includes("e783"));
+  assert.match(unassigned, /disabled=""/);
+  assert.doesNotMatch(assigned, /disabled=""/);
+});
+
+test("provider credential classification renders only safe metadata fields", () => {
+  const html = renderToStaticMarkup(
+    ProviderCredentialClassification({
+      sessions: [
+        {
+          ...providerCredentialSessionsFixture()[0],
+          codex: {
+            ...providerCredentialSessionsFixture()[0].codex,
+            accessToken: "codex-access-token-secret",
+            refreshToken: "codex-refresh-token-secret",
+            idToken: "header.payload.signature",
+          },
+        },
+        {
+          ...providerCredentialSessionsFixture()[1],
+          claude: {
+            ...providerCredentialSessionsFixture()[1].claude,
+            accessToken: "claude-access-token-secret",
+            refreshToken: "claude-refresh-token-secret",
+          },
+        },
+      ],
+      assignments: {codex: "personal"},
+      onClassify: () => {},
+    }),
+  );
+
+  assert.ok(html.includes("Codex"));
+  assert.ok(html.includes("Claude"));
+  assert.ok(html.includes("user@company.com"));
+  assert.ok(html.includes("Business"));
+  assert.ok(html.includes("acct_123"));
+  assert.ok(html.includes("Pro"));
+  assert.ok(html.includes("e783"));
+  assert.doesNotMatch(html, /access-token-secret/);
+  assert.doesNotMatch(html, /refresh-token-secret/);
+  assert.doesNotMatch(html, /header\.payload\.signature/);
 });
 
 test("first-run welcome shows pending and error states", () => {
@@ -834,8 +915,9 @@ test("onboarding context creation refreshes launch state after success", async (
 
   const result = await createOnboardingContextAndRefresh({
     contextId: "personal",
-    createContext(contextId) {
-      calls.push(["createContext", contextId]);
+    importProviderIds: ["codex"],
+    createContext(contextId, importProviderIds) {
+      calls.push(["createContext", contextId, importProviderIds]);
       return Promise.resolve({
         ok: true,
         data: {
@@ -860,7 +942,7 @@ test("onboarding context creation refreshes launch state after success", async (
     launchState: refreshedState,
   });
   assert.deepEqual(calls, [
-    ["createContext", "personal"],
+    ["createContext", "personal", ["codex"]],
     ["getLaunchState"],
   ]);
 });
@@ -871,8 +953,8 @@ test("onboarding context creation returns failures without refreshing", async ()
 
   const result = await createOnboardingContextAndRefresh({
     contextId: "company",
-    createContext(contextId) {
-      calls.push(["createContext", contextId]);
+    createContext(contextId, importProviderIds) {
+      calls.push(["createContext", contextId, importProviderIds]);
       return Promise.resolve(error);
     },
     getLaunchState() {
@@ -885,7 +967,7 @@ test("onboarding context creation returns failures without refreshing", async ()
     ok: false,
     error: error.error,
   });
-  assert.deepEqual(calls, [["createContext", "company"]]);
+  assert.deepEqual(calls, [["createContext", "company", []]]);
 });
 
 function contextFixture(id, name, providers = []) {
@@ -923,8 +1005,33 @@ function launchStateFixture(overrides = {}) {
     selectionRequired: true,
     warnings: [],
     firstRun: false,
+    providerCredentialSessions: [],
     ...overrides,
   };
+}
+
+function providerCredentialSessionsFixture() {
+  return [
+    {
+      providerId: "codex",
+      name: "Codex",
+      metadataAvailable: true,
+      codex: {
+        email: "user@company.com",
+        chatgptPlanType: "Business",
+        chatgptAccountId: "acct_123",
+      },
+    },
+    {
+      providerId: "claude",
+      name: "Claude",
+      metadataAvailable: true,
+      claude: {
+        subscriptionType: "Pro",
+        organizationUuid: "e783",
+      },
+    },
+  ];
 }
 
 function projectBindingResult() {

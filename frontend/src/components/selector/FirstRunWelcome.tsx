@@ -1,21 +1,33 @@
-import type { DisplayError, LaunchState } from "../../lib/devctx-api";
+import type { DisplayError, LaunchState, ProviderCredentialSession } from "../../lib/devctx-api";
+import { ProviderCredentialClassification, type ProviderSessionAssignments } from "./ProviderCredentialClassification.js";
 
 interface FirstRunWelcomeProps {
   launchState: LaunchState;
+  providerCredentialSessions?: ProviderCredentialSession[];
+  providerSessionAssignments?: ProviderSessionAssignments;
   onCreatePersonal?: () => void;
   onCreateCompany?: () => void;
+  onClassifyProviderSession?: (providerId: string, contextId: "personal" | "company") => void;
   pendingContextId?: string;
   error?: DisplayError;
 }
 
 function FirstRunWelcome({
   launchState,
+  providerCredentialSessions = [],
+  providerSessionAssignments = {},
   onCreatePersonal,
   onCreateCompany,
+  onClassifyProviderSession,
   pendingContextId,
   error,
 }: FirstRunWelcomeProps) {
   const pending = pendingContextId !== undefined;
+  const canClassify = providerCredentialSessions.length === 0 || onClassifyProviderSession !== undefined;
+  const handleClassifyProviderSession = onClassifyProviderSession ?? (() => {});
+  const classificationComplete = providerCredentialSessions.every(
+    (session) => providerSessionAssignments[session.providerId] !== undefined,
+  );
 
   return (
     <section aria-labelledby="first-run-title" className="space-y-6">
@@ -24,8 +36,8 @@ function FirstRunWelcome({
           Create your first development context
         </h3>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Dev Context creates local identities for this machine so each project can open with the right editor state,
-          provider folders, and authentication setup.
+          Dev Context creates local identities for this machine so each project can open with the right provider
+          folders and authentication setup.
         </p>
       </div>
 
@@ -36,27 +48,34 @@ function FirstRunWelcome({
         />
         <GuidanceItem
           title="Isolated tools"
-          description="Each context gets separate editor and provider directories so project work does not share local state accidentally."
+          description="Each context gets separate Codex and Claude directories while VS Code keeps your normal profile."
         />
         <GuidanceItem
           title="Separate authentication"
-          description="Sign in inside each provider yourself. Dev Context does not store passwords, tokens, or cloud accounts."
+          description="Classify detected sessions before import, or sign in inside each provider yourself. Dev Context does not store passwords, tokens, or cloud accounts."
         />
       </div>
+
+      <ProviderCredentialClassification
+        sessions={providerCredentialSessions}
+        assignments={providerSessionAssignments}
+        disabled={pending}
+        onClassify={handleClassifyProviderSession}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="Create a default context">
         <OnboardingAction
           title="Personal"
           description="Use this for personal repositories, experiments, and tools tied to your own accounts."
           buttonLabel={pendingContextId === "personal" ? "Creating..." : "Create Personal"}
-          disabled={pending || onCreatePersonal === undefined}
+          disabled={pending || !canClassify || !classificationComplete || onCreatePersonal === undefined}
           onClick={onCreatePersonal}
         />
         <OnboardingAction
           title="Company"
           description="Use this for work repositories and tools tied to employer or client accounts."
           buttonLabel={pendingContextId === "company" ? "Creating..." : "Create Company"}
-          disabled={pending || onCreateCompany === undefined}
+          disabled={pending || !canClassify || !classificationComplete || onCreateCompany === undefined}
           onClick={onCreateCompany}
         />
       </div>

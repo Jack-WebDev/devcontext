@@ -1,9 +1,12 @@
 package application
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -85,6 +88,37 @@ func TestGetLaunchStateReturnsUnboundSelectorState(t *testing.T) {
 	}
 	if state.FirstRun {
 		t.Fatal("first run = true, want false")
+	}
+}
+
+func TestGetLaunchStateDetectsProviderCredentialSessionsForContextCreation(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	writeApplicationJSONFixture(t, filepath.Join(fixture.homeDir, ".claude", ".credentials.json"), map[string]string{
+		"subscriptionType": "Pro",
+		"organizationUuid": "e783",
+		"accessToken":      "not-presented",
+	})
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+
+	if len(state.ProviderCredentialSessions) != 1 {
+		t.Fatalf("provider credential sessions = %#v, want one Claude session", state.ProviderCredentialSessions)
+	}
+	session := state.ProviderCredentialSessions[0]
+	if session.ProviderID != "claude" || session.Name != "Claude" || !session.MetadataAvailable {
+		t.Fatalf("provider credential session = %#v, want available Claude session", session)
+	}
+	if session.Claude == nil ||
+		session.Claude.SubscriptionType != "Pro" ||
+		session.Claude.OrganizationUUID != "e783" {
+		t.Fatalf("claude metadata = %#v", session.Claude)
+	}
+	if rendered := fmt.Sprintf("%#v", state.ProviderCredentialSessions); strings.Contains(rendered, "not-presented") {
+		t.Fatalf("provider credential sessions exposed credential value: %#v", state.ProviderCredentialSessions)
 	}
 }
 
@@ -658,6 +692,19 @@ func writeFile(t *testing.T, path string, data []byte) {
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatalf("write file %q: %v", path, err)
 	}
+}
+
+func writeApplicationJSONFixture(t *testing.T, path string, value any) {
+	t.Helper()
+
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal json fixture: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatalf("create fixture directory %q: %v", filepath.Dir(path), err)
+	}
+	writeFile(t, path, data)
 }
 
 type applicationRecordingLogger struct {

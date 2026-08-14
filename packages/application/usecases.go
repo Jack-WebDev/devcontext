@@ -70,7 +70,7 @@ func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, er
 		return LaunchState{}, err
 	}
 	if len(contexts) == 0 {
-		return firstRunLaunchState(projectPath), nil
+		return s.firstRunLaunchState(projectPath), nil
 	}
 
 	lookup, err := s.dependencies.Projects.LookupWithContextValidation(string(projectPath), projectPath, s.dependencies.Contexts)
@@ -87,25 +87,37 @@ func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, er
 		return LaunchState{}, err
 	}
 
+	providerCredentialSessions, err := s.providerCredentialSessionStates()
+	if err != nil {
+		providerCredentialSessions = nil
+	}
+
 	return LaunchState{
-		Project:           projectState(projectPath),
-		Contexts:          s.contextStates(contexts),
-		Binding:           bindingState(lookup),
-		SelectedContextID: selectedContextID(resolution),
-		SelectionRequired: resolution.SelectionRequired,
-		ResolutionSource:  string(resolution.Source),
-		Warnings:          warningStates(resolution.Warnings),
+		Project:                    projectState(projectPath),
+		Contexts:                   s.contextStates(contexts),
+		Binding:                    bindingState(lookup),
+		SelectedContextID:          selectedContextID(resolution),
+		SelectionRequired:          resolution.SelectionRequired,
+		ResolutionSource:           string(resolution.Source),
+		Warnings:                   warningStates(resolution.Warnings),
+		ProviderCredentialSessions: providerCredentialSessions,
 	}, nil
 }
 
-func firstRunLaunchState(projectPath project.Path) LaunchState {
+func (s *Service) firstRunLaunchState(projectPath project.Path) LaunchState {
+	sessions, err := s.providerCredentialSessionStates()
+	if err != nil {
+		sessions = nil
+	}
+
 	return LaunchState{
-		Project:           projectState(projectPath),
-		Contexts:          []ContextState{},
-		Binding:           ProjectBindingState{ProjectPath: string(projectPath)},
-		SelectionRequired: true,
-		ResolutionSource:  string(launcher.ResolutionSourceUserSelection),
-		FirstRun:          true,
+		Project:                    projectState(projectPath),
+		Contexts:                   []ContextState{},
+		Binding:                    ProjectBindingState{ProjectPath: string(projectPath)},
+		SelectionRequired:          true,
+		ResolutionSource:           string(launcher.ResolutionSourceUserSelection),
+		FirstRun:                   true,
+		ProviderCredentialSessions: sessions,
 	}
 }
 
@@ -128,6 +140,7 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 		s.dependencies.Paths,
 		contextPaths,
 		ctx,
+		request.ImportProviderIDs,
 		s.dependencies.StoragePermissions,
 	); err != nil {
 		return CreateContextResult{}, err
@@ -263,6 +276,50 @@ func (s *Service) contextState(ctx devcontext.Context) ContextState {
 		Editor:    EditorState{Type: string(ctx.Editor.Type)},
 		Providers: s.providerStates(ctx),
 		Metadata:  cloneMetadata(ctx.Metadata),
+	}
+}
+
+func (s *Service) providerCredentialSessionStates() ([]ProviderCredentialSessionState, error) {
+	sessions, err := filesystem.DetectProviderCredentialSessions(s.dependencies.Paths)
+	if err != nil {
+		return nil, err
+	}
+
+	states := make([]ProviderCredentialSessionState, 0, len(sessions))
+	for _, session := range sessions {
+		state := ProviderCredentialSessionState{
+			ProviderID:        session.ProviderID,
+			Name:              providerCredentialSessionName(session.ProviderID),
+			MetadataAvailable: session.MetadataAvailable,
+		}
+		switch session.ProviderID {
+		case string(provider.CodexID):
+			state.Codex = &CodexCredentialSessionState{
+				Email:            session.Codex.Email,
+				ChatGPTPlanType:  session.Codex.ChatGPTPlanType,
+				ChatGPTAccountID: session.Codex.ChatGPTAccountID,
+			}
+		case string(provider.ClaudeID):
+			state.Claude = &ClaudeCredentialSessionState{
+				SubscriptionType: session.Claude.SubscriptionType,
+				OrganizationUUID: session.Claude.OrganizationUUID,
+			}
+		default:
+			continue
+		}
+		states = append(states, state)
+	}
+	return states, nil
+}
+
+func providerCredentialSessionName(providerID string) string {
+	switch providerID {
+	case string(provider.CodexID):
+		return "Codex"
+	case string(provider.ClaudeID):
+		return "Claude"
+	default:
+		return providerID
 	}
 }
 

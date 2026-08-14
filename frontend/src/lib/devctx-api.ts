@@ -36,6 +36,7 @@ export interface LaunchState {
   resolutionSource?: string;
   warnings: ResolutionWarning[];
   firstRun: boolean;
+  providerCredentialSessions: ProviderCredentialSession[];
 }
 
 export interface ProjectState {
@@ -103,10 +104,30 @@ export interface UnbindProjectRequest {
 
 export interface CreateContextRequest {
   contextId: string;
+  importProviderIds?: string[];
 }
 
 export interface CreateContextResult {
   context: ContextState;
+}
+
+export interface ProviderCredentialSession {
+  providerId: string;
+  name: string;
+  metadataAvailable: boolean;
+  codex?: CodexCredentialSession;
+  claude?: ClaudeCredentialSession;
+}
+
+export interface CodexCredentialSession {
+  email?: string;
+  chatgptPlanType?: string;
+  chatgptAccountId?: string;
+}
+
+export interface ClaudeCredentialSession {
+  subscriptionType?: string;
+  organizationUuid?: string;
 }
 
 export interface DevContextApi {
@@ -221,6 +242,7 @@ function normalizeLaunchState(value: unknown): LaunchState {
     resolutionSource: optionalString(object.resolutionSource),
     warnings: arrayValue(object.warnings).map(normalizeResolutionWarning),
     firstRun: booleanValue(object.firstRun),
+    providerCredentialSessions: arrayValue(object.providerCredentialSessions).map(normalizeProviderCredentialSession),
   };
 }
 
@@ -274,6 +296,40 @@ function normalizeProviderState(value: unknown): ProviderState {
     enabled: booleanValue(object.enabled),
     state: stringValue(object.state),
     explanation: optionalString(object.explanation),
+  };
+}
+
+function normalizeProviderCredentialSession(value: unknown): ProviderCredentialSession {
+  const object = objectValue(value);
+  return {
+    providerId: stringValue(object.providerId),
+    name: stringValue(object.name),
+    metadataAvailable: booleanValue(object.metadataAvailable),
+    codex: normalizeCodexCredentialSession(object.codex),
+    claude: normalizeClaudeCredentialSession(object.claude),
+  };
+}
+
+function normalizeCodexCredentialSession(value: unknown): CodexCredentialSession | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const object = objectValue(value);
+  return {
+    email: optionalString(object.email),
+    chatgptPlanType: optionalString(object.chatgptPlanType),
+    chatgptAccountId: optionalString(object.chatgptAccountId),
+  };
+}
+
+function normalizeClaudeCredentialSession(value: unknown): ClaudeCredentialSession | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const object = objectValue(value);
+  return {
+    subscriptionType: optionalString(object.subscriptionType),
+    organizationUuid: optionalString(object.organizationUuid),
   };
 }
 
