@@ -1,4 +1,7 @@
 import type { ProviderCredentialSession } from "../../lib/devctx-api";
+import { Badge } from "../ui/badge.js";
+import { Button } from "../ui/button.js";
+import { Card, CardContent } from "../ui/card.js";
 
 type ProviderSessionAssignments = Record<string, "personal" | "company" | undefined>;
 
@@ -55,40 +58,44 @@ function ProviderCredentialSessionCard({
   onClassify: (providerId: string, contextId: "personal" | "company") => void;
 }) {
   return (
-    <article className="border border-border bg-card p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h5 className="text-sm font-semibold">{session.name}</h5>
-          <p className="mt-1 text-xs text-muted-foreground">{providerSessionSourceLabel(session)}</p>
-          <ProviderCredentialMetadata session={session} />
+    <Card as="article" size="sm" className="border border-border py-0">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h5 className="text-sm font-semibold">{session.name}</h5>
+            <p className="mt-1 text-xs text-muted-foreground">{providerSessionSourceLabel(session)}</p>
+            <ProviderCredentialMetadata session={session} />
+          </div>
+          <Badge variant={assignment === undefined ? "secondary" : "default"} className="text-xs font-medium">
+            {assignment === undefined
+              ? "Unassigned"
+              : assignment === "personal"
+                ? "Will import to Personal"
+                : "Will import to Company"}
+          </Badge>
         </div>
-        <p className="text-xs font-medium text-muted-foreground">
-          {assignment === undefined
-            ? "Unassigned"
-            : assignment === "personal"
-              ? "Will import to Personal"
-              : "Will import to Company"}
-        </p>
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label={`Classify ${session.name} session`}>
-        <button
-          type="button"
-          className={classificationButtonClassName(assignment === "personal")}
-          disabled={disabled}
-          onClick={() => onClassify(session.providerId, "personal")}
-        >
-          Import to Personal
-        </button>
-        <button
-          type="button"
-          className={classificationButtonClassName(assignment === "company")}
-          disabled={disabled}
-          onClick={() => onClassify(session.providerId, "company")}
-        >
-          Import to Company
-        </button>
-      </div>
-    </article>
+        <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label={`Classify ${session.name} session`}>
+          <Button
+            type="button"
+            variant={assignment === "personal" ? "default" : "outline"}
+            size="sm"
+            disabled={disabled}
+            onClick={() => onClassify(session.providerId, "personal")}
+          >
+            Import to Personal
+          </Button>
+          <Button
+            type="button"
+            variant={assignment === "company" ? "default" : "outline"}
+            size="sm"
+            disabled={disabled}
+            onClick={() => onClassify(session.providerId, "company")}
+          >
+            Import to Company
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -150,15 +157,6 @@ function providerSessionSourceLabel(session: ProviderCredentialSession): string 
 
 function rowHasValue(row: { label: string; value?: string }): row is { label: string; value: string } {
   return row.value !== undefined && row.value !== "";
-}
-
-function classificationButtonClassName(selected: boolean): string {
-  const base =
-    "border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50";
-  if (selected) {
-    return `${base} border-primary bg-primary text-primary-foreground`;
-  }
-  return `${base} border-border bg-background hover:bg-muted`;
 }
 
 export { ProviderCredentialClassification };
