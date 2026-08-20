@@ -11,6 +11,8 @@ import type {
   ProviderCredentialSession,
   ProjectBindingState,
 } from "../../lib/devctx-api";
+import { Button } from "../ui/button.js";
+import { Card, CardContent } from "../ui/card.js";
 import { ContextMismatchDialog } from "./ContextMismatchDialog";
 import { ContextCard } from "./ContextCard";
 import { FirstRunWelcome, shouldRenderFirstRunWelcome } from "./FirstRunWelcome";
@@ -265,9 +267,14 @@ function SelectorView({
           />
 
           {launchPending ? (
-            <p className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground" role="status">
+            <Card
+              as="p"
+              size="sm"
+              className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground"
+              role="status"
+            >
               Launching selected context...
-            </p>
+            </Card>
           ) : null}
 
           {launchError ? <GuiErrorNotice error={launchError} /> : null}
@@ -335,50 +342,54 @@ function MissingDefaultContextActions({
   }
 
   return (
-    <section className="border border-border bg-muted/30 p-4" aria-label="Add default contexts">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-sm font-semibold">Add another default context</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Create the missing Personal or Company context when this machine needs both identities.
+    <Card as="section" size="sm" className="border border-border bg-muted/30 py-0" aria-label="Add default contexts">
+      <CardContent className="p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold">Add another default context</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Create the missing Personal or Company context when this machine needs both identities.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {missingPersonal ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={pending || !classificationComplete || onCreatePersonal === undefined}
+                onClick={onCreatePersonal}
+              >
+                {pendingContextId === "personal" ? "Creating..." : "Add Personal"}
+              </Button>
+            ) : null}
+            {missingCompany ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={pending || !classificationComplete || onCreateCompany === undefined}
+                onClick={onCreateCompany}
+              >
+                {pendingContextId === "company" ? "Creating..." : "Add Company"}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+        <ProviderCredentialClassification
+          sessions={providerCredentialSessions}
+          assignments={providerSessionAssignments}
+          disabled={pending}
+          onClassify={onClassifyProviderSession}
+        />
+        {pendingContextId ? (
+          <p className="mt-3 text-sm text-muted-foreground" role="status">
+            Creating {pendingContextId === "personal" ? "Personal" : "Company"} context...
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {missingPersonal ? (
-            <button
-              type="button"
-              className="border border-border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={pending || !classificationComplete || onCreatePersonal === undefined}
-              onClick={onCreatePersonal}
-            >
-              {pendingContextId === "personal" ? "Creating..." : "Add Personal"}
-            </button>
-          ) : null}
-          {missingCompany ? (
-            <button
-              type="button"
-              className="border border-border bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={pending || !classificationComplete || onCreateCompany === undefined}
-              onClick={onCreateCompany}
-            >
-              {pendingContextId === "company" ? "Creating..." : "Add Company"}
-            </button>
-          ) : null}
-        </div>
-      </div>
-      <ProviderCredentialClassification
-        sessions={providerCredentialSessions}
-        assignments={providerSessionAssignments}
-        disabled={pending}
-        onClassify={onClassifyProviderSession}
-      />
-      {pendingContextId ? (
-        <p className="mt-3 text-sm text-muted-foreground" role="status">
-          Creating {pendingContextId === "personal" ? "Personal" : "Company"} context...
-        </p>
-      ) : null}
-      {error ? <GuiErrorNotice error={error} /> : null}
-    </section>
+        ) : null}
+        {error ? <GuiErrorNotice error={error} /> : null}
+      </CardContent>
+    </Card>
   );
 }
 

@@ -1,4 +1,6 @@
 import type { ContextMismatch, ContextState } from "../../lib/devctx-api";
+import { Button } from "../ui/button.js";
+import { Card, CardContent } from "../ui/card.js";
 
 interface ContextMismatchDialogProps {
   mismatch: ContextMismatch;
@@ -16,13 +18,14 @@ function ContextMismatchDialog({
   onOpenAnyway,
 }: ContextMismatchDialogProps) {
   return (
-    <section
+    <Card
+      as="section"
       aria-labelledby="context-mismatch-title"
       aria-modal="true"
-      className="border border-destructive/30 bg-card p-5 text-sm shadow-sm"
+      className="border border-destructive/30 py-0"
       role="dialog"
     >
-      <div className="space-y-4">
+      <CardContent className="space-y-4 p-5">
         <div>
           <h3 id="context-mismatch-title" className="text-base font-semibold text-foreground">
             Context mismatch
@@ -40,25 +43,25 @@ function ContextMismatchDialog({
         </dl>
 
         <div className="flex justify-end gap-3">
-          <button
+          <Button
             type="button"
-            className="border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-foreground/30 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+            variant="outline"
             disabled={launchPending}
             onClick={onCancel}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="bg-destructive px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:cursor-not-allowed disabled:opacity-50"
+            variant="destructive"
             disabled={launchPending}
             onClick={onOpenAnyway}
           >
             {launchPending ? "Opening..." : "Open Anyway"}
-          </button>
+          </Button>
         </div>
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }
 

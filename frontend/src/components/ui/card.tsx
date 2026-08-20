@@ -1,23 +1,27 @@
 import * as React from "react"
 
-import { cn } from "@/lib/utils"
+import { cn } from "../../lib/utils.js"
+
+type CardElement = "article" | "div" | "label" | "p" | "section"
 
 function Card({
+  as: Component = "div",
   className,
   size = "default",
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
-  return (
-    <div
-      data-slot="card"
-      data-size={size}
-      className={cn(
-        "group/card flex flex-col gap-(--card-spacing) overflow-hidden bg-card py-(--card-spacing) text-sm text-card-foreground shadow-sm ring-1 ring-foreground/5 [--card-spacing:--spacing(8)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(5)] *:[img:first-child]:rounded-none *:[img:last-child]:rounded-none",
-        className
-      )}
-      {...props}
-    />
-  )
+}: React.HTMLAttributes<HTMLElement> & {
+  as?: CardElement
+  size?: "default" | "sm"
+}) {
+  return React.createElement(Component, {
+    ...props,
+    "data-slot": "card",
+    "data-size": size,
+    className: cn(
+      "group/card flex flex-col gap-(--card-spacing) overflow-hidden bg-card py-(--card-spacing) text-sm text-card-foreground shadow-sm ring-1 ring-foreground/5 [--card-spacing:--spacing(8)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(5)] *:[img:first-child]:rounded-none *:[img:last-child]:rounded-none",
+      className
+    ),
+  })
 }
 
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {

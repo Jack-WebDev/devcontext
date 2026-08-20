@@ -1,4 +1,7 @@
 import type { DisplayError, LaunchState, ProviderCredentialSession } from "../../lib/devctx-api";
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert.js";
+import { Button } from "../ui/button.js";
+import { Card, CardContent } from "../ui/card.js";
 import { ProviderCredentialClassification, type ProviderSessionAssignments } from "./ProviderCredentialClassification.js";
 
 interface FirstRunWelcomeProps {
@@ -81,26 +84,33 @@ function FirstRunWelcome({
       </div>
 
       {pendingContextId ? (
-        <p className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground" role="status">
+        <Card
+          as="p"
+          size="sm"
+          className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground"
+          role="status"
+        >
           Creating {pendingContextId === "personal" ? "Personal" : "Company"} context...
-        </p>
+        </Card>
       ) : null}
 
       {error ? <FirstRunErrorNotice error={error} /> : null}
 
-      <p className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+      <Card as="p" size="sm" className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
         Current project: <span className="font-medium text-foreground">{launchState.project.path}</span>
-      </p>
+      </Card>
     </section>
   );
 }
 
 function GuidanceItem({ title, description }: { title: string; description: string }) {
   return (
-    <div className="border border-border bg-card p-4">
-      <h4 className="text-sm font-semibold">{title}</h4>
-      <p className="mt-2 text-sm text-muted-foreground">{description}</p>
-    </div>
+    <Card size="sm" className="border border-border py-0">
+      <CardContent className="p-4">
+        <h4 className="text-sm font-semibold">{title}</h4>
+        <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -118,29 +128,26 @@ function OnboardingAction({
   onClick?: () => void;
 }) {
   return (
-    <div className="border border-border bg-card p-5">
-      <div className="space-y-2">
-        <h4 className="text-base font-semibold">{title}</h4>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
-      <button
-        type="button"
-        className="mt-4 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={disabled}
-        onClick={onClick}
-      >
-        {buttonLabel}
-      </button>
-    </div>
+    <Card size="sm" className="border border-border py-0">
+      <CardContent className="p-5">
+        <div className="space-y-2">
+          <h4 className="text-base font-semibold">{title}</h4>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+        <Button type="button" className="mt-4" disabled={disabled} onClick={onClick}>
+          {buttonLabel}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
 function FirstRunErrorNotice({ error }: { error: DisplayError }) {
   return (
-    <div className="border border-destructive/40 bg-destructive/5 p-4 text-sm" role="alert">
-      <p className="font-medium text-destructive">{error.message}</p>
-      <p className="mt-1 text-muted-foreground">{error.recovery}</p>
-    </div>
+    <Alert variant="destructive" className="border-destructive/40">
+      <AlertTitle>{error.message}</AlertTitle>
+      <AlertDescription>{error.recovery}</AlertDescription>
+    </Alert>
   );
 }
 

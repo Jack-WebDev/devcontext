@@ -1,4 +1,5 @@
 import type { DisplayError } from "../../lib/devctx-api";
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert.js";
 
 interface GuiErrorNoticeProps {
   error: DisplayError;
@@ -6,11 +7,13 @@ interface GuiErrorNoticeProps {
 
 function GuiErrorNotice({ error }: GuiErrorNoticeProps) {
   return (
-    <section className="border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive" role="alert">
-      <p className="text-xs font-semibold uppercase tracking-wide">{errorTitle(error.code)}</p>
-      <p className="mt-2 font-medium">{error.message}</p>
-      <p className="mt-1 text-destructive/80">{error.recovery}</p>
-    </section>
+    <Alert variant="destructive" className="border-destructive/30">
+      <AlertTitle className="text-xs uppercase tracking-wide">{errorTitle(error.code)}</AlertTitle>
+      <AlertDescription>
+        <p className="font-medium">{error.message}</p>
+        <p className="mt-1">{error.recovery}</p>
+      </AlertDescription>
+    </Alert>
   );
 }
 
