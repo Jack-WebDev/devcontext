@@ -148,10 +148,11 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 	if err != nil {
 		return CreateContextResult{}, err
 	}
-	if err := filesystem.CreateContextDirectoryTreeWithProviderCredentialsAndPermissions(
+	if err := filesystem.CreateContextDirectoryTreeWithProviderRegistryCredentialsAndPermissions(
 		s.dependencies.Paths,
 		contextPaths,
 		ctx,
+		s.dependencies.ProviderRegistry,
 		request.ImportProviderIDs,
 		s.dependencies.StoragePermissions,
 	); err != nil {

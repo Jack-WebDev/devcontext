@@ -160,7 +160,7 @@ func (r Runner) runContext(command ContextCommand) Result {
 		if err != nil {
 			return r.errorResult(err)
 		}
-		if err := filesystem.CreateContextDirectoryTreeWithProviderCredentialsAndPermissions(paths, contextPaths, ctx, nil, r.storagePermissions()); err != nil {
+		if err := filesystem.CreateContextDirectoryTreeWithProviderRegistryCredentialsAndPermissions(paths, contextPaths, ctx, r.providerRegistry(), nil, r.storagePermissions()); err != nil {
 			return r.errorResult(err)
 		}
 		return successResult(renderContextCreate(ctx))
