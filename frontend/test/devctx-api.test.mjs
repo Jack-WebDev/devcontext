@@ -23,6 +23,19 @@ test("adapter normalizes successful Wails calls", async () => {
                 state: "configured",
               },
             ],
+            confidence: {
+              contextId: "personal",
+              status: "needs_attention",
+              checks: [
+                {
+                  component: "codex",
+                  severity: "needs_attention",
+                  label: "Codex",
+                  message: "Codex is not authenticated for this context.",
+                  actionHint: "Sign in to Codex.",
+                },
+              ],
+            },
             metadata: {accent: "blue"},
           },
         ],
@@ -31,6 +44,25 @@ test("adapter normalizes successful Wails calls", async () => {
           bound: true,
           contextId: "personal",
           dangling: false,
+        },
+        confidence: {
+          contextId: "personal",
+          status: "needs_attention",
+          checks: [
+            {
+              component: "codex",
+              severity: "needs_attention",
+              label: "Codex",
+              message: "Codex is not authenticated for this context.",
+              actionHint: "Sign in to Codex.",
+            },
+            {
+              component: "vscode",
+              severity: "ready",
+              label: "VS Code",
+              message: "VS Code is available for launch.",
+            },
+          ],
         },
         selectedContextId: "personal",
         selectionRequired: false,
@@ -69,6 +101,11 @@ test("adapter normalizes successful Wails calls", async () => {
           name: "Personal",
           editor: {type: "vscode"},
           providers: [],
+          confidence: {
+            contextId: "personal",
+            status: "ready",
+            checks: [],
+          },
         },
       };
     },
@@ -97,6 +134,11 @@ test("adapter normalizes successful Wails calls", async () => {
           name: "Personal",
           editor: {type: "vscode"},
           providers: [],
+          confidence: {
+            contextId: "personal",
+            status: "ready",
+            checks: [],
+          },
         },
       };
     },
@@ -120,6 +162,19 @@ test("adapter normalizes successful Wails calls", async () => {
               explanation: undefined,
             },
           ],
+          confidence: {
+            contextId: "personal",
+            status: "needs_attention",
+            checks: [
+              {
+                component: "codex",
+                severity: "needs_attention",
+                label: "Codex",
+                message: "Codex is not authenticated for this context.",
+                actionHint: "Sign in to Codex.",
+              },
+            ],
+          },
           metadata: {accent: "blue"},
         },
       ],
@@ -130,6 +185,26 @@ test("adapter normalizes successful Wails calls", async () => {
         dangling: false,
         missingContextId: undefined,
         recovery: undefined,
+      },
+      confidence: {
+        contextId: "personal",
+        status: "needs_attention",
+        checks: [
+          {
+            component: "codex",
+            severity: "needs_attention",
+            label: "Codex",
+            message: "Codex is not authenticated for this context.",
+            actionHint: "Sign in to Codex.",
+          },
+          {
+            component: "vscode",
+            severity: "ready",
+            label: "VS Code",
+            message: "VS Code is available for launch.",
+            actionHint: undefined,
+          },
+        ],
       },
       selectedContextId: "personal",
       selectionRequired: false,
@@ -172,6 +247,11 @@ test("adapter normalizes successful Wails calls", async () => {
         name: "Personal",
         editor: {type: "vscode"},
         providers: [],
+        confidence: {
+          contextId: "personal",
+          status: "ready",
+          checks: [],
+        },
         metadata: undefined,
       },
       warnings: [],
@@ -207,6 +287,11 @@ test("adapter normalizes successful Wails calls", async () => {
         name: "Personal",
         editor: {type: "vscode"},
         providers: [],
+        confidence: {
+          contextId: "personal",
+          status: "ready",
+          checks: [],
+        },
         metadata: undefined,
       },
     },
@@ -350,6 +435,7 @@ test("adapter unwraps tuple-shaped Wails responses", async () => {
         missingContextId: undefined,
         recovery: undefined,
       },
+      confidence: undefined,
       selectedContextId: undefined,
       selectionRequired: true,
       resolutionSource: undefined,

@@ -31,6 +31,7 @@ export interface LaunchState {
   project: ProjectState;
   contexts: ContextState[];
   binding: ProjectBindingState;
+  confidence?: LaunchConfidenceState;
   selectedContextId?: string;
   selectionRequired: boolean;
   resolutionSource?: string;
@@ -49,6 +50,7 @@ export interface ContextState {
   name: string;
   editor: EditorState;
   providers: ProviderState[];
+  confidence?: LaunchConfidenceState;
   metadata?: Record<string, string>;
 }
 
@@ -62,6 +64,24 @@ export interface ProviderState {
   enabled: boolean;
   state: string;
   explanation?: string;
+}
+
+export type LaunchConfidenceStatus = "ready" | "needs_attention" | "blocked";
+
+export type LaunchConfidenceCheckComponent = "claude" | "codex" | "vscode" | "isolation";
+
+export interface LaunchConfidenceState {
+  contextId: string;
+  status: LaunchConfidenceStatus;
+  checks: LaunchConfidenceCheck[];
+}
+
+export interface LaunchConfidenceCheck {
+  component: LaunchConfidenceCheckComponent;
+  severity: LaunchConfidenceStatus;
+  label: string;
+  message: string;
+  actionHint?: string;
 }
 
 export interface ProjectBindingState {
@@ -238,6 +258,7 @@ function normalizeLaunchState(value: unknown): LaunchState {
     project: normalizeProjectState(object.project),
     contexts: arrayValue(object.contexts).map(normalizeContextState),
     binding: normalizeProjectBindingState(object.binding),
+    confidence: normalizeLaunchConfidenceState(object.confidence),
     selectedContextId: optionalString(object.selectedContextId),
     selectionRequired: booleanValue(object.selectionRequired),
     resolutionSource: optionalString(object.resolutionSource),
@@ -245,6 +266,53 @@ function normalizeLaunchState(value: unknown): LaunchState {
     firstRun: booleanValue(object.firstRun),
     providerCredentialSessions: arrayValue(object.providerCredentialSessions).map(normalizeProviderCredentialSession),
   };
+}
+
+function normalizeLaunchConfidenceState(value: unknown): LaunchConfidenceState | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const object = objectValue(value);
+  return {
+    contextId: stringValue(object.contextId),
+    status: normalizeLaunchConfidenceStatus(object.status),
+    checks: arrayValue(object.checks).map(normalizeLaunchConfidenceCheck),
+  };
+}
+
+function normalizeLaunchConfidenceCheck(value: unknown): LaunchConfidenceCheck {
+  const object = objectValue(value);
+  return {
+    component: normalizeLaunchConfidenceCheckComponent(object.component),
+    severity: normalizeLaunchConfidenceStatus(object.severity),
+    label: stringValue(object.label),
+    message: stringValue(object.message),
+    actionHint: optionalString(object.actionHint),
+  };
+}
+
+function normalizeLaunchConfidenceStatus(value: unknown): LaunchConfidenceStatus {
+  switch (value) {
+    case "ready":
+    case "needs_attention":
+    case "blocked":
+      return value;
+    default:
+      throw new Error("Invalid Dev Context response.");
+  }
+}
+
+function normalizeLaunchConfidenceCheckComponent(value: unknown): LaunchConfidenceCheckComponent {
+  switch (value) {
+    case "claude":
+    case "codex":
+    case "vscode":
+    case "isolation":
+      return value;
+    default:
+      throw new Error("Invalid Dev Context response.");
+  }
 }
 
 function normalizeLaunchProjectResult(value: unknown): LaunchProjectResult {
@@ -278,6 +346,7 @@ function normalizeContextState(value: unknown): ContextState {
     name: stringValue(object.name),
     editor: normalizeEditorState(object.editor),
     providers: arrayValue(object.providers).map(normalizeProviderState),
+    confidence: normalizeLaunchConfidenceState(object.confidence),
     metadata: optionalStringRecord(object.metadata),
   };
 }

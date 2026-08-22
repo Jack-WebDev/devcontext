@@ -11,6 +11,7 @@ type LaunchState struct {
 	Project                    ProjectState                     `json:"project"`
 	Contexts                   []ContextState                   `json:"contexts"`
 	Binding                    ProjectBindingState              `json:"binding"`
+	Confidence                 *LaunchConfidenceState           `json:"confidence,omitempty"`
 	SelectedContextID          string                           `json:"selectedContextId,omitempty"`
 	SelectionRequired          bool                             `json:"selectionRequired"`
 	ResolutionSource           string                           `json:"resolutionSource,omitempty"`
@@ -28,11 +29,12 @@ type ProjectState struct {
 // ContextState is the presentation-safe identity and readiness summary for one
 // configured context.
 type ContextState struct {
-	ID        string            `json:"id"`
-	Name      string            `json:"name"`
-	Editor    EditorState       `json:"editor"`
-	Providers []ProviderState   `json:"providers"`
-	Metadata  map[string]string `json:"metadata,omitempty"`
+	ID         string                `json:"id"`
+	Name       string                `json:"name"`
+	Editor     EditorState           `json:"editor"`
+	Providers  []ProviderState       `json:"providers"`
+	Confidence LaunchConfidenceState `json:"confidence"`
+	Metadata   map[string]string     `json:"metadata,omitempty"`
 }
 
 // EditorState describes the editor selected by a context without exposing
@@ -49,6 +51,14 @@ type ProviderState struct {
 	Enabled     bool   `json:"enabled"`
 	State       string `json:"state"`
 	Explanation string `json:"explanation,omitempty"`
+}
+
+// LaunchConfidenceState summarizes backend-owned launch readiness for the
+// selected or recommended context.
+type LaunchConfidenceState struct {
+	ContextID string                  `json:"contextId"`
+	Status    LaunchConfidenceStatus  `json:"status"`
+	Checks    []LaunchConfidenceCheck `json:"checks"`
 }
 
 // ProjectBindingState describes the current remembered context for a project.
