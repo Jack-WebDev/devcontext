@@ -272,15 +272,15 @@ test("context card renders as a selectable control when wired", () => {
 
 test("context card renders enabled provider status variants with accessible names", () => {
   const context = contextFixture("personal", "Personal", [
-    providerFixture("claude-configured", "Claude", true, "configured"),
+    providerFixture("claude-ready", "Claude", true, "ready"),
     providerFixture("codex-not-configured", "Codex", true, "not_configured", "Codex isolated provider state was not found"),
     providerFixture("claude-missing", "Claude", true, "directory_missing", "Claude context directory is missing"),
     providerFixture("codex-unavailable", "Codex", true, "unavailable", "Codex context directory could not be inspected"),
-    providerFixture("disabled", "Disabled Provider", false, "configured"),
+    providerFixture("disabled", "Disabled Provider", false, "ready"),
   ]);
   const html = renderToStaticMarkup(ContextCard({context}));
 
-  assert.match(html, /Claude local status: Configured/);
+  assert.match(html, /Claude local status: Ready/);
   assert.match(html, /Codex local status: Not configured/);
   assert.match(html, /Claude local status: Directory missing/);
   assert.match(html, /Codex local status: Unavailable/);
@@ -291,10 +291,10 @@ test("context card renders enabled provider status variants with accessible name
 test("context card attaches authentication guidance to not configured Claude and Codex providers", () => {
   const personal = contextFixture("personal", "Personal", [
     providerFixture("codex", "Codex", true, "not_configured", "Codex isolated provider state was not found"),
-    providerFixture("claude", "Claude", true, "configured"),
+    providerFixture("claude", "Claude", true, "ready"),
   ]);
   const company = contextFixture("company", "Company", [
-    providerFixture("codex", "Codex", true, "configured"),
+    providerFixture("codex", "Codex", true, "ready"),
     providerFixture("internal", "Internal Tool", true, "not_configured"),
   ]);
   const html = [
@@ -989,6 +989,9 @@ function providerFixture(id, name, enabled, state, explanation) {
     enabled,
     state,
     explanation,
+    identity: enabled && state === "ready"
+      ? {status: "unavailable", message: "Account identity unavailable."}
+      : {status: "none"},
   };
 }
 

@@ -62,7 +62,16 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 		contextState.Name != "Personal" ||
 		contextState.Editor != (EditorState{Type: string(editor.TypeVSCode)}) ||
 		!reflect.DeepEqual(contextState.Providers, []ProviderState{
-			{ID: "fake", Name: "Fake Provider", Enabled: true, State: string(provider.StatusReady)},
+			{
+				ID:      "fake",
+				Name:    "Fake Provider",
+				Enabled: true,
+				State:   ProviderReadinessReady,
+				Identity: ProviderIdentityState{
+					Status:  ProviderIdentityUnavailable,
+					Message: "Account identity unavailable.",
+				},
+			},
 		}) ||
 		!reflect.DeepEqual(contextState.Metadata, map[string]string{"accent": "blue"}) {
 		t.Fatalf("context state = %#v, want personal context identity/readiness", contextState)
@@ -318,11 +327,126 @@ func TestGetLaunchStateReportsMissingProviderStatus(t *testing.T) {
 		ID:          "fake",
 		Name:        "Fake Provider",
 		Enabled:     true,
-		State:       string(provider.StatusUnavailable),
+		State:       ProviderReadinessUnavailable,
 		Explanation: "Fake Provider command was not found",
+		Identity: ProviderIdentityState{
+			Status:  ProviderIdentityUnavailable,
+			Message: "Account identity unavailable.",
+		},
 	}
 	if got != want {
 		t.Fatalf("provider status = %#v, want %#v", got, want)
+	}
+}
+
+func TestGetLaunchStateNormalizesProviderReadinessForUI(t *testing.T) {
+	tests := []struct {
+		name   string
+		status provider.Status
+		want   ProviderReadinessState
+	}{
+		{
+			name:   "configured maps to ready",
+			status: provider.ConfiguredStatus(),
+			want:   ProviderReadinessReady,
+		},
+		{
+			name:   "not configured",
+			status: provider.NotConfiguredStatus("missing"),
+			want:   ProviderReadinessNotConfigured,
+		},
+		{
+			name:   "directory missing",
+			status: provider.DirectoryMissingStatus("missing directory"),
+			want:   ProviderReadinessDirectoryMissing,
+		},
+		{
+			name:   "unavailable",
+			status: provider.UnavailableStatus("unavailable"),
+			want:   ProviderReadinessUnavailable,
+		},
+		{
+			name:   "unknown falls back to unavailable",
+			status: provider.Status{State: "configured_but_unknown"},
+			want:   ProviderReadinessUnavailable,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newApplicationFixture(t)
+			fixture.provider.statusByContext = map[string]provider.Status{
+				"personal": tt.status,
+			}
+			fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+			state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+			if appErr != nil {
+				t.Fatalf("get launch state: %v", appErr)
+			}
+
+			if got := state.Contexts[0].Providers[0].State; got != tt.want {
+				t.Fatalf("provider state = %q, want %q", got, tt.want)
+			}
+			if !state.Contexts[0].Providers[0].State.Valid() {
+				t.Fatalf("provider state is invalid: %q", state.Contexts[0].Providers[0].State)
+			}
+		})
+	}
+}
+
+func TestGetLaunchStateReturnsProviderIdentityContract(t *testing.T) {
+	tests := []struct {
+		name    string
+		enabled bool
+		status  provider.Status
+		want    ProviderIdentityState
+	}{
+		{
+			name:    "configured provider identity unavailable until verified",
+			enabled: true,
+			status:  provider.ConfiguredStatus(),
+			want: ProviderIdentityState{
+				Status:  ProviderIdentityUnavailable,
+				Message: "Account identity unavailable.",
+			},
+		},
+		{
+			name:    "not configured provider has no identity",
+			enabled: true,
+			status:  provider.NotConfiguredStatus("missing"),
+			want:    ProviderIdentityState{Status: ProviderIdentityNone},
+		},
+		{
+			name:    "disabled provider has no identity",
+			enabled: false,
+			status:  provider.ConfiguredStatus(),
+			want:    ProviderIdentityState{Status: ProviderIdentityNone},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newApplicationFixture(t)
+			fixture.provider.statusByContext = map[string]provider.Status{
+				"personal": tt.status,
+			}
+			ctx := fixture.context("personal", "Personal")
+			ctx.Providers["fake"] = provider.Config{Enabled: tt.enabled}
+			fixture.writeContext(t, ctx)
+
+			state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+			if appErr != nil {
+				t.Fatalf("get launch state: %v", appErr)
+			}
+
+			if got := state.Contexts[0].Providers[0].Identity; !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("provider identity = %#v, want %#v", got, tt.want)
+			}
+			if !state.Contexts[0].Providers[0].Identity.Status.Valid() {
+				t.Fatalf("provider identity status is invalid: %q", state.Contexts[0].Providers[0].Identity.Status)
+			}
+		})
 	}
 }
 

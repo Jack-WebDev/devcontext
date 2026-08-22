@@ -46,11 +46,99 @@ type EditorState struct {
 // ProviderState describes one provider's participation and local readiness for
 // a context.
 type ProviderState struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Enabled     bool   `json:"enabled"`
-	State       string `json:"state"`
-	Explanation string `json:"explanation,omitempty"`
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Enabled     bool                   `json:"enabled"`
+	State       ProviderReadinessState `json:"state"`
+	Explanation string                 `json:"explanation,omitempty"`
+	Identity    ProviderIdentityState  `json:"identity"`
+}
+
+// ProviderReadinessState is the UI-facing provider readiness vocabulary.
+// It intentionally maps core provider.StatusConfigured to ready so API
+// consumers do not need to understand storage-oriented provider wording.
+type ProviderReadinessState string
+
+const (
+	// ProviderReadinessReady means the provider has local state for this
+	// context.
+	ProviderReadinessReady ProviderReadinessState = "ready"
+
+	// ProviderReadinessNotConfigured means provider storage exists but does not
+	// appear initialized.
+	ProviderReadinessNotConfigured ProviderReadinessState = "not_configured"
+
+	// ProviderReadinessDirectoryMissing means context-owned provider storage is
+	// absent.
+	ProviderReadinessDirectoryMissing ProviderReadinessState = "directory_missing"
+
+	// ProviderReadinessUnavailable means local readiness could not be
+	// determined.
+	ProviderReadinessUnavailable ProviderReadinessState = "unavailable"
+)
+
+// Valid reports whether state is one of the bounded API provider readiness
+// states.
+func (s ProviderReadinessState) Valid() bool {
+	switch s {
+	case ProviderReadinessReady, ProviderReadinessNotConfigured, ProviderReadinessDirectoryMissing, ProviderReadinessUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// ProviderIdentityStatus identifies whether provider account identity is safe
+// to display.
+type ProviderIdentityStatus string
+
+const (
+	// ProviderIdentityVerified means identity metadata was verified from local
+	// provider state and is safe to display.
+	ProviderIdentityVerified ProviderIdentityStatus = "verified"
+
+	// ProviderIdentityUnavailable means provider state exists, but account
+	// identity could not be verified.
+	ProviderIdentityUnavailable ProviderIdentityStatus = "unavailable"
+
+	// ProviderIdentityNone means no provider account identity is present for
+	// this context.
+	ProviderIdentityNone ProviderIdentityStatus = "none"
+)
+
+// Valid reports whether status is one of the bounded API provider identity
+// states.
+func (s ProviderIdentityStatus) Valid() bool {
+	switch s {
+	case ProviderIdentityVerified, ProviderIdentityUnavailable, ProviderIdentityNone:
+		return true
+	default:
+		return false
+	}
+}
+
+// ProviderIdentityState contains only safe provider account identity metadata.
+// Verified provider-specific fields are added by provider extraction phases;
+// until then, the status tells the UI not to guess.
+type ProviderIdentityState struct {
+	Status  ProviderIdentityStatus       `json:"status"`
+	Message string                       `json:"message,omitempty"`
+	Codex   *CodexProviderIdentityState  `json:"codex,omitempty"`
+	Claude  *ClaudeProviderIdentityState `json:"claude,omitempty"`
+}
+
+// CodexProviderIdentityState is safe verified Codex identity metadata.
+type CodexProviderIdentityState struct {
+	Email            string `json:"email,omitempty"`
+	ChatGPTPlanType  string `json:"chatgptPlanType,omitempty"`
+	ChatGPTAccountID string `json:"chatgptAccountId,omitempty"`
+}
+
+// ClaudeProviderIdentityState is safe verified Claude identity metadata.
+type ClaudeProviderIdentityState struct {
+	SubscriptionType string `json:"subscriptionType,omitempty"`
+	OrganizationUUID string `json:"organizationUuid,omitempty"`
+	OrganizationName string `json:"organizationName,omitempty"`
 }
 
 // LaunchConfidenceState summarizes backend-owned launch readiness for the
