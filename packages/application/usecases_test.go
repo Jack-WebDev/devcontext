@@ -54,17 +54,22 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	if state.ResolutionSource != string(launcher.ResolutionSourceProjectBinding) {
 		t.Fatalf("resolution source = %q, want project binding", state.ResolutionSource)
 	}
-	assertContextStates(t, state.Contexts, []ContextState{
-		{
-			ID:     "personal",
-			Name:   "Personal",
-			Editor: EditorState{Type: string(editor.TypeVSCode)},
-			Providers: []ProviderState{
-				{ID: "fake", Name: "Fake Provider", Enabled: true, State: string(provider.StatusReady)},
-			},
-			Metadata: map[string]string{"accent": "blue"},
-		},
-	})
+	if len(state.Contexts) != 1 {
+		t.Fatalf("context count = %d, want 1", len(state.Contexts))
+	}
+	contextState := state.Contexts[0]
+	if contextState.ID != "personal" ||
+		contextState.Name != "Personal" ||
+		contextState.Editor != (EditorState{Type: string(editor.TypeVSCode)}) ||
+		!reflect.DeepEqual(contextState.Providers, []ProviderState{
+			{ID: "fake", Name: "Fake Provider", Enabled: true, State: string(provider.StatusReady)},
+		}) ||
+		!reflect.DeepEqual(contextState.Metadata, map[string]string{"accent": "blue"}) {
+		t.Fatalf("context state = %#v, want personal context identity/readiness", contextState)
+	}
+	if contextState.Confidence.ContextID != "personal" {
+		t.Fatalf("context confidence = %#v, want personal confidence", contextState.Confidence)
+	}
 }
 
 func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
@@ -138,6 +143,98 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 	}
 	if !reflect.DeepEqual(state.Confidence.Checks, wantChecks) {
 		t.Fatalf("confidence checks = %#v, want %#v", state.Confidence.Checks, wantChecks)
+	}
+}
+
+func TestGetLaunchStateReturnsPerContextConfidenceSummaries(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.provider = &applicationFakeProvider{
+		id:          provider.CodexID,
+		displayName: "Codex",
+		statusByContext: map[string]provider.Status{
+			"company":  provider.ConfiguredStatus(),
+			"personal": provider.NotConfiguredStatus("Codex is not authenticated."),
+		},
+	}
+	fixture.editor.executable = "/fixture/code"
+	company := fixture.context("company", "Company")
+	company.Providers = provider.Configs{
+		provider.CodexID: {Enabled: true},
+	}
+	personal := fixture.context("personal", "Personal")
+	personal.Providers = provider.Configs{
+		provider.CodexID: {Enabled: true},
+	}
+	fixture.writeContext(t, company)
+	fixture.writeContext(t, personal)
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+	if state.Confidence != nil {
+		t.Fatalf("top-level confidence = %#v, want nil while selection is required", state.Confidence)
+	}
+	if len(state.Contexts) != 2 {
+		t.Fatalf("context count = %d, want 2", len(state.Contexts))
+	}
+
+	confidenceByContext := map[string]LaunchConfidenceState{}
+	for _, contextState := range state.Contexts {
+		confidenceByContext[contextState.ID] = contextState.Confidence
+	}
+
+	if got := confidenceByContext["company"]; got.ContextID != "company" || got.Status != LaunchConfidenceBlocked {
+		t.Fatalf("company confidence = %#v, want company blocked by missing VS Code profile", got)
+	}
+	if got := confidenceByContext["personal"]; got.ContextID != "personal" || got.Status != LaunchConfidenceBlocked {
+		t.Fatalf("personal confidence = %#v, want personal blocked by missing VS Code profile", got)
+	}
+	assertConfidenceCheck(t, confidenceByContext["company"].Checks, LaunchConfidenceCheck{
+		Component: LaunchConfidenceCheckCodex,
+		Severity:  LaunchConfidenceReady,
+		Label:     "Codex",
+		Message:   "Codex is ready for this context.",
+	})
+	assertConfidenceCheck(t, confidenceByContext["personal"].Checks, LaunchConfidenceCheck{
+		Component:  LaunchConfidenceCheckCodex,
+		Severity:   LaunchConfidenceNeedsAttention,
+		Label:      "Codex",
+		Message:    "Codex is not authenticated.",
+		ActionHint: "Open and configure Codex for this context.",
+	})
+}
+
+func TestGetLaunchStateTopLevelConfidenceMatchesSelectedContextSummary(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.provider = &applicationFakeProvider{
+		id:          provider.CodexID,
+		displayName: "Codex",
+		statusByContext: map[string]provider.Status{
+			"personal": provider.NotConfiguredStatus("Codex is not authenticated."),
+		},
+	}
+	fixture.editor.executable = "/fixture/code"
+	ctx := fixture.context("personal", "Personal")
+	ctx.Providers = provider.Configs{
+		provider.CodexID: {Enabled: true},
+	}
+	fixture.writeContext(t, ctx)
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.projectDir),
+		ContextID:   devcontext.MustID("personal"),
+		CreatedAt:   fixture.now,
+	})
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+	if state.Confidence == nil {
+		t.Fatal("top-level confidence = nil, want selected context confidence")
+	}
+	if !reflect.DeepEqual(*state.Confidence, state.Contexts[0].Confidence) {
+		t.Fatalf("top-level confidence = %#v, want context confidence %#v", *state.Confidence, state.Contexts[0].Confidence)
 	}
 }
 
@@ -620,6 +717,17 @@ func assertContextStates(t *testing.T, got []ContextState, want []ContextState) 
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("contexts = %#v, want %#v", got, want)
 	}
+}
+
+func assertConfidenceCheck(t *testing.T, checks []LaunchConfidenceCheck, want LaunchConfidenceCheck) {
+	t.Helper()
+
+	for _, check := range checks {
+		if check == want {
+			return
+		}
+	}
+	t.Fatalf("checks = %#v, want containing %#v", checks, want)
 }
 
 func assertFirstRunState(t *testing.T, state LaunchState, projectDir string) {

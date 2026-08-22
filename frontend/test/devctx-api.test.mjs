@@ -23,6 +23,19 @@ test("adapter normalizes successful Wails calls", async () => {
                 state: "configured",
               },
             ],
+            confidence: {
+              contextId: "personal",
+              status: "needs_attention",
+              checks: [
+                {
+                  component: "codex",
+                  severity: "needs_attention",
+                  label: "Codex",
+                  message: "Codex is not authenticated for this context.",
+                  actionHint: "Sign in to Codex.",
+                },
+              ],
+            },
             metadata: {accent: "blue"},
           },
         ],
@@ -88,6 +101,11 @@ test("adapter normalizes successful Wails calls", async () => {
           name: "Personal",
           editor: {type: "vscode"},
           providers: [],
+          confidence: {
+            contextId: "personal",
+            status: "ready",
+            checks: [],
+          },
         },
       };
     },
@@ -116,6 +134,11 @@ test("adapter normalizes successful Wails calls", async () => {
           name: "Personal",
           editor: {type: "vscode"},
           providers: [],
+          confidence: {
+            contextId: "personal",
+            status: "ready",
+            checks: [],
+          },
         },
       };
     },
@@ -139,6 +162,19 @@ test("adapter normalizes successful Wails calls", async () => {
               explanation: undefined,
             },
           ],
+          confidence: {
+            contextId: "personal",
+            status: "needs_attention",
+            checks: [
+              {
+                component: "codex",
+                severity: "needs_attention",
+                label: "Codex",
+                message: "Codex is not authenticated for this context.",
+                actionHint: "Sign in to Codex.",
+              },
+            ],
+          },
           metadata: {accent: "blue"},
         },
       ],
@@ -211,6 +247,11 @@ test("adapter normalizes successful Wails calls", async () => {
         name: "Personal",
         editor: {type: "vscode"},
         providers: [],
+        confidence: {
+          contextId: "personal",
+          status: "ready",
+          checks: [],
+        },
         metadata: undefined,
       },
       warnings: [],
@@ -246,6 +287,11 @@ test("adapter normalizes successful Wails calls", async () => {
         name: "Personal",
         editor: {type: "vscode"},
         providers: [],
+        confidence: {
+          contextId: "personal",
+          status: "ready",
+          checks: [],
+        },
         metadata: undefined,
       },
     },

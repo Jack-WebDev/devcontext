@@ -271,12 +271,14 @@ func (s *Service) contextStates(contexts []devcontext.Context) []ContextState {
 }
 
 func (s *Service) contextState(ctx devcontext.Context) ContextState {
+	providerEntries := s.providerStateEntries(ctx)
 	return ContextState{
-		ID:        ctx.ID.String(),
-		Name:      ctx.Name,
-		Editor:    EditorState{Type: string(ctx.Editor.Type)},
-		Providers: providerStatesFromEntries(s.providerStateEntries(ctx)),
-		Metadata:  cloneMetadata(ctx.Metadata),
+		ID:         ctx.ID.String(),
+		Name:       ctx.Name,
+		Editor:     EditorState{Type: string(ctx.Editor.Type)},
+		Providers:  providerStatesFromEntries(providerEntries),
+		Confidence: s.launchConfidenceStateForContext(ctx, providerEntries),
+		Metadata:   cloneMetadata(ctx.Metadata),
 	}
 }
 
@@ -391,9 +393,13 @@ func (s *Service) launchConfidenceState(ctx *devcontext.Context) *LaunchConfiden
 	if ctx == nil {
 		return nil
 	}
+	confidence := s.launchConfidenceStateForContext(*ctx, s.providerStateEntries(*ctx))
+	return &confidence
+}
 
+func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, providerEntries []providerStateEntry) LaunchConfidenceState {
 	checks := make([]LaunchConfidenceCheck, 0)
-	for _, entry := range s.providerStateEntries(*ctx) {
+	for _, entry := range providerEntries {
 		if !entry.state.Enabled {
 			continue
 		}
@@ -419,7 +425,7 @@ func (s *Service) launchConfidenceState(ctx *devcontext.Context) *LaunchConfiden
 		checks = append(checks, launcher.IsolationConfidenceChecks(contextPaths)...)
 	}
 
-	return &LaunchConfidenceState{
+	return LaunchConfidenceState{
 		ContextID: ctx.ID.String(),
 		Status:    launchConfidenceStatus(checks),
 		Checks:    checks,

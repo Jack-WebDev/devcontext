@@ -29,11 +29,12 @@ type ProjectState struct {
 // ContextState is the presentation-safe identity and readiness summary for one
 // configured context.
 type ContextState struct {
-	ID        string            `json:"id"`
-	Name      string            `json:"name"`
-	Editor    EditorState       `json:"editor"`
-	Providers []ProviderState   `json:"providers"`
-	Metadata  map[string]string `json:"metadata,omitempty"`
+	ID         string                `json:"id"`
+	Name       string                `json:"name"`
+	Editor     EditorState           `json:"editor"`
+	Providers  []ProviderState       `json:"providers"`
+	Confidence LaunchConfidenceState `json:"confidence"`
+	Metadata   map[string]string     `json:"metadata,omitempty"`
 }
 
 // EditorState describes the editor selected by a context without exposing

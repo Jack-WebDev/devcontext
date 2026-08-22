@@ -50,6 +50,7 @@ export interface ContextState {
   name: string;
   editor: EditorState;
   providers: ProviderState[];
+  confidence?: LaunchConfidenceState;
   metadata?: Record<string, string>;
 }
 
@@ -345,6 +346,7 @@ function normalizeContextState(value: unknown): ContextState {
     name: stringValue(object.name),
     editor: normalizeEditorState(object.editor),
     providers: arrayValue(object.providers).map(normalizeProviderState),
+    confidence: normalizeLaunchConfidenceState(object.confidence),
     metadata: optionalStringRecord(object.metadata),
   };
 }
