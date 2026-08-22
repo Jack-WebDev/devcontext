@@ -43,6 +43,7 @@
 `devctx` is a **local development identity launcher**.
 
 Instead of opening a project directly:
+Instead of opening a project directly:
 
 ```bash
 code .
@@ -54,6 +55,7 @@ open it through Dev Context:
 devctx .
 ```
 
+Dev Context asks **which development identity you want to use**, prepares an isolated environment for that identity, and then launches your coding tool.
 Dev Context asks **which development identity you want to use**, prepares an isolated environment for that identity, and then launches your coding tool.
 
 ```text
@@ -370,6 +372,7 @@ devctx_<version>_windows_amd64_installer.exe
 ```
 
 Run the installer and verify:
+Run the installer and verify:
 
 ```bash
 devctx --version
@@ -412,17 +415,20 @@ devctx_<version>_linux_amd64.tar.gz
 ```
 
 Extract:
+Extract:
 
 ```bash
 tar -xzf devctx_<version>_linux_amd64.tar.gz
 ```
 
 Move the executable onto your `PATH`:
+Move the executable onto your `PATH`:
 
 ```bash
 sudo mv devctx /usr/local/bin/devctx
 ```
 
+Verify:
 Verify:
 
 ```bash
@@ -480,8 +486,16 @@ Contexts are stored locally under the Dev Context home directory:
     │   └── providers/
     │       ├── claude/
     │       └── codex/
+    │   ├── context.toml
+    │   └── providers/
+    │       ├── claude/
+    │       └── codex/
     │
     └── company/
+        ├── context.toml
+        └── providers/
+            ├── claude/
+            └── codex/
         ├── context.toml
         └── providers/
             ├── claude/
