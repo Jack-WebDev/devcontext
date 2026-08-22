@@ -156,7 +156,7 @@ func TestNewServiceWithDependenciesUsesFakesWithoutWails(t *testing.T) {
 		Contexts:          contexts,
 		Projects:          projects,
 		Paths:             paths,
-		Providers:         []provider.Provider{fakeProvider},
+		ProviderRegistry:  provider.MustNewRegistry([]provider.Provider{fakeProvider}),
 		Editor:            fakeEditor,
 		ProcessLauncher:   fakeLauncher,
 		ParentEnvironment: []string{"PATH=/fixture/bin"},
@@ -171,8 +171,8 @@ func TestNewServiceWithDependenciesUsesFakesWithoutWails(t *testing.T) {
 	if builder.Editor != fakeEditor {
 		t.Fatalf("builder editor = %#v, want fake editor", builder.Editor)
 	}
-	if !reflect.DeepEqual(builder.Providers, []provider.Provider{fakeProvider}) {
-		t.Fatalf("builder providers = %#v, want fake provider", builder.Providers)
+	if !reflect.DeepEqual(builder.ProviderRegistry.All(), []provider.Provider{fakeProvider}) {
+		t.Fatalf("builder providers = %#v, want fake provider", builder.ProviderRegistry.All())
 	}
 	if service.processLauncher() != fakeLauncher {
 		t.Fatalf("process launcher = %#v, want fake launcher", service.processLauncher())

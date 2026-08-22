@@ -47,7 +47,7 @@ type Runner struct {
 	Projects           project.Repository
 	WorkingDirectory   string
 	Paths              filesystem.PlatformPaths
-	Providers          []provider.Provider
+	ProviderRegistry   provider.Registry
 	Editor             editor.Editor
 	ProcessLauncher    launcher.ProcessLauncher
 	ParentEnvironment  []string
@@ -100,7 +100,7 @@ func (r Runner) runRootLaunch(command RootLaunchCommand) Result {
 	builder := launcher.LaunchPlanBuilder{
 		Resolver:          launcher.NewResolver(r.Contexts, r.Projects),
 		PlatformPaths:     paths,
-		Providers:         r.providers(),
+		ProviderRegistry:  r.providerRegistry(),
 		Editor:            r.editor(),
 		ParentEnvironment: r.parentEnvironment(),
 	}
@@ -151,7 +151,7 @@ func (r Runner) runContext(command ContextCommand) Result {
 		if err != nil {
 			return r.errorResult(err)
 		}
-		ctx, err := devcontext.DefaultContextForID(contextID, r.now())
+		ctx, err := devcontext.DefaultContextForIDWithProviderRegistry(contextID, r.now(), r.providerRegistry())
 		if err != nil {
 			return r.errorResult(err)
 		}
@@ -227,14 +227,11 @@ func (r Runner) paths() filesystem.PlatformPaths {
 	return filesystem.NewDefaultPlatformPaths()
 }
 
-func (r Runner) providers() []provider.Provider {
-	if r.Providers != nil {
-		return r.Providers
+func (r Runner) providerRegistry() provider.Registry {
+	if !r.ProviderRegistry.IsZero() {
+		return r.ProviderRegistry
 	}
-	return []provider.Provider{
-		provider.ClaudeProvider{},
-		provider.CodexProvider{},
-	}
+	return provider.DefaultRegistry()
 }
 
 func (r Runner) editor() editor.Editor {

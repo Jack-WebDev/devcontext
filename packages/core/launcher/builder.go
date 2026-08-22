@@ -40,7 +40,7 @@ type ContextResolver interface {
 type LaunchPlanBuilder struct {
 	Resolver          ContextResolver
 	PlatformPaths     filesystem.PlatformPaths
-	Providers         []provider.Provider
+	ProviderRegistry  provider.Registry
 	Editor            editor.Editor
 	ParentEnvironment []string
 }
@@ -120,12 +120,10 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 }
 
 func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, paths filesystem.ContextPaths) ([]provider.EnvironmentContribution, []provider.ID, error) {
-	knownProviderIDs := make(map[provider.ID]struct{}, len(b.Providers))
-	contributions := make([]provider.EnvironmentContribution, 0, len(b.Providers))
-	for _, integration := range b.Providers {
-		if integration == nil {
-			continue
-		}
+	providers := b.ProviderRegistry.All()
+	knownProviderIDs := make(map[provider.ID]struct{}, len(providers))
+	contributions := make([]provider.EnvironmentContribution, 0, len(providers))
+	for _, integration := range providers {
 		providerID := integration.ID()
 		knownProviderIDs[providerID] = struct{}{}
 

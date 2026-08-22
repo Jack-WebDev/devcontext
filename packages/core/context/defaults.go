@@ -15,36 +15,51 @@ const (
 
 // DefaultPersonalContext returns the built-in Personal context seed.
 func DefaultPersonalContext(createdAt time.Time) Context {
-	return defaultContextSeed(MustID(personalContextID), "Personal", createdAt)
+	return DefaultPersonalContextWithProviderRegistry(createdAt, provider.DefaultRegistry())
 }
 
 // DefaultCompanyContext returns the built-in Company context seed.
 func DefaultCompanyContext(createdAt time.Time) Context {
-	return defaultContextSeed(MustID(companyContextID), "Company", createdAt)
+	return DefaultCompanyContextWithProviderRegistry(createdAt, provider.DefaultRegistry())
+}
+
+// DefaultPersonalContextWithProviderRegistry returns the built-in Personal
+// context seed using the registry's default-enabled providers.
+func DefaultPersonalContextWithProviderRegistry(createdAt time.Time, registry provider.Registry) Context {
+	return defaultContextSeed(MustID(personalContextID), "Personal", createdAt, registry)
+}
+
+// DefaultCompanyContextWithProviderRegistry returns the built-in Company
+// context seed using the registry's default-enabled providers.
+func DefaultCompanyContextWithProviderRegistry(createdAt time.Time, registry provider.Registry) Context {
+	return defaultContextSeed(MustID(companyContextID), "Company", createdAt, registry)
 }
 
 // DefaultContextForID returns the built-in context seed for a supported default
 // context ID.
 func DefaultContextForID(id ID, createdAt time.Time) (Context, error) {
+	return DefaultContextForIDWithProviderRegistry(id, createdAt, provider.DefaultRegistry())
+}
+
+// DefaultContextForIDWithProviderRegistry returns the built-in context seed for
+// a supported default context ID using the registry's default-enabled providers.
+func DefaultContextForIDWithProviderRegistry(id ID, createdAt time.Time, registry provider.Registry) (Context, error) {
 	switch id.String() {
 	case personalContextID:
-		return DefaultPersonalContext(createdAt), nil
+		return DefaultPersonalContextWithProviderRegistry(createdAt, registry), nil
 	case companyContextID:
-		return DefaultCompanyContext(createdAt), nil
+		return DefaultCompanyContextWithProviderRegistry(createdAt, registry), nil
 	default:
 		return Context{}, fmt.Errorf("%w: unsupported default context %q", ErrContextNotFound, id.String())
 	}
 }
 
-func defaultContextSeed(id ID, name string, createdAt time.Time) Context {
+func defaultContextSeed(id ID, name string, createdAt time.Time, registry provider.Registry) Context {
 	return Context{
-		ID:     id,
-		Name:   name,
-		Editor: editor.DefaultConfig(),
-		Providers: provider.Configs{
-			provider.ClaudeID: {Enabled: true},
-			provider.CodexID:  {Enabled: true},
-		},
+		ID:        id,
+		Name:      name,
+		Editor:    editor.DefaultConfig(),
+		Providers: registry.DefaultConfigs(),
 		CreatedAt: createdAt.UTC(),
 	}
 }
