@@ -25,6 +25,7 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 		Providers: provider.Configs{
 			"fake":     {Enabled: true},
 			"disabled": {Enabled: false},
+			"missing":  {Enabled: true},
 		},
 		CreatedAt: time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC),
 	}
@@ -96,6 +97,9 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 		ContextPaths:     contextPaths,
 		Warnings:         warnings,
 		ResolutionSource: launcher.ResolutionSourceExplicit,
+		MissingProviderIDs: []provider.ID{
+			"missing",
+		},
 	}
 	if !reflect.DeepEqual(plan, want) {
 		t.Fatalf("plan = %#v, want %#v", plan, want)

@@ -738,7 +738,11 @@ func (f runnerFixture) writeContext(t *testing.T, ctx devcontext.Context) {
 		t.Fatalf("derive context paths: %v", err)
 	}
 	contextPaths = contextPaths.WithProviderStorageDirs(cliEnabledProviderIDs(ctx))
-	dirs := []string{contextPaths.RootDir}
+	dirs := []string{
+		contextPaths.RootDir,
+		contextPaths.VSCodeDir,
+		contextPaths.VSCodeUserDataDir,
+	}
 	for _, dir := range contextPaths.ProviderStorageDirs {
 		dirs = append(dirs, dir)
 	}

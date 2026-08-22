@@ -73,12 +73,13 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 	if err != nil {
 		return LaunchPlan{}, err
 	}
-	contextPaths = contextPaths.WithProviderStorageDirs(enabledProviderIDs(*resolution.Context))
-	if err := filesystem.ValidateContextDirectoryTree(contextPaths); err != nil {
+	providerRegistry := b.providerRegistry()
+	contextPaths = contextPaths.WithProviderStorageDirs(registeredEnabledProviderIDs(*resolution.Context, providerRegistry))
+	if err := filesystem.ValidateContextDirectoryTreeWithProviderRegistry(contextPaths, *resolution.Context, providerRegistry); err != nil {
 		return LaunchPlan{}, err
 	}
 
-	contributions, missingProviderIDs, err := b.providerContributions(*resolution.Context, contextPaths)
+	contributions, missingProviderIDs, err := b.providerContributions(*resolution.Context, contextPaths, providerRegistry)
 	if err != nil {
 		return LaunchPlan{}, err
 	}
@@ -120,8 +121,8 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 	}, nil
 }
 
-func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, paths filesystem.ContextPaths) ([]provider.EnvironmentContribution, []provider.ID, error) {
-	providers := b.ProviderRegistry.All()
+func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, paths filesystem.ContextPaths, registry provider.Registry) ([]provider.EnvironmentContribution, []provider.ID, error) {
+	providers := registry.All()
 	knownProviderIDs := make(map[provider.ID]struct{}, len(providers))
 	contributions := make([]provider.EnvironmentContribution, 0, len(providers))
 	for _, integration := range providers {
@@ -166,16 +167,21 @@ func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, 
 	return contributions, missingProviderIDs, nil
 }
 
-func enabledProviderIDs(ctx devcontext.Context) []provider.ID {
+func (b LaunchPlanBuilder) providerRegistry() provider.Registry {
+	if b.ProviderRegistry.IsZero() {
+		return provider.BuiltInRegistry()
+	}
+	return b.ProviderRegistry
+}
+
+func registeredEnabledProviderIDs(ctx devcontext.Context, registry provider.Registry) []provider.ID {
 	ids := make([]provider.ID, 0, len(ctx.Providers))
-	for providerID, config := range ctx.Providers {
-		if config.Enabled {
+	for _, integration := range registry.All() {
+		providerID := integration.ID()
+		if config, ok := ctx.Providers[providerID]; ok && config.Enabled {
 			ids = append(ids, providerID)
 		}
 	}
-	sort.Slice(ids, func(i int, j int) bool {
-		return ids[i] < ids[j]
-	})
 	return ids
 }
 

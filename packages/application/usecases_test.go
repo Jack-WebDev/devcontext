@@ -97,6 +97,11 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 		provider.CodexID: {Enabled: true},
 	}
 	fixture.writeContext(t, ctx)
+	contextPaths, err := filesystem.DeriveContextPaths(fixture.paths, ctx.ID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	removeAll(t, contextPaths.VSCodeUserDataDir)
 	fixture.writeBindings(t, project.Binding{
 		ProjectPath: project.Path(fixture.projectDir),
 		ContextID:   devcontext.MustID("personal"),
@@ -177,6 +182,16 @@ func TestGetLaunchStateReturnsPerContextConfidenceSummaries(t *testing.T) {
 	}
 	fixture.writeContext(t, company)
 	fixture.writeContext(t, personal)
+	companyPaths, err := filesystem.DeriveContextPaths(fixture.paths, company.ID)
+	if err != nil {
+		t.Fatalf("derive company paths: %v", err)
+	}
+	personalPaths, err := filesystem.DeriveContextPaths(fixture.paths, personal.ID)
+	if err != nil {
+		t.Fatalf("derive personal paths: %v", err)
+	}
+	removeAll(t, companyPaths.VSCodeUserDataDir)
+	removeAll(t, personalPaths.VSCodeUserDataDir)
 
 	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
 	if appErr != nil {
@@ -1174,6 +1189,8 @@ func (f applicationFixture) writeContext(t *testing.T, ctx devcontext.Context) {
 	}
 	contextPaths = contextPaths.WithProviderStorageDirs(enabledProviderIDs(ctx))
 	mkdir(t, contextPaths.RootDir)
+	mkdir(t, contextPaths.VSCodeDir)
+	mkdir(t, contextPaths.VSCodeUserDataDir)
 	for _, dir := range contextPaths.ProviderStorageDirs {
 		mkdir(t, dir)
 	}
