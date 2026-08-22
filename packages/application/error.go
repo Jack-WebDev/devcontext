@@ -243,13 +243,25 @@ func contextStorageRecovery(err *filesystem.ContextStorageError) string {
 
 	paths := make([]string, 0, len(err.Missing))
 	for _, missing := range err.Missing {
-		paths = append(paths, fmt.Sprintf("%s: %s", missing.Kind, missing.Path))
+		paths = append(paths, fmt.Sprintf("%s: %s", missingDirectoryLabel(missing), missing.Path))
 	}
 	return fmt.Sprintf(
 		"Repair or recreate context %q. Missing paths: %s.",
 		err.ContextID.String(),
 		strings.Join(paths, "; "),
 	)
+}
+
+func missingDirectoryLabel(missing filesystem.MissingContextDirectory) string {
+	kind := string(missing.Kind)
+	if missing.ProviderID == "" {
+		return kind
+	}
+	kind += ":" + missing.ProviderID
+	if missing.ProviderDisplayName != "" {
+		kind += " (" + missing.ProviderDisplayName + ")"
+	}
+	return kind
 }
 
 func missingVSCodeRecovery(candidates []string) string {

@@ -76,8 +76,8 @@ func TestCreateContextDirectoryTreeUsesRegisteredEnabledProviders(t *testing.T) 
 		"unknown":    {Enabled: true},
 	}
 	registry := provider.MustNewRegistry([]provider.Provider{
-		contextTreeFakeProvider{id: "registered"},
-		contextTreeFakeProvider{id: "disabled"},
+		contextTreeFakeProvider{id: "registered", displayName: "Registered Provider"},
+		contextTreeFakeProvider{id: "disabled", displayName: "Disabled Provider"},
 	})
 
 	if err := filesystem.CreateContextDirectoryTreeWithProviderRegistry(contextPaths, ctx, registry); err != nil {
@@ -171,7 +171,7 @@ func TestValidateContextDirectoryTreeReportsIncompleteStorage(t *testing.T) {
 		t.Fatalf("remove codex dir: %v", err)
 	}
 
-	err = filesystem.ValidateContextDirectoryTree(contextPaths)
+	err = filesystem.ValidateContextDirectoryTreeWithProviderRegistry(contextPaths, ctx, provider.BuiltInRegistry())
 	if !errors.Is(err, filesystem.ErrContextStorageIncomplete) {
 		t.Fatalf("error = %v, want %v", err, filesystem.ErrContextStorageIncomplete)
 	}
@@ -181,10 +181,96 @@ func TestValidateContextDirectoryTreeReportsIncompleteStorage(t *testing.T) {
 	}
 	wantMissing := []filesystem.MissingContextDirectory{
 		{
-			Kind:       filesystem.ContextDirectoryProvider,
-			ProviderID: string(provider.CodexID),
-			Path:       contextPaths.ProviderStorageDir(provider.CodexID),
-			Reason:     "missing",
+			Kind:                filesystem.ContextDirectoryProvider,
+			ProviderID:          string(provider.CodexID),
+			ProviderDisplayName: "Codex",
+			Path:                contextPaths.ProviderStorageDir(provider.CodexID),
+			Reason:              "missing",
+		},
+	}
+	if !reflect.DeepEqual(storageErr.Missing, wantMissing) {
+		t.Fatalf("missing directories = %#v, want %#v", storageErr.Missing, wantMissing)
+	}
+}
+
+func TestValidateContextDirectoryTreeChecksEditorStorage(t *testing.T) {
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return t.TempDir(), nil
+	})
+	contextID := devcontext.MustID("client-a")
+	contextPaths, err := filesystem.DeriveContextPaths(platformPaths, contextID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	ctx := contextTreeContext(contextID, "Client A")
+	if err := filesystem.CreateContextDirectoryTree(contextPaths, ctx); err != nil {
+		t.Fatalf("create context directory tree: %v", err)
+	}
+	if err := os.RemoveAll(contextPaths.VSCodeUserDataDir); err != nil {
+		t.Fatalf("remove vscode user data dir: %v", err)
+	}
+
+	err = filesystem.ValidateContextDirectoryTreeWithProviderRegistry(contextPaths, ctx, provider.BuiltInRegistry())
+	if !errors.Is(err, filesystem.ErrContextStorageIncomplete) {
+		t.Fatalf("error = %v, want %v", err, filesystem.ErrContextStorageIncomplete)
+	}
+	var storageErr *filesystem.ContextStorageError
+	if !errors.As(err, &storageErr) {
+		t.Fatalf("error = %T, want *filesystem.ContextStorageError", err)
+	}
+	wantMissing := []filesystem.MissingContextDirectory{
+		{
+			Kind:   filesystem.ContextDirectoryEditor,
+			Path:   contextPaths.VSCodeUserDataDir,
+			Reason: "missing",
+		},
+	}
+	if !reflect.DeepEqual(storageErr.Missing, wantMissing) {
+		t.Fatalf("missing directories = %#v, want %#v", storageErr.Missing, wantMissing)
+	}
+}
+
+func TestValidateContextDirectoryTreeUsesRegisteredEnabledProviders(t *testing.T) {
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return t.TempDir(), nil
+	})
+	contextID := devcontext.MustID("client-a")
+	contextPaths, err := filesystem.DeriveContextPaths(platformPaths, contextID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	ctx := contextTreeContext(contextID, "Client A")
+	ctx.Providers = provider.Configs{
+		"registered": {Enabled: true},
+		"disabled":   {Enabled: false},
+		"unknown":    {Enabled: true},
+	}
+	registry := provider.MustNewRegistry([]provider.Provider{
+		contextTreeFakeProvider{id: "registered", displayName: "Registered Provider"},
+		contextTreeFakeProvider{id: "disabled", displayName: "Disabled Provider"},
+	})
+	if err := filesystem.CreateContextDirectoryTreeWithProviderRegistry(contextPaths, ctx, registry); err != nil {
+		t.Fatalf("create context directory tree: %v", err)
+	}
+	if err := os.RemoveAll(contextPaths.ProviderStorageDir("registered")); err != nil {
+		t.Fatalf("remove registered provider dir: %v", err)
+	}
+
+	err = filesystem.ValidateContextDirectoryTreeWithProviderRegistry(contextPaths, ctx, registry)
+	if !errors.Is(err, filesystem.ErrContextStorageIncomplete) {
+		t.Fatalf("error = %v, want %v", err, filesystem.ErrContextStorageIncomplete)
+	}
+	var storageErr *filesystem.ContextStorageError
+	if !errors.As(err, &storageErr) {
+		t.Fatalf("error = %T, want *filesystem.ContextStorageError", err)
+	}
+	wantMissing := []filesystem.MissingContextDirectory{
+		{
+			Kind:                filesystem.ContextDirectoryProvider,
+			ProviderID:          "registered",
+			ProviderDisplayName: "Registered Provider",
+			Path:                contextPaths.ProviderStorageDir("registered"),
+			Reason:              "missing",
 		},
 	}
 	if !reflect.DeepEqual(storageErr.Missing, wantMissing) {
@@ -332,7 +418,8 @@ func contextTreeContext(id devcontext.ID, name string) devcontext.Context {
 }
 
 type contextTreeFakeProvider struct {
-	id provider.ID
+	id          provider.ID
+	displayName string
 }
 
 func (p contextTreeFakeProvider) ID() provider.ID {
@@ -340,6 +427,9 @@ func (p contextTreeFakeProvider) ID() provider.ID {
 }
 
 func (p contextTreeFakeProvider) DisplayName() string {
+	if p.displayName != "" {
+		return p.displayName
+	}
 	return string(p.id)
 }
 
