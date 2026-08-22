@@ -33,6 +33,8 @@ func TestCreateContextDirectoryTreeCreatesCompleteRestrictedTree(t *testing.T) {
 
 	for _, dir := range []string{
 		contextPaths.RootDir,
+		contextPaths.VSCodeDir,
+		contextPaths.VSCodeUserDataDir,
 		contextPaths.ProviderStorageDir(provider.ClaudeID),
 		contextPaths.ProviderStorageDir(provider.CodexID),
 	} {
@@ -54,8 +56,40 @@ func TestCreateContextDirectoryTreeCreatesCompleteRestrictedTree(t *testing.T) {
 	assertRestrictedMode(t, contextPaths.ConfigPath, filesystem.RestrictedFileMode)
 	assertDirectoryEmpty(t, contextPaths.ProviderStorageDir(provider.ClaudeID))
 	assertDirectoryEmpty(t, contextPaths.ProviderStorageDir(provider.CodexID))
-	assertPathMissing(t, contextPaths.VSCodeDir)
-	assertPathMissing(t, contextPaths.VSCodeUserDataDir)
+	assertDirectoryExists(t, contextPaths.VSCodeDir)
+	assertDirectoryEmpty(t, contextPaths.VSCodeUserDataDir)
+}
+
+func TestCreateContextDirectoryTreeUsesRegisteredEnabledProviders(t *testing.T) {
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return t.TempDir(), nil
+	})
+	contextID := devcontext.MustID("client-a")
+	contextPaths, err := filesystem.DeriveContextPaths(platformPaths, contextID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	ctx := contextTreeContext(contextID, "Client A")
+	ctx.Providers = provider.Configs{
+		"registered": {Enabled: true},
+		"disabled":   {Enabled: false},
+		"unknown":    {Enabled: true},
+	}
+	registry := provider.MustNewRegistry([]provider.Provider{
+		contextTreeFakeProvider{id: "registered"},
+		contextTreeFakeProvider{id: "disabled"},
+	})
+
+	if err := filesystem.CreateContextDirectoryTreeWithProviderRegistry(contextPaths, ctx, registry); err != nil {
+		t.Fatalf("create context directory tree: %v", err)
+	}
+
+	assertDirectoryExists(t, contextPaths.RootDir)
+	assertDirectoryExists(t, contextPaths.VSCodeDir)
+	assertDirectoryExists(t, contextPaths.VSCodeUserDataDir)
+	assertDirectoryExists(t, contextPaths.ProviderStorageDir("registered"))
+	assertPathMissing(t, contextPaths.ProviderStorageDir("disabled"))
+	assertPathMissing(t, contextPaths.ProviderStorageDir("unknown"))
 }
 
 func TestCreateContextDirectoryTreeRejectsMismatchedContextID(t *testing.T) {
@@ -295,4 +329,24 @@ func contextTreeContext(id devcontext.ID, name string) devcontext.Context {
 		},
 		CreatedAt: time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC),
 	}
+}
+
+type contextTreeFakeProvider struct {
+	id provider.ID
+}
+
+func (p contextTreeFakeProvider) ID() provider.ID {
+	return p.id
+}
+
+func (p contextTreeFakeProvider) DisplayName() string {
+	return string(p.id)
+}
+
+func (p contextTreeFakeProvider) BuildEnvironment(provider.RuntimeContext) (provider.EnvironmentContribution, error) {
+	return nil, nil
+}
+
+func (p contextTreeFakeProvider) Status(provider.RuntimeContext) (provider.Status, error) {
+	return provider.ReadyStatus(), nil
 }
