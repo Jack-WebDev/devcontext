@@ -96,6 +96,7 @@ func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, er
 		Project:                    projectState(projectPath),
 		Contexts:                   s.contextStates(contexts),
 		Binding:                    bindingState(lookup),
+		Confidence:                 s.launchConfidenceState(resolution.Context),
 		SelectedContextID:          selectedContextID(resolution),
 		SelectionRequired:          resolution.SelectionRequired,
 		ResolutionSource:           string(resolution.Source),
@@ -274,7 +275,7 @@ func (s *Service) contextState(ctx devcontext.Context) ContextState {
 		ID:        ctx.ID.String(),
 		Name:      ctx.Name,
 		Editor:    EditorState{Type: string(ctx.Editor.Type)},
-		Providers: s.providerStates(ctx),
+		Providers: providerStatesFromEntries(s.providerStateEntries(ctx)),
 		Metadata:  cloneMetadata(ctx.Metadata),
 	}
 }
@@ -324,8 +325,14 @@ func providerCredentialSessionName(providerID string) string {
 	}
 }
 
-func (s *Service) providerStates(ctx devcontext.Context) []ProviderState {
-	states := make([]ProviderState, 0, len(s.dependencies.Providers))
+type providerStateEntry struct {
+	providerID provider.ID
+	state      ProviderState
+	status     provider.Status
+}
+
+func (s *Service) providerStateEntries(ctx devcontext.Context) []providerStateEntry {
+	entries := make([]providerStateEntry, 0, len(s.dependencies.Providers))
 	contextPaths, pathsErr := filesystem.DeriveContextPaths(s.dependencies.Paths, ctx.ID)
 	for _, integration := range s.dependencies.Providers {
 		if integration == nil {
@@ -357,15 +364,79 @@ func (s *Service) providerStates(ctx devcontext.Context) []ProviderState {
 			}
 		}
 
-		states = append(states, ProviderState{
-			ID:          string(integration.ID()),
-			Name:        integration.DisplayName(),
-			Enabled:     enabled,
-			State:       string(status.State),
-			Explanation: status.Explanation,
+		entries = append(entries, providerStateEntry{
+			providerID: integration.ID(),
+			status:     status,
+			state: ProviderState{
+				ID:          string(integration.ID()),
+				Name:        integration.DisplayName(),
+				Enabled:     enabled,
+				State:       string(status.State),
+				Explanation: status.Explanation,
+			},
 		})
 	}
+	return entries
+}
+
+func providerStatesFromEntries(entries []providerStateEntry) []ProviderState {
+	states := make([]ProviderState, len(entries))
+	for i, entry := range entries {
+		states[i] = entry.state
+	}
 	return states
+}
+
+func (s *Service) launchConfidenceState(ctx *devcontext.Context) *LaunchConfidenceState {
+	if ctx == nil {
+		return nil
+	}
+
+	checks := make([]LaunchConfidenceCheck, 0)
+	for _, entry := range s.providerStateEntries(*ctx) {
+		if !entry.state.Enabled {
+			continue
+		}
+		check, ok := launcher.ProviderConfidenceCheck(entry.providerID, entry.state.Name, entry.status)
+		if ok {
+			checks = append(checks, check)
+		}
+	}
+
+	executable, editorErr := s.dependencies.Editor.DetectExecutable(ctx.Editor)
+	checks = append(checks, launcher.VSCodeConfidenceCheck(executable, editorErr))
+
+	contextPaths, pathsErr := filesystem.DeriveContextPaths(s.dependencies.Paths, ctx.ID)
+	if pathsErr != nil {
+		checks = append(checks, LaunchConfidenceCheck{
+			Component:  LaunchConfidenceCheckIsolation,
+			Severity:   LaunchConfidenceBlocked,
+			Label:      "Isolation",
+			Message:    "Context isolation paths could not be determined.",
+			ActionHint: "Run diagnostics to inspect context storage.",
+		})
+	} else {
+		checks = append(checks, launcher.IsolationConfidenceChecks(contextPaths)...)
+	}
+
+	return &LaunchConfidenceState{
+		ContextID: ctx.ID.String(),
+		Status:    launchConfidenceStatus(checks),
+		Checks:    checks,
+	}
+}
+
+func launchConfidenceStatus(checks []LaunchConfidenceCheck) LaunchConfidenceStatus {
+	status := LaunchConfidenceReady
+	for _, check := range checks {
+		if check.Severity == LaunchConfidenceBlocked {
+			return LaunchConfidenceBlocked
+		}
+		if check.Severity == LaunchConfidenceNeedsAttention {
+			status = LaunchConfidenceNeedsAttention
+		}
+	}
+	return status
 }
 
 func processRequestFromLaunchPlan(plan launcher.LaunchPlan, detachMode launcher.DetachMode) launcher.ProcessRequest {

@@ -42,6 +42,9 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	if state.SelectedContextID != "personal" {
 		t.Fatalf("selected context = %q, want personal", state.SelectedContextID)
 	}
+	if state.Confidence == nil || state.Confidence.ContextID != "personal" {
+		t.Fatalf("confidence = %#v, want personal confidence", state.Confidence)
+	}
 	if state.SelectionRequired {
 		t.Fatal("selection required = true, want false")
 	}
@@ -62,6 +65,80 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 			Metadata: map[string]string{"accent": "blue"},
 		},
 	})
+}
+
+func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.provider = &applicationFakeProvider{
+		id:          provider.CodexID,
+		displayName: "Codex",
+		statusByContext: map[string]provider.Status{
+			"personal": provider.NotConfiguredStatus("Codex is not authenticated."),
+		},
+	}
+	fixture.editor.executable = "/fixture/code"
+	ctx := fixture.context("personal", "Personal")
+	ctx.Providers = provider.Configs{
+		provider.CodexID: {Enabled: true},
+	}
+	fixture.writeContext(t, ctx)
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.projectDir),
+		ContextID:   devcontext.MustID("personal"),
+		CreatedAt:   fixture.now,
+	})
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+
+	if state.Confidence == nil {
+		t.Fatal("confidence = nil, want selected context confidence")
+	}
+	if state.Confidence.ContextID != "personal" {
+		t.Fatalf("confidence context = %q, want personal", state.Confidence.ContextID)
+	}
+	if state.Confidence.Status != LaunchConfidenceBlocked {
+		t.Fatalf("confidence status = %q, want blocked because VS Code profile storage is absent", state.Confidence.Status)
+	}
+	wantChecks := []LaunchConfidenceCheck{
+		{
+			Component:  LaunchConfidenceCheckCodex,
+			Severity:   LaunchConfidenceNeedsAttention,
+			Label:      "Codex",
+			Message:    "Codex is not authenticated.",
+			ActionHint: "Open and configure Codex for this context.",
+		},
+		{
+			Component: LaunchConfidenceCheckVSCode,
+			Severity:  LaunchConfidenceReady,
+			Label:     "VS Code",
+			Message:   "VS Code is available for launch.",
+		},
+		{
+			Component: LaunchConfidenceCheckIsolation,
+			Severity:  LaunchConfidenceReady,
+			Label:     "Context storage",
+			Message:   "Context storage is ready.",
+		},
+		{
+			Component: LaunchConfidenceCheckIsolation,
+			Severity:  LaunchConfidenceReady,
+			Label:     "Provider isolation",
+			Message:   "Claude and Codex isolation directories are ready.",
+		},
+		{
+			Component:  LaunchConfidenceCheckIsolation,
+			Severity:   LaunchConfidenceBlocked,
+			Label:      "VS Code profile",
+			Message:    "VS Code profile isolation is not ready.",
+			ActionHint: "Run diagnostics to repair context storage.",
+		},
+	}
+	if !reflect.DeepEqual(state.Confidence.Checks, wantChecks) {
+		t.Fatalf("confidence checks = %#v, want %#v", state.Confidence.Checks, wantChecks)
+	}
 }
 
 func TestGetLaunchStateReturnsUnboundSelectorState(t *testing.T) {
@@ -85,6 +162,9 @@ func TestGetLaunchStateReturnsUnboundSelectorState(t *testing.T) {
 	}
 	if len(state.Contexts) != 2 {
 		t.Fatalf("context count = %d, want 2", len(state.Contexts))
+	}
+	if state.Confidence != nil {
+		t.Fatalf("confidence = %#v, want nil while user selection is required", state.Confidence)
 	}
 	if state.FirstRun {
 		t.Fatal("first run = true, want false")
@@ -568,6 +648,9 @@ func assertFirstRunState(t *testing.T, state LaunchState, projectDir string) {
 	}
 	if len(state.Warnings) != 0 {
 		t.Fatalf("warnings = %#v, want none", state.Warnings)
+	}
+	if state.Confidence != nil {
+		t.Fatalf("confidence = %#v, want nil", state.Confidence)
 	}
 }
 
