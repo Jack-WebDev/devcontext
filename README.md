@@ -2,31 +2,45 @@
 
 # DEVCTX
 
-### Development identities, isolated.
+### *Development identities, isolated.*
 
-[![Release](https://img.shields.io/github/v/release/Jack-WebDev/devcontext?style=flat-square\&label=release)](https://github.com/Jack-WebDev/devcontext/releases)
-[![Build](https://img.shields.io/github/actions/workflow/status/Jack-WebDev/devcontext/release.yml?style=flat-square\&label=build)](https://github.com/Jack-WebDev/devcontext/actions)
-[![License](https://img.shields.io/github/license/Jack-WebDev/devcontext?style=flat-square)](LICENSE)
+<p>
+  <img src="https://img.shields.io/github/v/release/Jack-WebDev/devcontext?style=for-the-badge&label=release&color=6366F1&labelColor=1a1a2e" alt="Release" />
+  <img src="https://img.shields.io/github/actions/workflow/status/Jack-WebDev/devcontext/release.yml?style=for-the-badge&label=build&color=22C55E&labelColor=1a1a2e" alt="Build" />
+  <img src="https://img.shields.io/github/license/Jack-WebDev/devcontext?style=for-the-badge&color=F59E0B&labelColor=1a1a2e" alt="License" />
+</p>
+
+<p>
+  <img src="https://img.shields.io/badge/Windows-supported-0078D6?style=flat-square&logo=windows&logoColor=white" alt="Windows" />
+  <img src="https://img.shields.io/badge/macOS-supported-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS" />
+  <img src="https://img.shields.io/badge/Linux-supported-FCC624?style=flat-square&logo=linux&logoColor=black" alt="Linux" />
+  <img src="https://img.shields.io/badge/status-pre--1.0-EF4444?style=flat-square" alt="Pre-1.0" />
+</p>
 
 **Keep personal, company, client, and open-source development identities separate on the same machine.**
 
-[Getting Started](#getting-started) •
-[How It Works](#how-it-works) •
-[Installation](#installation) •
-[Roadmap](#roadmap) •
-[Contributing](CONTRIBUTING.md)
+<sub>One command. One prompt. Zero cross-contamination between your Claude, Codex, and editor sessions.</sub>
+
+<br>
+
+[**🚀 Getting Started**](#-getting-started) •
+[**⚙️ How It Works**](#️-how-it-works) •
+[**📦 Installation**](#-installation) •
+[**🗺️ Roadmap**](#️-roadmap) •
+[**🤝 Contributing**](CONTRIBUTING.md)
 
 </div>
 
----
+<br>
 
-> **Note**
->
-> Dev Context is currently pre-1.0. The core workflow is usable, but commands, configuration, storage, and integrations may evolve as the project matures.
+> [!NOTE]
+> Dev Context is currently **pre-1.0**. The core workflow is usable, but commands, configuration, storage, and integrations may evolve as the project matures.
+
+<br>
 
 ## What is it?
 
-`devctx` is a local development identity launcher.
+`devctx` is a **local development identity launcher**.
 
 Instead of opening a project directly:
 
@@ -50,42 +64,42 @@ $ devctx .
         │                           │
         │   Personal    Company     │
         └─────────────┬─────────────┘
-                      │
-                      ▼
-              Prepare identity
-                      │
-          ┌───────────┴───────────┐
-          │                       │
-          ▼                       ▼
-       Claude                   Codex
-       Personal                 Personal
-          │                       │
-          └───────────┬───────────┘
-                      │
-                      ▼
-                   VS Code
+                       │
+                       ▼
+               Prepare identity
+                       │
+           ┌───────────┴───────────┐
+           │                       │
+           ▼                       ▼
+        Claude                   Codex
+        Personal                 Personal
+           │                       │
+           └───────────┬───────────┘
+                        │
+                        ▼
+                     VS Code
 ```
 
-The goal is simple:
+<div align="center">
 
-> **Know which identity you're using before you code.**
+### Know **which identity** you're using *before* you code
 
----
+</div>
+
+<br>
 
 ## Why?
 
-A single development machine can easily contain several identities.
+A single development machine can easily contain several identities:
 
-You might have:
-
-* a personal Claude subscription
-* a company Claude subscription
-* a personal Codex account
-* a company Codex account
-* different Git identities
-* different GitHub accounts
-* different package registries
-* different cloud accounts
+| 🪪 Identity type | Example |
+| --- | --- |
+| AI provider | Personal & company Claude subscriptions |
+| AI provider | Personal & company Codex accounts |
+| Version control | Different Git identities |
+| Hosting | Different GitHub accounts |
+| Packages | Different package registries |
+| Cloud | Different cloud accounts |
 
 The problem is that development tools normally don't understand the boundary between them.
 
@@ -95,11 +109,15 @@ You open a personal project:
 code ~/projects/my-side-project
 ```
 
-but your current Claude session belongs to your employer.
+but your current Claude session belongs to your employer. Or you open company code while your personal development account is active.
 
-Or you open company code while your personal development account is active.
+**Dev Context puts an explicit identity boundary *before* the project launches.**
 
-Dev Context puts an explicit identity boundary **before the project launches**.
+<table>
+<tr>
+<td valign="top">
+
+**Personal project**
 
 ```text
 Personal project
@@ -113,7 +131,10 @@ Claude    Codex
 Personal  Personal
 ```
 
-and separately:
+</td>
+<td valign="top">
+
+**Company project**
 
 ```text
 Company project
@@ -127,11 +148,15 @@ Claude    Codex
 Company   Company
 ```
 
-Both can run at the same time without sharing provider state.
+</td>
+</tr>
+</table>
 
----
+✅ Both can run **at the same time** without sharing provider state.
 
-## Getting Started
+<br>
+
+## 🚀 Getting Started
 
 Install Dev Context, then run:
 
@@ -154,8 +179,6 @@ You can also launch a specific identity directly:
 devctx --personal .
 ```
 
-or:
-
 ```bash
 devctx --company .
 ```
@@ -164,50 +187,46 @@ Equivalent long form:
 
 ```bash
 devctx --context personal .
-```
-
-```bash
 devctx --context company .
 ```
 
-You can also open another project:
+Or open another project:
 
 ```bash
 devctx /path/to/project
 ```
 
----
+<br>
 
-## How It Works
+## ⚙️ How It Works
 
-The central concept in Dev Context is the **context**.
-
-A context represents a development identity.
-
-Examples:
+The central concept in Dev Context is the **context** — a development identity.
 
 ```text
-Personal
-Company
-Client A
-Open Source
+Personal   Company   Client A   Open Source
 ```
 
-A context can contain isolated configuration and state for the development tools associated with that identity.
+A context can contain isolated configuration and state for the development tools associated with that identity:
 
 ```text
 Context
 │
-├── Coding tool
+├── 🖥️  Coding tool
 │
-├── Providers
+├── 🔌 Providers
 │
-├── Environment
+├── 🌐 Environment
 │
-└── Project
+└── 📁 Project
 ```
 
 For example:
+
+<table>
+<tr>
+<td valign="top">
+
+**Personal**
 
 ```text
 Personal
@@ -217,7 +236,10 @@ Personal
 └── Codex
 ```
 
-and:
+</td>
+<td valign="top">
+
+**Company**
 
 ```text
 Company
@@ -227,17 +249,21 @@ Company
 └── Codex
 ```
 
-Dev Context launches each environment independently.
+</td>
+</tr>
+</table>
 
-The context is the root concept.
+Dev Context launches each environment independently. **The context is the root concept** — VS Code, Claude Code, Codex, and future integrations are adapters that operate inside that context.
 
-VS Code, Claude Code, Codex, and future integrations are adapters that operate inside that context.
-
----
+<br>
 
 ## Features
 
-### Context-based launching
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 🎛️ Context-based launching
 
 Launch any project through a development identity:
 
@@ -245,57 +271,38 @@ Launch any project through a development identity:
 devctx .
 ```
 
-### Multiple identities at the same time
+### 🔀 Multiple identities at once
 
 A Personal project and Company project can run simultaneously without sharing the same provider environment.
 
-### Claude Code isolation
-
-Claude Code state can be isolated per context.
+### 🤖 Claude isolation
 
 ```text
-Personal
-└── Claude → Personal
-
-Company
-└── Claude → Company
+Personal → Claude → Personal
+Company  → Claude → Company
 ```
 
-### Codex isolation
+</td>
+<td width="50%" valign="top">
 
-Codex state can also be separated:
+### 🧩 Codex isolation
 
 ```text
-Personal
-└── Codex → Personal
-
-Company
-└── Codex → Company
+Personal → Codex → Personal
+Company  → Codex → Company
 ```
 
-### Project bindings
+### 📌 Project bindings
 
-Projects can remember their normal identity.
+Projects can remember their normal identity:
 
 ```bash
 devctx project bind personal
-```
-
-Now Dev Context knows that the project normally belongs to your Personal context.
-
-Inspect the binding:
-
-```bash
 devctx project show
-```
-
-Remove it:
-
-```bash
 devctx project unbind
 ```
 
-### Direct launching
+### ⚡ Direct launching
 
 Skip the selector when you already know the context:
 
@@ -303,50 +310,58 @@ Skip the selector when you already know the context:
 devctx --personal .
 ```
 
-### Local-first
+### 🔒 Local-first
 
-Dev Context stores context information locally.
+No Dev Context cloud account required — everything stays on your machine.
 
-There is no Dev Context cloud account required to separate your local development identities.
+</td>
+</tr>
+</table>
 
----
+<br>
 
-## Supported Tools
+## 🧰 Supported Tools
 
 ### Coding tools
 
-| Tool           | Status      |
-| -------------- | ----------- |
-| VS Code        | ✅ Supported |
-| Cursor         | 🚧 Planned  |
-| Windsurf       | 🚧 Planned  |
+| Tool | Status |
+| --- | :---: |
+| VS Code | ✅ Supported |
+| Cursor | 🚧 Planned |
+| Windsurf | 🚧 Planned |
 | JetBrains IDEs | 🗺️ Planned |
-| Zed            | 🗺️ Planned |
-| Neovim         | 🗺️ Planned |
+| Zed | 🗺️ Planned |
+| Neovim | 🗺️ Planned |
 
 ### Providers
 
-| Provider          | Status      |
-| ----------------- | ----------- |
-| Claude Code       | ✅ Supported |
-| Codex             | ✅ Supported |
-| Git identities    | 🗺️ Planned |
+| Provider | Status |
+| --- | :---: |
+| Claude Code | ✅ Supported |
+| Codex | ✅ Supported |
+| Git identities | 🗺️ Planned |
 | GitHub identities | 🗺️ Planned |
-| npm identities    | 🗺️ Planned |
-| AWS profiles      | 🗺️ Planned |
-| Azure profiles    | 🗺️ Planned |
+| npm identities | 🗺️ Planned |
+| AWS profiles | 🗺️ Planned |
+| Azure profiles | 🗺️ Planned |
 
-The long-term model is intentionally not tied to VS Code or any single AI provider.
+> The long-term model is intentionally **not** tied to VS Code or any single AI provider.
 
----
+<br>
 
-## Installation
+## 📦 Installation
 
 Prebuilt binaries are available from:
 
-**[GitHub Releases →](https://github.com/Jack-WebDev/devcontext/releases)**
+<div align="center">
 
-### Windows
+### **[⬇️ GitHub Releases →](https://github.com/Jack-WebDev/devcontext/releases)**
+
+</div>
+
+<details>
+<summary><b>🪟 Windows</b></summary>
+<br>
 
 Download:
 
@@ -360,7 +375,11 @@ Run the installer and verify:
 devctx --version
 ```
 
-### macOS
+</details>
+
+<details>
+<summary><b>🍎 macOS</b></summary>
+<br>
 
 Download:
 
@@ -380,7 +399,11 @@ Then verify:
 devctx --version
 ```
 
-### Linux
+</details>
+
+<details>
+<summary><b>🐧 Linux</b></summary>
+<br>
 
 Download:
 
@@ -406,9 +429,11 @@ Verify:
 devctx --version
 ```
 
----
+</details>
 
-## Requirements
+<br>
+
+## ✅ Requirements
 
 The current coding-tool implementation requires the VS Code CLI:
 
@@ -416,45 +441,36 @@ The current coding-tool implementation requires the VS Code CLI:
 code --version
 ```
 
-Claude Code is optional:
+Claude Code is **optional**:
 
 ```bash
 claude --version
 ```
 
-Codex is optional:
+Codex is **optional**:
 
 ```bash
 codex --version
 ```
 
-Dev Context only manages integrations that you enable.
+> Dev Context only manages integrations that you enable.
 
----
+<br>
 
-## Context Management
-
-List available contexts:
+## 🗂️ Context Management
 
 ```bash
+# List available contexts
 devctx context list
-```
 
-Create a Personal context:
-
-```bash
+# Create a Personal context
 devctx context create personal
-```
 
-Create a Company context:
-
-```bash
+# Create a Company context
 devctx context create company
 ```
 
-Contexts are stored locally under the Dev Context home directory.
-
-Conceptually:
+Contexts are stored locally under the Dev Context home directory:
 
 ```text
 ~/.devctx/
@@ -472,35 +488,29 @@ Conceptually:
             └── codex/
 ```
 
-The exact storage structure may change before 1.0.
+> ⚠️ The exact storage structure may change before 1.0.
 
----
+<br>
 
-## Security
+## 🔐 Security
 
-Dev Context creates **local identity boundaries**.
-
-It is not a secrets manager.
+Dev Context creates **local identity boundaries**. It is **not** a secrets manager.
 
 Dev Context does not intentionally:
 
-* parse credential secrets
-* display credential secrets
-* upload credential files
-* synchronize credentials between contexts
-* overwrite existing context credentials during normal launches
+- ❌ parse credential secrets
+- ❌ display credential secrets
+- ❌ upload credential files
+- ❌ synchronize credentials between contexts
+- ❌ overwrite existing context credentials during normal launches
 
-Provider credential files are treated as opaque provider-owned data.
-
-Authentication remains the responsibility of the provider.
-
-Dev Context controls which local environment that provider runs inside.
+Provider credential files are treated as **opaque, provider-owned data**. Authentication remains the responsibility of the provider — Dev Context controls *which local environment* that provider runs inside.
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
----
+<br>
 
-## Architecture
+## 🏗️ Architecture
 
 Dev Context follows one core rule:
 
@@ -513,7 +523,7 @@ Context
    └── Launch
 ```
 
-Not:
+**Not** this — integrations are replaceable, identity is not:
 
 ```text
 VS Code → Context
@@ -521,13 +531,11 @@ Claude  → Context
 Codex   → Context
 ```
 
-Integrations are replaceable.
+> The development identity is the product.
 
-The development identity is the product.
+<br>
 
----
-
-## Roadmap
+## 🗺️ Roadmap
 
 ### Identity confidence
 
@@ -544,7 +552,7 @@ Codex        Personal ✓
 Status       Ready to launch
 ```
 
-Eventually additional identity checks may include:
+Eventually, additional identity checks may include:
 
 ```text
 Git          jack@example.com ✓
@@ -553,111 +561,76 @@ npm          jack ✓
 AWS          personal ✓
 ```
 
-### Coding tool adapters
-
-Planned:
+### 🧩 Coding tool adapters
 
 ```text
-VS Code
-   ↓
-Cursor
-   ↓
-Windsurf
-   ↓
-JetBrains
-   ↓
-Zed
-   ↓
-Neovim
+VS Code → Cursor → Windsurf → JetBrains → Zed → Neovim
 ```
 
-### Additional identity providers
+### 🔌 Additional identity providers
 
-Potential integrations include:
+Potential integrations include Git, GitHub, npm, AWS, Azure, and additional AI development tools.
 
-* Git
-* GitHub
-* npm
-* AWS
-* Azure
-* additional AI development tools
+> The scope remains **development identity separation**. Dev Context is not intended to become a runtime manager, task runner, package manager, or general secrets manager.
 
-The scope remains development identity separation.
+<br>
 
-Dev Context is not intended to become a runtime manager, task runner, package manager, or general secrets manager.
+## 🛠️ Building From Source
 
----
+**Requirements**
 
-## Building From Source
-
-Requirements:
-
-* Go 1.25+
-* Node.js 22+
-* npm
-* Wails CLI v2
-* platform-specific Wails dependencies
-
-Clone:
+- Go 1.25+
+- Node.js 22+
+- npm
+- Wails CLI v2
+- platform-specific Wails dependencies
 
 ```bash
+# Clone
 git clone https://github.com/Jack-WebDev/devcontext.git
 cd devcontext
-```
 
-Install frontend dependencies:
-
-```bash
+# Install frontend dependencies
 cd frontend
 npm install
 cd ..
-```
 
-Run:
-
-```bash
+# Run
 npm run dev
-```
 
-Build:
-
-```bash
+# Build
 npm run build
-```
 
-Run Go tests:
-
-```bash
+# Run Go tests
 go test ./...
-```
 
-Run frontend tests:
-
-```bash
+# Run frontend tests
 cd frontend
 npm run test:once
 ```
 
----
+<br>
 
-## Contributing
+## 🤝 Contributing
 
-Contributions are welcome.
+Contributions are welcome! Bug reports, feature requests, documentation improvements, platform fixes, and new integrations are all useful.
 
-Bug reports, feature requests, documentation improvements, platform fixes, and new integrations are all useful.
-
-Before making a substantial architectural change, open an issue first so the approach can be discussed.
+> Before making a substantial architectural change, please open an issue first so the approach can be discussed.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
----
+<br>
 
-## License
+## 📄 License
 
 Dev Context is available under the [MIT License](LICENSE).
 
+<br>
+
 <div align="center">
 
-**Know which identity you're using before you code.**
+### Know which identity you're using **before** you code
+
+<sub>Made for developers juggling too many identities.</sub>
 
 </div>
