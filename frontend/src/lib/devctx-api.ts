@@ -31,11 +31,13 @@ export interface LaunchState {
   project: ProjectState;
   contexts: ContextState[];
   binding: ProjectBindingState;
+  confidence?: LaunchConfidenceState;
   selectedContextId?: string;
   selectionRequired: boolean;
   resolutionSource?: string;
   warnings: ResolutionWarning[];
   firstRun: boolean;
+  providerCredentialSessions: ProviderCredentialSession[];
 }
 
 export interface ProjectState {
@@ -48,6 +50,7 @@ export interface ContextState {
   name: string;
   editor: EditorState;
   providers: ProviderState[];
+  confidence?: LaunchConfidenceState;
   metadata?: Record<string, string>;
 }
 
@@ -59,8 +62,50 @@ export interface ProviderState {
   id: string;
   name: string;
   enabled: boolean;
-  state: string;
+  state: ProviderReadinessState;
   explanation?: string;
+  identity: ProviderIdentityState;
+}
+
+export type ProviderReadinessState = "ready" | "not_configured" | "directory_missing" | "unavailable";
+
+export type ProviderIdentityStatus = "verified" | "unavailable" | "none" | "mismatch_evidence";
+
+export interface ProviderIdentityState {
+  status: ProviderIdentityStatus;
+  message?: string;
+  codex?: CodexProviderIdentity;
+  claude?: ClaudeProviderIdentity;
+}
+
+export interface CodexProviderIdentity {
+  email?: string;
+  chatgptPlanType?: string;
+  chatgptAccountId?: string;
+}
+
+export interface ClaudeProviderIdentity {
+  subscriptionType?: string;
+  organizationUuid?: string;
+  organizationName?: string;
+}
+
+export type LaunchConfidenceStatus = "ready" | "needs_attention" | "blocked";
+
+export type LaunchConfidenceCheckComponent = "claude" | "codex" | "vscode" | "isolation";
+
+export interface LaunchConfidenceState {
+  contextId: string;
+  status: LaunchConfidenceStatus;
+  checks: LaunchConfidenceCheck[];
+}
+
+export interface LaunchConfidenceCheck {
+  component: LaunchConfidenceCheckComponent;
+  severity: LaunchConfidenceStatus;
+  label: string;
+  message: string;
+  actionHint?: string;
 }
 
 export interface ProjectBindingState {
@@ -86,6 +131,19 @@ export interface LaunchProjectRequest {
   confirmContextMismatch?: boolean;
 }
 
+export interface PreflightLaunchProjectRequest {
+  projectPath?: string;
+  contextId: string;
+  confirmContextMismatch?: boolean;
+}
+
+export interface PreflightLaunchProjectResult {
+  project: ProjectState;
+  context: ContextState;
+  confidence: LaunchConfidenceState;
+  warnings: ResolutionWarning[];
+}
+
 export interface LaunchProjectResult {
   project: ProjectState;
   context: ContextState;
@@ -103,14 +161,36 @@ export interface UnbindProjectRequest {
 
 export interface CreateContextRequest {
   contextId: string;
+  importProviderIds?: string[];
 }
 
 export interface CreateContextResult {
   context: ContextState;
 }
 
+export interface ProviderCredentialSession {
+  providerId: string;
+  name: string;
+  metadataAvailable: boolean;
+  codex?: CodexCredentialSession;
+  claude?: ClaudeCredentialSession;
+}
+
+export interface CodexCredentialSession {
+  email?: string;
+  chatgptPlanType?: string;
+  chatgptAccountId?: string;
+}
+
+export interface ClaudeCredentialSession {
+  subscriptionType?: string;
+  organizationUuid?: string;
+  organizationName?: string;
+}
+
 export interface DevContextApi {
   getLaunchState(request?: GetLaunchStateRequest): Promise<ApiResult<LaunchState>>;
+  preflightLaunchProject(request: PreflightLaunchProjectRequest): Promise<ApiResult<PreflightLaunchProjectResult>>;
   launchProject(request: LaunchProjectRequest): Promise<ApiResult<LaunchProjectResult>>;
   bindProject(request: BindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
   unbindProject(request?: UnbindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
@@ -119,6 +199,7 @@ export interface DevContextApi {
 
 export interface WailsBindings {
   getLaunchState(request: GetLaunchStateRequest): Promise<unknown>;
+  preflightLaunchProject(request: PreflightLaunchProjectRequest): Promise<unknown>;
   launchProject(request: LaunchProjectRequest): Promise<unknown>;
   bindProject(request: BindProjectRequest): Promise<unknown>;
   unbindProject(request: UnbindProjectRequest): Promise<unknown>;
@@ -129,6 +210,16 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
   return {
     getLaunchState(request = {}) {
       return callBinding(() => bindings.getLaunchState(request), normalizeLaunchState);
+    },
+    preflightLaunchProject(request) {
+      return callBinding(
+        () =>
+          bindings.preflightLaunchProject({
+            ...request,
+            confirmContextMismatch: request.confirmContextMismatch ?? false,
+          }),
+        normalizePreflightLaunchProjectResult,
+      );
     },
     launchProject(request) {
       return callBinding(
@@ -156,6 +247,13 @@ const generatedBindings: WailsBindings = {
   async getLaunchState(request) {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
     return bindings.GetLaunchState(request);
+  },
+  async preflightLaunchProject(request) {
+    const bindings = await import("../../wailsjs/go/wailsapp/App");
+    return bindings.PreflightLaunchProject({
+      ...request,
+      confirmContextMismatch: request.confirmContextMismatch ?? false,
+    });
   },
   async launchProject(request) {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
@@ -216,12 +314,61 @@ function normalizeLaunchState(value: unknown): LaunchState {
     project: normalizeProjectState(object.project),
     contexts: arrayValue(object.contexts).map(normalizeContextState),
     binding: normalizeProjectBindingState(object.binding),
+    confidence: normalizeLaunchConfidenceState(object.confidence),
     selectedContextId: optionalString(object.selectedContextId),
     selectionRequired: booleanValue(object.selectionRequired),
     resolutionSource: optionalString(object.resolutionSource),
     warnings: arrayValue(object.warnings).map(normalizeResolutionWarning),
     firstRun: booleanValue(object.firstRun),
+    providerCredentialSessions: arrayValue(object.providerCredentialSessions).map(normalizeProviderCredentialSession),
   };
+}
+
+function normalizeLaunchConfidenceState(value: unknown): LaunchConfidenceState | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const object = objectValue(value);
+  return {
+    contextId: stringValue(object.contextId),
+    status: normalizeLaunchConfidenceStatus(object.status),
+    checks: arrayValue(object.checks).map(normalizeLaunchConfidenceCheck),
+  };
+}
+
+function normalizeLaunchConfidenceCheck(value: unknown): LaunchConfidenceCheck {
+  const object = objectValue(value);
+  return {
+    component: normalizeLaunchConfidenceCheckComponent(object.component),
+    severity: normalizeLaunchConfidenceStatus(object.severity),
+    label: stringValue(object.label),
+    message: stringValue(object.message),
+    actionHint: optionalString(object.actionHint),
+  };
+}
+
+function normalizeLaunchConfidenceStatus(value: unknown): LaunchConfidenceStatus {
+  switch (value) {
+    case "ready":
+    case "needs_attention":
+    case "blocked":
+      return value;
+    default:
+      throw new Error("Invalid Dev Context response.");
+  }
+}
+
+function normalizeLaunchConfidenceCheckComponent(value: unknown): LaunchConfidenceCheckComponent {
+  switch (value) {
+    case "claude":
+    case "codex":
+    case "vscode":
+    case "isolation":
+      return value;
+    default:
+      throw new Error("Invalid Dev Context response.");
+  }
 }
 
 function normalizeLaunchProjectResult(value: unknown): LaunchProjectResult {
@@ -231,6 +378,24 @@ function normalizeLaunchProjectResult(value: unknown): LaunchProjectResult {
     context: normalizeContextState(object.context),
     warnings: arrayValue(object.warnings).map(normalizeResolutionWarning),
   };
+}
+
+function normalizePreflightLaunchProjectResult(value: unknown): PreflightLaunchProjectResult {
+  const object = objectValue(value);
+  return {
+    project: normalizeProjectState(object.project),
+    context: normalizeContextState(object.context),
+    confidence: requiredLaunchConfidenceState(object.confidence),
+    warnings: arrayValue(object.warnings).map(normalizeResolutionWarning),
+  };
+}
+
+function requiredLaunchConfidenceState(value: unknown): LaunchConfidenceState {
+  const confidence = normalizeLaunchConfidenceState(value);
+  if (confidence === undefined) {
+    throw new Error("Invalid Dev Context response.");
+  }
+  return confidence;
 }
 
 function normalizeCreateContextResult(value: unknown): CreateContextResult {
@@ -255,6 +420,7 @@ function normalizeContextState(value: unknown): ContextState {
     name: stringValue(object.name),
     editor: normalizeEditorState(object.editor),
     providers: arrayValue(object.providers).map(normalizeProviderState),
+    confidence: normalizeLaunchConfidenceState(object.confidence),
     metadata: optionalStringRecord(object.metadata),
   };
 }
@@ -272,8 +438,106 @@ function normalizeProviderState(value: unknown): ProviderState {
     id: stringValue(object.id),
     name: stringValue(object.name),
     enabled: booleanValue(object.enabled),
-    state: stringValue(object.state),
+    state: normalizeProviderReadinessState(object.state),
     explanation: optionalString(object.explanation),
+    identity: normalizeProviderIdentityState(object.identity),
+  };
+}
+
+function normalizeProviderReadinessState(value: unknown): ProviderReadinessState {
+  switch (value) {
+    case "ready":
+    case "not_configured":
+    case "directory_missing":
+    case "unavailable":
+      return value;
+    default:
+      throw new Error("Invalid Dev Context response.");
+  }
+}
+
+function normalizeProviderIdentityState(value: unknown): ProviderIdentityState {
+  if (value === undefined || value === null) {
+    return { status: "none" };
+  }
+
+  const object = objectValue(value);
+  return {
+    status: normalizeProviderIdentityStatus(object.status),
+    message: optionalString(object.message),
+    codex: normalizeCodexProviderIdentity(object.codex),
+    claude: normalizeClaudeProviderIdentity(object.claude),
+  };
+}
+
+function normalizeProviderIdentityStatus(value: unknown): ProviderIdentityStatus {
+  switch (value) {
+    case "verified":
+    case "unavailable":
+    case "none":
+    case "mismatch_evidence":
+      return value;
+    default:
+      throw new Error("Invalid Dev Context response.");
+  }
+}
+
+function normalizeCodexProviderIdentity(value: unknown): CodexProviderIdentity | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const object = objectValue(value);
+  return {
+    email: optionalString(object.email),
+    chatgptPlanType: optionalString(object.chatgptPlanType),
+    chatgptAccountId: optionalString(object.chatgptAccountId),
+  };
+}
+
+function normalizeClaudeProviderIdentity(value: unknown): ClaudeProviderIdentity | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const object = objectValue(value);
+  return {
+    subscriptionType: optionalString(object.subscriptionType),
+    organizationUuid: optionalString(object.organizationUuid),
+    organizationName: optionalString(object.organizationName),
+  };
+}
+
+function normalizeProviderCredentialSession(value: unknown): ProviderCredentialSession {
+  const object = objectValue(value);
+  return {
+    providerId: stringValue(object.providerId),
+    name: stringValue(object.name),
+    metadataAvailable: booleanValue(object.metadataAvailable),
+    codex: normalizeCodexCredentialSession(object.codex),
+    claude: normalizeClaudeCredentialSession(object.claude),
+  };
+}
+
+function normalizeCodexCredentialSession(value: unknown): CodexCredentialSession | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const object = objectValue(value);
+  return {
+    email: optionalString(object.email),
+    chatgptPlanType: optionalString(object.chatgptPlanType),
+    chatgptAccountId: optionalString(object.chatgptAccountId),
+  };
+}
+
+function normalizeClaudeCredentialSession(value: unknown): ClaudeCredentialSession | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const object = objectValue(value);
+  return {
+    subscriptionType: optionalString(object.subscriptionType),
+    organizationUuid: optionalString(object.organizationUuid),
+    organizationName: optionalString(object.organizationName),
   };
 }
 

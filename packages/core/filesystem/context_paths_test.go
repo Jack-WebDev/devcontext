@@ -1,10 +1,12 @@
 package filesystem_test
 
 import (
+	"reflect"
 	"testing"
 
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/filesystem"
+	"devctx/packages/core/provider"
 )
 
 func TestDeriveContextPathsFromUnixHome(t *testing.T) {
@@ -18,14 +20,17 @@ func TestDeriveContextPathsFromUnixHome(t *testing.T) {
 	}
 
 	assertContextPaths(t, contextPaths, filesystem.ContextPaths{
-		ContextID:         devcontext.MustID("personal"),
-		RootDir:           "/home/alex/.devctx/contexts/personal",
-		ConfigPath:        "/home/alex/.devctx/contexts/personal/context.toml",
-		ClaudeDir:         "/home/alex/.devctx/contexts/personal/claude",
-		CodexDir:          "/home/alex/.devctx/contexts/personal/codex",
-		VSCodeDir:         "/home/alex/.devctx/contexts/personal/vscode",
-		VSCodeUserDataDir: "/home/alex/.devctx/contexts/personal/vscode/user-data",
+		ContextID:              devcontext.MustID("personal"),
+		RootDir:                "/home/alex/.devctx/contexts/personal",
+		ConfigPath:             "/home/alex/.devctx/contexts/personal/context.toml",
+		ProviderStorageRootDir: "/home/alex/.devctx/contexts/personal/providers",
+		ProviderStorageDirs:    map[provider.ID]string{},
+		VSCodeDir:              "/home/alex/.devctx/contexts/personal/vscode",
+		VSCodeUserDataDir:      "/home/alex/.devctx/contexts/personal/vscode/user-data",
 	})
+	if got := contextPaths.ProviderStorageDir(provider.CodexID); got != "/home/alex/.devctx/contexts/personal/providers/codex" {
+		t.Fatalf("codex provider storage dir = %q", got)
+	}
 }
 
 func TestDeriveContextPathsFromWindowsHome(t *testing.T) {
@@ -39,20 +44,23 @@ func TestDeriveContextPathsFromWindowsHome(t *testing.T) {
 	}
 
 	assertContextPaths(t, contextPaths, filesystem.ContextPaths{
-		ContextID:         devcontext.MustID("client-a"),
-		RootDir:           `C:\Users\Alex\.devctx\contexts\client-a`,
-		ConfigPath:        `C:\Users\Alex\.devctx\contexts\client-a\context.toml`,
-		ClaudeDir:         `C:\Users\Alex\.devctx\contexts\client-a\claude`,
-		CodexDir:          `C:\Users\Alex\.devctx\contexts\client-a\codex`,
-		VSCodeDir:         `C:\Users\Alex\.devctx\contexts\client-a\vscode`,
-		VSCodeUserDataDir: `C:\Users\Alex\.devctx\contexts\client-a\vscode\user-data`,
+		ContextID:              devcontext.MustID("client-a"),
+		RootDir:                `C:\Users\Alex\.devctx\contexts\client-a`,
+		ConfigPath:             `C:\Users\Alex\.devctx\contexts\client-a\context.toml`,
+		ProviderStorageRootDir: `C:\Users\Alex\.devctx\contexts\client-a\providers`,
+		ProviderStorageDirs:    map[provider.ID]string{},
+		VSCodeDir:              `C:\Users\Alex\.devctx\contexts\client-a\vscode`,
+		VSCodeUserDataDir:      `C:\Users\Alex\.devctx\contexts\client-a\vscode\user-data`,
 	})
+	if got := contextPaths.ProviderStorageDir(provider.ClaudeID); got != `C:\Users\Alex\.devctx\contexts\client-a\providers\claude` {
+		t.Fatalf("claude provider storage dir = %q", got)
+	}
 }
 
 func assertContextPaths(t *testing.T, got filesystem.ContextPaths, want filesystem.ContextPaths) {
 	t.Helper()
 
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("context paths = %#v, want %#v", got, want)
 	}
 }

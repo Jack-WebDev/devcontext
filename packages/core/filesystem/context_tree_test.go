@@ -33,10 +33,10 @@ func TestCreateContextDirectoryTreeCreatesCompleteRestrictedTree(t *testing.T) {
 
 	for _, dir := range []string{
 		contextPaths.RootDir,
-		contextPaths.ClaudeDir,
-		contextPaths.CodexDir,
 		contextPaths.VSCodeDir,
 		contextPaths.VSCodeUserDataDir,
+		contextPaths.ProviderStorageDir(provider.ClaudeID),
+		contextPaths.ProviderStorageDir(provider.CodexID),
 	} {
 		assertDirectoryExists(t, dir)
 		assertRestrictedMode(t, dir, filesystem.RestrictedDirectoryMode)
@@ -54,20 +54,52 @@ func TestCreateContextDirectoryTreeCreatesCompleteRestrictedTree(t *testing.T) {
 		t.Fatalf("decoded context = %#v, want %#v", decoded, ctx)
 	}
 	assertRestrictedMode(t, contextPaths.ConfigPath, filesystem.RestrictedFileMode)
-	assertDirectoryEmpty(t, contextPaths.ClaudeDir)
-	assertDirectoryEmpty(t, contextPaths.CodexDir)
+	assertDirectoryEmpty(t, contextPaths.ProviderStorageDir(provider.ClaudeID))
+	assertDirectoryEmpty(t, contextPaths.ProviderStorageDir(provider.CodexID))
+	assertDirectoryExists(t, contextPaths.VSCodeDir)
 	assertDirectoryEmpty(t, contextPaths.VSCodeUserDataDir)
+}
+
+func TestCreateContextDirectoryTreeUsesRegisteredEnabledProviders(t *testing.T) {
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return t.TempDir(), nil
+	})
+	contextID := devcontext.MustID("client-a")
+	contextPaths, err := filesystem.DeriveContextPaths(platformPaths, contextID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	ctx := contextTreeContext(contextID, "Client A")
+	ctx.Providers = provider.Configs{
+		"registered": {Enabled: true},
+		"disabled":   {Enabled: false},
+		"unknown":    {Enabled: true},
+	}
+	registry := provider.MustNewRegistry([]provider.Provider{
+		contextTreeFakeProvider{id: "registered", displayName: "Registered Provider"},
+		contextTreeFakeProvider{id: "disabled", displayName: "Disabled Provider"},
+	})
+
+	if err := filesystem.CreateContextDirectoryTreeWithProviderRegistry(contextPaths, ctx, registry); err != nil {
+		t.Fatalf("create context directory tree: %v", err)
+	}
+
+	assertDirectoryExists(t, contextPaths.RootDir)
+	assertDirectoryExists(t, contextPaths.VSCodeDir)
+	assertDirectoryExists(t, contextPaths.VSCodeUserDataDir)
+	assertDirectoryExists(t, contextPaths.ProviderStorageDir("registered"))
+	assertPathMissing(t, contextPaths.ProviderStorageDir("disabled"))
+	assertPathMissing(t, contextPaths.ProviderStorageDir("unknown"))
 }
 
 func TestCreateContextDirectoryTreeRejectsMismatchedContextID(t *testing.T) {
 	contextPaths := filesystem.ContextPaths{
-		ContextID:         devcontext.MustID("company"),
-		RootDir:           "/devctx/contexts/company",
-		ConfigPath:        "/devctx/contexts/company/context.toml",
-		ClaudeDir:         "/devctx/contexts/company/claude",
-		CodexDir:          "/devctx/contexts/company/codex",
-		VSCodeDir:         "/devctx/contexts/company/vscode",
-		VSCodeUserDataDir: "/devctx/contexts/company/vscode/user-data",
+		ContextID:              devcontext.MustID("company"),
+		RootDir:                "/devctx/contexts/company",
+		ConfigPath:             "/devctx/contexts/company/context.toml",
+		ProviderStorageRootDir: "/devctx/contexts/company/providers",
+		VSCodeDir:              "/devctx/contexts/company/vscode",
+		VSCodeUserDataDir:      "/devctx/contexts/company/vscode/user-data",
 	}
 	ctx := contextTreeContext(devcontext.MustID("personal"), "Personal")
 
@@ -92,7 +124,7 @@ func TestCreateContextDirectoryTreeRejectsDuplicateWithoutModifyingTree(t *testi
 	if err := filesystem.CreateContextDirectoryTree(contextPaths, original); err != nil {
 		t.Fatalf("create original context directory tree: %v", err)
 	}
-	sentinelPath := filepath.Join(contextPaths.ClaudeDir, "auth-state.json")
+	sentinelPath := filepath.Join(contextPaths.ProviderStorageDir(provider.ClaudeID), "auth-state.json")
 	if err := os.WriteFile(sentinelPath, []byte("keep me"), 0o600); err != nil {
 		t.Fatalf("write sentinel file: %v", err)
 	}
@@ -134,17 +166,12 @@ func TestValidateContextDirectoryTreeReportsIncompleteStorage(t *testing.T) {
 	if err := filesystem.CreateContextDirectoryTree(contextPaths, ctx); err != nil {
 		t.Fatalf("create context directory tree: %v", err)
 	}
-	if err := os.RemoveAll(contextPaths.CodexDir); err != nil {
+	contextPaths = contextPaths.WithProviderStorageDirs([]provider.ID{provider.ClaudeID, provider.CodexID})
+	if err := os.RemoveAll(contextPaths.ProviderStorageDir(provider.CodexID)); err != nil {
 		t.Fatalf("remove codex dir: %v", err)
 	}
-	if err := os.RemoveAll(contextPaths.VSCodeDir); err != nil {
-		t.Fatalf("remove vscode dir: %v", err)
-	}
-	if err := os.WriteFile(contextPaths.VSCodeDir, []byte("not a directory"), 0o600); err != nil {
-		t.Fatalf("write vscode file: %v", err)
-	}
 
-	err = filesystem.ValidateContextDirectoryTree(contextPaths)
+	err = filesystem.ValidateContextDirectoryTreeWithProviderRegistry(contextPaths, ctx, provider.BuiltInRegistry())
 	if !errors.Is(err, filesystem.ErrContextStorageIncomplete) {
 		t.Fatalf("error = %v, want %v", err, filesystem.ErrContextStorageIncomplete)
 	}
@@ -154,19 +181,96 @@ func TestValidateContextDirectoryTreeReportsIncompleteStorage(t *testing.T) {
 	}
 	wantMissing := []filesystem.MissingContextDirectory{
 		{
-			Kind:   filesystem.ContextDirectoryCodex,
-			Path:   contextPaths.CodexDir,
-			Reason: "missing",
+			Kind:                filesystem.ContextDirectoryProvider,
+			ProviderID:          string(provider.CodexID),
+			ProviderDisplayName: "Codex",
+			Path:                contextPaths.ProviderStorageDir(provider.CodexID),
+			Reason:              "missing",
 		},
+	}
+	if !reflect.DeepEqual(storageErr.Missing, wantMissing) {
+		t.Fatalf("missing directories = %#v, want %#v", storageErr.Missing, wantMissing)
+	}
+}
+
+func TestValidateContextDirectoryTreeChecksEditorStorage(t *testing.T) {
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return t.TempDir(), nil
+	})
+	contextID := devcontext.MustID("client-a")
+	contextPaths, err := filesystem.DeriveContextPaths(platformPaths, contextID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	ctx := contextTreeContext(contextID, "Client A")
+	if err := filesystem.CreateContextDirectoryTree(contextPaths, ctx); err != nil {
+		t.Fatalf("create context directory tree: %v", err)
+	}
+	if err := os.RemoveAll(contextPaths.VSCodeUserDataDir); err != nil {
+		t.Fatalf("remove vscode user data dir: %v", err)
+	}
+
+	err = filesystem.ValidateContextDirectoryTreeWithProviderRegistry(contextPaths, ctx, provider.BuiltInRegistry())
+	if !errors.Is(err, filesystem.ErrContextStorageIncomplete) {
+		t.Fatalf("error = %v, want %v", err, filesystem.ErrContextStorageIncomplete)
+	}
+	var storageErr *filesystem.ContextStorageError
+	if !errors.As(err, &storageErr) {
+		t.Fatalf("error = %T, want *filesystem.ContextStorageError", err)
+	}
+	wantMissing := []filesystem.MissingContextDirectory{
 		{
-			Kind:   filesystem.ContextDirectoryVSCode,
-			Path:   contextPaths.VSCodeDir,
-			Reason: "not a directory",
-		},
-		{
-			Kind:   filesystem.ContextDirectoryVSCodeUserData,
+			Kind:   filesystem.ContextDirectoryEditor,
 			Path:   contextPaths.VSCodeUserDataDir,
 			Reason: "missing",
+		},
+	}
+	if !reflect.DeepEqual(storageErr.Missing, wantMissing) {
+		t.Fatalf("missing directories = %#v, want %#v", storageErr.Missing, wantMissing)
+	}
+}
+
+func TestValidateContextDirectoryTreeUsesRegisteredEnabledProviders(t *testing.T) {
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return t.TempDir(), nil
+	})
+	contextID := devcontext.MustID("client-a")
+	contextPaths, err := filesystem.DeriveContextPaths(platformPaths, contextID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	ctx := contextTreeContext(contextID, "Client A")
+	ctx.Providers = provider.Configs{
+		"registered": {Enabled: true},
+		"disabled":   {Enabled: false},
+		"unknown":    {Enabled: true},
+	}
+	registry := provider.MustNewRegistry([]provider.Provider{
+		contextTreeFakeProvider{id: "registered", displayName: "Registered Provider"},
+		contextTreeFakeProvider{id: "disabled", displayName: "Disabled Provider"},
+	})
+	if err := filesystem.CreateContextDirectoryTreeWithProviderRegistry(contextPaths, ctx, registry); err != nil {
+		t.Fatalf("create context directory tree: %v", err)
+	}
+	if err := os.RemoveAll(contextPaths.ProviderStorageDir("registered")); err != nil {
+		t.Fatalf("remove registered provider dir: %v", err)
+	}
+
+	err = filesystem.ValidateContextDirectoryTreeWithProviderRegistry(contextPaths, ctx, registry)
+	if !errors.Is(err, filesystem.ErrContextStorageIncomplete) {
+		t.Fatalf("error = %v, want %v", err, filesystem.ErrContextStorageIncomplete)
+	}
+	var storageErr *filesystem.ContextStorageError
+	if !errors.As(err, &storageErr) {
+		t.Fatalf("error = %T, want *filesystem.ContextStorageError", err)
+	}
+	wantMissing := []filesystem.MissingContextDirectory{
+		{
+			Kind:                filesystem.ContextDirectoryProvider,
+			ProviderID:          "registered",
+			ProviderDisplayName: "Registered Provider",
+			Path:                contextPaths.ProviderStorageDir("registered"),
+			Reason:              "missing",
 		},
 	}
 	if !reflect.DeepEqual(storageErr.Missing, wantMissing) {
@@ -257,6 +361,16 @@ func assertDirectoryEmpty(t *testing.T, path string) {
 	}
 }
 
+func assertPathMissing(t *testing.T, path string) {
+	t.Helper()
+
+	if _, err := os.Stat(path); err == nil {
+		t.Fatalf("path %s exists, want missing", path)
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat path %s: %v", path, err)
+	}
+}
+
 func snapshotTree(t *testing.T, root string) map[string]string {
 	t.Helper()
 
@@ -301,4 +415,28 @@ func contextTreeContext(id devcontext.ID, name string) devcontext.Context {
 		},
 		CreatedAt: time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC),
 	}
+}
+
+type contextTreeFakeProvider struct {
+	id          provider.ID
+	displayName string
+}
+
+func (p contextTreeFakeProvider) ID() provider.ID {
+	return p.id
+}
+
+func (p contextTreeFakeProvider) DisplayName() string {
+	if p.displayName != "" {
+		return p.displayName
+	}
+	return string(p.id)
+}
+
+func (p contextTreeFakeProvider) BuildEnvironment(provider.RuntimeContext) (provider.EnvironmentContribution, error) {
+	return nil, nil
+}
+
+func (p contextTreeFakeProvider) Status(provider.RuntimeContext) (provider.Status, error) {
+	return provider.ReadyStatus(), nil
 }

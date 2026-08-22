@@ -10,12 +10,18 @@ import {
   shouldRenderFirstRunWelcome,
 } from "../.tmp-test/src/components/selector/FirstRunWelcome.js";
 import {GuiErrorNotice} from "../.tmp-test/src/components/selector/GuiErrorNotice.js";
+import {ProviderCredentialClassification} from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
 import {ProjectIdentity} from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import {
   boundContextName,
   RememberProjectControl,
 } from "../.tmp-test/src/components/selector/RememberProjectControl.js";
 import {SelectorActions} from "../.tmp-test/src/components/selector/SelectorActions.js";
+import {
+  confidenceStatusPresentation,
+  SelectorConfidenceSummary,
+} from "../.tmp-test/src/components/selector/SelectorConfidenceSummary.js";
+import {SelectorLayout} from "../.tmp-test/src/components/selector/SelectorLayout.js";
 import {cancelSelector} from "../.tmp-test/src/components/selector/cancel-action.js";
 import {missingDefaultContextIds} from "../.tmp-test/src/components/selector/default-context-actions.js";
 import {
@@ -99,6 +105,89 @@ test("first-run welcome disables setup actions until handlers are wired", () => 
   const html = renderToStaticMarkup(FirstRunWelcome({launchState: state}));
 
   assert.match(html, /disabled=""/);
+});
+
+test("first-run welcome requires detected provider sessions to be classified before creation", () => {
+  const state = launchStateFixture({
+    contexts: [],
+    firstRun: true,
+    providerCredentialSessions: providerCredentialSessionsFixture(),
+  });
+
+  const unassigned = renderToStaticMarkup(
+    FirstRunWelcome({
+      launchState: state,
+      providerCredentialSessions: state.providerCredentialSessions,
+      providerSessionAssignments: {},
+      onCreatePersonal: () => {},
+      onCreateCompany: () => {},
+      onClassifyProviderSession: () => {},
+    }),
+  );
+  const assigned = renderToStaticMarkup(
+    FirstRunWelcome({
+      launchState: state,
+      providerCredentialSessions: state.providerCredentialSessions,
+      providerSessionAssignments: {codex: "company", claude: "personal"},
+      onCreatePersonal: () => {},
+      onCreateCompany: () => {},
+      onClassifyProviderSession: () => {},
+    }),
+  );
+
+  assert.ok(unassigned.includes("Classify detected provider sessions"));
+  assert.ok(unassigned.includes("Email:"));
+  assert.ok(unassigned.includes("user@company.com"));
+  assert.ok(unassigned.includes("Plan:"));
+  assert.ok(unassigned.includes("Business"));
+  assert.ok(unassigned.includes("Subscription:"));
+  assert.ok(unassigned.includes("Pro"));
+  assert.ok(unassigned.includes("Organization:"));
+  assert.ok(unassigned.includes("Jishin Labs"));
+  assert.ok(unassigned.includes("Organization ID:"));
+  assert.ok(unassigned.includes("e783"));
+  assert.match(unassigned, /disabled=""/);
+  assert.doesNotMatch(assigned, /disabled=""/);
+});
+
+test("provider credential classification renders only safe metadata fields", () => {
+  const html = renderToStaticMarkup(
+    ProviderCredentialClassification({
+      sessions: [
+        {
+          ...providerCredentialSessionsFixture()[0],
+          codex: {
+            ...providerCredentialSessionsFixture()[0].codex,
+            accessToken: "codex-access-token-secret",
+            refreshToken: "codex-refresh-token-secret",
+            idToken: "header.payload.signature",
+          },
+        },
+        {
+          ...providerCredentialSessionsFixture()[1],
+          claude: {
+            ...providerCredentialSessionsFixture()[1].claude,
+            accessToken: "claude-access-token-secret",
+            refreshToken: "claude-refresh-token-secret",
+          },
+        },
+      ],
+      assignments: {codex: "personal"},
+      onClassify: () => {},
+    }),
+  );
+
+  assert.ok(html.includes("Codex"));
+  assert.ok(html.includes("Claude"));
+  assert.ok(html.includes("user@company.com"));
+  assert.ok(html.includes("Business"));
+  assert.ok(html.includes("acct_123"));
+  assert.ok(html.includes("Pro"));
+  assert.ok(html.includes("Jishin Labs"));
+  assert.ok(html.includes("e783"));
+  assert.doesNotMatch(html, /access-token-secret/);
+  assert.doesNotMatch(html, /refresh-token-secret/);
+  assert.doesNotMatch(html, /header\.payload\.signature/);
 });
 
 test("first-run welcome shows pending and error states", () => {
@@ -189,9 +278,9 @@ test("context card renders as a selectable control when wired", () => {
 test("context card renders enabled provider status variants with accessible names", () => {
   const context = contextFixture("personal", "Personal", [
     providerFixture("claude-ready", "Claude", true, "ready"),
-    providerFixture("codex-not-configured", "Codex", true, "not_configured", "Codex context directory is empty"),
+    providerFixture("codex-not-configured", "Codex", true, "not_configured", "Codex isolated provider state was not found"),
     providerFixture("claude-missing", "Claude", true, "directory_missing", "Claude context directory is missing"),
-    providerFixture("codex-unavailable", "Codex", true, "unavailable", "Codex command was not found"),
+    providerFixture("codex-unavailable", "Codex", true, "unavailable", "Codex context directory could not be inspected"),
     providerFixture("disabled", "Disabled Provider", false, "ready"),
   ]);
   const html = renderToStaticMarkup(ContextCard({context}));
@@ -200,13 +289,13 @@ test("context card renders enabled provider status variants with accessible name
   assert.match(html, /Codex local status: Not configured/);
   assert.match(html, /Claude local status: Directory missing/);
   assert.match(html, /Codex local status: Unavailable/);
-  assert.ok(html.includes("Codex context directory is empty"));
+  assert.ok(html.includes("Codex isolated provider state was not found"));
   assert.ok(!html.includes("Disabled Provider"));
 });
 
 test("context card attaches authentication guidance to not configured Claude and Codex providers", () => {
   const personal = contextFixture("personal", "Personal", [
-    providerFixture("codex", "Codex", true, "not_configured", "Codex context directory is empty"),
+    providerFixture("codex", "Codex", true, "not_configured", "Codex isolated provider state was not found"),
     providerFixture("claude", "Claude", true, "ready"),
   ]);
   const company = contextFixture("company", "Company", [
@@ -218,9 +307,8 @@ test("context card attaches authentication guidance to not configured Claude and
     renderToStaticMarkup(ContextCard({context: company})),
   ].join("");
 
-  assert.ok(html.includes("Codex is enabled for Personal but is not signed in yet."));
-  assert.ok(html.includes("Open Personal, then sign in with Codex inside that tool."));
-  assert.ok(html.includes("Dev Context will not copy credentials or ask for passwords or tokens."));
+  assert.ok(html.includes("Codex is enabled for Personal but no isolated provider state was found."));
+  assert.ok(html.includes("Open Personal, then sign in with the Codex VS Code extension."));
   assert.ok(!html.includes("Claude is enabled for Personal"));
   assert.ok(!html.includes("Codex is enabled for Company"));
   assert.ok(!html.includes("Internal Tool is enabled for Company"));
@@ -484,6 +572,59 @@ test("selector actions show launch as enabled and pending", () => {
   assert.ok(pending.includes("Launching..."));
 });
 
+test("selector layout keeps project, contexts, confidence, remember, and actions in order", () => {
+  const html = renderToStaticMarkup(
+    SelectorLayout({
+      projectIdentity: "Project identity",
+      contextCards: "Context cards",
+      confidenceSummary: "Confidence summary",
+      rememberControl: "Remember control",
+      launchActions: "Launch actions",
+    }),
+  );
+
+  const sections = [
+    'data-selector-layout-section="project-identity"',
+    'data-selector-layout-section="context-cards"',
+    'data-selector-layout-section="confidence-summary"',
+    'data-selector-layout-section="remember-control"',
+    'data-selector-layout-section="launch-actions"',
+  ];
+  assert.deepEqual(
+    sections.map((section) => html.indexOf(section) >= 0),
+    [true, true, true, true, true],
+  );
+  assert.deepEqual(
+    sections.map((section) => html.indexOf(section)),
+    [...sections.map((section) => html.indexOf(section))].sort((left, right) => left - right),
+  );
+});
+
+test("selector confidence summary renders selected context readiness", () => {
+  const selected = renderToStaticMarkup(
+    SelectorConfidenceSummary({
+      context: {
+        ...contextFixture("personal", "Personal"),
+        confidence: {
+          contextId: "personal",
+          status: "needs_attention",
+          checks: [],
+        },
+      },
+    }),
+  );
+  const empty = renderToStaticMarkup(SelectorConfidenceSummary({}));
+
+  assert.ok(selected.includes("Confidence summary"));
+  assert.ok(selected.includes("Personal"));
+  assert.ok(selected.includes("Needs attention"));
+  assert.ok(empty.includes("Select a context to review launch readiness."));
+  assert.deepEqual(
+    ["ready", "needs_attention", "blocked"].map((status) => confidenceStatusPresentation(status).label),
+    ["Ready", "Needs attention", "Blocked"],
+  );
+});
+
 test("selector critical path renders selected context and submits remembered launch", async () => {
   const launchState = launchStateFixture({
     binding: {
@@ -533,6 +674,10 @@ test("selector critical path renders selected context and submits remembered lau
       calls.push(["bindProject", request]);
       return Promise.resolve(projectBindingResult());
     },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(preflightLaunchProjectResult());
+    },
     launchProject(request) {
       calls.push(["launchProject", request]);
       return Promise.resolve(launchProjectResult());
@@ -542,6 +687,7 @@ test("selector critical path renders selected context and submits remembered lau
   assert.deepEqual(result, launchProjectResult());
   assert.deepEqual(calls, [
     ["bindProject", {projectPath: "/work/api", contextId: "company"}],
+    ["preflightLaunchProject", {projectPath: "/work/api", contextId: "company"}],
     ["launchProject", {projectPath: "/work/api", contextId: "company"}],
   ]);
 });
@@ -554,6 +700,10 @@ test("launch action does nothing without a selected context", async () => {
     bindProject(request) {
       calls.push(["bindProject", request]);
       return Promise.resolve(projectBindingResult());
+    },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(preflightLaunchProjectResult());
     },
     launchProject(request) {
       calls.push(["launchProject", request]);
@@ -575,6 +725,10 @@ test("launch action launches the selected context when remember is off", async (
       calls.push(["bindProject", request]);
       return Promise.resolve(projectBindingResult());
     },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(preflightLaunchProjectResult());
+    },
     launchProject(request) {
       calls.push(["launchProject", request]);
       return Promise.resolve(launchProjectResult());
@@ -583,6 +737,7 @@ test("launch action launches the selected context when remember is off", async (
 
   assert.deepEqual(result, launchProjectResult());
   assert.deepEqual(calls, [
+    ["preflightLaunchProject", {projectPath: "/work/api", contextId: "personal"}],
     ["launchProject", {projectPath: "/work/api", contextId: "personal"}],
   ]);
 });
@@ -597,6 +752,10 @@ test("launch action binds before launch when remember is on", async () => {
       calls.push(["bindProject", request]);
       return Promise.resolve(projectBindingResult());
     },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(preflightLaunchProjectResult());
+    },
     launchProject(request) {
       calls.push(["launchProject", request]);
       return Promise.resolve(launchProjectResult());
@@ -606,6 +765,7 @@ test("launch action binds before launch when remember is on", async () => {
   assert.deepEqual(result, launchProjectResult());
   assert.deepEqual(calls, [
     ["bindProject", {projectPath: "/work/api", contextId: "company"}],
+    ["preflightLaunchProject", {projectPath: "/work/api", contextId: "company"}],
     ["launchProject", {projectPath: "/work/api", contextId: "company"}],
   ]);
 });
@@ -620,6 +780,10 @@ test("launch action returns binding errors without launching", async () => {
       calls.push(["bindProject", request]);
       return Promise.resolve(apiError("validation_error", "Unable to complete request.", "Check the selected project and context, then retry."));
     },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(preflightLaunchProjectResult());
+    },
     launchProject(request) {
       calls.push(["launchProject", request]);
       return Promise.resolve(launchProjectResult());
@@ -629,6 +793,33 @@ test("launch action returns binding errors without launching", async () => {
   assert.deepEqual(result, apiError("validation_error", "Unable to complete request.", "Check the selected project and context, then retry."));
   assert.deepEqual(calls, [
     ["bindProject", {projectPath: "/work/api", contextId: "company"}],
+  ]);
+});
+
+test("launch action returns preflight errors without launching", async () => {
+  const calls = [];
+  const error = apiError("launch_error", "Unable to launch editor.", "Check the editor command.");
+  const result = await launchSelectedContext({
+    projectPath: "/work/api",
+    selectedContextId: "personal",
+    rememberProject: false,
+    bindProject(request) {
+      calls.push(["bindProject", request]);
+      return Promise.resolve(projectBindingResult());
+    },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(error);
+    },
+    launchProject(request) {
+      calls.push(["launchProject", request]);
+      return Promise.resolve(launchProjectResult());
+    },
+  });
+
+  assert.deepEqual(result, error);
+  assert.deepEqual(calls, [
+    ["preflightLaunchProject", {projectPath: "/work/api", contextId: "personal"}],
   ]);
 });
 
@@ -643,6 +834,10 @@ test("launch action resubmits explicit context mismatch confirmation", async () 
       calls.push(["bindProject", request]);
       return Promise.resolve(projectBindingResult());
     },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(preflightLaunchProjectResult());
+    },
     launchProject(request) {
       calls.push(["launchProject", request]);
       return Promise.resolve(launchProjectResult());
@@ -651,6 +846,14 @@ test("launch action resubmits explicit context mismatch confirmation", async () 
 
   assert.deepEqual(result, launchProjectResult());
   assert.deepEqual(calls, [
+    [
+      "preflightLaunchProject",
+      {
+        projectPath: "/work/api",
+        contextId: "personal",
+        confirmContextMismatch: true,
+      },
+    ],
     [
       "launchProject",
       {
@@ -739,6 +942,10 @@ test("context mismatch open anyway submits exactly one confirmed launch", async 
       calls.push(["bindProject", request]);
       return Promise.resolve(projectBindingResult());
     },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(preflightLaunchProjectResult());
+    },
     launchProject(request) {
       calls.push(["launchProject", request]);
       return Promise.resolve(launchProjectResult());
@@ -747,6 +954,14 @@ test("context mismatch open anyway submits exactly one confirmed launch", async 
 
   assert.deepEqual(result, launchProjectResult());
   assert.deepEqual(calls, [
+    [
+      "preflightLaunchProject",
+      {
+        projectPath: "/work/api",
+        contextId: "personal",
+        confirmContextMismatch: true,
+      },
+    ],
     [
       "launchProject",
       {
@@ -835,8 +1050,9 @@ test("onboarding context creation refreshes launch state after success", async (
 
   const result = await createOnboardingContextAndRefresh({
     contextId: "personal",
-    createContext(contextId) {
-      calls.push(["createContext", contextId]);
+    importProviderIds: ["codex"],
+    createContext(contextId, importProviderIds) {
+      calls.push(["createContext", contextId, importProviderIds]);
       return Promise.resolve({
         ok: true,
         data: {
@@ -861,7 +1077,7 @@ test("onboarding context creation refreshes launch state after success", async (
     launchState: refreshedState,
   });
   assert.deepEqual(calls, [
-    ["createContext", "personal"],
+    ["createContext", "personal", ["codex"]],
     ["getLaunchState"],
   ]);
 });
@@ -872,8 +1088,8 @@ test("onboarding context creation returns failures without refreshing", async ()
 
   const result = await createOnboardingContextAndRefresh({
     contextId: "company",
-    createContext(contextId) {
-      calls.push(["createContext", contextId]);
+    createContext(contextId, importProviderIds) {
+      calls.push(["createContext", contextId, importProviderIds]);
       return Promise.resolve(error);
     },
     getLaunchState() {
@@ -886,7 +1102,7 @@ test("onboarding context creation returns failures without refreshing", async ()
     ok: false,
     error: error.error,
   });
-  assert.deepEqual(calls, [["createContext", "company"]]);
+  assert.deepEqual(calls, [["createContext", "company", []]]);
 });
 
 function contextFixture(id, name, providers = []) {
@@ -905,6 +1121,9 @@ function providerFixture(id, name, enabled, state, explanation) {
     enabled,
     state,
     explanation,
+    identity: enabled && state === "ready"
+      ? {status: "unavailable", message: "Account identity unavailable."}
+      : {status: "none"},
   };
 }
 
@@ -924,8 +1143,34 @@ function launchStateFixture(overrides = {}) {
     selectionRequired: true,
     warnings: [],
     firstRun: false,
+    providerCredentialSessions: [],
     ...overrides,
   };
+}
+
+function providerCredentialSessionsFixture() {
+  return [
+    {
+      providerId: "codex",
+      name: "Codex",
+      metadataAvailable: true,
+      codex: {
+        email: "user@company.com",
+        chatgptPlanType: "Business",
+        chatgptAccountId: "acct_123",
+      },
+    },
+    {
+      providerId: "claude",
+      name: "Claude",
+      metadataAvailable: true,
+      claude: {
+        subscriptionType: "Pro",
+        organizationUuid: "e783",
+        organizationName: "Jishin Labs",
+      },
+    },
+  ];
 }
 
 function projectBindingResult() {
@@ -946,6 +1191,22 @@ function launchProjectResult() {
     data: {
       project: {name: "api", path: "/work/api"},
       context: contextFixture("personal", "Personal"),
+      warnings: [],
+    },
+  };
+}
+
+function preflightLaunchProjectResult() {
+  return {
+    ok: true,
+    data: {
+      project: {name: "api", path: "/work/api"},
+      context: contextFixture("personal", "Personal"),
+      confidence: {
+        contextId: "personal",
+        status: "ready",
+        checks: [],
+      },
       warnings: [],
     },
   };

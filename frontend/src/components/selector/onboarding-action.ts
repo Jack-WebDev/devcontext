@@ -2,7 +2,8 @@ import type { ApiResult, CreateContextResult, DisplayError, LaunchState } from "
 
 interface CreateOnboardingContextDependencies {
   contextId: string;
-  createContext: (contextId: string) => Promise<ApiResult<CreateContextResult>>;
+  importProviderIds?: string[];
+  createContext: (contextId: string, importProviderIds: string[]) => Promise<ApiResult<CreateContextResult>>;
   getLaunchState: () => Promise<ApiResult<LaunchState>>;
 }
 
@@ -13,7 +14,7 @@ type CreateOnboardingContextResult =
 async function createOnboardingContextAndRefresh(
   dependencies: CreateOnboardingContextDependencies,
 ): Promise<CreateOnboardingContextResult> {
-  const created = await dependencies.createContext(dependencies.contextId);
+  const created = await dependencies.createContext(dependencies.contextId, dependencies.importProviderIds ?? []);
   if (!created.ok) {
     return { ok: false, error: created.error };
   }

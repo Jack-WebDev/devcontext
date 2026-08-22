@@ -1,4 +1,5 @@
 import type { ContextState, ProjectBindingState } from "../../lib/devctx-api";
+import { Card } from "../ui/card.js";
 
 interface RememberProjectControlProps {
   binding: ProjectBindingState;
@@ -20,16 +21,16 @@ function RememberProjectControl({
   const boundContext = boundContextName(binding, contexts);
   if (boundContext !== undefined) {
     return (
-      <p className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+      <Card as="p" size="sm" className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
         This project is remembered for <span className="font-medium text-foreground">{boundContext}</span>.
-      </p>
+      </Card>
     );
   }
 
   const disabled = disabledByParent || selectedContextId === undefined;
 
   return (
-    <label className="flex items-start gap-3 border border-border p-3 text-sm">
+    <Card as="label" size="sm" className="flex-row items-start gap-3 border border-border p-3 text-sm">
       <input
         type="checkbox"
         className="mt-0.5 size-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed"
@@ -48,7 +49,7 @@ function RememberProjectControl({
             : "Use this context automatically for this project next time."}
         </span>
       </span>
-    </label>
+    </Card>
   );
 }
 

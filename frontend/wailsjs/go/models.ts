@@ -16,6 +16,7 @@ export namespace application {
 	}
 	export class CreateContextRequest {
 	    contextId: string;
+	    importProviderIds?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new CreateContextRequest(source);
@@ -24,6 +25,7 @@ export namespace application {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.contextId = source["contextId"];
+	        this.importProviderIds = source["importProviderIds"];
 	    }
 	}
 	export class GetLaunchStateRequest {
@@ -54,6 +56,22 @@ export namespace application {
 	        this.confirmContextMismatch = source["confirmContextMismatch"];
 	    }
 	}
+	export class PreflightLaunchProjectRequest {
+	    projectPath?: string;
+	    contextId: string;
+	    confirmContextMismatch: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PreflightLaunchProjectRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectPath = source["projectPath"];
+	        this.contextId = source["contextId"];
+	        this.confirmContextMismatch = source["confirmContextMismatch"];
+	    }
+	}
 	export class UnbindProjectRequest {
 	    projectPath?: string;
 	
@@ -68,4 +86,3 @@ export namespace application {
 	}
 
 }
-

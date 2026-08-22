@@ -1,6 +1,9 @@
 import type { KeyboardEvent, Ref } from "react";
 
 import type { ContextState, ProviderState } from "../../lib/devctx-api";
+import { Badge } from "../ui/badge.js";
+import { Button } from "../ui/button.js";
+import { Card, CardContent } from "../ui/card.js";
 import type { ContextNavigationDirection } from "./selection-state";
 
 interface ContextCardProps {
@@ -33,7 +36,7 @@ function ContextCard({
     ? "focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/50"
     : "";
   const disabledClassName = disabled ? "opacity-60" : "";
-  const className = `min-w-0 border bg-card p-5 text-left text-card-foreground shadow-sm transition-colors ${selectedClassName} ${focusClassName} ${disabledClassName}`;
+  const className = `min-w-0 border py-0 text-left transition-colors ${selectedClassName} ${focusClassName} ${disabledClassName}`;
   const enabledProviders = context.providers.filter((provider) => provider.enabled);
   const contextNameId = `context-${context.id}-name`;
   const contextSelectionId = `context-${context.id}-selection`;
@@ -53,18 +56,21 @@ function ContextCard({
   }
 
   return (
-    <article
+    <Card
+      as="article"
+      size="sm"
       className={className}
       aria-labelledby={contextNameId}
       aria-describedby={contextSelectionId}
       data-selected={selected ? "true" : undefined}
     >
-      <div className="min-w-0 space-y-4">
+      <CardContent className="min-w-0 space-y-4 p-5">
         {onSelect ? (
-          <button
+          <Button
             ref={buttonRef}
             type="button"
-            className="block min-w-0 text-left outline-none focus-visible:outline-none disabled:cursor-not-allowed"
+            variant="ghost"
+            className="block h-auto w-full min-w-0 justify-start whitespace-normal p-0 text-left font-normal tracking-normal normal-case hover:bg-transparent focus-visible:ring-0 disabled:cursor-not-allowed"
             aria-labelledby={contextNameId}
             aria-describedby={contextSelectionId}
             aria-pressed={selected}
@@ -74,7 +80,7 @@ function ContextCard({
             onKeyDown={handleButtonKeyDown}
           >
             <ContextIdentity context={context} selected={selected} />
-          </button>
+          </Button>
         ) : (
           <ContextIdentity context={context} selected={selected} />
         )}
@@ -86,8 +92,8 @@ function ContextCard({
             ))}
           </ul>
         ) : null}
-      </div>
-    </article>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -98,8 +104,9 @@ function ContextIdentity({ context, selected }: { context: ContextState; selecte
         <h3 id={`context-${context.id}-name`} className="truncate text-base font-semibold" title={context.name}>
           {context.name}
         </h3>
-        <span
+        <Badge
           id={`context-${context.id}-selection`}
+          variant={selected ? "default" : "secondary"}
           className={`shrink-0 border px-2 py-0.5 text-xs font-semibold ${
             selected
               ? "border-primary bg-primary text-primary-foreground"
@@ -107,7 +114,7 @@ function ContextIdentity({ context, selected }: { context: ContextState; selecte
           }`}
         >
           {selected ? "Selected" : "Not selected"}
-        </span>
+        </Badge>
       </div>
       <p className="truncate font-mono text-xs text-muted-foreground" title={context.id}>
         {context.id}
@@ -140,7 +147,9 @@ function ProviderStatusRow({ context, provider }: { context: ContextState; provi
             role="img"
             aria-label={accessibleStatus}
           />
-          <span className="text-xs font-medium text-muted-foreground">{status.label}</span>
+          <Badge variant="secondary" className="text-xs font-medium normal-case tracking-normal">
+            {status.label}
+          </Badge>
         </div>
       </div>
       {authenticationGuidance ? (
@@ -160,13 +169,13 @@ function providerAuthenticationGuidance(context: ContextState, provider: Provide
   switch (provider.id) {
     case "claude":
     case "codex":
-      return `${provider.name} is enabled for ${context.name} but is not signed in yet. Open ${context.name}, then sign in with ${provider.name} inside that tool. Dev Context will not copy credentials or ask for passwords or tokens.`;
+      return `${provider.name} is enabled for ${context.name} but no isolated provider state was found. Open ${context.name}, then sign in with the ${provider.name} VS Code extension.`;
     default:
       return undefined;
   }
 }
 
-function providerStatusPresentation(state: string): { label: string; indicatorClassName: string } {
+function providerStatusPresentation(state: ProviderState["state"]): { label: string; indicatorClassName: string } {
   switch (state) {
     case "ready":
       return { label: "Ready", indicatorClassName: "bg-emerald-600" };

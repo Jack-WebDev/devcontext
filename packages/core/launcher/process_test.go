@@ -28,14 +28,10 @@ func TestProcessLauncherInterfaceRecordsCompleteProcessRequest(t *testing.T) {
 	processLauncher := &recordingProcessLauncher{}
 	request := launcher.ProcessRequest{
 		Executable: launcher.Executable("/usr/local/bin/code"),
-		Arguments: launcher.Arguments{
-			"--user-data-dir",
-			"/home/alex/.devctx/contexts/client-a/vscode/user-data",
-			"/work/client-a/api",
-		},
+		Arguments:  launcher.Arguments{"/work/client-a/api"},
 		Environment: launcher.Environment{
-			"CLAUDE_CONFIG_DIR": "/home/alex/.devctx/contexts/client-a/claude",
-			"CODEX_HOME":        "/home/alex/.devctx/contexts/client-a/codex",
+			"CLAUDE_CONFIG_DIR": "/home/alex/.devctx/contexts/client-a/providers/claude",
+			"CODEX_HOME":        "/home/alex/.devctx/contexts/client-a/providers/codex",
 			"DEVCTX_CONTEXT":    "client-a",
 		},
 		WorkingDirectory: launcher.WorkingDirectory("/work/client-a/api"),
@@ -68,7 +64,7 @@ func TestNativeProcessLauncherLaunchesFixtureWithStructuredRequest(t *testing.T)
 			"DEVCTX_HELPER_PROCESS": "1",
 			"DEVCTX_RECORD_PATH":    recordPath,
 			"DEVCTX_CONTEXT":        "client-a",
-			"CODEX_HOME":            "/home/alex/.devctx/contexts/client-a/codex",
+			"CODEX_HOME":            "/home/alex/.devctx/contexts/client-a/providers/codex",
 		},
 		WorkingDirectory: launcher.WorkingDirectory(workingDirectory),
 		DetachMode:       launcher.DetachModeAttached,
@@ -89,8 +85,8 @@ func TestNativeProcessLauncherLaunchesFixtureWithStructuredRequest(t *testing.T)
 	if record.Environment["DEVCTX_CONTEXT"] != "client-a" {
 		t.Fatalf("DEVCTX_CONTEXT = %q, want %q", record.Environment["DEVCTX_CONTEXT"], "client-a")
 	}
-	if record.Environment["CODEX_HOME"] != "/home/alex/.devctx/contexts/client-a/codex" {
-		t.Fatalf("CODEX_HOME = %q, want %q", record.Environment["CODEX_HOME"], "/home/alex/.devctx/contexts/client-a/codex")
+	if record.Environment["CODEX_HOME"] != "/home/alex/.devctx/contexts/client-a/providers/codex" {
+		t.Fatalf("CODEX_HOME = %q, want %q", record.Environment["CODEX_HOME"], "/home/alex/.devctx/contexts/client-a/providers/codex")
 	}
 }
 

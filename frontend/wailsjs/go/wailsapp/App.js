@@ -18,6 +18,10 @@ export function LaunchProject(arg1) {
   return window['go']['wailsapp']['App']['LaunchProject'](arg1);
 }
 
+export function PreflightLaunchProject(arg1) {
+  return window['go']['wailsapp']['App']['PreflightLaunchProject'](arg1);
+}
+
 export function UnbindProject(arg1) {
   return window['go']['wailsapp']['App']['UnbindProject'](arg1);
 }

@@ -13,6 +13,7 @@ import (
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
+	"devctx/packages/core/provider"
 )
 
 func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
@@ -91,16 +92,18 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 				ContextID: devcontext.MustID("personal"),
 				Missing: []filesystem.MissingContextDirectory{
 					{
-						Kind:   filesystem.ContextDirectoryCodex,
-						Path:   "/home/alex/.devctx/contexts/personal/codex",
-						Reason: "missing",
+						Kind:                filesystem.ContextDirectoryProvider,
+						ProviderID:          string(provider.CodexID),
+						ProviderDisplayName: "Codex",
+						Path:                "/home/alex/.devctx/contexts/personal/providers/codex",
+						Reason:              "missing",
 					},
 				},
 			},
 			want: "" +
 				"Context storage is incomplete\n" +
 				"\n" +
-				"Context \"personal\" is missing required storage directories: codex \"/home/alex/.devctx/contexts/personal/codex\" (missing).\n" +
+				"Context \"personal\" is missing required storage directories: provider:codex (Codex) \"/home/alex/.devctx/contexts/personal/providers/codex\" (missing).\n" +
 				"\n" +
 				"Next step:\n" +
 				"Repair or recreate the context before launching. Dev Context will not recreate incomplete context storage automatically.\n",

@@ -21,8 +21,53 @@ test("adapter normalizes successful Wails calls", async () => {
                 name: "Codex",
                 enabled: true,
                 state: "ready",
+                identity: {
+                  status: "verified",
+                  codex: {
+                    email: "user@company.com",
+                    chatgptPlanType: "Business",
+                    chatgptAccountId: "acct_123",
+                  },
+                },
+              },
+              {
+                id: "claude",
+                name: "Claude",
+                enabled: true,
+                state: "ready",
+                identity: {
+                  status: "verified",
+                  claude: {
+                    subscriptionType: "Pro",
+                    organizationUuid: "e783",
+                    organizationName: "Jishin Labs",
+                  },
+                },
+              },
+              {
+                id: "internal",
+                name: "Internal Tool",
+                enabled: true,
+                state: "ready",
+                identity: {
+                  status: "mismatch_evidence",
+                  message: "Different account identity detected.",
+                },
               },
             ],
+            confidence: {
+              contextId: "personal",
+              status: "needs_attention",
+              checks: [
+                {
+                  component: "codex",
+                  severity: "needs_attention",
+                  label: "Codex",
+                  message: "Codex is not authenticated for this context.",
+                  actionHint: "Sign in to Codex.",
+                },
+              ],
+            },
             metadata: {accent: "blue"},
           },
         ],
@@ -32,10 +77,51 @@ test("adapter normalizes successful Wails calls", async () => {
           contextId: "personal",
           dangling: false,
         },
+        confidence: {
+          contextId: "personal",
+          status: "needs_attention",
+          checks: [
+            {
+              component: "codex",
+              severity: "needs_attention",
+              label: "Codex",
+              message: "Codex is not authenticated for this context.",
+              actionHint: "Sign in to Codex.",
+            },
+            {
+              component: "vscode",
+              severity: "ready",
+              label: "VS Code",
+              message: "VS Code is available for launch.",
+            },
+          ],
+        },
         selectedContextId: "personal",
         selectionRequired: false,
         resolutionSource: "project_binding",
         firstRun: false,
+        providerCredentialSessions: [
+          {
+            providerId: "codex",
+            name: "Codex",
+            metadataAvailable: true,
+            codex: {
+              email: "user@company.com",
+              chatgptPlanType: "Business",
+              chatgptAccountId: "acct_123",
+            },
+          },
+          {
+            providerId: "claude",
+            name: "Claude",
+            metadataAvailable: true,
+            claude: {
+              subscriptionType: "Pro",
+              organizationUuid: "e783",
+              organizationName: "Jishin Labs",
+            },
+          },
+        ],
       };
     },
     async launchProject(request) {
@@ -47,6 +133,33 @@ test("adapter normalizes successful Wails calls", async () => {
           name: "Personal",
           editor: {type: "vscode"},
           providers: [],
+          confidence: {
+            contextId: "personal",
+            status: "ready",
+            checks: [],
+          },
+        },
+      };
+    },
+    async preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return {
+        project: {name: "api", path: "/work/api"},
+        context: {
+          id: "personal",
+          name: "Personal",
+          editor: {type: "vscode"},
+          providers: [],
+          confidence: {
+            contextId: "personal",
+            status: "ready",
+            checks: [],
+          },
+        },
+        confidence: {
+          contextId: "personal",
+          status: "ready",
+          checks: [],
         },
       };
     },
@@ -75,6 +188,11 @@ test("adapter normalizes successful Wails calls", async () => {
           name: "Personal",
           editor: {type: "vscode"},
           providers: [],
+          confidence: {
+            contextId: "personal",
+            status: "ready",
+            checks: [],
+          },
         },
       };
     },
@@ -96,8 +214,61 @@ test("adapter normalizes successful Wails calls", async () => {
               enabled: true,
               state: "ready",
               explanation: undefined,
+              identity: {
+                status: "verified",
+                message: undefined,
+                codex: {
+                  email: "user@company.com",
+                  chatgptPlanType: "Business",
+                  chatgptAccountId: "acct_123",
+                },
+                claude: undefined,
+              },
+            },
+            {
+              id: "claude",
+              name: "Claude",
+              enabled: true,
+              state: "ready",
+              explanation: undefined,
+              identity: {
+                status: "verified",
+                message: undefined,
+                codex: undefined,
+                claude: {
+                  subscriptionType: "Pro",
+                  organizationUuid: "e783",
+                  organizationName: "Jishin Labs",
+                },
+              },
+            },
+            {
+              id: "internal",
+              name: "Internal Tool",
+              enabled: true,
+              state: "ready",
+              explanation: undefined,
+              identity: {
+                status: "mismatch_evidence",
+                message: "Different account identity detected.",
+                codex: undefined,
+                claude: undefined,
+              },
             },
           ],
+          confidence: {
+            contextId: "personal",
+            status: "needs_attention",
+            checks: [
+              {
+                component: "codex",
+                severity: "needs_attention",
+                label: "Codex",
+                message: "Codex is not authenticated for this context.",
+                actionHint: "Sign in to Codex.",
+              },
+            ],
+          },
           metadata: {accent: "blue"},
         },
       ],
@@ -109,14 +280,82 @@ test("adapter normalizes successful Wails calls", async () => {
         missingContextId: undefined,
         recovery: undefined,
       },
+      confidence: {
+        contextId: "personal",
+        status: "needs_attention",
+        checks: [
+          {
+            component: "codex",
+            severity: "needs_attention",
+            label: "Codex",
+            message: "Codex is not authenticated for this context.",
+            actionHint: "Sign in to Codex.",
+          },
+          {
+            component: "vscode",
+            severity: "ready",
+            label: "VS Code",
+            message: "VS Code is available for launch.",
+            actionHint: undefined,
+          },
+        ],
+      },
       selectedContextId: "personal",
       selectionRequired: false,
       resolutionSource: "project_binding",
       warnings: [],
       firstRun: false,
+      providerCredentialSessions: [
+        {
+          providerId: "codex",
+          name: "Codex",
+          metadataAvailable: true,
+          codex: {
+            email: "user@company.com",
+            chatgptPlanType: "Business",
+            chatgptAccountId: "acct_123",
+          },
+          claude: undefined,
+        },
+        {
+          providerId: "claude",
+          name: "Claude",
+          metadataAvailable: true,
+          codex: undefined,
+          claude: {
+            subscriptionType: "Pro",
+            organizationUuid: "e783",
+            organizationName: "Jishin Labs",
+          },
+        },
+      ],
     },
   });
 
+  assert.deepEqual(await api.preflightLaunchProject({projectPath: "/work/api", contextId: "personal"}), {
+    ok: true,
+    data: {
+      project: {name: "api", path: "/work/api"},
+      context: {
+        id: "personal",
+        name: "Personal",
+        editor: {type: "vscode"},
+        providers: [],
+        confidence: {
+          contextId: "personal",
+          status: "ready",
+          checks: [],
+        },
+        metadata: undefined,
+      },
+      confidence: {
+        contextId: "personal",
+        status: "ready",
+        checks: [],
+      },
+      warnings: [],
+    },
+  });
   assert.deepEqual(await api.launchProject({projectPath: "/work/api", contextId: "personal"}), {
     ok: true,
     data: {
@@ -126,6 +365,11 @@ test("adapter normalizes successful Wails calls", async () => {
         name: "Personal",
         editor: {type: "vscode"},
         providers: [],
+        confidence: {
+          contextId: "personal",
+          status: "ready",
+          checks: [],
+        },
         metadata: undefined,
       },
       warnings: [],
@@ -153,7 +397,7 @@ test("adapter normalizes successful Wails calls", async () => {
       recovery: undefined,
     },
   });
-  assert.deepEqual(await api.createContext({contextId: "personal"}), {
+  assert.deepEqual(await api.createContext({contextId: "personal", importProviderIds: ["codex"]}), {
     ok: true,
     data: {
       context: {
@@ -161,12 +405,25 @@ test("adapter normalizes successful Wails calls", async () => {
         name: "Personal",
         editor: {type: "vscode"},
         providers: [],
+        confidence: {
+          contextId: "personal",
+          status: "ready",
+          checks: [],
+        },
         metadata: undefined,
       },
     },
   });
   assert.deepEqual(calls, [
     ["getLaunchState", {projectPath: "/work/api"}],
+    [
+      "preflightLaunchProject",
+      {
+        projectPath: "/work/api",
+        contextId: "personal",
+        confirmContextMismatch: false,
+      },
+    ],
     [
       "launchProject",
       {
@@ -177,7 +434,7 @@ test("adapter normalizes successful Wails calls", async () => {
     ],
     ["bindProject", {projectPath: "/work/api", contextId: "personal"}],
     ["unbindProject", {projectPath: "/work/api"}],
-    ["createContext", {contextId: "personal"}],
+    ["createContext", {contextId: "personal", importProviderIds: ["codex"]}],
   ]);
 });
 
@@ -187,6 +444,18 @@ test("adapter normalizes resolved application errors", async () => {
       throw new Error("not used");
     },
     async launchProject() {
+      return {
+        code: "context_mismatch_requires_confirmation",
+        message: "Context mismatch requires confirmation.",
+        recovery: "Confirm the mismatch intentionally.",
+        contextMismatch: {
+          projectPath: "/work/api",
+          boundContextId: "company",
+          requestedContextId: "personal",
+        },
+      };
+    },
+    async preflightLaunchProject() {
       return {
         code: "context_mismatch_requires_confirmation",
         message: "Context mismatch requires confirmation.",
@@ -280,6 +549,16 @@ test("adapter unwraps tuple-shaped Wails responses", async () => {
         },
       ];
     },
+    async preflightLaunchProject() {
+      return [
+        {},
+        {
+          code: "launch_error",
+          message: "Unable to launch editor.",
+          recovery: "Check the editor command.",
+        },
+      ];
+    },
     async bindProject() {
       throw new Error("not used");
     },
@@ -304,11 +583,13 @@ test("adapter unwraps tuple-shaped Wails responses", async () => {
         missingContextId: undefined,
         recovery: undefined,
       },
+      confidence: undefined,
       selectedContextId: undefined,
       selectionRequired: true,
       resolutionSource: undefined,
       warnings: [],
       firstRun: true,
+      providerCredentialSessions: [],
     },
   });
 
@@ -329,6 +610,13 @@ test("adapter normalizes rejected promises into displayable errors", async () =>
       throw new Error("Wails bridge unavailable");
     },
     async launchProject() {
+      throw {
+        code: "launch_error",
+        message: "Unable to launch editor.",
+        recovery: "Check the editor command.",
+      };
+    },
+    async preflightLaunchProject() {
       throw {
         code: "launch_error",
         message: "Unable to launch editor.",
@@ -399,6 +687,9 @@ test("adapter normalizes create context onboarding failure responses", async () 
       throw new Error("not used");
     },
     async launchProject() {
+      throw new Error("not used");
+    },
+    async preflightLaunchProject() {
       throw new Error("not used");
     },
     async bindProject() {

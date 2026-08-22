@@ -17,13 +17,13 @@ func TestBuildPreservesUnrelatedParentVariables(t *testing.T) {
 			"SHELL=/bin/bash",
 		},
 		provider.EnvironmentContribution{
-			provider.CodexHomeEnvVar: "/home/alex/.devctx/contexts/personal/codex",
+			provider.CodexHomeEnvVar: "/home/alex/.devctx/contexts/personal/providers/codex",
 		},
 	)
 
 	assertVariable(t, variables, "PATH", "/usr/bin")
 	assertVariable(t, variables, "SHELL", "/bin/bash")
-	assertVariable(t, variables, provider.CodexHomeEnvVar, "/home/alex/.devctx/contexts/personal/codex")
+	assertVariable(t, variables, provider.CodexHomeEnvVar, "/home/alex/.devctx/contexts/personal/providers/codex")
 }
 
 func TestBuildReplacesDuplicateKeys(t *testing.T) {
@@ -34,12 +34,12 @@ func TestBuildReplacesDuplicateKeys(t *testing.T) {
 			"CODEX_HOME=/global/codex",
 		},
 		provider.EnvironmentContribution{
-			provider.CodexHomeEnvVar: "/home/alex/.devctx/contexts/company/codex",
+			provider.CodexHomeEnvVar: "/home/alex/.devctx/contexts/company/providers/codex",
 		},
 	)
 
 	assertVariable(t, variables, "PATH", "/usr/bin")
-	assertVariable(t, variables, provider.CodexHomeEnvVar, "/home/alex/.devctx/contexts/company/codex")
+	assertVariable(t, variables, provider.CodexHomeEnvVar, "/home/alex/.devctx/contexts/company/providers/codex")
 }
 
 func TestBuildForContextAddsActiveContextMarker(t *testing.T) {
@@ -50,7 +50,7 @@ func TestBuildForContextAddsActiveContextMarker(t *testing.T) {
 		},
 		devcontext.MustID("personal"),
 		provider.EnvironmentContribution{
-			provider.CodexHomeEnvVar: "/home/alex/.devctx/contexts/personal/codex",
+			provider.CodexHomeEnvVar: "/home/alex/.devctx/contexts/personal/providers/codex",
 		},
 	)
 	if err != nil {
@@ -60,7 +60,7 @@ func TestBuildForContextAddsActiveContextMarker(t *testing.T) {
 		nil,
 		devcontext.MustID("company"),
 		provider.EnvironmentContribution{
-			provider.CodexHomeEnvVar: "/home/alex/.devctx/contexts/company/codex",
+			provider.CodexHomeEnvVar: "/home/alex/.devctx/contexts/company/providers/codex",
 		},
 	)
 	if err != nil {
@@ -87,13 +87,13 @@ func TestBuildForContextRejectsMissingContextID(t *testing.T) {
 func TestEnvironReturnsDeterministicEntries(t *testing.T) {
 	variables := environment.Variables{
 		"SHELL":                  "/bin/bash",
-		provider.CodexHomeEnvVar: "/home/alex/.devctx/contexts/personal/codex",
+		provider.CodexHomeEnvVar: "/home/alex/.devctx/contexts/personal/providers/codex",
 		"PATH":                   "/usr/bin",
 	}
 
 	got := variables.Environ()
 	want := []string{
-		"CODEX_HOME=/home/alex/.devctx/contexts/personal/codex",
+		"CODEX_HOME=/home/alex/.devctx/contexts/personal/providers/codex",
 		"PATH=/usr/bin",
 		"SHELL=/bin/bash",
 	}
@@ -122,21 +122,21 @@ func TestBuildForContextIsolationMatrix(t *testing.T) {
 			},
 			contributions: []provider.EnvironmentContribution{
 				{
-					provider.CodexHomeEnvVar:       "/home/alex/.devctx/contexts/personal/codex",
-					provider.ClaudeConfigDirEnvVar: "/home/alex/.devctx/contexts/personal/claude",
+					provider.CodexHomeEnvVar:       "/home/alex/.devctx/contexts/personal/providers/codex",
+					provider.ClaudeConfigDirEnvVar: "/home/alex/.devctx/contexts/personal/providers/claude",
 				},
 			},
 			want: environment.Variables{
 				"PATH":                          "/usr/bin",
 				"API_TOKEN":                     "personal-secret",
 				environment.ActiveContextEnvVar: "personal",
-				provider.CodexHomeEnvVar:        "/home/alex/.devctx/contexts/personal/codex",
-				provider.ClaudeConfigDirEnvVar:  "/home/alex/.devctx/contexts/personal/claude",
+				provider.CodexHomeEnvVar:        "/home/alex/.devctx/contexts/personal/providers/codex",
+				provider.ClaudeConfigDirEnvVar:  "/home/alex/.devctx/contexts/personal/providers/claude",
 			},
 			wantRedacted: []string{
 				"API_TOKEN=<redacted>",
-				"CLAUDE_CONFIG_DIR=/home/alex/.devctx/contexts/personal/claude",
-				"CODEX_HOME=/home/alex/.devctx/contexts/personal/codex",
+				"CLAUDE_CONFIG_DIR=/home/alex/.devctx/contexts/personal/providers/claude",
+				"CODEX_HOME=/home/alex/.devctx/contexts/personal/providers/codex",
 				"DEVCTX_CONTEXT=personal",
 				"PATH=/usr/bin",
 			},
@@ -147,15 +147,15 @@ func TestBuildForContextIsolationMatrix(t *testing.T) {
 			parent:    []string{"PATH=/usr/bin"},
 			contributions: []provider.EnvironmentContribution{
 				{
-					provider.CodexHomeEnvVar:       "/home/alex/.devctx/contexts/company/codex",
-					provider.ClaudeConfigDirEnvVar: "/home/alex/.devctx/contexts/company/claude",
+					provider.CodexHomeEnvVar:       "/home/alex/.devctx/contexts/company/providers/codex",
+					provider.ClaudeConfigDirEnvVar: "/home/alex/.devctx/contexts/company/providers/claude",
 				},
 			},
 			want: environment.Variables{
 				"PATH":                          "/usr/bin",
 				environment.ActiveContextEnvVar: "company",
-				provider.CodexHomeEnvVar:        "/home/alex/.devctx/contexts/company/codex",
-				provider.ClaudeConfigDirEnvVar:  "/home/alex/.devctx/contexts/company/claude",
+				provider.CodexHomeEnvVar:        "/home/alex/.devctx/contexts/company/providers/codex",
+				provider.ClaudeConfigDirEnvVar:  "/home/alex/.devctx/contexts/company/providers/claude",
 			},
 		},
 		{
@@ -167,13 +167,13 @@ func TestBuildForContextIsolationMatrix(t *testing.T) {
 			},
 			contributions: []provider.EnvironmentContribution{
 				{
-					provider.CodexHomeEnvVar: "/home/alex/.devctx/contexts/client-a/codex",
+					provider.CodexHomeEnvVar: "/home/alex/.devctx/contexts/client-a/providers/codex",
 				},
 			},
 			want: environment.Variables{
 				"PATH":                          "/usr/bin",
 				environment.ActiveContextEnvVar: "client-a",
-				provider.CodexHomeEnvVar:        "/home/alex/.devctx/contexts/client-a/codex",
+				provider.CodexHomeEnvVar:        "/home/alex/.devctx/contexts/client-a/providers/codex",
 				provider.ClaudeConfigDirEnvVar:  "/parent/claude",
 			},
 		},

@@ -4,8 +4,12 @@ package provider
 type StatusState string
 
 const (
-	// StatusReady means the provider appears locally configured for the context.
-	StatusReady StatusState = "ready"
+	// StatusConfigured means the provider appears locally configured for the
+	// context.
+	StatusConfigured StatusState = "configured"
+
+	// StatusReady is kept as a source compatibility alias for older call sites.
+	StatusReady StatusState = StatusConfigured
 
 	// StatusNotConfigured means provider storage exists but does not appear
 	// initialized.
@@ -27,7 +31,12 @@ type Status struct {
 
 // ReadyStatus reports a locally ready provider.
 func ReadyStatus() Status {
-	return Status{State: StatusReady}
+	return ConfiguredStatus()
+}
+
+// ConfiguredStatus reports a locally configured provider.
+func ConfiguredStatus() Status {
+	return Status{State: StatusConfigured}
 }
 
 // NotConfiguredStatus reports provider storage that is present but
@@ -49,7 +58,7 @@ func UnavailableStatus(explanation string) Status {
 // Valid reports whether state is one of the bounded provider readiness states.
 func (s StatusState) Valid() bool {
 	switch s {
-	case StatusReady, StatusNotConfigured, StatusDirectoryMissing, StatusUnavailable:
+	case StatusConfigured, StatusNotConfigured, StatusDirectoryMissing, StatusUnavailable:
 		return true
 	default:
 		return false

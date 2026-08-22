@@ -1,9 +1,9 @@
 package application
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	devcontext "devctx/packages/core/context"
@@ -29,6 +29,16 @@ func (s *Service) LaunchProject(request LaunchProjectRequest) (LaunchProjectResu
 	result, err := s.launchProject(request)
 	if err != nil {
 		return LaunchProjectResult{}, NewError(err)
+	}
+	return result, nil
+}
+
+// PreflightLaunchProject checks launch readiness for a selected context without
+// starting the editor process.
+func (s *Service) PreflightLaunchProject(request PreflightLaunchProjectRequest) (PreflightLaunchProjectResult, *Error) {
+	result, err := s.preflightLaunchProject(request)
+	if err != nil {
+		return PreflightLaunchProjectResult{}, NewError(err)
 	}
 	return result, nil
 }
@@ -71,7 +81,7 @@ func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, er
 		return LaunchState{}, err
 	}
 	if len(contexts) == 0 {
-		return firstRunLaunchState(projectPath), nil
+		return s.firstRunLaunchState(projectPath), nil
 	}
 
 	lookup, err := s.dependencies.Projects.LookupWithContextValidation(string(projectPath), projectPath, s.dependencies.Contexts)
@@ -88,25 +98,38 @@ func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, er
 		return LaunchState{}, err
 	}
 
+	providerCredentialSessions, err := s.providerCredentialSessionStates()
+	if err != nil {
+		providerCredentialSessions = nil
+	}
+
 	return LaunchState{
-		Project:           projectState(projectPath),
-		Contexts:          s.contextStates(contexts),
-		Binding:           bindingState(lookup),
-		SelectedContextID: selectedContextID(resolution),
-		SelectionRequired: resolution.SelectionRequired,
-		ResolutionSource:  string(resolution.Source),
-		Warnings:          warningStates(resolution.Warnings),
+		Project:                    projectState(projectPath),
+		Contexts:                   s.contextStates(contexts),
+		Binding:                    bindingState(lookup),
+		Confidence:                 s.launchConfidenceState(resolution.Context),
+		SelectedContextID:          selectedContextID(resolution),
+		SelectionRequired:          resolution.SelectionRequired,
+		ResolutionSource:           string(resolution.Source),
+		Warnings:                   warningStates(resolution.Warnings),
+		ProviderCredentialSessions: providerCredentialSessions,
 	}, nil
 }
 
-func firstRunLaunchState(projectPath project.Path) LaunchState {
+func (s *Service) firstRunLaunchState(projectPath project.Path) LaunchState {
+	sessions, err := s.providerCredentialSessionStates()
+	if err != nil {
+		sessions = nil
+	}
+
 	return LaunchState{
-		Project:           projectState(projectPath),
-		Contexts:          []ContextState{},
-		Binding:           ProjectBindingState{ProjectPath: string(projectPath)},
-		SelectionRequired: true,
-		ResolutionSource:  string(launcher.ResolutionSourceUserSelection),
-		FirstRun:          true,
+		Project:                    projectState(projectPath),
+		Contexts:                   []ContextState{},
+		Binding:                    ProjectBindingState{ProjectPath: string(projectPath)},
+		SelectionRequired:          true,
+		ResolutionSource:           string(launcher.ResolutionSourceUserSelection),
+		FirstRun:                   true,
+		ProviderCredentialSessions: sessions,
 	}
 }
 
@@ -116,7 +139,7 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 		return CreateContextResult{}, err
 	}
 
-	ctx, err := defaultContextForID(contextID, s.now())
+	ctx, err := devcontext.DefaultContextForIDWithProviderRegistry(contextID, s.now(), s.dependencies.ProviderRegistry)
 	if err != nil {
 		return CreateContextResult{}, err
 	}
@@ -125,26 +148,18 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 	if err != nil {
 		return CreateContextResult{}, err
 	}
-	if err := filesystem.CreateContextDirectoryTreeWithPermissions(
+	if err := filesystem.CreateContextDirectoryTreeWithProviderRegistryCredentialsAndPermissions(
+		s.dependencies.Paths,
 		contextPaths,
 		ctx,
+		s.dependencies.ProviderRegistry,
+		request.ImportProviderIDs,
 		s.dependencies.StoragePermissions,
 	); err != nil {
 		return CreateContextResult{}, err
 	}
 
 	return CreateContextResult{Context: s.contextState(ctx)}, nil
-}
-
-func defaultContextForID(contextID devcontext.ID, createdAt time.Time) (devcontext.Context, error) {
-	switch contextID.String() {
-	case "personal":
-		return devcontext.DefaultPersonalContext(createdAt), nil
-	case "company":
-		return devcontext.DefaultCompanyContext(createdAt), nil
-	default:
-		return devcontext.Context{}, fmt.Errorf("%w: unsupported default context %q", devcontext.ErrContextNotFound, contextID.String())
-	}
 }
 
 func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResult, error) {
@@ -199,6 +214,47 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 		Project:  projectState(plan.ProjectPath),
 		Context:  s.contextState(plan.Context),
 		Warnings: warningStates(plan.Warnings),
+	}, nil
+}
+
+func (s *Service) preflightLaunchProject(request PreflightLaunchProjectRequest) (PreflightLaunchProjectResult, error) {
+	projectPath, err := s.canonicalProjectPath(request.ProjectPath)
+	if err != nil {
+		return PreflightLaunchProjectResult{}, err
+	}
+	if err := project.ValidateProjectDirectory(projectPath); err != nil {
+		return PreflightLaunchProjectResult{}, err
+	}
+	contextID, err := devcontext.NewID(request.ContextID)
+	if err != nil {
+		return PreflightLaunchProjectResult{}, err
+	}
+
+	confirmation := launcher.ContextMismatchUnconfirmed
+	if request.ConfirmContextMismatch {
+		confirmation = launcher.ContextMismatchAccepted
+	}
+
+	resolution, err := launcher.NewResolver(s.dependencies.Contexts, s.dependencies.Projects).Resolve(launcher.LaunchRequest{
+		ProjectPath:          projectPath,
+		RequestedContext:     &contextID,
+		MismatchConfirmation: confirmation,
+		Interactive:          true,
+		Source:               launcher.InvocationSourceGUI,
+	})
+	if err != nil {
+		return PreflightLaunchProjectResult{}, err
+	}
+	if resolution.Context == nil || resolution.SelectionRequired {
+		return PreflightLaunchProjectResult{}, launcher.ErrLaunchSelectionRequired
+	}
+
+	contextState := s.contextState(*resolution.Context)
+	return PreflightLaunchProjectResult{
+		Project:    projectState(projectPath),
+		Context:    contextState,
+		Confidence: contextState.Confidence,
+		Warnings:   warningStates(resolution.Warnings),
 	}, nil
 }
 
@@ -268,23 +324,69 @@ func (s *Service) contextStates(contexts []devcontext.Context) []ContextState {
 }
 
 func (s *Service) contextState(ctx devcontext.Context) ContextState {
+	providerEntries := s.providerStateEntries(ctx)
 	return ContextState{
-		ID:        ctx.ID.String(),
-		Name:      ctx.Name,
-		Editor:    EditorState{Type: string(ctx.Editor.Type)},
-		Providers: s.providerStates(ctx),
-		Metadata:  cloneMetadata(ctx.Metadata),
+		ID:         ctx.ID.String(),
+		Name:       ctx.Name,
+		Editor:     EditorState{Type: string(ctx.Editor.Type)},
+		Providers:  providerStatesFromEntries(providerEntries),
+		Confidence: s.launchConfidenceStateForContext(ctx, providerEntries),
+		Metadata:   cloneMetadata(ctx.Metadata),
 	}
 }
 
-func (s *Service) providerStates(ctx devcontext.Context) []ProviderState {
-	states := make([]ProviderState, 0, len(s.dependencies.Providers))
-	contextPaths, pathsErr := filesystem.DeriveContextPaths(s.dependencies.Paths, ctx.ID)
-	for _, integration := range s.dependencies.Providers {
-		if integration == nil {
+func (s *Service) providerCredentialSessionStates() ([]ProviderCredentialSessionState, error) {
+	sessions, err := filesystem.DetectProviderCredentialSessions(s.dependencies.Paths)
+	if err != nil {
+		return nil, err
+	}
+
+	states := make([]ProviderCredentialSessionState, 0, len(sessions))
+	for _, session := range sessions {
+		integration, ok := s.dependencies.ProviderRegistry.Get(provider.ID(session.ProviderID))
+		if !ok {
 			continue
 		}
+		state := ProviderCredentialSessionState{
+			ProviderID:        session.ProviderID,
+			Name:              integration.DisplayName(),
+			MetadataAvailable: session.MetadataAvailable,
+		}
+		switch session.ProviderID {
+		case string(provider.CodexID):
+			state.Codex = &CodexCredentialSessionState{
+				Email:            session.Codex.Email,
+				ChatGPTPlanType:  session.Codex.ChatGPTPlanType,
+				ChatGPTAccountID: session.Codex.ChatGPTAccountID,
+			}
+		case string(provider.ClaudeID):
+			state.Claude = &ClaudeCredentialSessionState{
+				SubscriptionType: session.Claude.SubscriptionType,
+				OrganizationUUID: session.Claude.OrganizationUUID,
+				OrganizationName: session.Claude.OrganizationName,
+			}
+		default:
+			continue
+		}
+		states = append(states, state)
+	}
+	return states, nil
+}
 
+type providerStateEntry struct {
+	providerID provider.ID
+	state      ProviderState
+	status     provider.Status
+}
+
+func (s *Service) providerStateEntries(ctx devcontext.Context) []providerStateEntry {
+	providers := s.dependencies.ProviderRegistry.All()
+	entries := make([]providerStateEntry, 0, len(providers))
+	contextPaths, pathsErr := filesystem.DeriveContextPaths(s.dependencies.Paths, ctx.ID)
+	if pathsErr == nil {
+		contextPaths = contextPaths.WithProviderStorageDirs(enabledProviderIDs(ctx))
+	}
+	for _, integration := range providers {
 		config, ok := ctx.Providers[integration.ID()]
 		enabled := ok && config.Enabled
 		status := provider.NotConfiguredStatus("Provider is disabled for this context")
@@ -298,8 +400,7 @@ func (s *Service) providerStates(ctx devcontext.Context) []ProviderState {
 					Config:    config,
 					Paths: provider.ContextPaths{
 						RootDir:           contextPaths.RootDir,
-						ClaudeDir:         contextPaths.ClaudeDir,
-						CodexDir:          contextPaths.CodexDir,
+						StorageDir:        contextPaths.ProviderStorageDir(integration.ID()),
 						VSCodeDir:         contextPaths.VSCodeDir,
 						VSCodeUserDataDir: contextPaths.VSCodeUserDataDir,
 					},
@@ -310,15 +411,171 @@ func (s *Service) providerStates(ctx devcontext.Context) []ProviderState {
 			}
 		}
 
-		states = append(states, ProviderState{
-			ID:          string(integration.ID()),
-			Name:        integration.DisplayName(),
-			Enabled:     enabled,
-			State:       string(status.State),
-			Explanation: status.Explanation,
+		entries = append(entries, providerStateEntry{
+			providerID: integration.ID(),
+			status:     status,
+			state: ProviderState{
+				ID:          string(integration.ID()),
+				Name:        integration.DisplayName(),
+				Enabled:     enabled,
+				State:       providerReadinessState(status),
+				Explanation: status.Explanation,
+				Identity:    providerIdentityState(integration.ID(), enabled, status, contextPaths, pathsErr),
+			},
 		})
 	}
+	return entries
+}
+
+func providerStatesFromEntries(entries []providerStateEntry) []ProviderState {
+	states := make([]ProviderState, len(entries))
+	for i, entry := range entries {
+		states[i] = entry.state
+	}
 	return states
+}
+
+func enabledProviderIDs(ctx devcontext.Context) []provider.ID {
+	ids := make([]provider.ID, 0, len(ctx.Providers))
+	for providerID, config := range ctx.Providers {
+		if config.Enabled {
+			ids = append(ids, providerID)
+		}
+	}
+	sort.Slice(ids, func(i int, j int) bool {
+		return ids[i] < ids[j]
+	})
+	return ids
+}
+
+func providerReadinessState(status provider.Status) ProviderReadinessState {
+	switch status.State {
+	case provider.StatusConfigured:
+		return ProviderReadinessReady
+	case provider.StatusNotConfigured:
+		return ProviderReadinessNotConfigured
+	case provider.StatusDirectoryMissing:
+		return ProviderReadinessDirectoryMissing
+	case provider.StatusUnavailable:
+		return ProviderReadinessUnavailable
+	default:
+		return ProviderReadinessUnavailable
+	}
+}
+
+func providerIdentityState(providerID provider.ID, enabled bool, status provider.Status, contextPaths filesystem.ContextPaths, pathsErr error) ProviderIdentityState {
+	if !enabled {
+		return ProviderIdentityState{Status: ProviderIdentityNone}
+	}
+
+	switch status.State {
+	case provider.StatusConfigured:
+		if pathsErr != nil {
+			return unavailableProviderIdentity()
+		}
+		return verifiedProviderIdentity(providerID, contextPaths)
+	case provider.StatusUnavailable:
+		return unavailableProviderIdentity()
+	default:
+		return ProviderIdentityState{Status: ProviderIdentityNone}
+	}
+}
+
+func verifiedProviderIdentity(providerID provider.ID, contextPaths filesystem.ContextPaths) ProviderIdentityState {
+	switch providerID {
+	case provider.CodexID:
+		metadata, available, err := filesystem.DetectCodexContextCredentialMetadata(contextPaths)
+		if err != nil || !available {
+			return unavailableProviderIdentity()
+		}
+		return ProviderIdentityState{
+			Status: ProviderIdentityVerified,
+			Codex: &CodexProviderIdentityState{
+				Email:            metadata.Email,
+				ChatGPTPlanType:  metadata.ChatGPTPlanType,
+				ChatGPTAccountID: metadata.ChatGPTAccountID,
+			},
+		}
+	case provider.ClaudeID:
+		metadata, available, err := filesystem.DetectClaudeContextCredentialMetadata(contextPaths)
+		if err != nil || !available {
+			return unavailableProviderIdentity()
+		}
+		return ProviderIdentityState{
+			Status: ProviderIdentityVerified,
+			Claude: &ClaudeProviderIdentityState{
+				SubscriptionType: metadata.SubscriptionType,
+				OrganizationUUID: metadata.OrganizationUUID,
+				OrganizationName: metadata.OrganizationName,
+			},
+		}
+	default:
+		return unavailableProviderIdentity()
+	}
+}
+
+func unavailableProviderIdentity() ProviderIdentityState {
+	return ProviderIdentityState{
+		Status:  ProviderIdentityUnavailable,
+		Message: "Account identity unavailable.",
+	}
+}
+
+func (s *Service) launchConfidenceState(ctx *devcontext.Context) *LaunchConfidenceState {
+	if ctx == nil {
+		return nil
+	}
+	confidence := s.launchConfidenceStateForContext(*ctx, s.providerStateEntries(*ctx))
+	return &confidence
+}
+
+func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, providerEntries []providerStateEntry) LaunchConfidenceState {
+	checks := make([]LaunchConfidenceCheck, 0)
+	for _, entry := range providerEntries {
+		if !entry.state.Enabled {
+			continue
+		}
+		check, ok := launcher.ProviderConfidenceCheck(entry.providerID, entry.state.Name, entry.status)
+		if ok {
+			checks = append(checks, check)
+		}
+	}
+
+	executable, editorErr := s.dependencies.Editor.DetectExecutable(ctx.Editor)
+	checks = append(checks, launcher.VSCodeConfidenceCheck(executable, editorErr))
+
+	contextPaths, pathsErr := filesystem.DeriveContextPaths(s.dependencies.Paths, ctx.ID)
+	if pathsErr != nil {
+		checks = append(checks, LaunchConfidenceCheck{
+			Component:  LaunchConfidenceCheckIsolation,
+			Severity:   LaunchConfidenceBlocked,
+			Label:      "Isolation",
+			Message:    "Context isolation paths could not be determined.",
+			ActionHint: "Run diagnostics to inspect context storage.",
+		})
+	} else {
+		contextPaths = contextPaths.WithProviderStorageDirs(enabledProviderIDs(ctx))
+		checks = append(checks, launcher.IsolationConfidenceChecks(contextPaths)...)
+	}
+
+	return LaunchConfidenceState{
+		ContextID: ctx.ID.String(),
+		Status:    launchConfidenceStatus(checks),
+		Checks:    checks,
+	}
+}
+
+func launchConfidenceStatus(checks []LaunchConfidenceCheck) LaunchConfidenceStatus {
+	status := LaunchConfidenceReady
+	for _, check := range checks {
+		if check.Severity == LaunchConfidenceBlocked {
+			return LaunchConfidenceBlocked
+		}
+		if check.Severity == LaunchConfidenceNeedsAttention {
+			status = LaunchConfidenceNeedsAttention
+		}
+	}
+	return status
 }
 
 func processRequestFromLaunchPlan(plan launcher.LaunchPlan, detachMode launcher.DetachMode) launcher.ProcessRequest {

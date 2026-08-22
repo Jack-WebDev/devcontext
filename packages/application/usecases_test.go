@@ -1,9 +1,13 @@
 package application
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -39,6 +43,9 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	if state.SelectedContextID != "personal" {
 		t.Fatalf("selected context = %q, want personal", state.SelectedContextID)
 	}
+	if state.Confidence == nil || state.Confidence.ContextID != "personal" {
+		t.Fatalf("confidence = %#v, want personal confidence", state.Confidence)
+	}
 	if state.SelectionRequired {
 		t.Fatal("selection required = true, want false")
 	}
@@ -48,17 +55,263 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	if state.ResolutionSource != string(launcher.ResolutionSourceProjectBinding) {
 		t.Fatalf("resolution source = %q, want project binding", state.ResolutionSource)
 	}
-	assertContextStates(t, state.Contexts, []ContextState{
-		{
-			ID:     "personal",
-			Name:   "Personal",
-			Editor: EditorState{Type: string(editor.TypeVSCode)},
-			Providers: []ProviderState{
-				{ID: "fake", Name: "Fake Provider", Enabled: true, State: string(provider.StatusReady)},
+	if len(state.Contexts) != 1 {
+		t.Fatalf("context count = %d, want 1", len(state.Contexts))
+	}
+	contextState := state.Contexts[0]
+	if contextState.ID != "personal" ||
+		contextState.Name != "Personal" ||
+		contextState.Editor != (EditorState{Type: string(editor.TypeVSCode)}) ||
+		!reflect.DeepEqual(contextState.Providers, []ProviderState{
+			{
+				ID:      "fake",
+				Name:    "Fake Provider",
+				Enabled: true,
+				State:   ProviderReadinessReady,
+				Identity: ProviderIdentityState{
+					Status:  ProviderIdentityUnavailable,
+					Message: "Account identity unavailable.",
+				},
 			},
-			Metadata: map[string]string{"accent": "blue"},
+		}) ||
+		!reflect.DeepEqual(contextState.Metadata, map[string]string{"accent": "blue"}) {
+		t.Fatalf("context state = %#v, want personal context identity/readiness", contextState)
+	}
+	if contextState.Confidence.ContextID != "personal" {
+		t.Fatalf("context confidence = %#v, want personal confidence", contextState.Confidence)
+	}
+}
+
+func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.provider = &applicationFakeProvider{
+		id:          provider.CodexID,
+		displayName: "Codex",
+		statusByContext: map[string]provider.Status{
+			"personal": provider.NotConfiguredStatus("Codex is not authenticated."),
 		},
+	}
+	fixture.editor.executable = "/fixture/code"
+	ctx := fixture.context("personal", "Personal")
+	ctx.Providers = provider.Configs{
+		provider.CodexID: {Enabled: true},
+	}
+	fixture.writeContext(t, ctx)
+	contextPaths, err := filesystem.DeriveContextPaths(fixture.paths, ctx.ID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	removeAll(t, contextPaths.VSCodeUserDataDir)
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.projectDir),
+		ContextID:   devcontext.MustID("personal"),
+		CreatedAt:   fixture.now,
 	})
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+
+	if state.Confidence == nil {
+		t.Fatal("confidence = nil, want selected context confidence")
+	}
+	if state.Confidence.ContextID != "personal" {
+		t.Fatalf("confidence context = %q, want personal", state.Confidence.ContextID)
+	}
+	if state.Confidence.Status != LaunchConfidenceBlocked {
+		t.Fatalf("confidence status = %q, want blocked because VS Code profile storage is absent", state.Confidence.Status)
+	}
+	wantChecks := []LaunchConfidenceCheck{
+		{
+			Component:  LaunchConfidenceCheckCodex,
+			Severity:   LaunchConfidenceNeedsAttention,
+			Label:      "Codex",
+			Message:    "Codex is not authenticated.",
+			ActionHint: "Open and configure Codex for this context.",
+		},
+		{
+			Component: LaunchConfidenceCheckVSCode,
+			Severity:  LaunchConfidenceReady,
+			Label:     "VS Code",
+			Message:   "VS Code is available for launch.",
+		},
+		{
+			Component: LaunchConfidenceCheckIsolation,
+			Severity:  LaunchConfidenceReady,
+			Label:     "Context storage",
+			Message:   "Context storage is ready.",
+		},
+		{
+			Component: LaunchConfidenceCheckIsolation,
+			Severity:  LaunchConfidenceReady,
+			Label:     "Provider isolation",
+			Message:   "Provider isolation directories are ready.",
+		},
+		{
+			Component:  LaunchConfidenceCheckIsolation,
+			Severity:   LaunchConfidenceBlocked,
+			Label:      "VS Code profile",
+			Message:    "VS Code profile isolation is not ready.",
+			ActionHint: "Run diagnostics to repair context storage.",
+		},
+	}
+	if !reflect.DeepEqual(state.Confidence.Checks, wantChecks) {
+		t.Fatalf("confidence checks = %#v, want %#v", state.Confidence.Checks, wantChecks)
+	}
+}
+
+func TestGetLaunchStateReturnsPerContextConfidenceSummaries(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.provider = &applicationFakeProvider{
+		id:          provider.CodexID,
+		displayName: "Codex",
+		statusByContext: map[string]provider.Status{
+			"company":  provider.ConfiguredStatus(),
+			"personal": provider.NotConfiguredStatus("Codex is not authenticated."),
+		},
+	}
+	fixture.editor.executable = "/fixture/code"
+	company := fixture.context("company", "Company")
+	company.Providers = provider.Configs{
+		provider.CodexID: {Enabled: true},
+	}
+	personal := fixture.context("personal", "Personal")
+	personal.Providers = provider.Configs{
+		provider.CodexID: {Enabled: true},
+	}
+	fixture.writeContext(t, company)
+	fixture.writeContext(t, personal)
+	companyPaths, err := filesystem.DeriveContextPaths(fixture.paths, company.ID)
+	if err != nil {
+		t.Fatalf("derive company paths: %v", err)
+	}
+	personalPaths, err := filesystem.DeriveContextPaths(fixture.paths, personal.ID)
+	if err != nil {
+		t.Fatalf("derive personal paths: %v", err)
+	}
+	removeAll(t, companyPaths.VSCodeUserDataDir)
+	removeAll(t, personalPaths.VSCodeUserDataDir)
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+	if state.Confidence != nil {
+		t.Fatalf("top-level confidence = %#v, want nil while selection is required", state.Confidence)
+	}
+	if len(state.Contexts) != 2 {
+		t.Fatalf("context count = %d, want 2", len(state.Contexts))
+	}
+
+	confidenceByContext := map[string]LaunchConfidenceState{}
+	for _, contextState := range state.Contexts {
+		confidenceByContext[contextState.ID] = contextState.Confidence
+	}
+
+	if got := confidenceByContext["company"]; got.ContextID != "company" || got.Status != LaunchConfidenceBlocked {
+		t.Fatalf("company confidence = %#v, want company blocked by missing VS Code profile", got)
+	}
+	if got := confidenceByContext["personal"]; got.ContextID != "personal" || got.Status != LaunchConfidenceBlocked {
+		t.Fatalf("personal confidence = %#v, want personal blocked by missing VS Code profile", got)
+	}
+	assertConfidenceCheck(t, confidenceByContext["company"].Checks, LaunchConfidenceCheck{
+		Component: LaunchConfidenceCheckCodex,
+		Severity:  LaunchConfidenceReady,
+		Label:     "Codex",
+		Message:   "Codex is ready for this context.",
+	})
+	assertConfidenceCheck(t, confidenceByContext["personal"].Checks, LaunchConfidenceCheck{
+		Component:  LaunchConfidenceCheckCodex,
+		Severity:   LaunchConfidenceNeedsAttention,
+		Label:      "Codex",
+		Message:    "Codex is not authenticated.",
+		ActionHint: "Open and configure Codex for this context.",
+	})
+}
+
+func TestGetLaunchStateTopLevelConfidenceMatchesSelectedContextSummary(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.provider = &applicationFakeProvider{
+		id:          provider.CodexID,
+		displayName: "Codex",
+		statusByContext: map[string]provider.Status{
+			"personal": provider.NotConfiguredStatus("Codex is not authenticated."),
+		},
+	}
+	fixture.editor.executable = "/fixture/code"
+	ctx := fixture.context("personal", "Personal")
+	ctx.Providers = provider.Configs{
+		provider.CodexID: {Enabled: true},
+	}
+	fixture.writeContext(t, ctx)
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.projectDir),
+		ContextID:   devcontext.MustID("personal"),
+		CreatedAt:   fixture.now,
+	})
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+	if state.Confidence == nil {
+		t.Fatal("top-level confidence = nil, want selected context confidence")
+	}
+	if !reflect.DeepEqual(*state.Confidence, state.Contexts[0].Confidence) {
+		t.Fatalf("top-level confidence = %#v, want context confidence %#v", *state.Confidence, state.Contexts[0].Confidence)
+	}
+}
+
+func TestPreflightLaunchProjectReturnsReadinessWithoutStartingProcess(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+	result, appErr := fixture.service().PreflightLaunchProject(PreflightLaunchProjectRequest{
+		ProjectPath: ".",
+		ContextID:   "personal",
+	})
+	if appErr != nil {
+		t.Fatalf("preflight launch project: %v", appErr)
+	}
+
+	if result.Project != (ProjectState{Name: "current", Path: fixture.projectDir}) {
+		t.Fatalf("project = %#v, want current project", result.Project)
+	}
+	if result.Context.ID != "personal" || result.Confidence.ContextID != "personal" {
+		t.Fatalf("preflight result = %#v, want personal context and confidence", result)
+	}
+	if !reflect.DeepEqual(result.Confidence, result.Context.Confidence) {
+		t.Fatalf("preflight confidence = %#v, want context confidence %#v", result.Confidence, result.Context.Confidence)
+	}
+	if len(fixture.process.requests) != 0 {
+		t.Fatalf("process requests = %#v, want none for preflight", fixture.process.requests)
+	}
+}
+
+func TestPreflightLaunchProjectRequiresMismatchConfirmation(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	fixture.writeContext(t, fixture.context("company", "Company"))
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.projectDir),
+		ContextID:   devcontext.MustID("company"),
+		CreatedAt:   fixture.now,
+	})
+
+	_, appErr := fixture.service().PreflightLaunchProject(PreflightLaunchProjectRequest{
+		ProjectPath: ".",
+		ContextID:   "personal",
+	})
+	if appErr == nil {
+		t.Fatal("preflight error = nil, want mismatch confirmation error")
+	}
+	if appErr.Code != ErrorCodeContextMismatch {
+		t.Fatalf("error code = %q, want %q", appErr.Code, ErrorCodeContextMismatch)
+	}
+	if len(fixture.process.requests) != 0 {
+		t.Fatalf("process requests = %#v, want none for preflight", fixture.process.requests)
+	}
 }
 
 func TestGetLaunchStateReturnsUnboundSelectorState(t *testing.T) {
@@ -83,8 +336,48 @@ func TestGetLaunchStateReturnsUnboundSelectorState(t *testing.T) {
 	if len(state.Contexts) != 2 {
 		t.Fatalf("context count = %d, want 2", len(state.Contexts))
 	}
+	if state.Confidence != nil {
+		t.Fatalf("confidence = %#v, want nil while user selection is required", state.Confidence)
+	}
 	if state.FirstRun {
 		t.Fatal("first run = true, want false")
+	}
+}
+
+func TestGetLaunchStateDetectsProviderCredentialSessionsForContextCreation(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.providerRegistry = provider.MustNewRegistry([]provider.Provider{
+		fixture.provider,
+		provider.ClaudeProvider{},
+	}, fixture.provider.ID())
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	writeApplicationJSONFixture(t, filepath.Join(fixture.homeDir, ".claude", ".credentials.json"), map[string]string{
+		"subscriptionType": "Pro",
+		"organizationUuid": "e783",
+		"organizationName": "Jishin Labs",
+		"accessToken":      "not-presented",
+	})
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+
+	if len(state.ProviderCredentialSessions) != 1 {
+		t.Fatalf("provider credential sessions = %#v, want one Claude session", state.ProviderCredentialSessions)
+	}
+	session := state.ProviderCredentialSessions[0]
+	if session.ProviderID != "claude" || session.Name != "Claude" || !session.MetadataAvailable {
+		t.Fatalf("provider credential session = %#v, want available Claude session", session)
+	}
+	if session.Claude == nil ||
+		session.Claude.SubscriptionType != "Pro" ||
+		session.Claude.OrganizationUUID != "e783" ||
+		session.Claude.OrganizationName != "Jishin Labs" {
+		t.Fatalf("claude metadata = %#v", session.Claude)
+	}
+	if rendered := fmt.Sprintf("%#v", state.ProviderCredentialSessions); strings.Contains(rendered, "not-presented") {
+		t.Fatalf("provider credential sessions exposed credential value: %#v", state.ProviderCredentialSessions)
 	}
 }
 
@@ -105,11 +398,261 @@ func TestGetLaunchStateReportsMissingProviderStatus(t *testing.T) {
 		ID:          "fake",
 		Name:        "Fake Provider",
 		Enabled:     true,
-		State:       string(provider.StatusUnavailable),
+		State:       ProviderReadinessUnavailable,
 		Explanation: "Fake Provider command was not found",
+		Identity: ProviderIdentityState{
+			Status:  ProviderIdentityUnavailable,
+			Message: "Account identity unavailable.",
+		},
 	}
 	if got != want {
 		t.Fatalf("provider status = %#v, want %#v", got, want)
+	}
+}
+
+func TestGetLaunchStateNormalizesProviderReadinessForUI(t *testing.T) {
+	tests := []struct {
+		name   string
+		status provider.Status
+		want   ProviderReadinessState
+	}{
+		{
+			name:   "configured maps to ready",
+			status: provider.ConfiguredStatus(),
+			want:   ProviderReadinessReady,
+		},
+		{
+			name:   "not configured",
+			status: provider.NotConfiguredStatus("missing"),
+			want:   ProviderReadinessNotConfigured,
+		},
+		{
+			name:   "directory missing",
+			status: provider.DirectoryMissingStatus("missing directory"),
+			want:   ProviderReadinessDirectoryMissing,
+		},
+		{
+			name:   "unavailable",
+			status: provider.UnavailableStatus("unavailable"),
+			want:   ProviderReadinessUnavailable,
+		},
+		{
+			name:   "unknown falls back to unavailable",
+			status: provider.Status{State: "configured_but_unknown"},
+			want:   ProviderReadinessUnavailable,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newApplicationFixture(t)
+			fixture.provider.statusByContext = map[string]provider.Status{
+				"personal": tt.status,
+			}
+			fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+			state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+			if appErr != nil {
+				t.Fatalf("get launch state: %v", appErr)
+			}
+
+			if got := state.Contexts[0].Providers[0].State; got != tt.want {
+				t.Fatalf("provider state = %q, want %q", got, tt.want)
+			}
+			if !state.Contexts[0].Providers[0].State.Valid() {
+				t.Fatalf("provider state is invalid: %q", state.Contexts[0].Providers[0].State)
+			}
+		})
+	}
+}
+
+func TestGetLaunchStateReturnsProviderIdentityContract(t *testing.T) {
+	tests := []struct {
+		name    string
+		enabled bool
+		status  provider.Status
+		want    ProviderIdentityState
+	}{
+		{
+			name:    "configured provider identity unavailable until verified",
+			enabled: true,
+			status:  provider.ConfiguredStatus(),
+			want: ProviderIdentityState{
+				Status:  ProviderIdentityUnavailable,
+				Message: "Account identity unavailable.",
+			},
+		},
+		{
+			name:    "not configured provider has no identity",
+			enabled: true,
+			status:  provider.NotConfiguredStatus("missing"),
+			want:    ProviderIdentityState{Status: ProviderIdentityNone},
+		},
+		{
+			name:    "disabled provider has no identity",
+			enabled: false,
+			status:  provider.ConfiguredStatus(),
+			want:    ProviderIdentityState{Status: ProviderIdentityNone},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newApplicationFixture(t)
+			fixture.provider.statusByContext = map[string]provider.Status{
+				"personal": tt.status,
+			}
+			ctx := fixture.context("personal", "Personal")
+			ctx.Providers["fake"] = provider.Config{Enabled: tt.enabled}
+			fixture.writeContext(t, ctx)
+
+			state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+			if appErr != nil {
+				t.Fatalf("get launch state: %v", appErr)
+			}
+
+			if got := state.Contexts[0].Providers[0].Identity; !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("provider identity = %#v, want %#v", got, tt.want)
+			}
+			if !state.Contexts[0].Providers[0].Identity.Status.Valid() {
+				t.Fatalf("provider identity status is invalid: %q", state.Contexts[0].Providers[0].Identity.Status)
+			}
+		})
+	}
+}
+
+func TestGetLaunchStateReturnsVerifiedProviderIdentitiesForIsolatedContexts(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.providerRegistry = provider.MustNewRegistry([]provider.Provider{
+		applicationFakeProvider{
+			id:          provider.CodexID,
+			displayName: "Codex",
+			statusByContext: map[string]provider.Status{
+				"personal": provider.ConfiguredStatus(),
+			},
+		},
+		applicationFakeProvider{
+			id:          provider.ClaudeID,
+			displayName: "Claude",
+			statusByContext: map[string]provider.Status{
+				"personal": provider.ConfiguredStatus(),
+			},
+		},
+	})
+
+	ctx := fixture.context("personal", "Personal")
+	ctx.Providers = provider.Configs{
+		provider.CodexID:  {Enabled: true},
+		provider.ClaudeID: {Enabled: true},
+	}
+	fixture.writeContext(t, ctx)
+
+	contextPaths, err := filesystem.DeriveContextPaths(fixture.paths, ctx.ID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	codexToken := applicationTestJWT(t, map[string]string{
+		"email":               "user@company.com",
+		"chatgpt_plan_type":   "business",
+		"chatgpt_account_id":  "acct-123",
+		"ignored_token_claim": "jwt-secret-claim",
+	})
+	writeApplicationJSONFixture(t, filepath.Join(contextPaths.ProviderStorageDir(provider.CodexID), "auth.json"), map[string]any{
+		"tokens": map[string]string{
+			"id_token":     codexToken,
+			"access_token": "codex-access-token",
+		},
+	})
+	writeApplicationJSONFixture(t, filepath.Join(contextPaths.ProviderStorageDir(provider.ClaudeID), ".credentials.json"), map[string]string{
+		"subscriptionType": "Pro",
+		"organizationUuid": "e783-organization",
+		"organizationName": "Jishin Labs",
+		"accessToken":      "claude-access-token",
+		"refreshToken":     "claude-refresh-token",
+	})
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+
+	providersByID := map[string]ProviderState{}
+	for _, providerState := range state.Contexts[0].Providers {
+		providersByID[providerState.ID] = providerState
+	}
+
+	codex := providersByID["codex"].Identity
+	if codex.Status != ProviderIdentityVerified || codex.Codex == nil {
+		t.Fatalf("codex identity = %#v, want verified codex identity", codex)
+	}
+	if codex.Codex.Email != "user@company.com" ||
+		codex.Codex.ChatGPTPlanType != "business" ||
+		codex.Codex.ChatGPTAccountID != "acct-123" {
+		t.Fatalf("codex identity metadata = %#v", codex.Codex)
+	}
+
+	claude := providersByID["claude"].Identity
+	if claude.Status != ProviderIdentityVerified || claude.Claude == nil {
+		t.Fatalf("claude identity = %#v, want verified claude identity", claude)
+	}
+	if claude.Claude.SubscriptionType != "Pro" ||
+		claude.Claude.OrganizationUUID != "e783-organization" ||
+		claude.Claude.OrganizationName != "Jishin Labs" {
+		t.Fatalf("claude identity metadata = %#v", claude.Claude)
+	}
+
+	rendered := fmt.Sprintf("%#v", state.Contexts[0].Providers)
+	for _, secret := range []string{
+		codexToken,
+		"codex-access-token",
+		"jwt-secret-claim",
+		"claude-access-token",
+		"claude-refresh-token",
+	} {
+		if strings.Contains(rendered, secret) {
+			t.Fatalf("provider state exposed credential value %q: %s", secret, rendered)
+		}
+	}
+}
+
+func TestGetLaunchStateDoesNotInferIdentityMismatchEvidenceFromContextName(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.providerRegistry = provider.MustNewRegistry([]provider.Provider{
+		applicationFakeProvider{
+			id:          provider.CodexID,
+			displayName: "Codex",
+			statusByContext: map[string]provider.Status{
+				"company": provider.ConfiguredStatus(),
+			},
+		},
+	})
+
+	ctx := fixture.context("company", "Company")
+	ctx.Providers = provider.Configs{
+		provider.CodexID: {Enabled: true},
+	}
+	fixture.writeContext(t, ctx)
+
+	contextPaths, err := filesystem.DeriveContextPaths(fixture.paths, ctx.ID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	writeApplicationJSONFixture(t, filepath.Join(contextPaths.ProviderStorageDir(provider.CodexID), "auth.json"), map[string]string{
+		"id_token": applicationTestJWT(t, map[string]string{
+			"email":              "user@gmail.com",
+			"chatgpt_plan_type":  "plus",
+			"chatgpt_account_id": "acct-personal",
+		}),
+	})
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+
+	identity := state.Contexts[0].Providers[0].Identity
+	if identity.Status != ProviderIdentityVerified {
+		t.Fatalf("identity status = %q, want verified without inferred mismatch evidence", identity.Status)
 	}
 }
 
@@ -192,6 +735,10 @@ func TestGetLaunchStateReportsContextStorageErrors(t *testing.T) {
 }
 
 func TestCreateContextCreatesDefaultPersonalAndCompanyContexts(t *testing.T) {
+	defaultRegistry := provider.MustNewRegistry([]provider.Provider{
+		applicationFakeProvider{id: "fake"},
+	}, "fake")
+	now := time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC)
 	tests := []struct {
 		name      string
 		contextID string
@@ -200,12 +747,12 @@ func TestCreateContextCreatesDefaultPersonalAndCompanyContexts(t *testing.T) {
 		{
 			name:      "personal",
 			contextID: "personal",
-			want:      devcontext.DefaultPersonalContext(time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC)),
+			want:      devcontext.DefaultPersonalContextWithProviderRegistry(now, defaultRegistry),
 		},
 		{
 			name:      "company",
 			contextID: "company",
-			want:      devcontext.DefaultCompanyContext(time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC)),
+			want:      devcontext.DefaultCompanyContextWithProviderRegistry(now, defaultRegistry),
 		},
 	}
 
@@ -506,6 +1053,17 @@ func assertContextStates(t *testing.T, got []ContextState, want []ContextState) 
 	}
 }
 
+func assertConfidenceCheck(t *testing.T, checks []LaunchConfidenceCheck, want LaunchConfidenceCheck) {
+	t.Helper()
+
+	for _, check := range checks {
+		if check == want {
+			return
+		}
+	}
+	t.Fatalf("checks = %#v, want containing %#v", checks, want)
+}
+
 func assertFirstRunState(t *testing.T, state LaunchState, projectDir string) {
 	t.Helper()
 
@@ -533,6 +1091,9 @@ func assertFirstRunState(t *testing.T, state LaunchState, projectDir string) {
 	if len(state.Warnings) != 0 {
 		t.Fatalf("warnings = %#v, want none", state.Warnings)
 	}
+	if state.Confidence != nil {
+		t.Fatalf("confidence = %#v, want nil", state.Confidence)
+	}
 }
 
 type applicationFixture struct {
@@ -544,6 +1105,7 @@ type applicationFixture struct {
 	paths              filesystem.PlatformPaths
 	now                time.Time
 	provider           *applicationFakeProvider
+	providerRegistry   provider.Registry
 	editor             *applicationFakeEditor
 	process            *applicationFakeProcessLauncher
 	storagePermissions filesystem.StoragePermissions
@@ -580,11 +1142,16 @@ func newApplicationFixture(t *testing.T) applicationFixture {
 }
 
 func (f applicationFixture) service() *Service {
+	registry := f.providerRegistry
+	if registry.IsZero() {
+		registry = provider.MustNewRegistry([]provider.Provider{f.provider}, f.provider.ID())
+	}
+
 	return NewServiceWithDependencies(Dependencies{
 		Contexts:           devcontext.NewRepository(f.contextsDir),
 		Projects:           project.NewRepository(f.bindingsPath, f.paths),
 		Paths:              f.paths,
-		Providers:          []provider.Provider{f.provider},
+		ProviderRegistry:   registry,
 		Editor:             f.editor,
 		ProcessLauncher:    f.process,
 		StoragePermissions: f.storagePermissions,
@@ -620,11 +1187,13 @@ func (f applicationFixture) writeContext(t *testing.T, ctx devcontext.Context) {
 	if err != nil {
 		t.Fatalf("derive context paths: %v", err)
 	}
+	contextPaths = contextPaths.WithProviderStorageDirs(enabledProviderIDs(ctx))
 	mkdir(t, contextPaths.RootDir)
-	mkdir(t, contextPaths.ClaudeDir)
-	mkdir(t, contextPaths.CodexDir)
 	mkdir(t, contextPaths.VSCodeDir)
 	mkdir(t, contextPaths.VSCodeUserDataDir)
+	for _, dir := range contextPaths.ProviderStorageDirs {
+		mkdir(t, dir)
+	}
 	if err := devcontext.NewRepository(f.contextsDir).Write(ctx); err != nil {
 		t.Fatalf("write context %q: %v", ctx.ID.String(), err)
 	}
@@ -660,6 +1229,37 @@ func writeFile(t *testing.T, path string, data []byte) {
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatalf("write file %q: %v", path, err)
 	}
+}
+
+func writeApplicationJSONFixture(t *testing.T, path string, value any) {
+	t.Helper()
+
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal json fixture: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatalf("create fixture directory %q: %v", filepath.Dir(path), err)
+	}
+	writeFile(t, path, data)
+}
+
+func applicationTestJWT(t *testing.T, claims map[string]string) string {
+	t.Helper()
+
+	header, err := json.Marshal(map[string]string{"alg": "none"})
+	if err != nil {
+		t.Fatalf("marshal jwt header: %v", err)
+	}
+	payload, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatalf("marshal jwt payload: %v", err)
+	}
+	return strings.Join([]string{
+		base64.RawURLEncoding.EncodeToString(header),
+		base64.RawURLEncoding.EncodeToString(payload),
+		"signature",
+	}, ".")
 }
 
 type applicationRecordingLogger struct {

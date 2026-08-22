@@ -31,11 +31,11 @@ func (CodexProvider) DisplayName() string {
 // BuildEnvironment points Codex at the selected context's isolated home.
 func (CodexProvider) BuildEnvironment(ctx RuntimeContext) (EnvironmentContribution, error) {
 	return EnvironmentContribution{
-		CodexHomeEnvVar: ctx.Paths.CodexDir,
+		CodexHomeEnvVar: ctx.Paths.StorageDir,
 	}, nil
 }
 
 // Status returns local provider readiness.
 func (p CodexProvider) Status(ctx RuntimeContext) (Status, error) {
-	return detectLocalStatus(p.Probe, CodexCommand, p.DisplayName(), ctx.Paths.CodexDir)
+	return detectLocalStatus(p.Probe, p.DisplayName(), ctx.Paths.StorageDir)
 }

@@ -1,21 +1,36 @@
-import type { DisplayError, LaunchState } from "../../lib/devctx-api";
+import type { DisplayError, LaunchState, ProviderCredentialSession } from "../../lib/devctx-api";
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert.js";
+import { Button } from "../ui/button.js";
+import { Card, CardContent } from "../ui/card.js";
+import { ProviderCredentialClassification, type ProviderSessionAssignments } from "./ProviderCredentialClassification.js";
 
 interface FirstRunWelcomeProps {
   launchState: LaunchState;
+  providerCredentialSessions?: ProviderCredentialSession[];
+  providerSessionAssignments?: ProviderSessionAssignments;
   onCreatePersonal?: () => void;
   onCreateCompany?: () => void;
+  onClassifyProviderSession?: (providerId: string, contextId: "personal" | "company") => void;
   pendingContextId?: string;
   error?: DisplayError;
 }
 
 function FirstRunWelcome({
   launchState,
+  providerCredentialSessions = [],
+  providerSessionAssignments = {},
   onCreatePersonal,
   onCreateCompany,
+  onClassifyProviderSession,
   pendingContextId,
   error,
 }: FirstRunWelcomeProps) {
   const pending = pendingContextId !== undefined;
+  const canClassify = providerCredentialSessions.length === 0 || onClassifyProviderSession !== undefined;
+  const handleClassifyProviderSession = onClassifyProviderSession ?? (() => {});
+  const classificationComplete = providerCredentialSessions.every(
+    (session) => providerSessionAssignments[session.providerId] !== undefined,
+  );
 
   return (
     <section aria-labelledby="first-run-title" className="space-y-6">
@@ -24,8 +39,8 @@ function FirstRunWelcome({
           Create your first development context
         </h3>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Dev Context creates local identities for this machine so each project can open with the right editor state,
-          provider folders, and authentication setup.
+          Dev Context creates local identities for this machine so each project can open with the right provider
+          folders and authentication setup.
         </p>
       </div>
 
@@ -36,52 +51,66 @@ function FirstRunWelcome({
         />
         <GuidanceItem
           title="Isolated tools"
-          description="Each context gets separate editor and provider directories so project work does not share local state accidentally."
+          description="Each context gets separate Codex and Claude directories while VS Code keeps your normal profile."
         />
         <GuidanceItem
           title="Separate authentication"
-          description="Sign in inside each provider yourself. Dev Context does not store passwords, tokens, or cloud accounts."
+          description="Classify detected sessions before import, or sign in inside each provider yourself. Dev Context does not store passwords, tokens, or cloud accounts."
         />
       </div>
+
+      <ProviderCredentialClassification
+        sessions={providerCredentialSessions}
+        assignments={providerSessionAssignments}
+        disabled={pending}
+        onClassify={handleClassifyProviderSession}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="Create a default context">
         <OnboardingAction
           title="Personal"
           description="Use this for personal repositories, experiments, and tools tied to your own accounts."
           buttonLabel={pendingContextId === "personal" ? "Creating..." : "Create Personal"}
-          disabled={pending || onCreatePersonal === undefined}
+          disabled={pending || !canClassify || !classificationComplete || onCreatePersonal === undefined}
           onClick={onCreatePersonal}
         />
         <OnboardingAction
           title="Company"
           description="Use this for work repositories and tools tied to employer or client accounts."
           buttonLabel={pendingContextId === "company" ? "Creating..." : "Create Company"}
-          disabled={pending || onCreateCompany === undefined}
+          disabled={pending || !canClassify || !classificationComplete || onCreateCompany === undefined}
           onClick={onCreateCompany}
         />
       </div>
 
       {pendingContextId ? (
-        <p className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground" role="status">
+        <Card
+          as="p"
+          size="sm"
+          className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground"
+          role="status"
+        >
           Creating {pendingContextId === "personal" ? "Personal" : "Company"} context...
-        </p>
+        </Card>
       ) : null}
 
       {error ? <FirstRunErrorNotice error={error} /> : null}
 
-      <p className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+      <Card as="p" size="sm" className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
         Current project: <span className="font-medium text-foreground">{launchState.project.path}</span>
-      </p>
+      </Card>
     </section>
   );
 }
 
 function GuidanceItem({ title, description }: { title: string; description: string }) {
   return (
-    <div className="border border-border bg-card p-4">
-      <h4 className="text-sm font-semibold">{title}</h4>
-      <p className="mt-2 text-sm text-muted-foreground">{description}</p>
-    </div>
+    <Card size="sm" className="border border-border py-0">
+      <CardContent className="p-4">
+        <h4 className="text-sm font-semibold">{title}</h4>
+        <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -99,29 +128,26 @@ function OnboardingAction({
   onClick?: () => void;
 }) {
   return (
-    <div className="border border-border bg-card p-5">
-      <div className="space-y-2">
-        <h4 className="text-base font-semibold">{title}</h4>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
-      <button
-        type="button"
-        className="mt-4 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={disabled}
-        onClick={onClick}
-      >
-        {buttonLabel}
-      </button>
-    </div>
+    <Card size="sm" className="border border-border py-0">
+      <CardContent className="p-5">
+        <div className="space-y-2">
+          <h4 className="text-base font-semibold">{title}</h4>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+        <Button type="button" className="mt-4" disabled={disabled} onClick={onClick}>
+          {buttonLabel}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
 function FirstRunErrorNotice({ error }: { error: DisplayError }) {
   return (
-    <div className="border border-destructive/40 bg-destructive/5 p-4 text-sm" role="alert">
-      <p className="font-medium text-destructive">{error.message}</p>
-      <p className="mt-1 text-muted-foreground">{error.recovery}</p>
-    </div>
+    <Alert variant="destructive" className="border-destructive/40">
+      <AlertTitle>{error.message}</AlertTitle>
+      <AlertDescription>{error.recovery}</AlertDescription>
+    </Alert>
   );
 }
 

@@ -10,6 +10,11 @@ import (
 type fakeProvider struct{}
 
 var _ provider.Provider = fakeProvider{}
+var _ provider.GlobalCredentialDetector = fakeProvider{}
+var _ provider.CredentialMetadataExtractor = fakeProvider{}
+var _ provider.CredentialImporter = fakeProvider{}
+var _ provider.ContextIdentityDetector = fakeProvider{}
+var _ provider.SetupGuidanceProvider = fakeProvider{}
 
 func (fakeProvider) ID() provider.ID {
 	return "fake"
@@ -22,7 +27,7 @@ func (fakeProvider) DisplayName() string {
 func (fakeProvider) BuildEnvironment(ctx provider.RuntimeContext) (provider.EnvironmentContribution, error) {
 	return provider.EnvironmentContribution{
 		"FAKE_CONTEXT": ctx.ContextID,
-		"FAKE_HOME":    ctx.Paths.RootDir,
+		"FAKE_HOME":    ctx.Paths.StorageDir,
 	}, nil
 }
 
@@ -33,6 +38,40 @@ func (fakeProvider) Status(ctx provider.RuntimeContext) (provider.Status, error)
 	return provider.ReadyStatus(), nil
 }
 
+func (fakeProvider) DetectGlobalCredentialSession(provider.GlobalCredentialContext) (provider.CredentialSession, bool, error) {
+	return provider.CredentialSession{
+		MetadataAvailable: true,
+		Fields: []provider.MetadataField{
+			{Label: "Account", Value: "fake@example.com"},
+		},
+	}, true, nil
+}
+
+func (fakeProvider) ExtractCredentialMetadata(string) ([]provider.MetadataField, bool, error) {
+	return []provider.MetadataField{
+		{Label: "Account", Value: "fake@example.com"},
+	}, true, nil
+}
+
+func (fakeProvider) ImportCredentials(provider.CredentialImportContext) error {
+	return nil
+}
+
+func (fakeProvider) DetectContextIdentity(provider.RuntimeContext) (provider.Identity, bool, error) {
+	return provider.Identity{
+		Fields: []provider.MetadataField{
+			{Label: "Account", Value: "fake@example.com"},
+		},
+	}, true, nil
+}
+
+func (fakeProvider) SetupGuidance(provider.RuntimeContext) provider.SetupGuidance {
+	return provider.SetupGuidance{
+		Message:    "Configure Fake Provider.",
+		ActionHint: "Run fake auth login.",
+	}
+}
+
 func TestProviderInterfaceAllowsGenericProviderUse(t *testing.T) {
 	var integration provider.Provider = fakeProvider{}
 	ctx := provider.RuntimeContext{
@@ -41,7 +80,8 @@ func TestProviderInterfaceAllowsGenericProviderUse(t *testing.T) {
 			Enabled: true,
 		},
 		Paths: provider.ContextPaths{
-			RootDir: "/home/alex/.devctx/contexts/client-a",
+			RootDir:    "/home/alex/.devctx/contexts/client-a",
+			StorageDir: "/home/alex/.devctx/contexts/client-a/providers/fake",
 		},
 	}
 
@@ -58,7 +98,7 @@ func TestProviderInterfaceAllowsGenericProviderUse(t *testing.T) {
 	}
 	wantEnvironment := provider.EnvironmentContribution{
 		"FAKE_CONTEXT": "client-a",
-		"FAKE_HOME":    "/home/alex/.devctx/contexts/client-a",
+		"FAKE_HOME":    "/home/alex/.devctx/contexts/client-a/providers/fake",
 	}
 	if !reflect.DeepEqual(environment, wantEnvironment) {
 		t.Fatalf("environment = %#v, want %#v", environment, wantEnvironment)
@@ -70,5 +110,63 @@ func TestProviderInterfaceAllowsGenericProviderUse(t *testing.T) {
 	}
 	if status.State != provider.StatusReady {
 		t.Fatalf("status state = %q, want %q", status.State, provider.StatusReady)
+	}
+}
+
+func TestRuntimeContextPathsExposeOnlyProviderStorageDir(t *testing.T) {
+	contextPathsType := reflect.TypeOf(provider.ContextPaths{})
+
+	if _, ok := contextPathsType.FieldByName("StorageDir"); !ok {
+		t.Fatal("provider.ContextPaths is missing StorageDir")
+	}
+	for _, fieldName := range []string{"ClaudeDir", "CodexDir"} {
+		if _, ok := contextPathsType.FieldByName(fieldName); ok {
+			t.Fatalf("provider.ContextPaths exposes %s, want only provider-owned storage", fieldName)
+		}
+	}
+}
+
+func TestProviderOptionalCapabilityInterfacesUsePlainRuntimeValues(t *testing.T) {
+	var integration provider.Provider = fakeProvider{}
+	runtimeContext := provider.RuntimeContext{
+		ContextID: "client-a",
+		Config:    provider.Config{Enabled: true},
+		Paths: provider.ContextPaths{
+			RootDir:    "/home/alex/.devctx/contexts/client-a",
+			StorageDir: "/home/alex/.devctx/contexts/client-a/providers/fake",
+		},
+	}
+
+	globalDetector := integration.(provider.GlobalCredentialDetector)
+	session, ok, err := globalDetector.DetectGlobalCredentialSession(provider.GlobalCredentialContext{
+		UserHomeDir: "/home/alex",
+	})
+	if err != nil || !ok || !session.MetadataAvailable {
+		t.Fatalf("global session = %#v ok=%t err=%v", session, ok, err)
+	}
+
+	importer := integration.(provider.CredentialImporter)
+	if err := importer.ImportCredentials(provider.CredentialImportContext{
+		UserHomeDir: "/home/alex",
+		Runtime:     runtimeContext,
+	}); err != nil {
+		t.Fatalf("import credentials: %v", err)
+	}
+
+	identityDetector := integration.(provider.ContextIdentityDetector)
+	identity, ok, err := identityDetector.DetectContextIdentity(runtimeContext)
+	if err != nil || !ok || !reflect.DeepEqual(identity.Fields, session.Fields) {
+		t.Fatalf("identity = %#v ok=%t err=%v, want session fields %#v", identity, ok, err, session.Fields)
+	}
+
+	metadataExtractor := integration.(provider.CredentialMetadataExtractor)
+	fields, ok, err := metadataExtractor.ExtractCredentialMetadata("/home/alex/.fake/auth.json")
+	if err != nil || !ok || !reflect.DeepEqual(fields, session.Fields) {
+		t.Fatalf("metadata fields = %#v ok=%t err=%v, want %#v", fields, ok, err, session.Fields)
+	}
+
+	guidance := integration.(provider.SetupGuidanceProvider).SetupGuidance(runtimeContext)
+	if guidance.ActionHint == "" || guidance.Message == "" {
+		t.Fatalf("setup guidance = %#v, want message and action hint", guidance)
 	}
 }

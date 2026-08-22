@@ -1,3 +1,6 @@
+import { Button } from "../ui/button.js";
+import { Separator } from "../ui/separator.js";
+
 interface SelectorActionsProps {
   launchDisabled: boolean;
   launchPending: boolean;
@@ -7,23 +10,16 @@ interface SelectorActionsProps {
 
 function SelectorActions({ launchDisabled, launchPending, onLaunch, onCancel }: SelectorActionsProps) {
   return (
-    <div className="flex justify-end gap-3 border-t border-border pt-4">
-      <button
-        type="button"
-        className="border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-foreground/30 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={launchPending}
-        onClick={onCancel}
-      >
-        Cancel
-      </button>
-      <button
-        type="button"
-        className="bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={launchDisabled || launchPending}
-        onClick={onLaunch}
-      >
-        {launchPending ? "Launching..." : "Launch"}
-      </button>
+    <div className="space-y-4">
+      <Separator />
+      <div className="flex justify-end gap-3">
+        <Button type="button" variant="outline" disabled={launchPending} onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="button" disabled={launchDisabled || launchPending} onClick={onLaunch}>
+          {launchPending ? "Launching..." : "Launch"}
+        </Button>
+      </div>
     </div>
   );
 }

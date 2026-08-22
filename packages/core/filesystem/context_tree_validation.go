@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/provider"
 )
 
 // ErrContextStorageIncomplete identifies a context whose expected storage
@@ -18,18 +19,18 @@ var ErrContextStorageIncomplete = errors.New("context storage is incomplete")
 type ContextDirectoryKind string
 
 const (
-	ContextDirectoryRoot           ContextDirectoryKind = "context"
-	ContextDirectoryClaude         ContextDirectoryKind = "claude"
-	ContextDirectoryCodex          ContextDirectoryKind = "codex"
-	ContextDirectoryVSCode         ContextDirectoryKind = "vscode"
-	ContextDirectoryVSCodeUserData ContextDirectoryKind = "vscode_user_data"
+	ContextDirectoryRoot     ContextDirectoryKind = "context"
+	ContextDirectoryEditor   ContextDirectoryKind = "editor"
+	ContextDirectoryProvider ContextDirectoryKind = "provider"
 )
 
 // MissingContextDirectory describes one absent or non-directory context path.
 type MissingContextDirectory struct {
-	Kind   ContextDirectoryKind
-	Path   string
-	Reason string
+	Kind                ContextDirectoryKind
+	ProviderID          string
+	ProviderDisplayName string
+	Path                string
+	Reason              string
 }
 
 // ContextStorageError reports incomplete storage for one context.
@@ -45,11 +46,18 @@ func (e *ContextStorageError) Error() string {
 
 	details := make([]string, 0, len(e.Missing))
 	for _, missing := range e.Missing {
+		kind := string(missing.Kind)
+		if missing.ProviderID != "" {
+			kind += ":" + missing.ProviderID
+			if missing.ProviderDisplayName != "" {
+				kind += " (" + missing.ProviderDisplayName + ")"
+			}
+		}
 		if missing.Reason == "" {
-			details = append(details, fmt.Sprintf("%s %q", missing.Kind, missing.Path))
+			details = append(details, fmt.Sprintf("%s %q", kind, missing.Path))
 			continue
 		}
-		details = append(details, fmt.Sprintf("%s %q (%s)", missing.Kind, missing.Path, missing.Reason))
+		details = append(details, fmt.Sprintf("%s %q (%s)", kind, missing.Path, missing.Reason))
 	}
 	if len(details) == 0 {
 		return fmt.Sprintf("%v: context %q", ErrContextStorageIncomplete, e.ContextID.String())
@@ -64,15 +72,31 @@ func (e *ContextStorageError) Unwrap() error {
 // ValidateContextDirectoryTree verifies that all expected context-owned
 // directories exist. It reports incomplete storage instead of recreating paths.
 func ValidateContextDirectoryTree(paths ContextPaths) error {
+	return validateContextDirectoryTree(paths, provider.Registry{})
+}
+
+// ValidateContextDirectoryTreeWithProviderRegistry verifies that all expected
+// context-owned directories exist for registered providers enabled in ctx. It
+// reports incomplete storage instead of recreating paths.
+func ValidateContextDirectoryTreeWithProviderRegistry(paths ContextPaths, ctx devcontext.Context, registry provider.Registry) error {
+	if registry.IsZero() {
+		registry = provider.BuiltInRegistry()
+	}
+	return validateContextDirectoryTree(paths.WithProviderStorageDirs(registeredEnabledProviderIDs(ctx, registry)), registry)
+}
+
+func validateContextDirectoryTree(paths ContextPaths, registry provider.Registry) error {
 	missing := make([]MissingContextDirectory, 0)
-	for _, expected := range expectedContextDirectories(paths) {
+	for _, expected := range expectedContextDirectories(paths, registry) {
 		info, err := os.Stat(expected.Path)
 		if err != nil {
 			if isMissingContextDirectoryError(err) {
 				missing = append(missing, MissingContextDirectory{
-					Kind:   expected.Kind,
-					Path:   expected.Path,
-					Reason: "missing",
+					Kind:                expected.Kind,
+					ProviderID:          expected.ProviderID,
+					ProviderDisplayName: expected.ProviderDisplayName,
+					Path:                expected.Path,
+					Reason:              "missing",
 				})
 				continue
 			}
@@ -83,9 +107,11 @@ func ValidateContextDirectoryTree(paths ContextPaths) error {
 		}
 		if !info.IsDir() {
 			missing = append(missing, MissingContextDirectory{
-				Kind:   expected.Kind,
-				Path:   expected.Path,
-				Reason: "not a directory",
+				Kind:                expected.Kind,
+				ProviderID:          expected.ProviderID,
+				ProviderDisplayName: expected.ProviderDisplayName,
+				Path:                expected.Path,
+				Reason:              "not a directory",
 			})
 		}
 	}
@@ -100,18 +126,38 @@ func ValidateContextDirectoryTree(paths ContextPaths) error {
 }
 
 type expectedContextDirectory struct {
-	Kind ContextDirectoryKind
-	Path string
+	Kind                ContextDirectoryKind
+	ProviderID          string
+	ProviderDisplayName string
+	Path                string
 }
 
-func expectedContextDirectories(paths ContextPaths) []expectedContextDirectory {
-	return []expectedContextDirectory{
+func expectedContextDirectories(paths ContextPaths, registry provider.Registry) []expectedContextDirectory {
+	expected := []expectedContextDirectory{
 		{Kind: ContextDirectoryRoot, Path: paths.RootDir},
-		{Kind: ContextDirectoryClaude, Path: paths.ClaudeDir},
-		{Kind: ContextDirectoryCodex, Path: paths.CodexDir},
-		{Kind: ContextDirectoryVSCode, Path: paths.VSCodeDir},
-		{Kind: ContextDirectoryVSCodeUserData, Path: paths.VSCodeUserDataDir},
+		{Kind: ContextDirectoryEditor, Path: paths.VSCodeDir},
+		{Kind: ContextDirectoryEditor, Path: paths.VSCodeUserDataDir},
 	}
+	for _, providerID := range sortedProviderStorageIDs(paths.ProviderStorageDirs) {
+		expected = append(expected, expectedContextDirectory{
+			Kind:                ContextDirectoryProvider,
+			ProviderID:          string(providerID),
+			ProviderDisplayName: providerDisplayName(providerID, registry),
+			Path:                paths.ProviderStorageDirs[providerID],
+		})
+	}
+	return expected
+}
+
+func providerDisplayName(providerID provider.ID, registry provider.Registry) string {
+	if registry.IsZero() {
+		return ""
+	}
+	integration, ok := registry.Get(providerID)
+	if !ok {
+		return ""
+	}
+	return integration.DisplayName()
 }
 
 func isMissingContextDirectoryError(err error) bool {

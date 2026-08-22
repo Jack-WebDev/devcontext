@@ -43,18 +43,19 @@ func (r Result) Write(stdout io.Writer, stderr io.Writer) error {
 
 // Runner executes implemented CLI commands against core repositories.
 type Runner struct {
-	Contexts          devcontext.Repository
-	Projects          project.Repository
-	WorkingDirectory  string
-	Paths             filesystem.PlatformPaths
-	Providers         []provider.Provider
-	Editor            editor.Editor
-	ProcessLauncher   launcher.ProcessLauncher
-	ParentEnvironment []string
-	DetachMode        launcher.DetachMode
-	Now               func() time.Time
-	Debug             bool
-	Logger            devlog.Logger
+	Contexts           devcontext.Repository
+	Projects           project.Repository
+	WorkingDirectory   string
+	Paths              filesystem.PlatformPaths
+	ProviderRegistry   provider.Registry
+	Editor             editor.Editor
+	ProcessLauncher    launcher.ProcessLauncher
+	ParentEnvironment  []string
+	DetachMode         launcher.DetachMode
+	StoragePermissions filesystem.StoragePermissions
+	Now                func() time.Time
+	Debug              bool
+	Logger             devlog.Logger
 }
 
 // Run parses and executes one CLI command.
@@ -99,7 +100,7 @@ func (r Runner) runRootLaunch(command RootLaunchCommand) Result {
 	builder := launcher.LaunchPlanBuilder{
 		Resolver:          launcher.NewResolver(r.Contexts, r.Projects),
 		PlatformPaths:     paths,
-		Providers:         r.providers(),
+		ProviderRegistry:  r.providerRegistry(),
 		Editor:            r.editor(),
 		ParentEnvironment: r.parentEnvironment(),
 	}
@@ -145,6 +146,24 @@ func (r Runner) runContext(command ContextCommand) Result {
 			return r.errorResult(err)
 		}
 		return successResult(renderContextList(contexts))
+	case ContextCreate:
+		contextID, err := devcontext.NewID(command.ContextID)
+		if err != nil {
+			return r.errorResult(err)
+		}
+		ctx, err := devcontext.DefaultContextForIDWithProviderRegistry(contextID, r.now(), r.providerRegistry())
+		if err != nil {
+			return r.errorResult(err)
+		}
+		paths := r.paths()
+		contextPaths, err := filesystem.DeriveContextPaths(paths, contextID)
+		if err != nil {
+			return r.errorResult(err)
+		}
+		if err := filesystem.CreateContextDirectoryTreeWithProviderRegistryCredentialsAndPermissions(paths, contextPaths, ctx, r.providerRegistry(), nil, r.storagePermissions()); err != nil {
+			return r.errorResult(err)
+		}
+		return successResult(renderContextCreate(ctx))
 	default:
 		return r.errorResult(fmt.Errorf("%w: context %s is not implemented", ErrInvalidCommand, command.Subcommand))
 	}
@@ -208,14 +227,11 @@ func (r Runner) paths() filesystem.PlatformPaths {
 	return filesystem.NewDefaultPlatformPaths()
 }
 
-func (r Runner) providers() []provider.Provider {
-	if r.Providers != nil {
-		return r.Providers
+func (r Runner) providerRegistry() provider.Registry {
+	if !r.ProviderRegistry.IsZero() {
+		return r.ProviderRegistry
 	}
-	return []provider.Provider{
-		provider.ClaudeProvider{},
-		provider.CodexProvider{},
-	}
+	return provider.BuiltInRegistry()
 }
 
 func (r Runner) editor() editor.Editor {
@@ -244,6 +260,13 @@ func (r Runner) detachMode() launcher.DetachMode {
 		return r.DetachMode
 	}
 	return launcher.DetachModeDetached
+}
+
+func (r Runner) storagePermissions() filesystem.StoragePermissions {
+	if r.StoragePermissions != nil {
+		return r.StoragePermissions
+	}
+	return filesystem.NewDefaultStoragePermissions()
 }
 
 func (r Runner) logger() devlog.Logger {
@@ -324,6 +347,10 @@ func renderContextList(contexts []devcontext.Context) string {
 	return builder.String()
 }
 
+func renderContextCreate(ctx devcontext.Context) string {
+	return fmt.Sprintf("Context:\n%s\n\nStatus:\ncreated\n", ctx.ID.String())
+}
+
 func renderProjectLookup(lookup project.BindingLookup) string {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Project:\n%s\n\n", lookup.ProjectPath)
@@ -365,10 +392,10 @@ func renderDebugLaunchPlan(plan launcher.LaunchPlan) string {
 	fmt.Fprintf(&builder, "editor_executable: %s\n", plan.Executable)
 	builder.WriteString("context_directories:\n")
 	fmt.Fprintf(&builder, "  root: %s\n", plan.ContextPaths.RootDir)
-	fmt.Fprintf(&builder, "  claude: %s\n", plan.ContextPaths.ClaudeDir)
-	fmt.Fprintf(&builder, "  codex: %s\n", plan.ContextPaths.CodexDir)
-	fmt.Fprintf(&builder, "  vscode: %s\n", plan.ContextPaths.VSCodeDir)
-	fmt.Fprintf(&builder, "  vscode_user_data: %s\n", plan.ContextPaths.VSCodeUserDataDir)
+	builder.WriteString("  providers:\n")
+	for _, providerID := range sortedProviderPathIDs(plan.ContextPaths.ProviderStorageDirs) {
+		fmt.Fprintf(&builder, "    %s: %s\n", providerID, plan.ContextPaths.ProviderStorageDirs[providerID])
+	}
 	builder.WriteString("arguments:\n")
 	for i, argument := range plan.Arguments {
 		fmt.Fprintf(&builder, "  %d: %s\n", i, argument)
@@ -378,6 +405,17 @@ func renderDebugLaunchPlan(plan launcher.LaunchPlan) string {
 		fmt.Fprintf(&builder, "  %s\n", entry)
 	}
 	return builder.String()
+}
+
+func sortedProviderPathIDs(paths map[provider.ID]string) []provider.ID {
+	ids := make([]provider.ID, 0, len(paths))
+	for providerID := range paths {
+		ids = append(ids, providerID)
+	}
+	sort.Slice(ids, func(i int, j int) bool {
+		return ids[i] < ids[j]
+	})
+	return ids
 }
 
 func redactedEnvironment(variables launcher.Environment) []string {

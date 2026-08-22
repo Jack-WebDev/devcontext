@@ -10,4 +10,6 @@ export function GetLaunchState(arg1:application.GetLaunchStateRequest):Promise<a
 
 export function LaunchProject(arg1:application.LaunchProjectRequest):Promise<any>;
 
+export function PreflightLaunchProject(arg1:application.PreflightLaunchProjectRequest):Promise<any>;
+
 export function UnbindProject(arg1:application.UnbindProjectRequest):Promise<any>;

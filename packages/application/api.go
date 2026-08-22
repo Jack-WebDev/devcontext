@@ -8,14 +8,16 @@ type GetLaunchStateRequest struct {
 // LaunchState contains everything the GUI needs to render the selector for one
 // project.
 type LaunchState struct {
-	Project           ProjectState        `json:"project"`
-	Contexts          []ContextState      `json:"contexts"`
-	Binding           ProjectBindingState `json:"binding"`
-	SelectedContextID string              `json:"selectedContextId,omitempty"`
-	SelectionRequired bool                `json:"selectionRequired"`
-	ResolutionSource  string              `json:"resolutionSource,omitempty"`
-	Warnings          []ResolutionWarning `json:"warnings,omitempty"`
-	FirstRun          bool                `json:"firstRun"`
+	Project                    ProjectState                     `json:"project"`
+	Contexts                   []ContextState                   `json:"contexts"`
+	Binding                    ProjectBindingState              `json:"binding"`
+	Confidence                 *LaunchConfidenceState           `json:"confidence,omitempty"`
+	SelectedContextID          string                           `json:"selectedContextId,omitempty"`
+	SelectionRequired          bool                             `json:"selectionRequired"`
+	ResolutionSource           string                           `json:"resolutionSource,omitempty"`
+	Warnings                   []ResolutionWarning              `json:"warnings,omitempty"`
+	FirstRun                   bool                             `json:"firstRun"`
+	ProviderCredentialSessions []ProviderCredentialSessionState `json:"providerCredentialSessions,omitempty"`
 }
 
 // ProjectState is the presentation-safe identity of one project.
@@ -27,11 +29,12 @@ type ProjectState struct {
 // ContextState is the presentation-safe identity and readiness summary for one
 // configured context.
 type ContextState struct {
-	ID        string            `json:"id"`
-	Name      string            `json:"name"`
-	Editor    EditorState       `json:"editor"`
-	Providers []ProviderState   `json:"providers"`
-	Metadata  map[string]string `json:"metadata,omitempty"`
+	ID         string                `json:"id"`
+	Name       string                `json:"name"`
+	Editor     EditorState           `json:"editor"`
+	Providers  []ProviderState       `json:"providers"`
+	Confidence LaunchConfidenceState `json:"confidence"`
+	Metadata   map[string]string     `json:"metadata,omitempty"`
 }
 
 // EditorState describes the editor selected by a context without exposing
@@ -43,11 +46,128 @@ type EditorState struct {
 // ProviderState describes one provider's participation and local readiness for
 // a context.
 type ProviderState struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Enabled     bool   `json:"enabled"`
-	State       string `json:"state"`
-	Explanation string `json:"explanation,omitempty"`
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Enabled     bool                   `json:"enabled"`
+	State       ProviderReadinessState `json:"state"`
+	Explanation string                 `json:"explanation,omitempty"`
+	Identity    ProviderIdentityState  `json:"identity"`
+}
+
+// ProviderReadinessState is the UI-facing provider readiness vocabulary.
+// It intentionally maps core provider.StatusConfigured to ready so API
+// consumers do not need to understand storage-oriented provider wording.
+type ProviderReadinessState string
+
+const (
+	// ProviderReadinessReady means the provider has local state for this
+	// context.
+	ProviderReadinessReady ProviderReadinessState = "ready"
+
+	// ProviderReadinessNotConfigured means provider storage exists but does not
+	// appear initialized.
+	ProviderReadinessNotConfigured ProviderReadinessState = "not_configured"
+
+	// ProviderReadinessDirectoryMissing means context-owned provider storage is
+	// absent.
+	ProviderReadinessDirectoryMissing ProviderReadinessState = "directory_missing"
+
+	// ProviderReadinessUnavailable means local readiness could not be
+	// determined.
+	ProviderReadinessUnavailable ProviderReadinessState = "unavailable"
+)
+
+// Valid reports whether state is one of the bounded API provider readiness
+// states.
+func (s ProviderReadinessState) Valid() bool {
+	switch s {
+	case ProviderReadinessReady, ProviderReadinessNotConfigured, ProviderReadinessDirectoryMissing, ProviderReadinessUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// ProviderIdentityStatus identifies whether provider account identity is safe
+// to display.
+type ProviderIdentityStatus string
+
+const (
+	// ProviderIdentityVerified means identity metadata was verified from local
+	// provider state and is safe to display.
+	ProviderIdentityVerified ProviderIdentityStatus = "verified"
+
+	// ProviderIdentityUnavailable means provider state exists, but account
+	// identity could not be verified.
+	ProviderIdentityUnavailable ProviderIdentityStatus = "unavailable"
+
+	// ProviderIdentityNone means no provider account identity is present for
+	// this context.
+	ProviderIdentityNone ProviderIdentityStatus = "none"
+
+	// ProviderIdentityMismatchEvidence means Dev Context has explicit evidence
+	// that the provider account may not match the intended context identity.
+	ProviderIdentityMismatchEvidence ProviderIdentityStatus = "mismatch_evidence"
+)
+
+// Valid reports whether status is one of the bounded API provider identity
+// states.
+func (s ProviderIdentityStatus) Valid() bool {
+	switch s {
+	case ProviderIdentityVerified, ProviderIdentityUnavailable, ProviderIdentityNone, ProviderIdentityMismatchEvidence:
+		return true
+	default:
+		return false
+	}
+}
+
+// ProviderIdentityState contains only safe provider account identity metadata.
+// Verified provider-specific fields are added by provider extraction phases;
+// until then, the status tells the UI not to guess.
+type ProviderIdentityState struct {
+	Status  ProviderIdentityStatus       `json:"status"`
+	Message string                       `json:"message,omitempty"`
+	Codex   *CodexProviderIdentityState  `json:"codex,omitempty"`
+	Claude  *ClaudeProviderIdentityState `json:"claude,omitempty"`
+}
+
+// CodexProviderIdentityState is safe verified Codex identity metadata.
+type CodexProviderIdentityState struct {
+	Email            string `json:"email,omitempty"`
+	ChatGPTPlanType  string `json:"chatgptPlanType,omitempty"`
+	ChatGPTAccountID string `json:"chatgptAccountId,omitempty"`
+}
+
+// ClaudeProviderIdentityState is safe verified Claude identity metadata.
+type ClaudeProviderIdentityState struct {
+	SubscriptionType string `json:"subscriptionType,omitempty"`
+	OrganizationUUID string `json:"organizationUuid,omitempty"`
+	OrganizationName string `json:"organizationName,omitempty"`
+}
+
+// PreflightLaunchProjectRequest asks the service to check launch readiness for
+// one project and context without starting the editor process.
+type PreflightLaunchProjectRequest struct {
+	ProjectPath            string `json:"projectPath,omitempty"`
+	ContextID              string `json:"contextId"`
+	ConfirmContextMismatch bool   `json:"confirmContextMismatch"`
+}
+
+// PreflightLaunchProjectResult describes launch readiness before an editor
+// process is started.
+type PreflightLaunchProjectResult struct {
+	Project    ProjectState          `json:"project"`
+	Context    ContextState          `json:"context"`
+	Confidence LaunchConfidenceState `json:"confidence"`
+	Warnings   []ResolutionWarning   `json:"warnings,omitempty"`
+}
+
+// LaunchConfidenceState summarizes backend-owned launch readiness for the
+// selected or recommended context.
+type LaunchConfidenceState struct {
+	ContextID string                  `json:"contextId"`
+	Status    LaunchConfidenceStatus  `json:"status"`
+	Checks    []LaunchConfidenceCheck `json:"checks"`
 }
 
 // ProjectBindingState describes the current remembered context for a project.
@@ -62,12 +182,39 @@ type ProjectBindingState struct {
 
 // CreateContextRequest asks the service to create one default context.
 type CreateContextRequest struct {
-	ContextID string `json:"contextId"`
+	ContextID         string   `json:"contextId"`
+	ImportProviderIDs []string `json:"importProviderIds,omitempty"`
 }
 
 // CreateContextResult describes a newly created context.
 type CreateContextResult struct {
 	Context ContextState `json:"context"`
+}
+
+// ProviderCredentialSessionState describes a detected global provider session
+// using only non-secret metadata that helps the user classify the session.
+type ProviderCredentialSessionState struct {
+	ProviderID        string                        `json:"providerId"`
+	Name              string                        `json:"name"`
+	MetadataAvailable bool                          `json:"metadataAvailable"`
+	Codex             *CodexCredentialSessionState  `json:"codex,omitempty"`
+	Claude            *ClaudeCredentialSessionState `json:"claude,omitempty"`
+}
+
+// CodexCredentialSessionState is safe Codex identity metadata decoded from the
+// id_token payload.
+type CodexCredentialSessionState struct {
+	Email            string `json:"email,omitempty"`
+	ChatGPTPlanType  string `json:"chatgptPlanType,omitempty"`
+	ChatGPTAccountID string `json:"chatgptAccountId,omitempty"`
+}
+
+// ClaudeCredentialSessionState is safe Claude identity metadata decoded from
+// the global credentials file.
+type ClaudeCredentialSessionState struct {
+	SubscriptionType string `json:"subscriptionType,omitempty"`
+	OrganizationUUID string `json:"organizationUuid,omitempty"`
+	OrganizationName string `json:"organizationName,omitempty"`
 }
 
 // ResolutionWarning is a presentation-safe launch warning.

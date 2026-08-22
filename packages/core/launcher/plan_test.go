@@ -29,11 +29,11 @@ func TestLaunchPlanRepresentsCompleteEditorLaunchOperation(t *testing.T) {
 		Context:          context,
 		Editor:           context.Editor,
 		Executable:       launcher.Executable("/usr/local/bin/code"),
-		Arguments:        launcher.Arguments{"--user-data-dir", "/home/alex/.devctx/contexts/client-a/vscode/user-data", "/work/client-a/api"},
+		Arguments:        launcher.Arguments{"/work/client-a/api"},
 		WorkingDirectory: launcher.WorkingDirectory("/work/client-a/api"),
 		Environment: launcher.Environment{
-			"CLAUDE_CONFIG_DIR": "/home/alex/.devctx/contexts/client-a/claude",
-			"CODEX_HOME":        "/home/alex/.devctx/contexts/client-a/codex",
+			"CLAUDE_CONFIG_DIR": "/home/alex/.devctx/contexts/client-a/providers/claude",
+			"CODEX_HOME":        "/home/alex/.devctx/contexts/client-a/providers/codex",
 			"DEVCTX_CONTEXT":    "client-a",
 		},
 		Warnings: []launcher.ResolutionWarning{
@@ -50,11 +50,11 @@ func TestLaunchPlanRepresentsCompleteEditorLaunchOperation(t *testing.T) {
 		Context:          context,
 		Editor:           editor.DefaultConfig(),
 		Executable:       launcher.Executable("/usr/local/bin/code"),
-		Arguments:        launcher.Arguments{"--user-data-dir", "/home/alex/.devctx/contexts/client-a/vscode/user-data", "/work/client-a/api"},
+		Arguments:        launcher.Arguments{"/work/client-a/api"},
 		WorkingDirectory: launcher.WorkingDirectory("/work/client-a/api"),
 		Environment: launcher.Environment{
-			"CLAUDE_CONFIG_DIR": "/home/alex/.devctx/contexts/client-a/claude",
-			"CODEX_HOME":        "/home/alex/.devctx/contexts/client-a/codex",
+			"CLAUDE_CONFIG_DIR": "/home/alex/.devctx/contexts/client-a/providers/claude",
+			"CODEX_HOME":        "/home/alex/.devctx/contexts/client-a/providers/codex",
 			"DEVCTX_CONTEXT":    "client-a",
 		},
 		Warnings: []launcher.ResolutionWarning{

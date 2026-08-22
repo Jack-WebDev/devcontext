@@ -21,7 +21,7 @@ type Dependencies struct {
 	Contexts           devcontext.Repository
 	Projects           project.Repository
 	Paths              filesystem.PlatformPaths
-	Providers          []provider.Provider
+	ProviderRegistry   provider.Registry
 	Editor             editor.Editor
 	ProcessLauncher    launcher.ProcessLauncher
 	StoragePermissions filesystem.StoragePermissions
@@ -76,7 +76,7 @@ func NewDefaultService(options DefaultOptions) (*Service, error) {
 		Contexts:           devcontext.NewRepository(layout.ContextsDir),
 		Projects:           project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
 		Paths:              paths,
-		Providers:          []provider.Provider{provider.ClaudeProvider{}, provider.CodexProvider{}},
+		ProviderRegistry:   provider.BuiltInRegistry(),
 		Editor:             editor.VSCodeEditor{},
 		ProcessLauncher:    launcher.NativeProcessLauncher{},
 		StoragePermissions: filesystem.NewDefaultStoragePermissions(),
@@ -101,7 +101,7 @@ func (s *Service) launchPlanBuilder() launcher.LaunchPlanBuilder {
 	return launcher.LaunchPlanBuilder{
 		Resolver:          launcher.NewResolver(s.dependencies.Contexts, s.dependencies.Projects),
 		PlatformPaths:     s.dependencies.Paths,
-		Providers:         s.dependencies.Providers,
+		ProviderRegistry:  s.dependencies.ProviderRegistry,
 		Editor:            s.dependencies.Editor,
 		ParentEnvironment: s.dependencies.ParentEnvironment,
 	}
@@ -123,8 +123,8 @@ func normalizeDependencies(dependencies Dependencies) Dependencies {
 	if dependencies.Paths == nil {
 		dependencies.Paths = filesystem.NewDefaultPlatformPaths()
 	}
-	if dependencies.Providers == nil {
-		dependencies.Providers = []provider.Provider{provider.ClaudeProvider{}, provider.CodexProvider{}}
+	if dependencies.ProviderRegistry.IsZero() {
+		dependencies.ProviderRegistry = provider.BuiltInRegistry()
 	}
 	if dependencies.Editor == nil {
 		dependencies.Editor = editor.VSCodeEditor{}

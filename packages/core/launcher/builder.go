@@ -40,7 +40,7 @@ type ContextResolver interface {
 type LaunchPlanBuilder struct {
 	Resolver          ContextResolver
 	PlatformPaths     filesystem.PlatformPaths
-	Providers         []provider.Provider
+	ProviderRegistry  provider.Registry
 	Editor            editor.Editor
 	ParentEnvironment []string
 }
@@ -73,11 +73,13 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 	if err != nil {
 		return LaunchPlan{}, err
 	}
-	if err := filesystem.ValidateContextDirectoryTree(contextPaths); err != nil {
+	providerRegistry := b.providerRegistry()
+	contextPaths = contextPaths.WithProviderStorageDirs(registeredEnabledProviderIDs(*resolution.Context, providerRegistry))
+	if err := filesystem.ValidateContextDirectoryTreeWithProviderRegistry(contextPaths, *resolution.Context, providerRegistry); err != nil {
 		return LaunchPlan{}, err
 	}
 
-	contributions, missingProviderIDs, err := b.providerContributions(*resolution.Context, contextPaths)
+	contributions, missingProviderIDs, err := b.providerContributions(*resolution.Context, contextPaths, providerRegistry)
 	if err != nil {
 		return LaunchPlan{}, err
 	}
@@ -119,13 +121,11 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 	}, nil
 }
 
-func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, paths filesystem.ContextPaths) ([]provider.EnvironmentContribution, []provider.ID, error) {
-	knownProviderIDs := make(map[provider.ID]struct{}, len(b.Providers))
-	contributions := make([]provider.EnvironmentContribution, 0, len(b.Providers))
-	for _, integration := range b.Providers {
-		if integration == nil {
-			continue
-		}
+func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, paths filesystem.ContextPaths, registry provider.Registry) ([]provider.EnvironmentContribution, []provider.ID, error) {
+	providers := registry.All()
+	knownProviderIDs := make(map[provider.ID]struct{}, len(providers))
+	contributions := make([]provider.EnvironmentContribution, 0, len(providers))
+	for _, integration := range providers {
 		providerID := integration.ID()
 		knownProviderIDs[providerID] = struct{}{}
 
@@ -138,8 +138,7 @@ func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, 
 			Config:    config,
 			Paths: provider.ContextPaths{
 				RootDir:           paths.RootDir,
-				ClaudeDir:         paths.ClaudeDir,
-				CodexDir:          paths.CodexDir,
+				StorageDir:        paths.ProviderStorageDir(providerID),
 				VSCodeDir:         paths.VSCodeDir,
 				VSCodeUserDataDir: paths.VSCodeUserDataDir,
 			},
@@ -166,6 +165,24 @@ func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, 
 		missingProviderIDs = nil
 	}
 	return contributions, missingProviderIDs, nil
+}
+
+func (b LaunchPlanBuilder) providerRegistry() provider.Registry {
+	if b.ProviderRegistry.IsZero() {
+		return provider.BuiltInRegistry()
+	}
+	return b.ProviderRegistry
+}
+
+func registeredEnabledProviderIDs(ctx devcontext.Context, registry provider.Registry) []provider.ID {
+	ids := make([]provider.ID, 0, len(ctx.Providers))
+	for _, integration := range registry.All() {
+		providerID := integration.ID()
+		if config, ok := ctx.Providers[providerID]; ok && config.Enabled {
+			ids = append(ids, providerID)
+		}
+	}
+	return ids
 }
 
 func launchArguments(arguments editor.Arguments) Arguments {
