@@ -1,6 +1,7 @@
 package application
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -450,6 +451,100 @@ func TestGetLaunchStateReturnsProviderIdentityContract(t *testing.T) {
 	}
 }
 
+func TestGetLaunchStateReturnsVerifiedProviderIdentitiesForIsolatedContexts(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.providers = []provider.Provider{
+		applicationFakeProvider{
+			id:          provider.CodexID,
+			displayName: "Codex",
+			statusByContext: map[string]provider.Status{
+				"personal": provider.ConfiguredStatus(),
+			},
+		},
+		applicationFakeProvider{
+			id:          provider.ClaudeID,
+			displayName: "Claude",
+			statusByContext: map[string]provider.Status{
+				"personal": provider.ConfiguredStatus(),
+			},
+		},
+	}
+
+	ctx := fixture.context("personal", "Personal")
+	ctx.Providers = provider.Configs{
+		provider.CodexID:  {Enabled: true},
+		provider.ClaudeID: {Enabled: true},
+	}
+	fixture.writeContext(t, ctx)
+
+	contextPaths, err := filesystem.DeriveContextPaths(fixture.paths, ctx.ID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	codexToken := applicationTestJWT(t, map[string]string{
+		"email":               "user@company.com",
+		"chatgpt_plan_type":   "business",
+		"chatgpt_account_id":  "acct-123",
+		"ignored_token_claim": "jwt-secret-claim",
+	})
+	writeApplicationJSONFixture(t, filepath.Join(contextPaths.CodexDir, "auth.json"), map[string]any{
+		"tokens": map[string]string{
+			"id_token":     codexToken,
+			"access_token": "codex-access-token",
+		},
+	})
+	writeApplicationJSONFixture(t, filepath.Join(contextPaths.ClaudeDir, ".credentials.json"), map[string]string{
+		"subscriptionType": "Pro",
+		"organizationUuid": "e783-organization",
+		"organizationName": "Jishin Labs",
+		"accessToken":      "claude-access-token",
+		"refreshToken":     "claude-refresh-token",
+	})
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+
+	providersByID := map[string]ProviderState{}
+	for _, providerState := range state.Contexts[0].Providers {
+		providersByID[providerState.ID] = providerState
+	}
+
+	codex := providersByID["codex"].Identity
+	if codex.Status != ProviderIdentityVerified || codex.Codex == nil {
+		t.Fatalf("codex identity = %#v, want verified codex identity", codex)
+	}
+	if codex.Codex.Email != "user@company.com" ||
+		codex.Codex.ChatGPTPlanType != "business" ||
+		codex.Codex.ChatGPTAccountID != "acct-123" {
+		t.Fatalf("codex identity metadata = %#v", codex.Codex)
+	}
+
+	claude := providersByID["claude"].Identity
+	if claude.Status != ProviderIdentityVerified || claude.Claude == nil {
+		t.Fatalf("claude identity = %#v, want verified claude identity", claude)
+	}
+	if claude.Claude.SubscriptionType != "Pro" ||
+		claude.Claude.OrganizationUUID != "e783-organization" ||
+		claude.Claude.OrganizationName != "Jishin Labs" {
+		t.Fatalf("claude identity metadata = %#v", claude.Claude)
+	}
+
+	rendered := fmt.Sprintf("%#v", state.Contexts[0].Providers)
+	for _, secret := range []string{
+		codexToken,
+		"codex-access-token",
+		"jwt-secret-claim",
+		"claude-access-token",
+		"claude-refresh-token",
+	} {
+		if strings.Contains(rendered, secret) {
+			t.Fatalf("provider state exposed credential value %q: %s", secret, rendered)
+		}
+	}
+}
+
 func TestGetLaunchStateReportsDanglingBindingWarning(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.writeContext(t, fixture.context("personal", "Personal"))
@@ -895,6 +990,7 @@ type applicationFixture struct {
 	paths              filesystem.PlatformPaths
 	now                time.Time
 	provider           *applicationFakeProvider
+	providers          []provider.Provider
 	editor             *applicationFakeEditor
 	process            *applicationFakeProcessLauncher
 	storagePermissions filesystem.StoragePermissions
@@ -931,11 +1027,16 @@ func newApplicationFixture(t *testing.T) applicationFixture {
 }
 
 func (f applicationFixture) service() *Service {
+	providers := f.providers
+	if providers == nil {
+		providers = []provider.Provider{f.provider}
+	}
+
 	return NewServiceWithDependencies(Dependencies{
 		Contexts:           devcontext.NewRepository(f.contextsDir),
 		Projects:           project.NewRepository(f.bindingsPath, f.paths),
 		Paths:              f.paths,
-		Providers:          []provider.Provider{f.provider},
+		Providers:          providers,
 		Editor:             f.editor,
 		ProcessLauncher:    f.process,
 		StoragePermissions: f.storagePermissions,
@@ -1022,6 +1123,24 @@ func writeApplicationJSONFixture(t *testing.T, path string, value any) {
 		t.Fatalf("create fixture directory %q: %v", filepath.Dir(path), err)
 	}
 	writeFile(t, path, data)
+}
+
+func applicationTestJWT(t *testing.T, claims map[string]string) string {
+	t.Helper()
+
+	header, err := json.Marshal(map[string]string{"alg": "none"})
+	if err != nil {
+		t.Fatalf("marshal jwt header: %v", err)
+	}
+	payload, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatalf("marshal jwt payload: %v", err)
+	}
+	return strings.Join([]string{
+		base64.RawURLEncoding.EncodeToString(header),
+		base64.RawURLEncoding.EncodeToString(payload),
+		"signature",
+	}, ".")
 }
 
 type applicationRecordingLogger struct {

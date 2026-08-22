@@ -77,6 +77,40 @@ func DetectProviderCredentialSessions(paths PlatformPaths) ([]DetectedProviderCr
 	return sessions, nil
 }
 
+// DetectCodexContextCredentialMetadata reads Codex identity metadata from one
+// context-owned provider directory. It returns only verified safe fields decoded
+// from local credential state.
+func DetectCodexContextCredentialMetadata(paths ContextPaths) (CodexCredentialMetadata, bool, error) {
+	path := joinPlatformPath(paths.CodexDir, codexAuthFileName)
+	exists, err := regularFileExists(path)
+	if err != nil {
+		return CodexCredentialMetadata{}, false, err
+	}
+	if !exists {
+		return CodexCredentialMetadata{}, false, nil
+	}
+
+	metadata, available := readCodexCredentialMetadata(path)
+	return metadata, available, nil
+}
+
+// DetectClaudeContextCredentialMetadata reads Claude identity metadata from one
+// context-owned provider directory. It returns only verified safe fields decoded
+// from local credential state.
+func DetectClaudeContextCredentialMetadata(paths ContextPaths) (ClaudeCredentialMetadata, bool, error) {
+	path := joinPlatformPath(paths.ClaudeDir, claudeCredentialsFileName)
+	exists, err := regularFileExists(path)
+	if err != nil {
+		return ClaudeCredentialMetadata{}, false, err
+	}
+	if !exists {
+		return ClaudeCredentialMetadata{}, false, nil
+	}
+
+	metadata, available := readClaudeCredentialMetadata(path)
+	return metadata, available, nil
+}
+
 // ImportProviderCredentials copies supported global provider credential files
 // into one context-owned provider tree. Credential files are treated as opaque
 // bytes and existing isolated files are never overwritten.

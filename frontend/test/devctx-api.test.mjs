@@ -22,8 +22,26 @@ test("adapter normalizes successful Wails calls", async () => {
                 enabled: true,
                 state: "ready",
                 identity: {
-                  status: "unavailable",
-                  message: "Account identity unavailable.",
+                  status: "verified",
+                  codex: {
+                    email: "user@company.com",
+                    chatgptPlanType: "Business",
+                    chatgptAccountId: "acct_123",
+                  },
+                },
+              },
+              {
+                id: "claude",
+                name: "Claude",
+                enabled: true,
+                state: "ready",
+                identity: {
+                  status: "verified",
+                  claude: {
+                    subscriptionType: "Pro",
+                    organizationUuid: "e783",
+                    organizationName: "Jishin Labs",
+                  },
                 },
               },
             ],
@@ -165,10 +183,31 @@ test("adapter normalizes successful Wails calls", async () => {
               state: "ready",
               explanation: undefined,
               identity: {
-                status: "unavailable",
-                message: "Account identity unavailable.",
-                codex: undefined,
+                status: "verified",
+                message: undefined,
+                codex: {
+                  email: "user@company.com",
+                  chatgptPlanType: "Business",
+                  chatgptAccountId: "acct_123",
+                },
                 claude: undefined,
+              },
+            },
+            {
+              id: "claude",
+              name: "Claude",
+              enabled: true,
+              state: "ready",
+              explanation: undefined,
+              identity: {
+                status: "verified",
+                message: undefined,
+                codex: undefined,
+                claude: {
+                  subscriptionType: "Pro",
+                  organizationUuid: "e783",
+                  organizationName: "Jishin Labs",
+                },
               },
             },
           ],

@@ -259,6 +259,97 @@ func TestDetectProviderCredentialSessionsReadsNestedCodexIDToken(t *testing.T) {
 	}
 }
 
+func TestDetectContextProviderCredentialMetadataReturnsOnlySafeMetadata(t *testing.T) {
+	homeDir := t.TempDir()
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return homeDir, nil
+	})
+	contextPaths := createEmptyContextProviderDirs(t, platformPaths, "personal")
+
+	codexToken := testJWT(t, map[string]string{
+		"email":               "user@company.com",
+		"chatgpt_plan_type":   "business",
+		"chatgpt_account_id":  "acct-123",
+		"ignored_token_claim": "jwt-secret-claim",
+	})
+	writeJSONCredentialFixture(t, filepath.Join(contextPaths.CodexDir, "auth.json"), map[string]any{
+		"tokens": map[string]string{
+			"id_token":     codexToken,
+			"access_token": "codex-access-token",
+		},
+	})
+	writeJSONCredentialFixture(t, filepath.Join(contextPaths.ClaudeDir, ".credentials.json"), map[string]string{
+		"subscriptionType": "Pro",
+		"organizationUuid": "e783-organization",
+		"organizationName": "Jishin Labs",
+		"accessToken":      "claude-access-token",
+		"refreshToken":     "claude-refresh-token",
+	})
+
+	codex, codexAvailable, err := filesystem.DetectCodexContextCredentialMetadata(contextPaths)
+	if err != nil {
+		t.Fatalf("detect codex context metadata: %v", err)
+	}
+	if !codexAvailable {
+		t.Fatal("codex metadata available = false, want true")
+	}
+	if codex.Email != "user@company.com" ||
+		codex.ChatGPTPlanType != "business" ||
+		codex.ChatGPTAccountID != "acct-123" {
+		t.Fatalf("codex metadata = %#v", codex)
+	}
+
+	claude, claudeAvailable, err := filesystem.DetectClaudeContextCredentialMetadata(contextPaths)
+	if err != nil {
+		t.Fatalf("detect claude context metadata: %v", err)
+	}
+	if !claudeAvailable {
+		t.Fatal("claude metadata available = false, want true")
+	}
+	if claude.SubscriptionType != "Pro" ||
+		claude.OrganizationUUID != "e783-organization" ||
+		claude.OrganizationName != "Jishin Labs" {
+		t.Fatalf("claude metadata = %#v", claude)
+	}
+
+	rendered := fmt.Sprintf("%#v %#v", codex, claude)
+	for _, secret := range []string{
+		codexToken,
+		"codex-access-token",
+		"jwt-secret-claim",
+		"claude-access-token",
+		"claude-refresh-token",
+	} {
+		if strings.Contains(rendered, secret) {
+			t.Fatalf("context metadata exposed credential value %q: %s", secret, rendered)
+		}
+	}
+}
+
+func TestDetectContextProviderCredentialMetadataReturnsUnavailableWhenFilesAreAbsent(t *testing.T) {
+	homeDir := t.TempDir()
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return homeDir, nil
+	})
+	contextPaths := createEmptyContextProviderDirs(t, platformPaths, "personal")
+
+	codex, codexAvailable, err := filesystem.DetectCodexContextCredentialMetadata(contextPaths)
+	if err != nil {
+		t.Fatalf("detect codex context metadata: %v", err)
+	}
+	if codexAvailable || codex != (filesystem.CodexCredentialMetadata{}) {
+		t.Fatalf("codex metadata = %#v available=%t, want absent", codex, codexAvailable)
+	}
+
+	claude, claudeAvailable, err := filesystem.DetectClaudeContextCredentialMetadata(contextPaths)
+	if err != nil {
+		t.Fatalf("detect claude context metadata: %v", err)
+	}
+	if claudeAvailable || claude != (filesystem.ClaudeCredentialMetadata{}) {
+		t.Fatalf("claude metadata = %#v available=%t, want absent", claude, claudeAvailable)
+	}
+}
+
 func TestCreateContextDirectoryTreeWithProviderCredentialsKeepsContextsIsolated(t *testing.T) {
 	homeDir := t.TempDir()
 	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {

@@ -375,7 +375,7 @@ func (s *Service) providerStateEntries(ctx devcontext.Context) []providerStateEn
 				Enabled:     enabled,
 				State:       providerReadinessState(status),
 				Explanation: status.Explanation,
-				Identity:    providerIdentityState(enabled, status),
+				Identity:    providerIdentityState(integration.ID(), enabled, status, contextPaths, pathsErr),
 			},
 		})
 	}
@@ -405,19 +405,61 @@ func providerReadinessState(status provider.Status) ProviderReadinessState {
 	}
 }
 
-func providerIdentityState(enabled bool, status provider.Status) ProviderIdentityState {
+func providerIdentityState(providerID provider.ID, enabled bool, status provider.Status, contextPaths filesystem.ContextPaths, pathsErr error) ProviderIdentityState {
 	if !enabled {
 		return ProviderIdentityState{Status: ProviderIdentityNone}
 	}
 
 	switch status.State {
-	case provider.StatusConfigured, provider.StatusUnavailable:
-		return ProviderIdentityState{
-			Status:  ProviderIdentityUnavailable,
-			Message: "Account identity unavailable.",
+	case provider.StatusConfigured:
+		if pathsErr != nil {
+			return unavailableProviderIdentity()
 		}
+		return verifiedProviderIdentity(providerID, contextPaths)
+	case provider.StatusUnavailable:
+		return unavailableProviderIdentity()
 	default:
 		return ProviderIdentityState{Status: ProviderIdentityNone}
+	}
+}
+
+func verifiedProviderIdentity(providerID provider.ID, contextPaths filesystem.ContextPaths) ProviderIdentityState {
+	switch providerID {
+	case provider.CodexID:
+		metadata, available, err := filesystem.DetectCodexContextCredentialMetadata(contextPaths)
+		if err != nil || !available {
+			return unavailableProviderIdentity()
+		}
+		return ProviderIdentityState{
+			Status: ProviderIdentityVerified,
+			Codex: &CodexProviderIdentityState{
+				Email:            metadata.Email,
+				ChatGPTPlanType:  metadata.ChatGPTPlanType,
+				ChatGPTAccountID: metadata.ChatGPTAccountID,
+			},
+		}
+	case provider.ClaudeID:
+		metadata, available, err := filesystem.DetectClaudeContextCredentialMetadata(contextPaths)
+		if err != nil || !available {
+			return unavailableProviderIdentity()
+		}
+		return ProviderIdentityState{
+			Status: ProviderIdentityVerified,
+			Claude: &ClaudeProviderIdentityState{
+				SubscriptionType: metadata.SubscriptionType,
+				OrganizationUUID: metadata.OrganizationUUID,
+				OrganizationName: metadata.OrganizationName,
+			},
+		}
+	default:
+		return unavailableProviderIdentity()
+	}
+}
+
+func unavailableProviderIdentity() ProviderIdentityState {
+	return ProviderIdentityState{
+		Status:  ProviderIdentityUnavailable,
+		Message: "Account identity unavailable.",
 	}
 }
 
