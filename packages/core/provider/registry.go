@@ -61,8 +61,9 @@ func MustNewRegistry(providers []Provider, defaultEnabledIDs ...ID) Registry {
 	return registry
 }
 
-// DefaultRegistry returns the providers enabled by default in Dev Context.
-func DefaultRegistry() Registry {
+// BuiltInRegistry returns the built-in providers enabled by default in Dev
+// Context.
+func BuiltInRegistry() Registry {
 	return MustNewRegistry(
 		[]Provider{
 			ClaudeProvider{},

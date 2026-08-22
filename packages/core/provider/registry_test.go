@@ -95,8 +95,8 @@ func TestRegistryRejectsInvalidProviders(t *testing.T) {
 	}
 }
 
-func TestDefaultRegistryContainsDefaultProviders(t *testing.T) {
-	registry := provider.DefaultRegistry()
+func TestBuiltInRegistryContainsDefaultProviders(t *testing.T) {
+	registry := provider.BuiltInRegistry()
 
 	if _, ok := registry.Get(provider.ClaudeID); !ok {
 		t.Fatal("Claude provider is not registered")

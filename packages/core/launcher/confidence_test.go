@@ -362,14 +362,14 @@ func TestVSCodeConfidenceCheckMapsExecutableReadiness(t *testing.T) {
 func TestIsolationConfidenceChecksRepresentStorageReadiness(t *testing.T) {
 	root := t.TempDir()
 	paths := filesystem.ContextPaths{
-		ContextID:         devcontext.MustID("personal"),
-		RootDir:           filepath.Join(root, "personal"),
-		ClaudeDir:         filepath.Join(root, "personal", "claude"),
-		CodexDir:          filepath.Join(root, "personal", "codex"),
-		VSCodeDir:         filepath.Join(root, "personal", "vscode"),
-		VSCodeUserDataDir: filepath.Join(root, "personal", "vscode", "user-data"),
+		ContextID:              devcontext.MustID("personal"),
+		RootDir:                filepath.Join(root, "personal"),
+		ProviderStorageRootDir: filepath.Join(root, "personal", "providers"),
+		VSCodeDir:              filepath.Join(root, "personal", "vscode"),
+		VSCodeUserDataDir:      filepath.Join(root, "personal", "vscode", "user-data"),
 	}
-	for _, dir := range []string{paths.RootDir, paths.ClaudeDir, paths.CodexDir, paths.VSCodeDir, paths.VSCodeUserDataDir} {
+	paths = paths.WithProviderStorageDirs([]provider.ID{provider.ClaudeID, provider.CodexID})
+	for _, dir := range []string{paths.RootDir, paths.ProviderStorageDir(provider.ClaudeID), paths.ProviderStorageDir(provider.CodexID), paths.VSCodeDir, paths.VSCodeUserDataDir} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatalf("create directory %q: %v", dir, err)
 		}
@@ -387,7 +387,7 @@ func TestIsolationConfidenceChecksRepresentStorageReadiness(t *testing.T) {
 			Component: launcher.ConfidenceCheckIsolation,
 			Severity:  launcher.ConfidenceReady,
 			Label:     "Provider isolation",
-			Message:   "Claude and Codex isolation directories are ready.",
+			Message:   "Provider isolation directories are ready.",
 		},
 		{
 			Component: launcher.ConfidenceCheckIsolation,
@@ -404,14 +404,14 @@ func TestIsolationConfidenceChecksRepresentStorageReadiness(t *testing.T) {
 func TestIsolationConfidenceChecksReportBlockedStorage(t *testing.T) {
 	root := t.TempDir()
 	paths := filesystem.ContextPaths{
-		ContextID:         devcontext.MustID("personal"),
-		RootDir:           filepath.Join(root, "personal"),
-		ClaudeDir:         filepath.Join(root, "personal", "claude"),
-		CodexDir:          filepath.Join(root, "personal", "codex"),
-		VSCodeDir:         filepath.Join(root, "personal", "vscode"),
-		VSCodeUserDataDir: filepath.Join(root, "personal", "vscode", "user-data"),
+		ContextID:              devcontext.MustID("personal"),
+		RootDir:                filepath.Join(root, "personal"),
+		ProviderStorageRootDir: filepath.Join(root, "personal", "providers"),
+		VSCodeDir:              filepath.Join(root, "personal", "vscode"),
+		VSCodeUserDataDir:      filepath.Join(root, "personal", "vscode", "user-data"),
 	}
-	for _, dir := range []string{paths.RootDir, paths.ClaudeDir, paths.VSCodeDir} {
+	paths = paths.WithProviderStorageDirs([]provider.ID{provider.ClaudeID, provider.CodexID})
+	for _, dir := range []string{paths.RootDir, paths.ProviderStorageDir(provider.ClaudeID), paths.VSCodeDir} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatalf("create directory %q: %v", dir, err)
 		}

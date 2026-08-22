@@ -44,6 +44,7 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 		t.Fatalf("derive context paths: %v", err)
 	}
 	createContextDirectories(t, contextPaths)
+	contextPaths = contextPaths.WithProviderStorageDirs([]provider.ID{"fake"})
 
 	fakeEditor := &builderFakeEditor{}
 	builder := launcher.LaunchPlanBuilder{
@@ -138,11 +139,8 @@ func TestLaunchPlanBuilderDoesNotRequireProviderCLICommands(t *testing.T) {
 				Source:  launcher.ResolutionSourceExplicit,
 			},
 		},
-		PlatformPaths: platformPaths,
-		ProviderRegistry: provider.MustNewRegistry([]provider.Provider{
-			provider.ClaudeProvider{},
-			provider.CodexProvider{},
-		}),
+		PlatformPaths:     platformPaths,
+		ProviderRegistry:  provider.BuiltInRegistry(),
 		Editor:            editor.VSCodeEditor{},
 		ParentEnvironment: []string{"PATH=/path/without/provider-clis"},
 	}
@@ -162,26 +160,30 @@ func TestLaunchPlanBuilderDoesNotRequireProviderCLICommands(t *testing.T) {
 	if !reflect.DeepEqual(plan.Arguments, launcher.Arguments{projectDir}) {
 		t.Fatalf("arguments = %#v, want only project path", plan.Arguments)
 	}
-	if plan.Environment[provider.CodexHomeEnvVar] != contextPaths.CodexDir {
-		t.Fatalf("CODEX_HOME = %q, want %q", plan.Environment[provider.CodexHomeEnvVar], contextPaths.CodexDir)
+	if plan.Environment[provider.CodexHomeEnvVar] != contextPaths.ProviderStorageDir(provider.CodexID) {
+		t.Fatalf("CODEX_HOME = %q, want %q", plan.Environment[provider.CodexHomeEnvVar], contextPaths.ProviderStorageDir(provider.CodexID))
 	}
-	if plan.Environment[provider.ClaudeConfigDirEnvVar] != contextPaths.ClaudeDir {
-		t.Fatalf("CLAUDE_CONFIG_DIR = %q, want %q", plan.Environment[provider.ClaudeConfigDirEnvVar], contextPaths.ClaudeDir)
+	if plan.Environment[provider.ClaudeConfigDirEnvVar] != contextPaths.ProviderStorageDir(provider.ClaudeID) {
+		t.Fatalf("CLAUDE_CONFIG_DIR = %q, want %q", plan.Environment[provider.ClaudeConfigDirEnvVar], contextPaths.ProviderStorageDir(provider.ClaudeID))
 	}
 }
 
 func createContextDirectories(t *testing.T, paths filesystem.ContextPaths) {
 	t.Helper()
 
+	paths = paths.WithProviderStorageDirs([]provider.ID{provider.ClaudeID, provider.CodexID, "fake"})
 	for _, dir := range []string{
 		paths.RootDir,
-		paths.ClaudeDir,
-		paths.CodexDir,
 		paths.VSCodeDir,
 		paths.VSCodeUserDataDir,
 	} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatalf("create context directory %q: %v", dir, err)
+		}
+	}
+	for _, dir := range paths.ProviderStorageDirs {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatalf("create provider directory %q: %v", dir, err)
 		}
 	}
 }
@@ -221,8 +223,12 @@ func TestLaunchPlanBuilderRejectsIncompleteContextStorage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("derive context paths: %v", err)
 	}
+	context.Providers = provider.Configs{
+		provider.CodexID: {Enabled: true},
+	}
 	createContextDirectories(t, contextPaths)
-	if err := os.RemoveAll(contextPaths.CodexDir); err != nil {
+	contextPaths = contextPaths.WithProviderStorageDirs([]provider.ID{provider.CodexID})
+	if err := os.RemoveAll(contextPaths.ProviderStorageDir(provider.CodexID)); err != nil {
 		t.Fatalf("remove codex dir: %v", err)
 	}
 	fakeEditor := &builderFakeEditor{}

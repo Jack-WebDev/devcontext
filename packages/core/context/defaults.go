@@ -15,12 +15,12 @@ const (
 
 // DefaultPersonalContext returns the built-in Personal context seed.
 func DefaultPersonalContext(createdAt time.Time) Context {
-	return DefaultPersonalContextWithProviderRegistry(createdAt, provider.DefaultRegistry())
+	return DefaultPersonalContextWithProviderRegistry(createdAt, provider.BuiltInRegistry())
 }
 
 // DefaultCompanyContext returns the built-in Company context seed.
 func DefaultCompanyContext(createdAt time.Time) Context {
-	return DefaultCompanyContextWithProviderRegistry(createdAt, provider.DefaultRegistry())
+	return DefaultCompanyContextWithProviderRegistry(createdAt, provider.BuiltInRegistry())
 }
 
 // DefaultPersonalContextWithProviderRegistry returns the built-in Personal
@@ -38,7 +38,7 @@ func DefaultCompanyContextWithProviderRegistry(createdAt time.Time, registry pro
 // DefaultContextForID returns the built-in context seed for a supported default
 // context ID.
 func DefaultContextForID(id ID, createdAt time.Time) (Context, error) {
-	return DefaultContextForIDWithProviderRegistry(id, createdAt, provider.DefaultRegistry())
+	return DefaultContextForIDWithProviderRegistry(id, createdAt, provider.BuiltInRegistry())
 }
 
 // DefaultContextForIDWithProviderRegistry returns the built-in context seed for

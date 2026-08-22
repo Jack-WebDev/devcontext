@@ -3,6 +3,7 @@ package application
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	devcontext "devctx/packages/core/context"
@@ -381,6 +382,9 @@ func (s *Service) providerStateEntries(ctx devcontext.Context) []providerStateEn
 	providers := s.dependencies.ProviderRegistry.All()
 	entries := make([]providerStateEntry, 0, len(providers))
 	contextPaths, pathsErr := filesystem.DeriveContextPaths(s.dependencies.Paths, ctx.ID)
+	if pathsErr == nil {
+		contextPaths = contextPaths.WithProviderStorageDirs(enabledProviderIDs(ctx))
+	}
 	for _, integration := range providers {
 		config, ok := ctx.Providers[integration.ID()]
 		enabled := ok && config.Enabled
@@ -395,8 +399,7 @@ func (s *Service) providerStateEntries(ctx devcontext.Context) []providerStateEn
 					Config:    config,
 					Paths: provider.ContextPaths{
 						RootDir:           contextPaths.RootDir,
-						ClaudeDir:         contextPaths.ClaudeDir,
-						CodexDir:          contextPaths.CodexDir,
+						StorageDir:        contextPaths.ProviderStorageDir(integration.ID()),
 						VSCodeDir:         contextPaths.VSCodeDir,
 						VSCodeUserDataDir: contextPaths.VSCodeUserDataDir,
 					},
@@ -429,6 +432,19 @@ func providerStatesFromEntries(entries []providerStateEntry) []ProviderState {
 		states[i] = entry.state
 	}
 	return states
+}
+
+func enabledProviderIDs(ctx devcontext.Context) []provider.ID {
+	ids := make([]provider.ID, 0, len(ctx.Providers))
+	for providerID, config := range ctx.Providers {
+		if config.Enabled {
+			ids = append(ids, providerID)
+		}
+	}
+	sort.Slice(ids, func(i int, j int) bool {
+		return ids[i] < ids[j]
+	})
+	return ids
 }
 
 func providerReadinessState(status provider.Status) ProviderReadinessState {
@@ -537,6 +553,7 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 			ActionHint: "Run diagnostics to inspect context storage.",
 		})
 	} else {
+		contextPaths = contextPaths.WithProviderStorageDirs(enabledProviderIDs(ctx))
 		checks = append(checks, launcher.IsolationConfidenceChecks(contextPaths)...)
 	}
 

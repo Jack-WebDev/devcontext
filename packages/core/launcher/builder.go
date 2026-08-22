@@ -73,6 +73,7 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 	if err != nil {
 		return LaunchPlan{}, err
 	}
+	contextPaths = contextPaths.WithProviderStorageDirs(enabledProviderIDs(*resolution.Context))
 	if err := filesystem.ValidateContextDirectoryTree(contextPaths); err != nil {
 		return LaunchPlan{}, err
 	}
@@ -136,8 +137,7 @@ func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, 
 			Config:    config,
 			Paths: provider.ContextPaths{
 				RootDir:           paths.RootDir,
-				ClaudeDir:         paths.ClaudeDir,
-				CodexDir:          paths.CodexDir,
+				StorageDir:        paths.ProviderStorageDir(providerID),
 				VSCodeDir:         paths.VSCodeDir,
 				VSCodeUserDataDir: paths.VSCodeUserDataDir,
 			},
@@ -164,6 +164,19 @@ func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, 
 		missingProviderIDs = nil
 	}
 	return contributions, missingProviderIDs, nil
+}
+
+func enabledProviderIDs(ctx devcontext.Context) []provider.ID {
+	ids := make([]provider.ID, 0, len(ctx.Providers))
+	for providerID, config := range ctx.Providers {
+		if config.Enabled {
+			ids = append(ids, providerID)
+		}
+	}
+	sort.Slice(ids, func(i int, j int) bool {
+		return ids[i] < ids[j]
+	})
+	return ids
 }
 
 func launchArguments(arguments editor.Arguments) Arguments {

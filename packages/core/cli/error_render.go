@@ -293,11 +293,15 @@ func contextStorageWhy(err *filesystem.ContextStorageError) string {
 
 	entries := make([]string, 0, len(err.Missing))
 	for _, missing := range err.Missing {
+		kind := string(missing.Kind)
+		if missing.ProviderID != "" {
+			kind += ":" + missing.ProviderID
+		}
 		if missing.Reason == "" {
-			entries = append(entries, fmt.Sprintf("%s %q", missing.Kind, missing.Path))
+			entries = append(entries, fmt.Sprintf("%s %q", kind, missing.Path))
 			continue
 		}
-		entries = append(entries, fmt.Sprintf("%s %q (%s)", missing.Kind, missing.Path, missing.Reason))
+		entries = append(entries, fmt.Sprintf("%s %q (%s)", kind, missing.Path, missing.Reason))
 	}
 	return fmt.Sprintf("Context %q is missing required storage directories: %s.", err.ContextID.String(), strings.Join(entries, "; "))
 }

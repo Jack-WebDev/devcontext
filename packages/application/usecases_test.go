@@ -141,7 +141,7 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 			Component: LaunchConfidenceCheckIsolation,
 			Severity:  LaunchConfidenceReady,
 			Label:     "Provider isolation",
-			Message:   "Claude and Codex isolation directories are ready.",
+			Message:   "Provider isolation directories are ready.",
 		},
 		{
 			Component:  LaunchConfidenceCheckIsolation,
@@ -542,13 +542,13 @@ func TestGetLaunchStateReturnsVerifiedProviderIdentitiesForIsolatedContexts(t *t
 		"chatgpt_account_id":  "acct-123",
 		"ignored_token_claim": "jwt-secret-claim",
 	})
-	writeApplicationJSONFixture(t, filepath.Join(contextPaths.CodexDir, "auth.json"), map[string]any{
+	writeApplicationJSONFixture(t, filepath.Join(contextPaths.ProviderStorageDir(provider.CodexID), "auth.json"), map[string]any{
 		"tokens": map[string]string{
 			"id_token":     codexToken,
 			"access_token": "codex-access-token",
 		},
 	})
-	writeApplicationJSONFixture(t, filepath.Join(contextPaths.ClaudeDir, ".credentials.json"), map[string]string{
+	writeApplicationJSONFixture(t, filepath.Join(contextPaths.ProviderStorageDir(provider.ClaudeID), ".credentials.json"), map[string]string{
 		"subscriptionType": "Pro",
 		"organizationUuid": "e783-organization",
 		"organizationName": "Jishin Labs",
@@ -622,7 +622,7 @@ func TestGetLaunchStateDoesNotInferIdentityMismatchEvidenceFromContextName(t *te
 	if err != nil {
 		t.Fatalf("derive context paths: %v", err)
 	}
-	writeApplicationJSONFixture(t, filepath.Join(contextPaths.CodexDir, "auth.json"), map[string]string{
+	writeApplicationJSONFixture(t, filepath.Join(contextPaths.ProviderStorageDir(provider.CodexID), "auth.json"), map[string]string{
 		"id_token": applicationTestJWT(t, map[string]string{
 			"email":              "user@gmail.com",
 			"chatgpt_plan_type":  "plus",
@@ -1172,9 +1172,11 @@ func (f applicationFixture) writeContext(t *testing.T, ctx devcontext.Context) {
 	if err != nil {
 		t.Fatalf("derive context paths: %v", err)
 	}
+	contextPaths = contextPaths.WithProviderStorageDirs(enabledProviderIDs(ctx))
 	mkdir(t, contextPaths.RootDir)
-	mkdir(t, contextPaths.ClaudeDir)
-	mkdir(t, contextPaths.CodexDir)
+	for _, dir := range contextPaths.ProviderStorageDirs {
+		mkdir(t, dir)
+	}
 	if err := devcontext.NewRepository(f.contextsDir).Write(ctx); err != nil {
 		t.Fatalf("write context %q: %v", ctx.ID.String(), err)
 	}

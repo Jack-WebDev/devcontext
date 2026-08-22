@@ -11,8 +11,8 @@ import (
 func TestCodexProviderBuildsIsolatedEnvironmentContribution(t *testing.T) {
 	integration := provider.CodexProvider{}
 
-	personalContext := providerRuntimeContext(t, "personal")
-	companyContext := providerRuntimeContext(t, "company")
+	personalContext := providerRuntimeContext(t, "personal", provider.CodexID)
+	companyContext := providerRuntimeContext(t, "company", provider.CodexID)
 
 	personalEnvironment, err := integration.BuildEnvironment(personalContext)
 	if err != nil {
@@ -23,8 +23,8 @@ func TestCodexProviderBuildsIsolatedEnvironmentContribution(t *testing.T) {
 		t.Fatalf("build company environment: %v", err)
 	}
 
-	assertOnlyEnvironmentValue(t, personalEnvironment, provider.CodexHomeEnvVar, "/home/alex/.devctx/contexts/personal/codex")
-	assertOnlyEnvironmentValue(t, companyEnvironment, provider.CodexHomeEnvVar, "/home/alex/.devctx/contexts/company/codex")
+	assertOnlyEnvironmentValue(t, personalEnvironment, provider.CodexHomeEnvVar, "/home/alex/.devctx/contexts/personal/providers/codex")
+	assertOnlyEnvironmentValue(t, companyEnvironment, provider.CodexHomeEnvVar, "/home/alex/.devctx/contexts/company/providers/codex")
 	if personalEnvironment[provider.CodexHomeEnvVar] == companyEnvironment[provider.CodexHomeEnvVar] {
 		t.Fatalf("Codex homes match, want isolated paths")
 	}
@@ -33,8 +33,8 @@ func TestCodexProviderBuildsIsolatedEnvironmentContribution(t *testing.T) {
 func TestClaudeProviderBuildsIsolatedEnvironmentContribution(t *testing.T) {
 	integration := provider.ClaudeProvider{}
 
-	personalContext := providerRuntimeContext(t, "personal")
-	companyContext := providerRuntimeContext(t, "company")
+	personalContext := providerRuntimeContext(t, "personal", provider.ClaudeID)
+	companyContext := providerRuntimeContext(t, "company", provider.ClaudeID)
 
 	personalEnvironment, err := integration.BuildEnvironment(personalContext)
 	if err != nil {
@@ -45,14 +45,14 @@ func TestClaudeProviderBuildsIsolatedEnvironmentContribution(t *testing.T) {
 		t.Fatalf("build company environment: %v", err)
 	}
 
-	assertOnlyEnvironmentValue(t, personalEnvironment, provider.ClaudeConfigDirEnvVar, "/home/alex/.devctx/contexts/personal/claude")
-	assertOnlyEnvironmentValue(t, companyEnvironment, provider.ClaudeConfigDirEnvVar, "/home/alex/.devctx/contexts/company/claude")
+	assertOnlyEnvironmentValue(t, personalEnvironment, provider.ClaudeConfigDirEnvVar, "/home/alex/.devctx/contexts/personal/providers/claude")
+	assertOnlyEnvironmentValue(t, companyEnvironment, provider.ClaudeConfigDirEnvVar, "/home/alex/.devctx/contexts/company/providers/claude")
 	if personalEnvironment[provider.ClaudeConfigDirEnvVar] == companyEnvironment[provider.ClaudeConfigDirEnvVar] {
 		t.Fatalf("Claude config dirs match, want isolated paths")
 	}
 }
 
-func providerRuntimeContext(t *testing.T, contextID string) provider.RuntimeContext {
+func providerRuntimeContext(t *testing.T, contextID string, providerID provider.ID) provider.RuntimeContext {
 	t.Helper()
 
 	paths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
@@ -70,8 +70,7 @@ func providerRuntimeContext(t *testing.T, contextID string) provider.RuntimeCont
 		},
 		Paths: provider.ContextPaths{
 			RootDir:           derivedPaths.RootDir,
-			ClaudeDir:         derivedPaths.ClaudeDir,
-			CodexDir:          derivedPaths.CodexDir,
+			StorageDir:        derivedPaths.ProviderStorageDir(providerID),
 			VSCodeDir:         derivedPaths.VSCodeDir,
 			VSCodeUserDataDir: derivedPaths.VSCodeUserDataDir,
 		},

@@ -12,6 +12,7 @@ import (
 
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/filesystem"
+	"devctx/packages/core/provider"
 )
 
 func TestCreateContextDirectoryTreeWithProviderCredentialsImportsGlobalFiles(t *testing.T) {
@@ -34,12 +35,12 @@ func TestCreateContextDirectoryTreeWithProviderCredentialsImportsGlobalFiles(t *
 		t.Fatalf("create context directory tree: %v", err)
 	}
 
-	assertFileBytes(t, filepath.Join(contextPaths.CodexDir, "auth.json"), []byte("codex-auth-fixture"))
-	assertFileBytes(t, filepath.Join(contextPaths.ClaudeDir, ".credentials.json"), []byte("claude-credentials-fixture"))
-	assertFileBytes(t, filepath.Join(contextPaths.ClaudeDir, "settings.json"), []byte("claude-settings-fixture"))
-	assertRestrictedMode(t, filepath.Join(contextPaths.CodexDir, "auth.json"), filesystem.RestrictedFileMode)
-	assertRestrictedMode(t, filepath.Join(contextPaths.ClaudeDir, ".credentials.json"), filesystem.RestrictedFileMode)
-	assertRestrictedMode(t, filepath.Join(contextPaths.ClaudeDir, "settings.json"), filesystem.RestrictedFileMode)
+	assertFileBytes(t, filepath.Join(codexProviderDir(contextPaths), "auth.json"), []byte("codex-auth-fixture"))
+	assertFileBytes(t, filepath.Join(claudeProviderDir(contextPaths), ".credentials.json"), []byte("claude-credentials-fixture"))
+	assertFileBytes(t, filepath.Join(claudeProviderDir(contextPaths), "settings.json"), []byte("claude-settings-fixture"))
+	assertRestrictedMode(t, filepath.Join(codexProviderDir(contextPaths), "auth.json"), filesystem.RestrictedFileMode)
+	assertRestrictedMode(t, filepath.Join(claudeProviderDir(contextPaths), ".credentials.json"), filesystem.RestrictedFileMode)
+	assertRestrictedMode(t, filepath.Join(claudeProviderDir(contextPaths), "settings.json"), filesystem.RestrictedFileMode)
 }
 
 func TestImportProviderCredentialsLeavesProvidersEmptyWhenGlobalCredentialsAreMissing(t *testing.T) {
@@ -60,8 +61,8 @@ func TestImportProviderCredentialsLeavesProvidersEmptyWhenGlobalCredentialsAreMi
 		t.Fatalf("create context directory tree: %v", err)
 	}
 
-	assertDirectoryEmpty(t, contextPaths.CodexDir)
-	assertDirectoryEmpty(t, contextPaths.ClaudeDir)
+	assertDirectoryEmpty(t, codexProviderDir(contextPaths))
+	assertDirectoryEmpty(t, claudeProviderDir(contextPaths))
 }
 
 func TestImportProviderCredentialsDoesNotOverwriteExistingIsolatedFiles(t *testing.T) {
@@ -74,17 +75,17 @@ func TestImportProviderCredentialsDoesNotOverwriteExistingIsolatedFiles(t *testi
 	writeCredentialFixture(t, filepath.Join(homeDir, ".claude", "settings.json"), []byte("global-settings"))
 
 	contextPaths := createEmptyContextProviderDirs(t, platformPaths, "personal")
-	writeCredentialFixture(t, filepath.Join(contextPaths.CodexDir, "auth.json"), []byte("isolated-codex"))
-	writeCredentialFixture(t, filepath.Join(contextPaths.ClaudeDir, ".credentials.json"), []byte("isolated-claude"))
-	writeCredentialFixture(t, filepath.Join(contextPaths.ClaudeDir, "settings.json"), []byte("isolated-settings"))
+	writeCredentialFixture(t, filepath.Join(codexProviderDir(contextPaths), "auth.json"), []byte("isolated-codex"))
+	writeCredentialFixture(t, filepath.Join(claudeProviderDir(contextPaths), ".credentials.json"), []byte("isolated-claude"))
+	writeCredentialFixture(t, filepath.Join(claudeProviderDir(contextPaths), "settings.json"), []byte("isolated-settings"))
 
 	if err := filesystem.ImportProviderCredentials(platformPaths, contextPaths, []string{"codex", "claude"}); err != nil {
 		t.Fatalf("import provider credentials: %v", err)
 	}
 
-	assertFileBytes(t, filepath.Join(contextPaths.CodexDir, "auth.json"), []byte("isolated-codex"))
-	assertFileBytes(t, filepath.Join(contextPaths.ClaudeDir, ".credentials.json"), []byte("isolated-claude"))
-	assertFileBytes(t, filepath.Join(contextPaths.ClaudeDir, "settings.json"), []byte("isolated-settings"))
+	assertFileBytes(t, filepath.Join(codexProviderDir(contextPaths), "auth.json"), []byte("isolated-codex"))
+	assertFileBytes(t, filepath.Join(claudeProviderDir(contextPaths), ".credentials.json"), []byte("isolated-claude"))
+	assertFileBytes(t, filepath.Join(claudeProviderDir(contextPaths), "settings.json"), []byte("isolated-settings"))
 }
 
 func TestCreateContextDirectoryTreeWithProviderCredentialsImportsOnlySelectedProviders(t *testing.T) {
@@ -107,8 +108,8 @@ func TestCreateContextDirectoryTreeWithProviderCredentialsImportsOnlySelectedPro
 		t.Fatalf("create context directory tree: %v", err)
 	}
 
-	assertFileBytes(t, filepath.Join(contextPaths.CodexDir, "auth.json"), []byte("global-codex"))
-	assertDirectoryEmpty(t, contextPaths.ClaudeDir)
+	assertFileBytes(t, filepath.Join(codexProviderDir(contextPaths), "auth.json"), []byte("global-codex"))
+	assertDirectoryEmpty(t, claudeProviderDir(contextPaths))
 }
 
 func TestDetectProviderCredentialSessionsReturnsOnlySafeMetadata(t *testing.T) {
@@ -272,13 +273,13 @@ func TestDetectContextProviderCredentialMetadataReturnsOnlySafeMetadata(t *testi
 		"chatgpt_account_id":  "acct-123",
 		"ignored_token_claim": "jwt-secret-claim",
 	})
-	writeJSONCredentialFixture(t, filepath.Join(contextPaths.CodexDir, "auth.json"), map[string]any{
+	writeJSONCredentialFixture(t, filepath.Join(codexProviderDir(contextPaths), "auth.json"), map[string]any{
 		"tokens": map[string]string{
 			"id_token":     codexToken,
 			"access_token": "codex-access-token",
 		},
 	})
-	writeJSONCredentialFixture(t, filepath.Join(contextPaths.ClaudeDir, ".credentials.json"), map[string]string{
+	writeJSONCredentialFixture(t, filepath.Join(claudeProviderDir(contextPaths), ".credentials.json"), map[string]string{
 		"subscriptionType": "Pro",
 		"organizationUuid": "e783-organization",
 		"organizationName": "Jishin Labs",
@@ -380,14 +381,14 @@ func TestCreateContextDirectoryTreeWithProviderCredentialsKeepsContextsIsolated(
 	if err != nil {
 		t.Fatalf("create company context: %v", err)
 	}
-	if personalPaths.CodexDir == companyPaths.CodexDir || personalPaths.ClaudeDir == companyPaths.ClaudeDir {
+	if codexProviderDir(personalPaths) == codexProviderDir(companyPaths) || claudeProviderDir(personalPaths) == claudeProviderDir(companyPaths) {
 		t.Fatalf("provider directories are shared: personal=%#v company=%#v", personalPaths, companyPaths)
 	}
 
-	assertFileBytes(t, filepath.Join(personalPaths.CodexDir, "auth.json"), []byte("personal-codex"))
-	assertFileBytes(t, filepath.Join(personalPaths.ClaudeDir, ".credentials.json"), []byte("personal-claude"))
-	assertFileBytes(t, filepath.Join(companyPaths.CodexDir, "auth.json"), []byte("company-codex"))
-	assertFileBytes(t, filepath.Join(companyPaths.ClaudeDir, ".credentials.json"), []byte("company-claude"))
+	assertFileBytes(t, filepath.Join(codexProviderDir(personalPaths), "auth.json"), []byte("personal-codex"))
+	assertFileBytes(t, filepath.Join(claudeProviderDir(personalPaths), ".credentials.json"), []byte("personal-claude"))
+	assertFileBytes(t, filepath.Join(codexProviderDir(companyPaths), "auth.json"), []byte("company-codex"))
+	assertFileBytes(t, filepath.Join(claudeProviderDir(companyPaths), ".credentials.json"), []byte("company-claude"))
 }
 
 func createEmptyContextProviderDirs(t *testing.T, platformPaths filesystem.PlatformPaths, contextID string) filesystem.ContextPaths {
@@ -397,12 +398,20 @@ func createEmptyContextProviderDirs(t *testing.T, platformPaths filesystem.Platf
 	if err != nil {
 		t.Fatalf("derive context paths: %v", err)
 	}
-	for _, dir := range []string{contextPaths.ClaudeDir, contextPaths.CodexDir} {
+	for _, dir := range []string{claudeProviderDir(contextPaths), codexProviderDir(contextPaths)} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatalf("create provider directory %q: %v", dir, err)
 		}
 	}
 	return contextPaths
+}
+
+func codexProviderDir(paths filesystem.ContextPaths) string {
+	return paths.ProviderStorageDir(provider.CodexID)
+}
+
+func claudeProviderDir(paths filesystem.ContextPaths) string {
+	return paths.ProviderStorageDir(provider.ClaudeID)
 }
 
 func writeCredentialFixture(t *testing.T, path string, data []byte) {

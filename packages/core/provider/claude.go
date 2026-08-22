@@ -34,11 +34,11 @@ func (ClaudeProvider) DisplayName() string {
 // directory.
 func (ClaudeProvider) BuildEnvironment(ctx RuntimeContext) (EnvironmentContribution, error) {
 	return EnvironmentContribution{
-		ClaudeConfigDirEnvVar: ctx.Paths.ClaudeDir,
+		ClaudeConfigDirEnvVar: ctx.Paths.StorageDir,
 	}, nil
 }
 
 // Status returns local provider readiness.
 func (p ClaudeProvider) Status(ctx RuntimeContext) (Status, error) {
-	return detectLocalStatus(p.Probe, p.DisplayName(), ctx.Paths.ClaudeDir)
+	return detectLocalStatus(p.Probe, p.DisplayName(), ctx.Paths.StorageDir)
 }

@@ -60,8 +60,8 @@ func TestRunnerContextCreateDoesNotImportUnclassifiedProviderCredentials(t *test
 	}
 
 	contextRoot := filepath.Join(fixture.homeDir, ".devctx", "contexts", "personal")
-	assertCLIDirectoryEmpty(t, filepath.Join(contextRoot, "codex"))
-	assertCLIDirectoryEmpty(t, filepath.Join(contextRoot, "claude"))
+	assertCLIDirectoryEmpty(t, filepath.Join(contextRoot, "providers", "codex"))
+	assertCLIDirectoryEmpty(t, filepath.Join(contextRoot, "providers", "claude"))
 }
 
 func TestRunnerProjectShowRendersBoundUnboundAndDanglingStates(t *testing.T) {
@@ -241,7 +241,7 @@ func TestRunnerRootLaunchBuildsPlanAndStartsDetachedProcess(t *testing.T) {
 	launchEditor := &recordingCLIEditor{}
 	processLauncher := &recordingProcessLauncher{}
 	runner := fixture.runner()
-	runner.ProviderRegistry = provider.DefaultRegistry()
+	runner.ProviderRegistry = provider.BuiltInRegistry()
 	runner.Editor = launchEditor
 	runner.ProcessLauncher = processLauncher
 	runner.ParentEnvironment = []string{
@@ -259,8 +259,8 @@ func TestRunnerRootLaunchBuildsPlanAndStartsDetachedProcess(t *testing.T) {
 		Arguments:  launcher.Arguments{fixture.workingDir},
 		Environment: launcher.Environment{
 			"PATH":              "/usr/local/bin",
-			"CODEX_HOME":        filepath.Join(contextRoot, "codex"),
-			"CLAUDE_CONFIG_DIR": filepath.Join(contextRoot, "claude"),
+			"CODEX_HOME":        filepath.Join(contextRoot, "providers", "codex"),
+			"CLAUDE_CONFIG_DIR": filepath.Join(contextRoot, "providers", "claude"),
 			"DEVCTX_CONTEXT":    "personal",
 		},
 		WorkingDirectory: launcher.WorkingDirectory(fixture.workingDir),
@@ -737,11 +737,12 @@ func (f runnerFixture) writeContext(t *testing.T, ctx devcontext.Context) {
 	if err != nil {
 		t.Fatalf("derive context paths: %v", err)
 	}
-	for _, dir := range []string{
-		contextPaths.RootDir,
-		contextPaths.ClaudeDir,
-		contextPaths.CodexDir,
-	} {
+	contextPaths = contextPaths.WithProviderStorageDirs(cliEnabledProviderIDs(ctx))
+	dirs := []string{contextPaths.RootDir}
+	for _, dir := range contextPaths.ProviderStorageDirs {
+		dirs = append(dirs, dir)
+	}
+	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatalf("create context directory %q: %v", dir, err)
 		}
@@ -749,6 +750,16 @@ func (f runnerFixture) writeContext(t *testing.T, ctx devcontext.Context) {
 	if err := devcontext.NewRepository(f.contextsDir).Write(ctx); err != nil {
 		t.Fatalf("write context %q: %v", ctx.ID.String(), err)
 	}
+}
+
+func cliEnabledProviderIDs(ctx devcontext.Context) []provider.ID {
+	ids := make([]provider.ID, 0, len(ctx.Providers))
+	for providerID, config := range ctx.Providers {
+		if config.Enabled {
+			ids = append(ids, providerID)
+		}
+	}
+	return ids
 }
 
 func (f runnerFixture) writeBindings(t *testing.T, bindings ...project.Binding) {

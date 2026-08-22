@@ -46,7 +46,7 @@ func BenchmarkDirectLaunchPreparation(b *testing.B) {
 			Projects:          project.NewRepository(filepath.Join(devContextHomeDir, "projects.toml"), paths),
 			WorkingDirectory:  workingDir,
 			Paths:             paths,
-			ProviderRegistry:  provider.DefaultRegistry(),
+			ProviderRegistry:  provider.BuiltInRegistry(),
 			Editor:            &recordingCLIEditor{},
 			ProcessLauncher:   &recordingProcessLauncher{},
 			ParentEnvironment: []string{"PATH=/usr/local/bin"},
