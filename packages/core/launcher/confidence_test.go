@@ -2,9 +2,16 @@ package launcher_test
 
 import (
 	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
+	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/editor"
+	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
+	"devctx/packages/core/provider"
 )
 
 func TestConfidenceStatusVariantsSerialize(t *testing.T) {
@@ -172,4 +179,288 @@ func TestConfidenceCheckRejectsIncompleteValues(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProviderConfidenceCheckMapsProviderStatus(t *testing.T) {
+	tests := []struct {
+		name        string
+		providerID  provider.ID
+		displayName string
+		status      provider.Status
+		want        launcher.ConfidenceCheck
+	}{
+		{
+			name:        "claude configured",
+			providerID:  provider.ClaudeID,
+			displayName: "Claude",
+			status:      provider.ConfiguredStatus(),
+			want: launcher.ConfidenceCheck{
+				Component: launcher.ConfidenceCheckClaude,
+				Severity:  launcher.ConfidenceReady,
+				Label:     "Claude",
+				Message:   "Claude is ready for this context.",
+			},
+		},
+		{
+			name:        "codex not configured",
+			providerID:  provider.CodexID,
+			displayName: "Codex",
+			status:      provider.NotConfiguredStatus("Codex is not authenticated."),
+			want: launcher.ConfidenceCheck{
+				Component:  launcher.ConfidenceCheckCodex,
+				Severity:   launcher.ConfidenceNeedsAttention,
+				Label:      "Codex",
+				Message:    "Codex is not authenticated.",
+				ActionHint: "Open and configure Codex for this context.",
+			},
+		},
+		{
+			name:        "claude directory missing",
+			providerID:  provider.ClaudeID,
+			displayName: "Claude",
+			status:      provider.DirectoryMissingStatus("Claude isolated provider directory is missing."),
+			want: launcher.ConfidenceCheck{
+				Component:  launcher.ConfidenceCheckClaude,
+				Severity:   launcher.ConfidenceBlocked,
+				Label:      "Claude",
+				Message:    "Claude isolated provider directory is missing.",
+				ActionHint: "Run diagnostics to repair context storage.",
+			},
+		},
+		{
+			name:        "codex unavailable",
+			providerID:  provider.CodexID,
+			displayName: "Codex",
+			status:      provider.UnavailableStatus("Codex context directory could not be inspected."),
+			want: launcher.ConfidenceCheck{
+				Component:  launcher.ConfidenceCheckCodex,
+				Severity:   launcher.ConfidenceNeedsAttention,
+				Label:      "Codex",
+				Message:    "Codex context directory could not be inspected.",
+				ActionHint: "Run diagnostics to inspect Codex.",
+			},
+		},
+		{
+			name:        "unknown provider status",
+			providerID:  provider.CodexID,
+			displayName: "Codex",
+			status:      provider.Status{State: "expired"},
+			want: launcher.ConfidenceCheck{
+				Component:  launcher.ConfidenceCheckCodex,
+				Severity:   launcher.ConfidenceNeedsAttention,
+				Label:      "Codex",
+				Message:    "Codex readiness could not be determined.",
+				ActionHint: "Run diagnostics to inspect Codex.",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := launcher.ProviderConfidenceCheck(tt.providerID, tt.displayName, tt.status)
+			if !ok {
+				t.Fatal("provider confidence check was not derived")
+			}
+			if got != tt.want {
+				t.Fatalf("check = %#v, want %#v", got, tt.want)
+			}
+			if !got.Valid() {
+				t.Fatalf("check is not valid: %#v", got)
+			}
+		})
+	}
+}
+
+func TestProviderConfidenceCheckSkipsUnknownProviders(t *testing.T) {
+	_, ok := launcher.ProviderConfidenceCheck("fake", "Fake Provider", provider.ConfiguredStatus())
+	if ok {
+		t.Fatal("unknown provider produced confidence check")
+	}
+}
+
+func TestVSCodeConfidenceCheckMapsExecutableReadiness(t *testing.T) {
+	tests := []struct {
+		name       string
+		executable editor.Executable
+		err        error
+		want       launcher.ConfidenceCheck
+	}{
+		{
+			name:       "ready",
+			executable: "/usr/local/bin/code",
+			want: launcher.ConfidenceCheck{
+				Component: launcher.ConfidenceCheckVSCode,
+				Severity:  launcher.ConfidenceReady,
+				Label:     "VS Code",
+				Message:   "VS Code is available for launch.",
+			},
+		},
+		{
+			name: "missing executable",
+			err: &editor.ExecutableNotFoundError{
+				EditorID:   editor.VSCodeID,
+				Candidates: []string{"code"},
+			},
+			want: launcher.ConfidenceCheck{
+				Component:  launcher.ConfidenceCheckVSCode,
+				Severity:   launcher.ConfidenceBlocked,
+				Label:      "VS Code",
+				Message:    "Dev Context could not find a VS Code command to launch.",
+				ActionHint: "Install the VS Code command line launcher or configure the VS Code executable.",
+			},
+		},
+		{
+			name: "invalid executable",
+			err: &editor.ExecutableNotExecutableError{
+				EditorID: editor.VSCodeID,
+				Path:     "/tmp/code",
+			},
+			want: launcher.ConfidenceCheck{
+				Component:  launcher.ConfidenceCheckVSCode,
+				Severity:   launcher.ConfidenceBlocked,
+				Label:      "VS Code",
+				Message:    "The configured VS Code command cannot be run.",
+				ActionHint: "Install the VS Code command line launcher or configure the VS Code executable.",
+			},
+		},
+		{
+			name: "empty executable without error",
+			want: launcher.ConfidenceCheck{
+				Component:  launcher.ConfidenceCheckVSCode,
+				Severity:   launcher.ConfidenceBlocked,
+				Label:      "VS Code",
+				Message:    "Dev Context could not find a VS Code command to launch.",
+				ActionHint: "Install the VS Code command line launcher or configure the VS Code executable.",
+			},
+		},
+		{
+			name: "unexpected error",
+			err:  errors.New("raw path /tmp/code failed"),
+			want: launcher.ConfidenceCheck{
+				Component:  launcher.ConfidenceCheckVSCode,
+				Severity:   launcher.ConfidenceBlocked,
+				Label:      "VS Code",
+				Message:    "VS Code readiness could not be checked.",
+				ActionHint: "Install the VS Code command line launcher or configure the VS Code executable.",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := launcher.VSCodeConfidenceCheck(tt.executable, tt.err)
+			if got != tt.want {
+				t.Fatalf("check = %#v, want %#v", got, tt.want)
+			}
+			if !got.Valid() {
+				t.Fatalf("check is not valid: %#v", got)
+			}
+		})
+	}
+}
+
+func TestIsolationConfidenceChecksRepresentStorageReadiness(t *testing.T) {
+	root := t.TempDir()
+	paths := filesystem.ContextPaths{
+		ContextID:         devcontext.MustID("personal"),
+		RootDir:           filepath.Join(root, "personal"),
+		ClaudeDir:         filepath.Join(root, "personal", "claude"),
+		CodexDir:          filepath.Join(root, "personal", "codex"),
+		VSCodeDir:         filepath.Join(root, "personal", "vscode"),
+		VSCodeUserDataDir: filepath.Join(root, "personal", "vscode", "user-data"),
+	}
+	for _, dir := range []string{paths.RootDir, paths.ClaudeDir, paths.CodexDir, paths.VSCodeDir, paths.VSCodeUserDataDir} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatalf("create directory %q: %v", dir, err)
+		}
+	}
+
+	got := launcher.IsolationConfidenceChecks(paths)
+	want := []launcher.ConfidenceCheck{
+		{
+			Component: launcher.ConfidenceCheckIsolation,
+			Severity:  launcher.ConfidenceReady,
+			Label:     "Context storage",
+			Message:   "Context storage is ready.",
+		},
+		{
+			Component: launcher.ConfidenceCheckIsolation,
+			Severity:  launcher.ConfidenceReady,
+			Label:     "Provider isolation",
+			Message:   "Claude and Codex isolation directories are ready.",
+		},
+		{
+			Component: launcher.ConfidenceCheckIsolation,
+			Severity:  launcher.ConfidenceReady,
+			Label:     "VS Code profile",
+			Message:   "VS Code profile isolation is ready.",
+		},
+	}
+	if !equalConfidenceChecks(got, want) {
+		t.Fatalf("checks = %#v, want %#v", got, want)
+	}
+}
+
+func TestIsolationConfidenceChecksReportBlockedStorage(t *testing.T) {
+	root := t.TempDir()
+	paths := filesystem.ContextPaths{
+		ContextID:         devcontext.MustID("personal"),
+		RootDir:           filepath.Join(root, "personal"),
+		ClaudeDir:         filepath.Join(root, "personal", "claude"),
+		CodexDir:          filepath.Join(root, "personal", "codex"),
+		VSCodeDir:         filepath.Join(root, "personal", "vscode"),
+		VSCodeUserDataDir: filepath.Join(root, "personal", "vscode", "user-data"),
+	}
+	for _, dir := range []string{paths.RootDir, paths.ClaudeDir, paths.VSCodeDir} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatalf("create directory %q: %v", dir, err)
+		}
+	}
+	if err := os.WriteFile(paths.VSCodeUserDataDir, []byte("not a directory"), 0o600); err != nil {
+		t.Fatalf("write vscode user data file: %v", err)
+	}
+
+	got := launcher.IsolationConfidenceChecks(paths)
+	want := []launcher.ConfidenceCheck{
+		{
+			Component: launcher.ConfidenceCheckIsolation,
+			Severity:  launcher.ConfidenceReady,
+			Label:     "Context storage",
+			Message:   "Context storage is ready.",
+		},
+		{
+			Component:  launcher.ConfidenceCheckIsolation,
+			Severity:   launcher.ConfidenceBlocked,
+			Label:      "Provider isolation",
+			Message:    "Provider isolation storage is incomplete.",
+			ActionHint: "Run diagnostics to repair context storage.",
+		},
+		{
+			Component:  launcher.ConfidenceCheckIsolation,
+			Severity:   launcher.ConfidenceBlocked,
+			Label:      "VS Code profile",
+			Message:    "VS Code profile isolation is not ready.",
+			ActionHint: "Run diagnostics to repair context storage.",
+		},
+	}
+	if !equalConfidenceChecks(got, want) {
+		t.Fatalf("checks = %#v, want %#v", got, want)
+	}
+	for _, check := range got {
+		if !check.Valid() {
+			t.Fatalf("check is not valid: %#v", check)
+		}
+	}
+}
+
+func equalConfidenceChecks(a []launcher.ConfidenceCheck, b []launcher.ConfidenceCheck) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
