@@ -48,7 +48,7 @@ func BenchmarkInteractiveLaunchStateLoading(b *testing.B) {
 		Contexts:          contexts,
 		Projects:          projects,
 		Paths:             paths,
-		Providers:         []provider.Provider{applicationFakeProvider{id: provider.ClaudeID}, applicationFakeProvider{id: provider.CodexID}},
+		ProviderRegistry:  provider.MustNewRegistry([]provider.Provider{applicationFakeProvider{id: provider.ClaudeID}, applicationFakeProvider{id: provider.CodexID}}),
 		ParentEnvironment: []string{"PATH=/usr/local/bin"},
 		WorkingDirectory:  projectDir,
 		Now: func() time.Time {

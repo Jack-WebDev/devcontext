@@ -331,6 +331,10 @@ func TestGetLaunchStateReturnsUnboundSelectorState(t *testing.T) {
 
 func TestGetLaunchStateDetectsProviderCredentialSessionsForContextCreation(t *testing.T) {
 	fixture := newApplicationFixture(t)
+	fixture.providerRegistry = provider.MustNewRegistry([]provider.Provider{
+		fixture.provider,
+		provider.ClaudeProvider{},
+	}, fixture.provider.ID())
 	fixture.writeContext(t, fixture.context("personal", "Personal"))
 	writeApplicationJSONFixture(t, filepath.Join(fixture.homeDir, ".claude", ".credentials.json"), map[string]string{
 		"subscriptionType": "Pro",
@@ -504,7 +508,7 @@ func TestGetLaunchStateReturnsProviderIdentityContract(t *testing.T) {
 
 func TestGetLaunchStateReturnsVerifiedProviderIdentitiesForIsolatedContexts(t *testing.T) {
 	fixture := newApplicationFixture(t)
-	fixture.providers = []provider.Provider{
+	fixture.providerRegistry = provider.MustNewRegistry([]provider.Provider{
 		applicationFakeProvider{
 			id:          provider.CodexID,
 			displayName: "Codex",
@@ -519,7 +523,7 @@ func TestGetLaunchStateReturnsVerifiedProviderIdentitiesForIsolatedContexts(t *t
 				"personal": provider.ConfiguredStatus(),
 			},
 		},
-	}
+	})
 
 	ctx := fixture.context("personal", "Personal")
 	ctx.Providers = provider.Configs{
@@ -598,7 +602,7 @@ func TestGetLaunchStateReturnsVerifiedProviderIdentitiesForIsolatedContexts(t *t
 
 func TestGetLaunchStateDoesNotInferIdentityMismatchEvidenceFromContextName(t *testing.T) {
 	fixture := newApplicationFixture(t)
-	fixture.providers = []provider.Provider{
+	fixture.providerRegistry = provider.MustNewRegistry([]provider.Provider{
 		applicationFakeProvider{
 			id:          provider.CodexID,
 			displayName: "Codex",
@@ -606,7 +610,7 @@ func TestGetLaunchStateDoesNotInferIdentityMismatchEvidenceFromContextName(t *te
 				"company": provider.ConfiguredStatus(),
 			},
 		},
-	}
+	})
 
 	ctx := fixture.context("company", "Company")
 	ctx.Providers = provider.Configs{
@@ -716,6 +720,10 @@ func TestGetLaunchStateReportsContextStorageErrors(t *testing.T) {
 }
 
 func TestCreateContextCreatesDefaultPersonalAndCompanyContexts(t *testing.T) {
+	defaultRegistry := provider.MustNewRegistry([]provider.Provider{
+		applicationFakeProvider{id: "fake"},
+	}, "fake")
+	now := time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC)
 	tests := []struct {
 		name      string
 		contextID string
@@ -724,12 +732,12 @@ func TestCreateContextCreatesDefaultPersonalAndCompanyContexts(t *testing.T) {
 		{
 			name:      "personal",
 			contextID: "personal",
-			want:      devcontext.DefaultPersonalContext(time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC)),
+			want:      devcontext.DefaultPersonalContextWithProviderRegistry(now, defaultRegistry),
 		},
 		{
 			name:      "company",
 			contextID: "company",
-			want:      devcontext.DefaultCompanyContext(time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC)),
+			want:      devcontext.DefaultCompanyContextWithProviderRegistry(now, defaultRegistry),
 		},
 	}
 
@@ -1082,7 +1090,7 @@ type applicationFixture struct {
 	paths              filesystem.PlatformPaths
 	now                time.Time
 	provider           *applicationFakeProvider
-	providers          []provider.Provider
+	providerRegistry   provider.Registry
 	editor             *applicationFakeEditor
 	process            *applicationFakeProcessLauncher
 	storagePermissions filesystem.StoragePermissions
@@ -1119,16 +1127,16 @@ func newApplicationFixture(t *testing.T) applicationFixture {
 }
 
 func (f applicationFixture) service() *Service {
-	providers := f.providers
-	if providers == nil {
-		providers = []provider.Provider{f.provider}
+	registry := f.providerRegistry
+	if registry.IsZero() {
+		registry = provider.MustNewRegistry([]provider.Provider{f.provider}, f.provider.ID())
 	}
 
 	return NewServiceWithDependencies(Dependencies{
 		Contexts:           devcontext.NewRepository(f.contextsDir),
 		Projects:           project.NewRepository(f.bindingsPath, f.paths),
 		Paths:              f.paths,
-		Providers:          providers,
+		ProviderRegistry:   registry,
 		Editor:             f.editor,
 		ProcessLauncher:    f.process,
 		StoragePermissions: f.storagePermissions,

@@ -138,7 +138,7 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 		return CreateContextResult{}, err
 	}
 
-	ctx, err := devcontext.DefaultContextForID(contextID, s.now())
+	ctx, err := devcontext.DefaultContextForIDWithProviderRegistry(contextID, s.now(), s.dependencies.ProviderRegistry)
 	if err != nil {
 		return CreateContextResult{}, err
 	}
@@ -341,9 +341,13 @@ func (s *Service) providerCredentialSessionStates() ([]ProviderCredentialSession
 
 	states := make([]ProviderCredentialSessionState, 0, len(sessions))
 	for _, session := range sessions {
+		integration, ok := s.dependencies.ProviderRegistry.Get(provider.ID(session.ProviderID))
+		if !ok {
+			continue
+		}
 		state := ProviderCredentialSessionState{
 			ProviderID:        session.ProviderID,
-			Name:              providerCredentialSessionName(session.ProviderID),
+			Name:              integration.DisplayName(),
 			MetadataAvailable: session.MetadataAvailable,
 		}
 		switch session.ProviderID {
@@ -367,17 +371,6 @@ func (s *Service) providerCredentialSessionStates() ([]ProviderCredentialSession
 	return states, nil
 }
 
-func providerCredentialSessionName(providerID string) string {
-	switch providerID {
-	case string(provider.CodexID):
-		return "Codex"
-	case string(provider.ClaudeID):
-		return "Claude"
-	default:
-		return providerID
-	}
-}
-
 type providerStateEntry struct {
 	providerID provider.ID
 	state      ProviderState
@@ -385,13 +378,10 @@ type providerStateEntry struct {
 }
 
 func (s *Service) providerStateEntries(ctx devcontext.Context) []providerStateEntry {
-	entries := make([]providerStateEntry, 0, len(s.dependencies.Providers))
+	providers := s.dependencies.ProviderRegistry.All()
+	entries := make([]providerStateEntry, 0, len(providers))
 	contextPaths, pathsErr := filesystem.DeriveContextPaths(s.dependencies.Paths, ctx.ID)
-	for _, integration := range s.dependencies.Providers {
-		if integration == nil {
-			continue
-		}
-
+	for _, integration := range providers {
 		config, ok := ctx.Providers[integration.ID()]
 		enabled := ok && config.Enabled
 		status := provider.NotConfiguredStatus("Provider is disabled for this context")

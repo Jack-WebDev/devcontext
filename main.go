@@ -111,7 +111,7 @@ func runCLI(args []string) cli.ExitCode {
 		Projects:          project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
 		WorkingDirectory:  workingDirectory,
 		Paths:             paths,
-		Providers:         []provider.Provider{provider.ClaudeProvider{}, provider.CodexProvider{}},
+		ProviderRegistry:  provider.DefaultRegistry(),
 		Editor:            editor.VSCodeEditor{},
 		ProcessLauncher:   launcher.NativeProcessLauncher{},
 		ParentEnvironment: os.Environ(),

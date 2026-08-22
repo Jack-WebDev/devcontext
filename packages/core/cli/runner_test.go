@@ -241,7 +241,7 @@ func TestRunnerRootLaunchBuildsPlanAndStartsDetachedProcess(t *testing.T) {
 	launchEditor := &recordingCLIEditor{}
 	processLauncher := &recordingProcessLauncher{}
 	runner := fixture.runner()
-	runner.Providers = []provider.Provider{provider.ClaudeProvider{}, provider.CodexProvider{}}
+	runner.ProviderRegistry = provider.DefaultRegistry()
 	runner.Editor = launchEditor
 	runner.ProcessLauncher = processLauncher
 	runner.ParentEnvironment = []string{

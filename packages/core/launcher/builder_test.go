@@ -55,10 +55,10 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 			},
 		},
 		PlatformPaths: platformPaths,
-		Providers: []provider.Provider{
+		ProviderRegistry: provider.MustNewRegistry([]provider.Provider{
 			builderFakeProvider{id: "fake"},
 			builderFakeProvider{id: "disabled"},
-		},
+		}),
 		Editor: fakeEditor,
 		ParentEnvironment: []string{
 			"PATH=/usr/local/bin",
@@ -139,10 +139,10 @@ func TestLaunchPlanBuilderDoesNotRequireProviderCLICommands(t *testing.T) {
 			},
 		},
 		PlatformPaths: platformPaths,
-		Providers: []provider.Provider{
+		ProviderRegistry: provider.MustNewRegistry([]provider.Provider{
 			provider.ClaudeProvider{},
 			provider.CodexProvider{},
-		},
+		}),
 		Editor:            editor.VSCodeEditor{},
 		ParentEnvironment: []string{"PATH=/path/without/provider-clis"},
 	}
