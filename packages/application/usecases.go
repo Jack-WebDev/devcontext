@@ -32,6 +32,16 @@ func (s *Service) LaunchProject(request LaunchProjectRequest) (LaunchProjectResu
 	return result, nil
 }
 
+// PreflightLaunchProject checks launch readiness for a selected context without
+// starting the editor process.
+func (s *Service) PreflightLaunchProject(request PreflightLaunchProjectRequest) (PreflightLaunchProjectResult, *Error) {
+	result, err := s.preflightLaunchProject(request)
+	if err != nil {
+		return PreflightLaunchProjectResult{}, NewError(err)
+	}
+	return result, nil
+}
+
 // BindProject remembers the selected context for one project.
 func (s *Service) BindProject(request BindProjectRequest) (ProjectBindingState, *Error) {
 	state, err := s.bindProject(request)
@@ -202,6 +212,47 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 		Project:  projectState(plan.ProjectPath),
 		Context:  s.contextState(plan.Context),
 		Warnings: warningStates(plan.Warnings),
+	}, nil
+}
+
+func (s *Service) preflightLaunchProject(request PreflightLaunchProjectRequest) (PreflightLaunchProjectResult, error) {
+	projectPath, err := s.canonicalProjectPath(request.ProjectPath)
+	if err != nil {
+		return PreflightLaunchProjectResult{}, err
+	}
+	if err := project.ValidateProjectDirectory(projectPath); err != nil {
+		return PreflightLaunchProjectResult{}, err
+	}
+	contextID, err := devcontext.NewID(request.ContextID)
+	if err != nil {
+		return PreflightLaunchProjectResult{}, err
+	}
+
+	confirmation := launcher.ContextMismatchUnconfirmed
+	if request.ConfirmContextMismatch {
+		confirmation = launcher.ContextMismatchAccepted
+	}
+
+	resolution, err := launcher.NewResolver(s.dependencies.Contexts, s.dependencies.Projects).Resolve(launcher.LaunchRequest{
+		ProjectPath:          projectPath,
+		RequestedContext:     &contextID,
+		MismatchConfirmation: confirmation,
+		Interactive:          true,
+		Source:               launcher.InvocationSourceGUI,
+	})
+	if err != nil {
+		return PreflightLaunchProjectResult{}, err
+	}
+	if resolution.Context == nil || resolution.SelectionRequired {
+		return PreflightLaunchProjectResult{}, launcher.ErrLaunchSelectionRequired
+	}
+
+	contextState := s.contextState(*resolution.Context)
+	return PreflightLaunchProjectResult{
+		Project:    projectState(projectPath),
+		Context:    contextState,
+		Confidence: contextState.Confidence,
+		Warnings:   warningStates(resolution.Warnings),
 	}, nil
 }
 

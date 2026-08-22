@@ -167,6 +167,14 @@ func TestProviderIdentityStateVariantsSerialize(t *testing.T) {
 			identity: application.ProviderIdentityState{Status: application.ProviderIdentityNone},
 			want:     `{"status":"none"}`,
 		},
+		{
+			name: "mismatch evidence",
+			identity: application.ProviderIdentityState{
+				Status:  application.ProviderIdentityMismatchEvidence,
+				Message: "Different account identity detected.",
+			},
+			want: `{"status":"mismatch_evidence","message":"Different account identity detected."}`,
+		},
 	}
 
 	for _, tt := range tests {

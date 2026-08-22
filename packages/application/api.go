@@ -104,13 +104,17 @@ const (
 	// ProviderIdentityNone means no provider account identity is present for
 	// this context.
 	ProviderIdentityNone ProviderIdentityStatus = "none"
+
+	// ProviderIdentityMismatchEvidence means Dev Context has explicit evidence
+	// that the provider account may not match the intended context identity.
+	ProviderIdentityMismatchEvidence ProviderIdentityStatus = "mismatch_evidence"
 )
 
 // Valid reports whether status is one of the bounded API provider identity
 // states.
 func (s ProviderIdentityStatus) Valid() bool {
 	switch s {
-	case ProviderIdentityVerified, ProviderIdentityUnavailable, ProviderIdentityNone:
+	case ProviderIdentityVerified, ProviderIdentityUnavailable, ProviderIdentityNone, ProviderIdentityMismatchEvidence:
 		return true
 	default:
 		return false
@@ -139,6 +143,23 @@ type ClaudeProviderIdentityState struct {
 	SubscriptionType string `json:"subscriptionType,omitempty"`
 	OrganizationUUID string `json:"organizationUuid,omitempty"`
 	OrganizationName string `json:"organizationName,omitempty"`
+}
+
+// PreflightLaunchProjectRequest asks the service to check launch readiness for
+// one project and context without starting the editor process.
+type PreflightLaunchProjectRequest struct {
+	ProjectPath            string `json:"projectPath,omitempty"`
+	ContextID              string `json:"contextId"`
+	ConfirmContextMismatch bool   `json:"confirmContextMismatch"`
+}
+
+// PreflightLaunchProjectResult describes launch readiness before an editor
+// process is started.
+type PreflightLaunchProjectResult struct {
+	Project    ProjectState          `json:"project"`
+	Context    ContextState          `json:"context"`
+	Confidence LaunchConfidenceState `json:"confidence"`
+	Warnings   []ResolutionWarning   `json:"warnings,omitempty"`
 }
 
 // LaunchConfidenceState summarizes backend-owned launch readiness for the

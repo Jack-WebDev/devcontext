@@ -56,6 +56,22 @@ export namespace application {
 	        this.confirmContextMismatch = source["confirmContextMismatch"];
 	    }
 	}
+	export class PreflightLaunchProjectRequest {
+	    projectPath?: string;
+	    contextId: string;
+	    confirmContextMismatch: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PreflightLaunchProjectRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectPath = source["projectPath"];
+	        this.contextId = source["contextId"];
+	        this.confirmContextMismatch = source["confirmContextMismatch"];
+	    }
+	}
 	export class UnbindProjectRequest {
 	    projectPath?: string;
 	
@@ -70,4 +86,3 @@ export namespace application {
 	}
 
 }
-
