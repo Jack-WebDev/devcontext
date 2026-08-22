@@ -3,9 +3,11 @@ package filesystem
 import (
 	"fmt"
 	"os"
+	"sort"
 	"time"
 
 	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/provider"
 )
 
 // CreateContextDirectoryTree creates the isolated storage tree for one context
@@ -40,6 +42,7 @@ func createContextDirectoryTree(paths ContextPaths, ctx devcontext.Context, perm
 	if permissions == nil {
 		permissions = NewDefaultStoragePermissions()
 	}
+	paths = paths.WithProviderStorageDirs(enabledContextProviderIDs(ctx))
 	if err := validateContextTree(paths, ctx); err != nil {
 		return err
 	}
@@ -139,9 +142,33 @@ func bootstrapDefaultContext(paths PlatformPaths, ctx devcontext.Context, permis
 }
 
 func contextTreeDirectories(paths ContextPaths) []string {
-	return []string{
-		paths.RootDir,
-		paths.ClaudeDir,
-		paths.CodexDir,
+	dirs := []string{paths.RootDir}
+	for _, providerID := range sortedProviderStorageIDs(paths.ProviderStorageDirs) {
+		dirs = append(dirs, paths.ProviderStorageDirs[providerID])
 	}
+	return dirs
+}
+
+func enabledContextProviderIDs(ctx devcontext.Context) []provider.ID {
+	ids := make([]provider.ID, 0, len(ctx.Providers))
+	for providerID, config := range ctx.Providers {
+		if config.Enabled {
+			ids = append(ids, providerID)
+		}
+	}
+	sort.Slice(ids, func(i int, j int) bool {
+		return ids[i] < ids[j]
+	})
+	return ids
+}
+
+func sortedProviderStorageIDs(providerDirs map[provider.ID]string) []provider.ID {
+	ids := make([]provider.ID, 0, len(providerDirs))
+	for providerID := range providerDirs {
+		ids = append(ids, providerID)
+	}
+	sort.Slice(ids, func(i int, j int) bool {
+		return ids[i] < ids[j]
+	})
+	return ids
 }

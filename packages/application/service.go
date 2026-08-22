@@ -76,7 +76,7 @@ func NewDefaultService(options DefaultOptions) (*Service, error) {
 		Contexts:           devcontext.NewRepository(layout.ContextsDir),
 		Projects:           project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
 		Paths:              paths,
-		ProviderRegistry:   provider.DefaultRegistry(),
+		ProviderRegistry:   provider.BuiltInRegistry(),
 		Editor:             editor.VSCodeEditor{},
 		ProcessLauncher:    launcher.NativeProcessLauncher{},
 		StoragePermissions: filesystem.NewDefaultStoragePermissions(),
@@ -124,7 +124,7 @@ func normalizeDependencies(dependencies Dependencies) Dependencies {
 		dependencies.Paths = filesystem.NewDefaultPlatformPaths()
 	}
 	if dependencies.ProviderRegistry.IsZero() {
-		dependencies.ProviderRegistry = provider.DefaultRegistry()
+		dependencies.ProviderRegistry = provider.BuiltInRegistry()
 	}
 	if dependencies.Editor == nil {
 		dependencies.Editor = editor.VSCodeEditor{}

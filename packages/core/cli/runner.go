@@ -231,7 +231,7 @@ func (r Runner) providerRegistry() provider.Registry {
 	if !r.ProviderRegistry.IsZero() {
 		return r.ProviderRegistry
 	}
-	return provider.DefaultRegistry()
+	return provider.BuiltInRegistry()
 }
 
 func (r Runner) editor() editor.Editor {
@@ -392,8 +392,10 @@ func renderDebugLaunchPlan(plan launcher.LaunchPlan) string {
 	fmt.Fprintf(&builder, "editor_executable: %s\n", plan.Executable)
 	builder.WriteString("context_directories:\n")
 	fmt.Fprintf(&builder, "  root: %s\n", plan.ContextPaths.RootDir)
-	fmt.Fprintf(&builder, "  claude: %s\n", plan.ContextPaths.ClaudeDir)
-	fmt.Fprintf(&builder, "  codex: %s\n", plan.ContextPaths.CodexDir)
+	builder.WriteString("  providers:\n")
+	for _, providerID := range sortedProviderPathIDs(plan.ContextPaths.ProviderStorageDirs) {
+		fmt.Fprintf(&builder, "    %s: %s\n", providerID, plan.ContextPaths.ProviderStorageDirs[providerID])
+	}
 	builder.WriteString("arguments:\n")
 	for i, argument := range plan.Arguments {
 		fmt.Fprintf(&builder, "  %d: %s\n", i, argument)
@@ -403,6 +405,17 @@ func renderDebugLaunchPlan(plan launcher.LaunchPlan) string {
 		fmt.Fprintf(&builder, "  %s\n", entry)
 	}
 	return builder.String()
+}
+
+func sortedProviderPathIDs(paths map[provider.ID]string) []provider.ID {
+	ids := make([]provider.ID, 0, len(paths))
+	for providerID := range paths {
+		ids = append(ids, providerID)
+	}
+	sort.Slice(ids, func(i int, j int) bool {
+		return ids[i] < ids[j]
+	})
+	return ids
 }
 
 func redactedEnvironment(variables launcher.Environment) []string {

@@ -33,8 +33,8 @@ func TestCreateContextDirectoryTreeCreatesCompleteRestrictedTree(t *testing.T) {
 
 	for _, dir := range []string{
 		contextPaths.RootDir,
-		contextPaths.ClaudeDir,
-		contextPaths.CodexDir,
+		contextPaths.ProviderStorageDir(provider.ClaudeID),
+		contextPaths.ProviderStorageDir(provider.CodexID),
 	} {
 		assertDirectoryExists(t, dir)
 		assertRestrictedMode(t, dir, filesystem.RestrictedDirectoryMode)
@@ -52,21 +52,20 @@ func TestCreateContextDirectoryTreeCreatesCompleteRestrictedTree(t *testing.T) {
 		t.Fatalf("decoded context = %#v, want %#v", decoded, ctx)
 	}
 	assertRestrictedMode(t, contextPaths.ConfigPath, filesystem.RestrictedFileMode)
-	assertDirectoryEmpty(t, contextPaths.ClaudeDir)
-	assertDirectoryEmpty(t, contextPaths.CodexDir)
+	assertDirectoryEmpty(t, contextPaths.ProviderStorageDir(provider.ClaudeID))
+	assertDirectoryEmpty(t, contextPaths.ProviderStorageDir(provider.CodexID))
 	assertPathMissing(t, contextPaths.VSCodeDir)
 	assertPathMissing(t, contextPaths.VSCodeUserDataDir)
 }
 
 func TestCreateContextDirectoryTreeRejectsMismatchedContextID(t *testing.T) {
 	contextPaths := filesystem.ContextPaths{
-		ContextID:         devcontext.MustID("company"),
-		RootDir:           "/devctx/contexts/company",
-		ConfigPath:        "/devctx/contexts/company/context.toml",
-		ClaudeDir:         "/devctx/contexts/company/claude",
-		CodexDir:          "/devctx/contexts/company/codex",
-		VSCodeDir:         "/devctx/contexts/company/vscode",
-		VSCodeUserDataDir: "/devctx/contexts/company/vscode/user-data",
+		ContextID:              devcontext.MustID("company"),
+		RootDir:                "/devctx/contexts/company",
+		ConfigPath:             "/devctx/contexts/company/context.toml",
+		ProviderStorageRootDir: "/devctx/contexts/company/providers",
+		VSCodeDir:              "/devctx/contexts/company/vscode",
+		VSCodeUserDataDir:      "/devctx/contexts/company/vscode/user-data",
 	}
 	ctx := contextTreeContext(devcontext.MustID("personal"), "Personal")
 
@@ -91,7 +90,7 @@ func TestCreateContextDirectoryTreeRejectsDuplicateWithoutModifyingTree(t *testi
 	if err := filesystem.CreateContextDirectoryTree(contextPaths, original); err != nil {
 		t.Fatalf("create original context directory tree: %v", err)
 	}
-	sentinelPath := filepath.Join(contextPaths.ClaudeDir, "auth-state.json")
+	sentinelPath := filepath.Join(contextPaths.ProviderStorageDir(provider.ClaudeID), "auth-state.json")
 	if err := os.WriteFile(sentinelPath, []byte("keep me"), 0o600); err != nil {
 		t.Fatalf("write sentinel file: %v", err)
 	}
@@ -133,7 +132,8 @@ func TestValidateContextDirectoryTreeReportsIncompleteStorage(t *testing.T) {
 	if err := filesystem.CreateContextDirectoryTree(contextPaths, ctx); err != nil {
 		t.Fatalf("create context directory tree: %v", err)
 	}
-	if err := os.RemoveAll(contextPaths.CodexDir); err != nil {
+	contextPaths = contextPaths.WithProviderStorageDirs([]provider.ID{provider.ClaudeID, provider.CodexID})
+	if err := os.RemoveAll(contextPaths.ProviderStorageDir(provider.CodexID)); err != nil {
 		t.Fatalf("remove codex dir: %v", err)
 	}
 
@@ -147,9 +147,10 @@ func TestValidateContextDirectoryTreeReportsIncompleteStorage(t *testing.T) {
 	}
 	wantMissing := []filesystem.MissingContextDirectory{
 		{
-			Kind:   filesystem.ContextDirectoryCodex,
-			Path:   contextPaths.CodexDir,
-			Reason: "missing",
+			Kind:       filesystem.ContextDirectoryProvider,
+			ProviderID: string(provider.CodexID),
+			Path:       contextPaths.ProviderStorageDir(provider.CodexID),
+			Reason:     "missing",
 		},
 	}
 	if !reflect.DeepEqual(storageErr.Missing, wantMissing) {

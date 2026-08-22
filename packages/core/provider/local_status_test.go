@@ -40,7 +40,7 @@ func TestCodexProviderDetectsLocalStatus(t *testing.T) {
 			}
 			status, err := integration.Status(provider.RuntimeContext{
 				Paths: provider.ContextPaths{
-					CodexDir: tt.directory,
+					StorageDir: tt.directory,
 				},
 			})
 			if err != nil {
@@ -84,7 +84,7 @@ func TestClaudeProviderDetectsLocalStatus(t *testing.T) {
 			}
 			status, err := integration.Status(provider.RuntimeContext{
 				Paths: provider.ContextPaths{
-					ClaudeDir: tt.directory,
+					StorageDir: tt.directory,
 				},
 			})
 			if err != nil {

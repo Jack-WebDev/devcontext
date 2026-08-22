@@ -18,16 +18,16 @@ var ErrContextStorageIncomplete = errors.New("context storage is incomplete")
 type ContextDirectoryKind string
 
 const (
-	ContextDirectoryRoot   ContextDirectoryKind = "context"
-	ContextDirectoryClaude ContextDirectoryKind = "claude"
-	ContextDirectoryCodex  ContextDirectoryKind = "codex"
+	ContextDirectoryRoot     ContextDirectoryKind = "context"
+	ContextDirectoryProvider ContextDirectoryKind = "provider"
 )
 
 // MissingContextDirectory describes one absent or non-directory context path.
 type MissingContextDirectory struct {
-	Kind   ContextDirectoryKind
-	Path   string
-	Reason string
+	Kind       ContextDirectoryKind
+	ProviderID string
+	Path       string
+	Reason     string
 }
 
 // ContextStorageError reports incomplete storage for one context.
@@ -43,11 +43,15 @@ func (e *ContextStorageError) Error() string {
 
 	details := make([]string, 0, len(e.Missing))
 	for _, missing := range e.Missing {
+		kind := string(missing.Kind)
+		if missing.ProviderID != "" {
+			kind += ":" + missing.ProviderID
+		}
 		if missing.Reason == "" {
-			details = append(details, fmt.Sprintf("%s %q", missing.Kind, missing.Path))
+			details = append(details, fmt.Sprintf("%s %q", kind, missing.Path))
 			continue
 		}
-		details = append(details, fmt.Sprintf("%s %q (%s)", missing.Kind, missing.Path, missing.Reason))
+		details = append(details, fmt.Sprintf("%s %q (%s)", kind, missing.Path, missing.Reason))
 	}
 	if len(details) == 0 {
 		return fmt.Sprintf("%v: context %q", ErrContextStorageIncomplete, e.ContextID.String())
@@ -68,9 +72,10 @@ func ValidateContextDirectoryTree(paths ContextPaths) error {
 		if err != nil {
 			if isMissingContextDirectoryError(err) {
 				missing = append(missing, MissingContextDirectory{
-					Kind:   expected.Kind,
-					Path:   expected.Path,
-					Reason: "missing",
+					Kind:       expected.Kind,
+					ProviderID: expected.ProviderID,
+					Path:       expected.Path,
+					Reason:     "missing",
 				})
 				continue
 			}
@@ -81,9 +86,10 @@ func ValidateContextDirectoryTree(paths ContextPaths) error {
 		}
 		if !info.IsDir() {
 			missing = append(missing, MissingContextDirectory{
-				Kind:   expected.Kind,
-				Path:   expected.Path,
-				Reason: "not a directory",
+				Kind:       expected.Kind,
+				ProviderID: expected.ProviderID,
+				Path:       expected.Path,
+				Reason:     "not a directory",
 			})
 		}
 	}
@@ -98,16 +104,23 @@ func ValidateContextDirectoryTree(paths ContextPaths) error {
 }
 
 type expectedContextDirectory struct {
-	Kind ContextDirectoryKind
-	Path string
+	Kind       ContextDirectoryKind
+	ProviderID string
+	Path       string
 }
 
 func expectedContextDirectories(paths ContextPaths) []expectedContextDirectory {
-	return []expectedContextDirectory{
+	expected := []expectedContextDirectory{
 		{Kind: ContextDirectoryRoot, Path: paths.RootDir},
-		{Kind: ContextDirectoryClaude, Path: paths.ClaudeDir},
-		{Kind: ContextDirectoryCodex, Path: paths.CodexDir},
 	}
+	for _, providerID := range sortedProviderStorageIDs(paths.ProviderStorageDirs) {
+		expected = append(expected, expectedContextDirectory{
+			Kind:       ContextDirectoryProvider,
+			ProviderID: string(providerID),
+			Path:       paths.ProviderStorageDirs[providerID],
+		})
+	}
+	return expected
 }
 
 func isMissingContextDirectoryError(err error) bool {

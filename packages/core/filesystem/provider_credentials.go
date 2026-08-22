@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"devctx/packages/core/provider"
 )
 
 const (
@@ -81,7 +83,7 @@ func DetectProviderCredentialSessions(paths PlatformPaths) ([]DetectedProviderCr
 // context-owned provider directory. It returns only verified safe fields decoded
 // from local credential state.
 func DetectCodexContextCredentialMetadata(paths ContextPaths) (CodexCredentialMetadata, bool, error) {
-	path := joinPlatformPath(paths.CodexDir, codexAuthFileName)
+	path := joinPlatformPath(paths.ProviderStorageDir(provider.ID(providerIDCodex)), codexAuthFileName)
 	exists, err := regularFileExists(path)
 	if err != nil {
 		return CodexCredentialMetadata{}, false, err
@@ -98,7 +100,7 @@ func DetectCodexContextCredentialMetadata(paths ContextPaths) (CodexCredentialMe
 // context-owned provider directory. It returns only verified safe fields decoded
 // from local credential state.
 func DetectClaudeContextCredentialMetadata(paths ContextPaths) (ClaudeCredentialMetadata, bool, error) {
-	path := joinPlatformPath(paths.ClaudeDir, claudeCredentialsFileName)
+	path := joinPlatformPath(paths.ProviderStorageDir(provider.ID(providerIDClaude)), claudeCredentialsFileName)
 	exists, err := regularFileExists(path)
 	if err != nil {
 		return ClaudeCredentialMetadata{}, false, err
@@ -192,7 +194,7 @@ func importCodexCredentials(homeDir string, paths ContextPaths, permissions Stor
 	if !exists {
 		return nil
 	}
-	destination := joinPlatformPath(paths.CodexDir, codexAuthFileName)
+	destination := joinPlatformPath(paths.ProviderStorageDir(provider.ID(providerIDCodex)), codexAuthFileName)
 	return copyOpaqueCredentialFile(source, destination, permissions)
 }
 
@@ -206,7 +208,7 @@ func importClaudeCredentials(homeDir string, paths ContextPaths, permissions Sto
 		return nil
 	}
 
-	credentialsDestination := joinPlatformPath(paths.ClaudeDir, claudeCredentialsFileName)
+	credentialsDestination := joinPlatformPath(paths.ProviderStorageDir(provider.ID(providerIDClaude)), claudeCredentialsFileName)
 	if err := copyOpaqueCredentialFile(credentialsSource, credentialsDestination, permissions); err != nil {
 		return err
 	}
@@ -219,7 +221,7 @@ func importClaudeCredentials(homeDir string, paths ContextPaths, permissions Sto
 	if !exists {
 		return nil
 	}
-	settingsDestination := joinPlatformPath(paths.ClaudeDir, claudeSettingsFileName)
+	settingsDestination := joinPlatformPath(paths.ProviderStorageDir(provider.ID(providerIDClaude)), claudeSettingsFileName)
 	return copyOpaqueCredentialFile(settingsSource, settingsDestination, permissions)
 }
 

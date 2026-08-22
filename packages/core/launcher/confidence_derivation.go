@@ -3,6 +3,7 @@ package launcher
 import (
 	"errors"
 	"os"
+	"sort"
 	"strings"
 
 	"devctx/packages/core/editor"
@@ -99,8 +100,8 @@ func IsolationConfidenceChecks(paths filesystem.ContextPaths) []ConfidenceCheck 
 			Component: ConfidenceCheckIsolation,
 			Label:     "Provider isolation",
 			Severity:  ConfidenceReady,
-			Message:   "Claude and Codex isolation directories are ready.",
-		}, []string{paths.ClaudeDir, paths.CodexDir}, "Provider isolation storage is incomplete."),
+			Message:   "Provider isolation directories are ready.",
+		}, providerStorageDirectories(paths), "Provider isolation storage is incomplete."),
 		multiDirectoryConfidenceCheck(ConfidenceCheck{
 			Component: ConfidenceCheckIsolation,
 			Label:     "VS Code profile",
@@ -108,6 +109,22 @@ func IsolationConfidenceChecks(paths filesystem.ContextPaths) []ConfidenceCheck 
 			Message:   "VS Code profile isolation is ready.",
 		}, []string{paths.VSCodeDir, paths.VSCodeUserDataDir}, "VS Code profile isolation is not ready."),
 	}
+}
+
+func providerStorageDirectories(paths filesystem.ContextPaths) []string {
+	providerIDs := make([]provider.ID, 0, len(paths.ProviderStorageDirs))
+	for providerID := range paths.ProviderStorageDirs {
+		providerIDs = append(providerIDs, providerID)
+	}
+	sort.Slice(providerIDs, func(i int, j int) bool {
+		return providerIDs[i] < providerIDs[j]
+	})
+
+	dirs := make([]string, 0, len(providerIDs))
+	for _, providerID := range providerIDs {
+		dirs = append(dirs, paths.ProviderStorageDirs[providerID])
+	}
+	return dirs
 }
 
 func providerConfidenceComponent(providerID provider.ID) (ConfidenceCheckComponent, bool) {
