@@ -22,7 +22,7 @@ func (fakeProvider) DisplayName() string {
 func (fakeProvider) BuildEnvironment(ctx provider.RuntimeContext) (provider.EnvironmentContribution, error) {
 	return provider.EnvironmentContribution{
 		"FAKE_CONTEXT": ctx.ContextID,
-		"FAKE_HOME":    ctx.Paths.RootDir,
+		"FAKE_HOME":    ctx.Paths.StorageDir,
 	}, nil
 }
 
@@ -41,7 +41,8 @@ func TestProviderInterfaceAllowsGenericProviderUse(t *testing.T) {
 			Enabled: true,
 		},
 		Paths: provider.ContextPaths{
-			RootDir: "/home/alex/.devctx/contexts/client-a",
+			RootDir:    "/home/alex/.devctx/contexts/client-a",
+			StorageDir: "/home/alex/.devctx/contexts/client-a/providers/fake",
 		},
 	}
 
@@ -58,7 +59,7 @@ func TestProviderInterfaceAllowsGenericProviderUse(t *testing.T) {
 	}
 	wantEnvironment := provider.EnvironmentContribution{
 		"FAKE_CONTEXT": "client-a",
-		"FAKE_HOME":    "/home/alex/.devctx/contexts/client-a",
+		"FAKE_HOME":    "/home/alex/.devctx/contexts/client-a/providers/fake",
 	}
 	if !reflect.DeepEqual(environment, wantEnvironment) {
 		t.Fatalf("environment = %#v, want %#v", environment, wantEnvironment)
@@ -70,5 +71,18 @@ func TestProviderInterfaceAllowsGenericProviderUse(t *testing.T) {
 	}
 	if status.State != provider.StatusReady {
 		t.Fatalf("status state = %q, want %q", status.State, provider.StatusReady)
+	}
+}
+
+func TestRuntimeContextPathsExposeOnlyProviderStorageDir(t *testing.T) {
+	contextPathsType := reflect.TypeOf(provider.ContextPaths{})
+
+	if _, ok := contextPathsType.FieldByName("StorageDir"); !ok {
+		t.Fatal("provider.ContextPaths is missing StorageDir")
+	}
+	for _, fieldName := range []string{"ClaudeDir", "CodexDir"} {
+		if _, ok := contextPathsType.FieldByName(fieldName); ok {
+			t.Fatalf("provider.ContextPaths exposes %s, want only provider-owned storage", fieldName)
+		}
 	}
 }

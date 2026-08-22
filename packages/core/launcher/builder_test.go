@@ -91,6 +91,7 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 			"DEVCTX_CONTEXT": "client-a",
 			"FAKE_CONTEXT":   "client-a",
 			"FAKE_ROOT":      contextPaths.RootDir,
+			"FAKE_STORAGE":   contextPaths.ProviderStorageDir("fake"),
 		},
 		ContextPaths:     contextPaths,
 		Warnings:         warnings,
@@ -297,6 +298,7 @@ func (p builderFakeProvider) BuildEnvironment(ctx provider.RuntimeContext) (prov
 	return provider.EnvironmentContribution{
 		"FAKE_CONTEXT": ctx.ContextID,
 		"FAKE_ROOT":    ctx.Paths.RootDir,
+		"FAKE_STORAGE": ctx.Paths.StorageDir,
 	}, nil
 }
 
