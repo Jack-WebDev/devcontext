@@ -8,6 +8,7 @@ import (
 
 type service interface {
 	GetLaunchState(application.GetLaunchStateRequest) (application.LaunchState, *application.Error)
+	PreflightLaunchProject(application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error)
 	LaunchProject(application.LaunchProjectRequest) (application.LaunchProjectResult, *application.Error)
 	BindProject(application.BindProjectRequest) (application.ProjectBindingState, *application.Error)
 	UnbindProject(application.UnbindProjectRequest) (application.ProjectBindingState, *application.Error)
@@ -37,6 +38,15 @@ func (a *App) GetLaunchState(request application.GetLaunchStateRequest) any {
 		return err
 	}
 	return state
+}
+
+// PreflightLaunchProject checks the selected launch without opening an editor.
+func (a *App) PreflightLaunchProject(request application.PreflightLaunchProjectRequest) any {
+	result, err := a.service.PreflightLaunchProject(request)
+	if err != nil {
+		return err
+	}
+	return result
 }
 
 // LaunchProject opens the selected project and context.

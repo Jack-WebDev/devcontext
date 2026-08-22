@@ -18,6 +18,11 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 			Project: application.ProjectState{Name: "api", Path: "/work/api"},
 			Context: application.ContextState{ID: "personal", Name: "Personal"},
 		},
+		preflightResult: application.PreflightLaunchProjectResult{
+			Project:    application.ProjectState{Name: "api", Path: "/work/api"},
+			Context:    application.ContextState{ID: "personal", Name: "Personal"},
+			Confidence: application.LaunchConfidenceState{ContextID: "personal", Status: application.LaunchConfidenceReady},
+		},
 		bindResult: application.ProjectBindingState{
 			ProjectPath: "/work/api",
 			Bound:       true,
@@ -45,6 +50,15 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	}
 	if service.launchStateRequest != stateRequest {
 		t.Fatalf("launch state request = %#v, want %#v", service.launchStateRequest, stateRequest)
+	}
+
+	preflightRequest := application.PreflightLaunchProjectRequest{ProjectPath: "/work/api", ContextID: "personal"}
+	preflight := app.PreflightLaunchProject(preflightRequest)
+	if !reflect.DeepEqual(preflight, service.preflightResult) {
+		t.Fatalf("preflight result = %#v, want %#v", preflight, service.preflightResult)
+	}
+	if service.preflightRequest != preflightRequest {
+		t.Fatalf("preflight request = %#v, want %#v", service.preflightRequest, preflightRequest)
 	}
 
 	launchRequest := application.LaunchProjectRequest{ProjectPath: "/work/api", ContextID: "personal"}
@@ -99,6 +113,10 @@ type fakeService struct {
 	launchState        application.LaunchState
 	launchStateErr     *application.Error
 
+	preflightRequest application.PreflightLaunchProjectRequest
+	preflightResult  application.PreflightLaunchProjectResult
+	preflightErr     *application.Error
+
 	launchRequest application.LaunchProjectRequest
 	launchResult  application.LaunchProjectResult
 	launchErr     *application.Error
@@ -119,6 +137,11 @@ type fakeService struct {
 func (s *fakeService) GetLaunchState(request application.GetLaunchStateRequest) (application.LaunchState, *application.Error) {
 	s.launchStateRequest = request
 	return s.launchState, s.launchStateErr
+}
+
+func (s *fakeService) PreflightLaunchProject(request application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error) {
+	s.preflightRequest = request
+	return s.preflightResult, s.preflightErr
 }
 
 func (s *fakeService) LaunchProject(request application.LaunchProjectRequest) (application.LaunchProjectResult, *application.Error) {

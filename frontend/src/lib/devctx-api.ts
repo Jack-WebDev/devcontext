@@ -69,7 +69,7 @@ export interface ProviderState {
 
 export type ProviderReadinessState = "ready" | "not_configured" | "directory_missing" | "unavailable";
 
-export type ProviderIdentityStatus = "verified" | "unavailable" | "none";
+export type ProviderIdentityStatus = "verified" | "unavailable" | "none" | "mismatch_evidence";
 
 export interface ProviderIdentityState {
   status: ProviderIdentityStatus;
@@ -131,6 +131,19 @@ export interface LaunchProjectRequest {
   confirmContextMismatch?: boolean;
 }
 
+export interface PreflightLaunchProjectRequest {
+  projectPath?: string;
+  contextId: string;
+  confirmContextMismatch?: boolean;
+}
+
+export interface PreflightLaunchProjectResult {
+  project: ProjectState;
+  context: ContextState;
+  confidence: LaunchConfidenceState;
+  warnings: ResolutionWarning[];
+}
+
 export interface LaunchProjectResult {
   project: ProjectState;
   context: ContextState;
@@ -177,6 +190,7 @@ export interface ClaudeCredentialSession {
 
 export interface DevContextApi {
   getLaunchState(request?: GetLaunchStateRequest): Promise<ApiResult<LaunchState>>;
+  preflightLaunchProject(request: PreflightLaunchProjectRequest): Promise<ApiResult<PreflightLaunchProjectResult>>;
   launchProject(request: LaunchProjectRequest): Promise<ApiResult<LaunchProjectResult>>;
   bindProject(request: BindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
   unbindProject(request?: UnbindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
@@ -185,6 +199,7 @@ export interface DevContextApi {
 
 export interface WailsBindings {
   getLaunchState(request: GetLaunchStateRequest): Promise<unknown>;
+  preflightLaunchProject(request: PreflightLaunchProjectRequest): Promise<unknown>;
   launchProject(request: LaunchProjectRequest): Promise<unknown>;
   bindProject(request: BindProjectRequest): Promise<unknown>;
   unbindProject(request: UnbindProjectRequest): Promise<unknown>;
@@ -195,6 +210,16 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
   return {
     getLaunchState(request = {}) {
       return callBinding(() => bindings.getLaunchState(request), normalizeLaunchState);
+    },
+    preflightLaunchProject(request) {
+      return callBinding(
+        () =>
+          bindings.preflightLaunchProject({
+            ...request,
+            confirmContextMismatch: request.confirmContextMismatch ?? false,
+          }),
+        normalizePreflightLaunchProjectResult,
+      );
     },
     launchProject(request) {
       return callBinding(
@@ -222,6 +247,13 @@ const generatedBindings: WailsBindings = {
   async getLaunchState(request) {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
     return bindings.GetLaunchState(request);
+  },
+  async preflightLaunchProject(request) {
+    const bindings = await import("../../wailsjs/go/wailsapp/App");
+    return bindings.PreflightLaunchProject({
+      ...request,
+      confirmContextMismatch: request.confirmContextMismatch ?? false,
+    });
   },
   async launchProject(request) {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
@@ -348,6 +380,24 @@ function normalizeLaunchProjectResult(value: unknown): LaunchProjectResult {
   };
 }
 
+function normalizePreflightLaunchProjectResult(value: unknown): PreflightLaunchProjectResult {
+  const object = objectValue(value);
+  return {
+    project: normalizeProjectState(object.project),
+    context: normalizeContextState(object.context),
+    confidence: requiredLaunchConfidenceState(object.confidence),
+    warnings: arrayValue(object.warnings).map(normalizeResolutionWarning),
+  };
+}
+
+function requiredLaunchConfidenceState(value: unknown): LaunchConfidenceState {
+  const confidence = normalizeLaunchConfidenceState(value);
+  if (confidence === undefined) {
+    throw new Error("Invalid Dev Context response.");
+  }
+  return confidence;
+}
+
 function normalizeCreateContextResult(value: unknown): CreateContextResult {
   const object = objectValue(value);
   return {
@@ -425,6 +475,7 @@ function normalizeProviderIdentityStatus(value: unknown): ProviderIdentityStatus
     case "verified":
     case "unavailable":
     case "none":
+    case "mismatch_evidence":
       return value;
     default:
       throw new Error("Invalid Dev Context response.");

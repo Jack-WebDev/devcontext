@@ -3,6 +3,8 @@ import type {
   BindProjectRequest,
   LaunchProjectRequest,
   LaunchProjectResult,
+  PreflightLaunchProjectRequest,
+  PreflightLaunchProjectResult,
   ProjectBindingState,
 } from "../../lib/devctx-api";
 
@@ -12,10 +14,15 @@ interface LaunchSelectorDependencies {
   rememberProject: boolean;
   confirmContextMismatch?: boolean;
   bindProject: (request: BindProjectRequest) => Promise<ApiResult<ProjectBindingState>>;
+  preflightLaunchProject: (request: PreflightLaunchProjectRequest) => Promise<ApiResult<PreflightLaunchProjectResult>>;
   launchProject: (request: LaunchProjectRequest) => Promise<ApiResult<LaunchProjectResult>>;
 }
 
-type LaunchSelectorResult = ApiResult<LaunchProjectResult> | ApiResult<ProjectBindingState> | undefined;
+type LaunchSelectorResult =
+  | ApiResult<LaunchProjectResult>
+  | ApiResult<PreflightLaunchProjectResult>
+  | ApiResult<ProjectBindingState>
+  | undefined;
 
 interface LaunchRequestGuard {
   run<T>(operation: () => Promise<T>): Promise<T | undefined>;
@@ -56,10 +63,19 @@ async function launchSelectedContext(dependencies: LaunchSelectorDependencies): 
     }
   }
 
-  return dependencies.launchProject({
+  const launchRequest = {
     projectPath: dependencies.projectPath,
     contextId,
     ...(dependencies.confirmContextMismatch ? { confirmContextMismatch: true } : {}),
+  };
+
+  const preflight = await dependencies.preflightLaunchProject(launchRequest);
+  if (!preflight.ok) {
+    return preflight;
+  }
+
+  return dependencies.launchProject({
+    ...launchRequest,
   });
 }
 

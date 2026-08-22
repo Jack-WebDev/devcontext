@@ -8,6 +8,8 @@ import type {
   LaunchProjectRequest,
   LaunchProjectResult,
   LaunchState,
+  PreflightLaunchProjectRequest,
+  PreflightLaunchProjectResult,
   ProviderCredentialSession,
   ProjectBindingState,
 } from "../../lib/devctx-api";
@@ -21,6 +23,8 @@ import { ProviderCredentialClassification, type ProviderSessionAssignments } fro
 import { ProjectIdentity } from "./ProjectIdentity";
 import { RememberProjectControl } from "./RememberProjectControl";
 import { SelectorActions } from "./SelectorActions";
+import { SelectorConfidenceSummary } from "./SelectorConfidenceSummary";
+import { SelectorLayout } from "./SelectorLayout";
 import { cancelSelector } from "./cancel-action";
 import { missingDefaultContextIds } from "./default-context-actions";
 import { createLaunchRequestGuard, launchSelectedContext } from "./launch-action";
@@ -36,6 +40,7 @@ import { canLaunchSelectedContextFromKeyboard, escapeKeyboardAction } from "./se
 interface SelectorViewProps {
   launchState: LaunchState;
   onBindProject: (request: BindProjectRequest) => Promise<ApiResult<ProjectBindingState>>;
+  onPreflightLaunchProject: (request: PreflightLaunchProjectRequest) => Promise<ApiResult<PreflightLaunchProjectResult>>;
   onLaunchProject: (request: LaunchProjectRequest) => Promise<ApiResult<LaunchProjectResult>>;
   onCancel: () => Promise<void> | void;
   onCreatePersonalContext?: (importProviderIds: string[]) => Promise<ApiResult<CreateContextResult>>;
@@ -45,6 +50,7 @@ interface SelectorViewProps {
 function SelectorView({
   launchState,
   onBindProject,
+  onPreflightLaunchProject,
   onLaunchProject,
   onCancel,
   onCreatePersonalContext,
@@ -66,6 +72,7 @@ function SelectorView({
   const contextButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const launchGuard = useRef(createLaunchRequestGuard());
   const mismatchDialogOpen = mismatchError?.contextMismatch !== undefined;
+  const selectedContext = launchState.contexts.find((context) => context.id === selectedContextId);
   const keyboardLaunchAvailable = canLaunchSelectedContextFromKeyboard({
     selectedContextId,
     launchPending,
@@ -156,6 +163,7 @@ function SelectorView({
           rememberProject,
           confirmContextMismatch,
           bindProject: onBindProject,
+          preflightLaunchProject: onPreflightLaunchProject,
           launchProject: onLaunchProject,
         });
 
@@ -204,50 +212,10 @@ function SelectorView({
 
   return (
     <div className="space-y-8" onKeyDown={handleSelectorKeyDown}>
-      <ProjectIdentity project={launchState.project} />
-
       {shouldRenderFirstRunWelcome(launchState) ? (
-        <FirstRunWelcome
-          launchState={launchState}
-          providerCredentialSessions={launchState.providerCredentialSessions}
-          providerSessionAssignments={providerSessionAssignments}
-          pendingContextId={onboardingPendingContextId}
-          error={onboardingError}
-          onClassifyProviderSession={handleClassifyProviderSession}
-          onCreatePersonal={
-            onCreatePersonalContext
-              ? () => void handleCreateContext("personal", onCreatePersonalContext)
-              : undefined
-          }
-          onCreateCompany={
-            onCreateCompanyContext
-              ? () => void handleCreateContext("company", onCreateCompanyContext)
-              : undefined
-          }
-        />
-      ) : (
-        <div className="space-y-3">
-          {selectedContextId === undefined ? (
-            <p className="text-sm text-muted-foreground">No context selected</p>
-          ) : null}
-
-          <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="Available contexts">
-            {launchState.contexts.map((context) => (
-              <ContextCard
-                key={context.id}
-                context={context}
-                selected={selectedContextId === context.id}
-                disabled={launchPending}
-                tabIndex={rovingContextId === context.id ? 0 : -1}
-                buttonRef={setContextButtonRef(context.id)}
-                onSelect={handleSelectContext}
-                onNavigate={handleContextNavigation}
-                onLaunchSelected={keyboardLaunchAvailable ? () => void handleLaunch() : undefined}
-              />
-            ))}
-          </div>
-
-          <MissingDefaultContextActions
+        <>
+          <ProjectIdentity project={launchState.project} />
+          <FirstRunWelcome
             launchState={launchState}
             providerCredentialSessions={launchState.providerCredentialSessions}
             providerSessionAssignments={providerSessionAssignments}
@@ -265,46 +233,97 @@ function SelectorView({
                 : undefined
             }
           />
+        </>
+      ) : (
+        <SelectorLayout
+          projectIdentity={<ProjectIdentity project={launchState.project} />}
+          contextCards={
+            <>
+              {selectedContextId === undefined ? (
+                <p className="text-sm text-muted-foreground">No context selected</p>
+              ) : null}
 
-          {launchPending ? (
-            <Card
-              as="p"
-              size="sm"
-              className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground"
-              role="status"
-            >
-              Launching selected context...
-            </Card>
-          ) : null}
+              <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="Available contexts">
+                {launchState.contexts.map((context) => (
+                  <ContextCard
+                    key={context.id}
+                    context={context}
+                    selected={selectedContextId === context.id}
+                    disabled={launchPending}
+                    tabIndex={rovingContextId === context.id ? 0 : -1}
+                    buttonRef={setContextButtonRef(context.id)}
+                    onSelect={handleSelectContext}
+                    onNavigate={handleContextNavigation}
+                    onLaunchSelected={keyboardLaunchAvailable ? () => void handleLaunch() : undefined}
+                  />
+                ))}
+              </div>
 
-          {launchError ? <GuiErrorNotice error={launchError} /> : null}
-
-          {mismatchError?.contextMismatch ? (
-            <ContextMismatchDialog
-              mismatch={mismatchError.contextMismatch}
+              <MissingDefaultContextActions
+                launchState={launchState}
+                providerCredentialSessions={launchState.providerCredentialSessions}
+                providerSessionAssignments={providerSessionAssignments}
+                pendingContextId={onboardingPendingContextId}
+                error={onboardingError}
+                onClassifyProviderSession={handleClassifyProviderSession}
+                onCreatePersonal={
+                  onCreatePersonalContext
+                    ? () => void handleCreateContext("personal", onCreatePersonalContext)
+                    : undefined
+                }
+                onCreateCompany={
+                  onCreateCompanyContext
+                    ? () => void handleCreateContext("company", onCreateCompanyContext)
+                    : undefined
+                }
+              />
+            </>
+          }
+          confidenceSummary={<SelectorConfidenceSummary context={selectedContext} />}
+          rememberControl={
+            <RememberProjectControl
+              binding={launchState.binding}
               contexts={launchState.contexts}
-              launchPending={launchPending}
-              onCancel={() => setMismatchError(undefined)}
-              onOpenAnyway={() => void handleLaunch(true)}
+              rememberProject={rememberProject}
+              selectedContextId={selectedContextId}
+              disabled={launchPending}
+              onRememberProjectChange={setRememberProject}
             />
-          ) : null}
+          }
+          launchActions={
+            <>
+              {launchPending ? (
+                <Card
+                  as="p"
+                  size="sm"
+                  className="mb-3 border border-border bg-muted/30 p-3 text-sm text-muted-foreground"
+                  role="status"
+                >
+                  Launching selected context...
+                </Card>
+              ) : null}
 
-          <RememberProjectControl
-            binding={launchState.binding}
-            contexts={launchState.contexts}
-            rememberProject={rememberProject}
-            selectedContextId={selectedContextId}
-            disabled={launchPending}
-            onRememberProjectChange={setRememberProject}
-          />
+              {launchError ? <GuiErrorNotice error={launchError} /> : null}
 
-          <SelectorActions
-            launchDisabled={selectedContextId === undefined}
-            launchPending={launchPending}
-            onLaunch={() => void handleLaunch()}
-            onCancel={() => void cancelSelector({ closeSelector: onCancel })}
-          />
-        </div>
+              {mismatchError?.contextMismatch ? (
+                <ContextMismatchDialog
+                  mismatch={mismatchError.contextMismatch}
+                  contexts={launchState.contexts}
+                  launchPending={launchPending}
+                  onCancel={() => setMismatchError(undefined)}
+                  onOpenAnyway={() => void handleLaunch(true)}
+                />
+              ) : null}
+
+              <SelectorActions
+                launchDisabled={selectedContextId === undefined}
+                launchPending={launchPending}
+                onLaunch={() => void handleLaunch()}
+                onCancel={() => void cancelSelector({ closeSelector: onCancel })}
+              />
+            </>
+          }
+        />
       )}
     </div>
   );

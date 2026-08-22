@@ -17,6 +17,11 @@ import {
   RememberProjectControl,
 } from "../.tmp-test/src/components/selector/RememberProjectControl.js";
 import {SelectorActions} from "../.tmp-test/src/components/selector/SelectorActions.js";
+import {
+  confidenceStatusPresentation,
+  SelectorConfidenceSummary,
+} from "../.tmp-test/src/components/selector/SelectorConfidenceSummary.js";
+import {SelectorLayout} from "../.tmp-test/src/components/selector/SelectorLayout.js";
 import {cancelSelector} from "../.tmp-test/src/components/selector/cancel-action.js";
 import {missingDefaultContextIds} from "../.tmp-test/src/components/selector/default-context-actions.js";
 import {
@@ -567,6 +572,59 @@ test("selector actions show launch as enabled and pending", () => {
   assert.ok(pending.includes("Launching..."));
 });
 
+test("selector layout keeps project, contexts, confidence, remember, and actions in order", () => {
+  const html = renderToStaticMarkup(
+    SelectorLayout({
+      projectIdentity: "Project identity",
+      contextCards: "Context cards",
+      confidenceSummary: "Confidence summary",
+      rememberControl: "Remember control",
+      launchActions: "Launch actions",
+    }),
+  );
+
+  const sections = [
+    'data-selector-layout-section="project-identity"',
+    'data-selector-layout-section="context-cards"',
+    'data-selector-layout-section="confidence-summary"',
+    'data-selector-layout-section="remember-control"',
+    'data-selector-layout-section="launch-actions"',
+  ];
+  assert.deepEqual(
+    sections.map((section) => html.indexOf(section) >= 0),
+    [true, true, true, true, true],
+  );
+  assert.deepEqual(
+    sections.map((section) => html.indexOf(section)),
+    [...sections.map((section) => html.indexOf(section))].sort((left, right) => left - right),
+  );
+});
+
+test("selector confidence summary renders selected context readiness", () => {
+  const selected = renderToStaticMarkup(
+    SelectorConfidenceSummary({
+      context: {
+        ...contextFixture("personal", "Personal"),
+        confidence: {
+          contextId: "personal",
+          status: "needs_attention",
+          checks: [],
+        },
+      },
+    }),
+  );
+  const empty = renderToStaticMarkup(SelectorConfidenceSummary({}));
+
+  assert.ok(selected.includes("Confidence summary"));
+  assert.ok(selected.includes("Personal"));
+  assert.ok(selected.includes("Needs attention"));
+  assert.ok(empty.includes("Select a context to review launch readiness."));
+  assert.deepEqual(
+    ["ready", "needs_attention", "blocked"].map((status) => confidenceStatusPresentation(status).label),
+    ["Ready", "Needs attention", "Blocked"],
+  );
+});
+
 test("selector critical path renders selected context and submits remembered launch", async () => {
   const launchState = launchStateFixture({
     binding: {
@@ -616,6 +674,10 @@ test("selector critical path renders selected context and submits remembered lau
       calls.push(["bindProject", request]);
       return Promise.resolve(projectBindingResult());
     },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(preflightLaunchProjectResult());
+    },
     launchProject(request) {
       calls.push(["launchProject", request]);
       return Promise.resolve(launchProjectResult());
@@ -625,6 +687,7 @@ test("selector critical path renders selected context and submits remembered lau
   assert.deepEqual(result, launchProjectResult());
   assert.deepEqual(calls, [
     ["bindProject", {projectPath: "/work/api", contextId: "company"}],
+    ["preflightLaunchProject", {projectPath: "/work/api", contextId: "company"}],
     ["launchProject", {projectPath: "/work/api", contextId: "company"}],
   ]);
 });
@@ -637,6 +700,10 @@ test("launch action does nothing without a selected context", async () => {
     bindProject(request) {
       calls.push(["bindProject", request]);
       return Promise.resolve(projectBindingResult());
+    },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(preflightLaunchProjectResult());
     },
     launchProject(request) {
       calls.push(["launchProject", request]);
@@ -658,6 +725,10 @@ test("launch action launches the selected context when remember is off", async (
       calls.push(["bindProject", request]);
       return Promise.resolve(projectBindingResult());
     },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(preflightLaunchProjectResult());
+    },
     launchProject(request) {
       calls.push(["launchProject", request]);
       return Promise.resolve(launchProjectResult());
@@ -666,6 +737,7 @@ test("launch action launches the selected context when remember is off", async (
 
   assert.deepEqual(result, launchProjectResult());
   assert.deepEqual(calls, [
+    ["preflightLaunchProject", {projectPath: "/work/api", contextId: "personal"}],
     ["launchProject", {projectPath: "/work/api", contextId: "personal"}],
   ]);
 });
@@ -680,6 +752,10 @@ test("launch action binds before launch when remember is on", async () => {
       calls.push(["bindProject", request]);
       return Promise.resolve(projectBindingResult());
     },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(preflightLaunchProjectResult());
+    },
     launchProject(request) {
       calls.push(["launchProject", request]);
       return Promise.resolve(launchProjectResult());
@@ -689,6 +765,7 @@ test("launch action binds before launch when remember is on", async () => {
   assert.deepEqual(result, launchProjectResult());
   assert.deepEqual(calls, [
     ["bindProject", {projectPath: "/work/api", contextId: "company"}],
+    ["preflightLaunchProject", {projectPath: "/work/api", contextId: "company"}],
     ["launchProject", {projectPath: "/work/api", contextId: "company"}],
   ]);
 });
@@ -703,6 +780,10 @@ test("launch action returns binding errors without launching", async () => {
       calls.push(["bindProject", request]);
       return Promise.resolve(apiError("validation_error", "Unable to complete request.", "Check the selected project and context, then retry."));
     },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(preflightLaunchProjectResult());
+    },
     launchProject(request) {
       calls.push(["launchProject", request]);
       return Promise.resolve(launchProjectResult());
@@ -712,6 +793,33 @@ test("launch action returns binding errors without launching", async () => {
   assert.deepEqual(result, apiError("validation_error", "Unable to complete request.", "Check the selected project and context, then retry."));
   assert.deepEqual(calls, [
     ["bindProject", {projectPath: "/work/api", contextId: "company"}],
+  ]);
+});
+
+test("launch action returns preflight errors without launching", async () => {
+  const calls = [];
+  const error = apiError("launch_error", "Unable to launch editor.", "Check the editor command.");
+  const result = await launchSelectedContext({
+    projectPath: "/work/api",
+    selectedContextId: "personal",
+    rememberProject: false,
+    bindProject(request) {
+      calls.push(["bindProject", request]);
+      return Promise.resolve(projectBindingResult());
+    },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(error);
+    },
+    launchProject(request) {
+      calls.push(["launchProject", request]);
+      return Promise.resolve(launchProjectResult());
+    },
+  });
+
+  assert.deepEqual(result, error);
+  assert.deepEqual(calls, [
+    ["preflightLaunchProject", {projectPath: "/work/api", contextId: "personal"}],
   ]);
 });
 
@@ -726,6 +834,10 @@ test("launch action resubmits explicit context mismatch confirmation", async () 
       calls.push(["bindProject", request]);
       return Promise.resolve(projectBindingResult());
     },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(preflightLaunchProjectResult());
+    },
     launchProject(request) {
       calls.push(["launchProject", request]);
       return Promise.resolve(launchProjectResult());
@@ -734,6 +846,14 @@ test("launch action resubmits explicit context mismatch confirmation", async () 
 
   assert.deepEqual(result, launchProjectResult());
   assert.deepEqual(calls, [
+    [
+      "preflightLaunchProject",
+      {
+        projectPath: "/work/api",
+        contextId: "personal",
+        confirmContextMismatch: true,
+      },
+    ],
     [
       "launchProject",
       {
@@ -822,6 +942,10 @@ test("context mismatch open anyway submits exactly one confirmed launch", async 
       calls.push(["bindProject", request]);
       return Promise.resolve(projectBindingResult());
     },
+    preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return Promise.resolve(preflightLaunchProjectResult());
+    },
     launchProject(request) {
       calls.push(["launchProject", request]);
       return Promise.resolve(launchProjectResult());
@@ -830,6 +954,14 @@ test("context mismatch open anyway submits exactly one confirmed launch", async 
 
   assert.deepEqual(result, launchProjectResult());
   assert.deepEqual(calls, [
+    [
+      "preflightLaunchProject",
+      {
+        projectPath: "/work/api",
+        contextId: "personal",
+        confirmContextMismatch: true,
+      },
+    ],
     [
       "launchProject",
       {
@@ -1059,6 +1191,22 @@ function launchProjectResult() {
     data: {
       project: {name: "api", path: "/work/api"},
       context: contextFixture("personal", "Personal"),
+      warnings: [],
+    },
+  };
+}
+
+function preflightLaunchProjectResult() {
+  return {
+    ok: true,
+    data: {
+      project: {name: "api", path: "/work/api"},
+      context: contextFixture("personal", "Personal"),
+      confidence: {
+        contextId: "personal",
+        status: "ready",
+        checks: [],
+      },
       warnings: [],
     },
   };

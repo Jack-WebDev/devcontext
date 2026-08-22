@@ -110,6 +110,7 @@ function renderSelectorContent(
     <SelectorView
       launchState={launchState.data}
       onBindProject={(request) => devContextApi.bindProject(request)}
+      onPreflightLaunchProject={(request) => devContextApi.preflightLaunchProject(request)}
       onLaunchProject={(request) => devContextApi.launchProject(request)}
       onCancel={() => devContextWindow.closeSelector()}
       onCreatePersonalContext={(importProviderIds) => onCreateContext("personal", importProviderIds)}

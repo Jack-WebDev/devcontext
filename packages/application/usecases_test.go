@@ -248,6 +248,57 @@ func TestGetLaunchStateTopLevelConfidenceMatchesSelectedContextSummary(t *testin
 	}
 }
 
+func TestPreflightLaunchProjectReturnsReadinessWithoutStartingProcess(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+	result, appErr := fixture.service().PreflightLaunchProject(PreflightLaunchProjectRequest{
+		ProjectPath: ".",
+		ContextID:   "personal",
+	})
+	if appErr != nil {
+		t.Fatalf("preflight launch project: %v", appErr)
+	}
+
+	if result.Project != (ProjectState{Name: "current", Path: fixture.projectDir}) {
+		t.Fatalf("project = %#v, want current project", result.Project)
+	}
+	if result.Context.ID != "personal" || result.Confidence.ContextID != "personal" {
+		t.Fatalf("preflight result = %#v, want personal context and confidence", result)
+	}
+	if !reflect.DeepEqual(result.Confidence, result.Context.Confidence) {
+		t.Fatalf("preflight confidence = %#v, want context confidence %#v", result.Confidence, result.Context.Confidence)
+	}
+	if len(fixture.process.requests) != 0 {
+		t.Fatalf("process requests = %#v, want none for preflight", fixture.process.requests)
+	}
+}
+
+func TestPreflightLaunchProjectRequiresMismatchConfirmation(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	fixture.writeContext(t, fixture.context("company", "Company"))
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.projectDir),
+		ContextID:   devcontext.MustID("company"),
+		CreatedAt:   fixture.now,
+	})
+
+	_, appErr := fixture.service().PreflightLaunchProject(PreflightLaunchProjectRequest{
+		ProjectPath: ".",
+		ContextID:   "personal",
+	})
+	if appErr == nil {
+		t.Fatal("preflight error = nil, want mismatch confirmation error")
+	}
+	if appErr.Code != ErrorCodeContextMismatch {
+		t.Fatalf("error code = %q, want %q", appErr.Code, ErrorCodeContextMismatch)
+	}
+	if len(fixture.process.requests) != 0 {
+		t.Fatalf("process requests = %#v, want none for preflight", fixture.process.requests)
+	}
+}
+
 func TestGetLaunchStateReturnsUnboundSelectorState(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.writeContext(t, fixture.context("personal", "Personal"))
@@ -542,6 +593,47 @@ func TestGetLaunchStateReturnsVerifiedProviderIdentitiesForIsolatedContexts(t *t
 		if strings.Contains(rendered, secret) {
 			t.Fatalf("provider state exposed credential value %q: %s", secret, rendered)
 		}
+	}
+}
+
+func TestGetLaunchStateDoesNotInferIdentityMismatchEvidenceFromContextName(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.providers = []provider.Provider{
+		applicationFakeProvider{
+			id:          provider.CodexID,
+			displayName: "Codex",
+			statusByContext: map[string]provider.Status{
+				"company": provider.ConfiguredStatus(),
+			},
+		},
+	}
+
+	ctx := fixture.context("company", "Company")
+	ctx.Providers = provider.Configs{
+		provider.CodexID: {Enabled: true},
+	}
+	fixture.writeContext(t, ctx)
+
+	contextPaths, err := filesystem.DeriveContextPaths(fixture.paths, ctx.ID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	writeApplicationJSONFixture(t, filepath.Join(contextPaths.CodexDir, "auth.json"), map[string]string{
+		"id_token": applicationTestJWT(t, map[string]string{
+			"email":              "user@gmail.com",
+			"chatgpt_plan_type":  "plus",
+			"chatgpt_account_id": "acct-personal",
+		}),
+	})
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+
+	identity := state.Contexts[0].Providers[0].Identity
+	if identity.Status != ProviderIdentityVerified {
+		t.Fatalf("identity status = %q, want verified without inferred mismatch evidence", identity.Status)
 	}
 }
 

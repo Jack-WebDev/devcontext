@@ -44,6 +44,16 @@ test("adapter normalizes successful Wails calls", async () => {
                   },
                 },
               },
+              {
+                id: "internal",
+                name: "Internal Tool",
+                enabled: true,
+                state: "ready",
+                identity: {
+                  status: "mismatch_evidence",
+                  message: "Different account identity detected.",
+                },
+              },
             ],
             confidence: {
               contextId: "personal",
@@ -131,6 +141,28 @@ test("adapter normalizes successful Wails calls", async () => {
         },
       };
     },
+    async preflightLaunchProject(request) {
+      calls.push(["preflightLaunchProject", request]);
+      return {
+        project: {name: "api", path: "/work/api"},
+        context: {
+          id: "personal",
+          name: "Personal",
+          editor: {type: "vscode"},
+          providers: [],
+          confidence: {
+            contextId: "personal",
+            status: "ready",
+            checks: [],
+          },
+        },
+        confidence: {
+          contextId: "personal",
+          status: "ready",
+          checks: [],
+        },
+      };
+    },
     async bindProject(request) {
       calls.push(["bindProject", request]);
       return {
@@ -210,6 +242,19 @@ test("adapter normalizes successful Wails calls", async () => {
                 },
               },
             },
+            {
+              id: "internal",
+              name: "Internal Tool",
+              enabled: true,
+              state: "ready",
+              explanation: undefined,
+              identity: {
+                status: "mismatch_evidence",
+                message: "Different account identity detected.",
+                codex: undefined,
+                claude: undefined,
+              },
+            },
           ],
           confidence: {
             contextId: "personal",
@@ -287,6 +332,30 @@ test("adapter normalizes successful Wails calls", async () => {
     },
   });
 
+  assert.deepEqual(await api.preflightLaunchProject({projectPath: "/work/api", contextId: "personal"}), {
+    ok: true,
+    data: {
+      project: {name: "api", path: "/work/api"},
+      context: {
+        id: "personal",
+        name: "Personal",
+        editor: {type: "vscode"},
+        providers: [],
+        confidence: {
+          contextId: "personal",
+          status: "ready",
+          checks: [],
+        },
+        metadata: undefined,
+      },
+      confidence: {
+        contextId: "personal",
+        status: "ready",
+        checks: [],
+      },
+      warnings: [],
+    },
+  });
   assert.deepEqual(await api.launchProject({projectPath: "/work/api", contextId: "personal"}), {
     ok: true,
     data: {
@@ -348,6 +417,14 @@ test("adapter normalizes successful Wails calls", async () => {
   assert.deepEqual(calls, [
     ["getLaunchState", {projectPath: "/work/api"}],
     [
+      "preflightLaunchProject",
+      {
+        projectPath: "/work/api",
+        contextId: "personal",
+        confirmContextMismatch: false,
+      },
+    ],
+    [
       "launchProject",
       {
         projectPath: "/work/api",
@@ -367,6 +444,18 @@ test("adapter normalizes resolved application errors", async () => {
       throw new Error("not used");
     },
     async launchProject() {
+      return {
+        code: "context_mismatch_requires_confirmation",
+        message: "Context mismatch requires confirmation.",
+        recovery: "Confirm the mismatch intentionally.",
+        contextMismatch: {
+          projectPath: "/work/api",
+          boundContextId: "company",
+          requestedContextId: "personal",
+        },
+      };
+    },
+    async preflightLaunchProject() {
       return {
         code: "context_mismatch_requires_confirmation",
         message: "Context mismatch requires confirmation.",
@@ -460,6 +549,16 @@ test("adapter unwraps tuple-shaped Wails responses", async () => {
         },
       ];
     },
+    async preflightLaunchProject() {
+      return [
+        {},
+        {
+          code: "launch_error",
+          message: "Unable to launch editor.",
+          recovery: "Check the editor command.",
+        },
+      ];
+    },
     async bindProject() {
       throw new Error("not used");
     },
@@ -511,6 +610,13 @@ test("adapter normalizes rejected promises into displayable errors", async () =>
       throw new Error("Wails bridge unavailable");
     },
     async launchProject() {
+      throw {
+        code: "launch_error",
+        message: "Unable to launch editor.",
+        recovery: "Check the editor command.",
+      };
+    },
+    async preflightLaunchProject() {
       throw {
         code: "launch_error",
         message: "Unable to launch editor.",
@@ -581,6 +687,9 @@ test("adapter normalizes create context onboarding failure responses", async () 
       throw new Error("not used");
     },
     async launchProject() {
+      throw new Error("not used");
+    },
+    async preflightLaunchProject() {
       throw new Error("not used");
     },
     async bindProject() {
