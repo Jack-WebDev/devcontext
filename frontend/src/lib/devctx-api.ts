@@ -62,8 +62,32 @@ export interface ProviderState {
   id: string;
   name: string;
   enabled: boolean;
-  state: string;
+  state: ProviderReadinessState;
   explanation?: string;
+  identity: ProviderIdentityState;
+}
+
+export type ProviderReadinessState = "ready" | "not_configured" | "directory_missing" | "unavailable";
+
+export type ProviderIdentityStatus = "verified" | "unavailable" | "none";
+
+export interface ProviderIdentityState {
+  status: ProviderIdentityStatus;
+  message?: string;
+  codex?: CodexProviderIdentity;
+  claude?: ClaudeProviderIdentity;
+}
+
+export interface CodexProviderIdentity {
+  email?: string;
+  chatgptPlanType?: string;
+  chatgptAccountId?: string;
+}
+
+export interface ClaudeProviderIdentity {
+  subscriptionType?: string;
+  organizationUuid?: string;
+  organizationName?: string;
 }
 
 export type LaunchConfidenceStatus = "ready" | "needs_attention" | "blocked";
@@ -364,8 +388,70 @@ function normalizeProviderState(value: unknown): ProviderState {
     id: stringValue(object.id),
     name: stringValue(object.name),
     enabled: booleanValue(object.enabled),
-    state: stringValue(object.state),
+    state: normalizeProviderReadinessState(object.state),
     explanation: optionalString(object.explanation),
+    identity: normalizeProviderIdentityState(object.identity),
+  };
+}
+
+function normalizeProviderReadinessState(value: unknown): ProviderReadinessState {
+  switch (value) {
+    case "ready":
+    case "not_configured":
+    case "directory_missing":
+    case "unavailable":
+      return value;
+    default:
+      throw new Error("Invalid Dev Context response.");
+  }
+}
+
+function normalizeProviderIdentityState(value: unknown): ProviderIdentityState {
+  if (value === undefined || value === null) {
+    return { status: "none" };
+  }
+
+  const object = objectValue(value);
+  return {
+    status: normalizeProviderIdentityStatus(object.status),
+    message: optionalString(object.message),
+    codex: normalizeCodexProviderIdentity(object.codex),
+    claude: normalizeClaudeProviderIdentity(object.claude),
+  };
+}
+
+function normalizeProviderIdentityStatus(value: unknown): ProviderIdentityStatus {
+  switch (value) {
+    case "verified":
+    case "unavailable":
+    case "none":
+      return value;
+    default:
+      throw new Error("Invalid Dev Context response.");
+  }
+}
+
+function normalizeCodexProviderIdentity(value: unknown): CodexProviderIdentity | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const object = objectValue(value);
+  return {
+    email: optionalString(object.email),
+    chatgptPlanType: optionalString(object.chatgptPlanType),
+    chatgptAccountId: optionalString(object.chatgptAccountId),
+  };
+}
+
+function normalizeClaudeProviderIdentity(value: unknown): ClaudeProviderIdentity | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const object = objectValue(value);
+  return {
+    subscriptionType: optionalString(object.subscriptionType),
+    organizationUuid: optionalString(object.organizationUuid),
+    organizationName: optionalString(object.organizationName),
   };
 }
 

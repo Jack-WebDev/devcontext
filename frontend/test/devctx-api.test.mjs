@@ -20,7 +20,11 @@ test("adapter normalizes successful Wails calls", async () => {
                 id: "codex",
                 name: "Codex",
                 enabled: true,
-                state: "configured",
+                state: "ready",
+                identity: {
+                  status: "unavailable",
+                  message: "Account identity unavailable.",
+                },
               },
             ],
             confidence: {
@@ -158,8 +162,14 @@ test("adapter normalizes successful Wails calls", async () => {
               id: "codex",
               name: "Codex",
               enabled: true,
-              state: "configured",
+              state: "ready",
               explanation: undefined,
+              identity: {
+                status: "unavailable",
+                message: "Account identity unavailable.",
+                codex: undefined,
+                claude: undefined,
+              },
             },
           ],
           confidence: {

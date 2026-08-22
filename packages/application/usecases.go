@@ -373,8 +373,9 @@ func (s *Service) providerStateEntries(ctx devcontext.Context) []providerStateEn
 				ID:          string(integration.ID()),
 				Name:        integration.DisplayName(),
 				Enabled:     enabled,
-				State:       string(status.State),
+				State:       providerReadinessState(status),
 				Explanation: status.Explanation,
+				Identity:    providerIdentityState(enabled, status),
 			},
 		})
 	}
@@ -387,6 +388,37 @@ func providerStatesFromEntries(entries []providerStateEntry) []ProviderState {
 		states[i] = entry.state
 	}
 	return states
+}
+
+func providerReadinessState(status provider.Status) ProviderReadinessState {
+	switch status.State {
+	case provider.StatusConfigured:
+		return ProviderReadinessReady
+	case provider.StatusNotConfigured:
+		return ProviderReadinessNotConfigured
+	case provider.StatusDirectoryMissing:
+		return ProviderReadinessDirectoryMissing
+	case provider.StatusUnavailable:
+		return ProviderReadinessUnavailable
+	default:
+		return ProviderReadinessUnavailable
+	}
+}
+
+func providerIdentityState(enabled bool, status provider.Status) ProviderIdentityState {
+	if !enabled {
+		return ProviderIdentityState{Status: ProviderIdentityNone}
+	}
+
+	switch status.State {
+	case provider.StatusConfigured, provider.StatusUnavailable:
+		return ProviderIdentityState{
+			Status:  ProviderIdentityUnavailable,
+			Message: "Account identity unavailable.",
+		}
+	default:
+		return ProviderIdentityState{Status: ProviderIdentityNone}
+	}
 }
 
 func (s *Service) launchConfidenceState(ctx *devcontext.Context) *LaunchConfidenceState {

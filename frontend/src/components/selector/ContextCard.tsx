@@ -175,12 +175,10 @@ function providerAuthenticationGuidance(context: ContextState, provider: Provide
   }
 }
 
-function providerStatusPresentation(state: string): { label: string; indicatorClassName: string } {
+function providerStatusPresentation(state: ProviderState["state"]): { label: string; indicatorClassName: string } {
   switch (state) {
-    case "configured":
-      return { label: "Configured", indicatorClassName: "bg-emerald-600" };
     case "ready":
-      return { label: "Configured", indicatorClassName: "bg-emerald-600" };
+      return { label: "Ready", indicatorClassName: "bg-emerald-600" };
     case "not_configured":
       return { label: "Not configured", indicatorClassName: "bg-amber-500" };
     case "directory_missing":
