@@ -143,6 +143,18 @@ func TestProviderIdentityStateVariantsSerialize(t *testing.T) {
 			want: `{"status":"verified","codex":{"email":"user@example.com","chatgptPlanType":"Business","chatgptAccountId":"acct_123"}}`,
 		},
 		{
+			name: "verified claude",
+			identity: application.ProviderIdentityState{
+				Status: application.ProviderIdentityVerified,
+				Claude: &application.ClaudeProviderIdentityState{
+					SubscriptionType: "Pro",
+					OrganizationUUID: "e783",
+					OrganizationName: "Jishin Labs",
+				},
+			},
+			want: `{"status":"verified","claude":{"subscriptionType":"Pro","organizationUuid":"e783","organizationName":"Jishin Labs"}}`,
+		},
+		{
 			name: "unavailable",
 			identity: application.ProviderIdentityState{
 				Status:  application.ProviderIdentityUnavailable,
