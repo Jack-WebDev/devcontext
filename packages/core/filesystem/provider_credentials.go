@@ -149,6 +149,31 @@ func ImportProviderCredentialsWithPermissions(paths PlatformPaths, contextPaths 
 	return nil
 }
 
+// ProviderStoragePath joins provider-owned storage path elements using the
+// platform style already present in storageDir.
+func ProviderStoragePath(storageDir string, elements ...string) string {
+	path := storageDir
+	for _, element := range elements {
+		path = joinPlatformPath(path, element)
+	}
+	return path
+}
+
+// ProviderCredentialFileExists reports whether path exists as a regular file.
+// Non-regular files are reported as errors.
+func ProviderCredentialFileExists(path string) (bool, error) {
+	return regularFileExists(path)
+}
+
+// CopyOpaqueProviderCredentialFile copies a provider credential file without
+// interpreting its contents. Existing destination files are left untouched.
+func CopyOpaqueProviderCredentialFile(source string, destination string, permissions StoragePermissions) error {
+	if permissions == nil {
+		permissions = NewDefaultStoragePermissions()
+	}
+	return copyOpaqueCredentialFile(source, destination, permissions)
+}
+
 func detectCodexCredentialSession(homeDir string) (DetectedProviderCredentialSession, bool, error) {
 	source := codexAuthPath(homeDir)
 	exists, err := regularFileExists(source)

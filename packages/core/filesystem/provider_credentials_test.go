@@ -351,6 +351,43 @@ func TestDetectContextProviderCredentialMetadataReturnsUnavailableWhenFilesAreAb
 	}
 }
 
+func TestDetectContextProviderCredentialMetadataIgnoresOldProviderLayout(t *testing.T) {
+	homeDir := t.TempDir()
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return homeDir, nil
+	})
+	contextPaths, err := filesystem.DeriveContextPaths(platformPaths, devcontext.MustID("personal"))
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+
+	codexToken := testJWT(t, map[string]string{
+		"email": "old-layout@example.com",
+	})
+	writeJSONCredentialFixture(t, filepath.Join(contextPaths.RootDir, "codex", "auth.json"), map[string]string{
+		"id_token": codexToken,
+	})
+	writeJSONCredentialFixture(t, filepath.Join(contextPaths.RootDir, "claude", ".credentials.json"), map[string]string{
+		"organizationName": "Old Layout Org",
+	})
+
+	codex, codexAvailable, err := filesystem.DetectCodexContextCredentialMetadata(contextPaths)
+	if err != nil {
+		t.Fatalf("detect codex context metadata: %v", err)
+	}
+	if codexAvailable || codex != (filesystem.CodexCredentialMetadata{}) {
+		t.Fatalf("codex metadata = %#v available=%t, want old layout ignored", codex, codexAvailable)
+	}
+
+	claude, claudeAvailable, err := filesystem.DetectClaudeContextCredentialMetadata(contextPaths)
+	if err != nil {
+		t.Fatalf("detect claude context metadata: %v", err)
+	}
+	if claudeAvailable || claude != (filesystem.ClaudeCredentialMetadata{}) {
+		t.Fatalf("claude metadata = %#v available=%t, want old layout ignored", claude, claudeAvailable)
+	}
+}
+
 func TestCreateContextDirectoryTreeWithProviderCredentialsKeepsContextsIsolated(t *testing.T) {
 	homeDir := t.TempDir()
 	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
@@ -389,6 +426,34 @@ func TestCreateContextDirectoryTreeWithProviderCredentialsKeepsContextsIsolated(
 	assertFileBytes(t, filepath.Join(claudeProviderDir(personalPaths), ".credentials.json"), []byte("personal-claude"))
 	assertFileBytes(t, filepath.Join(codexProviderDir(companyPaths), "auth.json"), []byte("company-codex"))
 	assertFileBytes(t, filepath.Join(claudeProviderDir(companyPaths), ".credentials.json"), []byte("company-claude"))
+}
+
+func TestGenericProviderCredentialHelpers(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "source", "credentials.json")
+	destination := filepath.Join(root, "destination", "credentials.json")
+	writeCredentialFixture(t, source, []byte("credential-bytes"))
+	if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
+		t.Fatalf("create destination directory: %v", err)
+	}
+
+	if got := filesystem.ProviderStoragePath(filepath.Join(root, "providers", "fake"), "nested", "state.json"); got != filepath.Join(root, "providers", "fake", "nested", "state.json") {
+		t.Fatalf("provider storage path = %q", got)
+	}
+	exists, err := filesystem.ProviderCredentialFileExists(source)
+	if err != nil || !exists {
+		t.Fatalf("source exists = %t err=%v, want regular file", exists, err)
+	}
+	if err := filesystem.CopyOpaqueProviderCredentialFile(source, destination, filesystem.NewDefaultStoragePermissions()); err != nil {
+		t.Fatalf("copy opaque provider credential: %v", err)
+	}
+	assertFileBytes(t, destination, []byte("credential-bytes"))
+
+	writeCredentialFixture(t, source, []byte("updated-credential-bytes"))
+	if err := filesystem.CopyOpaqueProviderCredentialFile(source, destination, filesystem.NewDefaultStoragePermissions()); err != nil {
+		t.Fatalf("copy existing opaque provider credential: %v", err)
+	}
+	assertFileBytes(t, destination, []byte("credential-bytes"))
 }
 
 func createEmptyContextProviderDirs(t *testing.T, platformPaths filesystem.PlatformPaths, contextID string) filesystem.ContextPaths {

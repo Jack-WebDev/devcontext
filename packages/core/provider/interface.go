@@ -33,3 +33,72 @@ type ContextPaths struct {
 
 // EnvironmentContribution stores environment variables owned by one provider.
 type EnvironmentContribution map[string]string
+
+// MetadataField contains one safe, non-secret provider metadata value suitable
+// for display.
+type MetadataField struct {
+	Label string
+	Value string
+}
+
+// CredentialSession contains safe metadata for a globally authenticated
+// provider session.
+type CredentialSession struct {
+	MetadataAvailable bool
+	Fields            []MetadataField
+}
+
+// Identity contains safe metadata for credentials stored in a context-owned
+// provider directory.
+type Identity struct {
+	Fields []MetadataField
+}
+
+// GlobalCredentialContext contains host paths needed to inspect global
+// provider credentials.
+type GlobalCredentialContext struct {
+	UserHomeDir string
+}
+
+// CredentialImportContext contains source and destination paths needed to
+// import opaque provider credential files into one context.
+type CredentialImportContext struct {
+	UserHomeDir string
+	Runtime     RuntimeContext
+}
+
+// SetupGuidance describes safe provider setup copy and optional action text.
+type SetupGuidance struct {
+	Message    string
+	ActionHint string
+}
+
+// GlobalCredentialDetector is implemented by providers that can identify a
+// global authenticated session without exposing secrets.
+type GlobalCredentialDetector interface {
+	DetectGlobalCredentialSession(GlobalCredentialContext) (CredentialSession, bool, error)
+}
+
+// CredentialMetadataExtractor is implemented by providers that can extract safe
+// metadata from their own credential files.
+type CredentialMetadataExtractor interface {
+	ExtractCredentialMetadata(path string) ([]MetadataField, bool, error)
+}
+
+// CredentialImporter is implemented by providers that can copy opaque global
+// credential files into their own context storage.
+type CredentialImporter interface {
+	ImportCredentials(CredentialImportContext) error
+}
+
+// ContextIdentityDetector is implemented by providers that can identify the
+// account represented by their context-owned credential state.
+type ContextIdentityDetector interface {
+	DetectContextIdentity(RuntimeContext) (Identity, bool, error)
+}
+
+// SetupGuidanceProvider is implemented by providers that can describe how a
+// user should configure or verify the provider for one context.
+type SetupGuidanceProvider interface {
+	SetupGuidance(RuntimeContext) SetupGuidance
+}
