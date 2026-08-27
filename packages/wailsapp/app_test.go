@@ -17,6 +17,9 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 		homeDashboard: application.HomeDashboardState{
 			Project: application.ProjectState{Name: "api", Path: "/work/api"},
 		},
+		recentProjects: application.RecentProjectsState{Projects: []application.RecentProjectState{{
+			Project: application.ProjectState{Name: "api", Path: "/work/api"}, ContextID: "personal",
+		}}},
 		launchResult: application.LaunchProjectResult{
 			Project: application.ProjectState{Name: "api", Path: "/work/api"},
 			Context: application.ContextState{ID: "personal", Name: "Personal"},
@@ -62,6 +65,11 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	}
 	if service.homeDashboardRequest != dashboardRequest {
 		t.Fatalf("home dashboard request = %#v, want %#v", service.homeDashboardRequest, dashboardRequest)
+	}
+
+	recentProjects := app.GetRecentProjects()
+	if !reflect.DeepEqual(recentProjects, service.recentProjects) {
+		t.Fatalf("recent projects = %#v, want %#v", recentProjects, service.recentProjects)
 	}
 
 	preflightRequest := application.PreflightLaunchProjectRequest{ProjectPath: "/work/api", ContextID: "personal"}
@@ -129,6 +137,9 @@ type fakeService struct {
 	homeDashboard        application.HomeDashboardState
 	homeDashboardErr     *application.Error
 
+	recentProjects    application.RecentProjectsState
+	recentProjectsErr *application.Error
+
 	preflightRequest application.PreflightLaunchProjectRequest
 	preflightResult  application.PreflightLaunchProjectResult
 	preflightErr     *application.Error
@@ -158,6 +169,10 @@ func (s *fakeService) GetLaunchState(request application.GetLaunchStateRequest) 
 func (s *fakeService) GetHomeDashboard(request application.GetHomeDashboardRequest) (application.HomeDashboardState, *application.Error) {
 	s.homeDashboardRequest = request
 	return s.homeDashboard, s.homeDashboardErr
+}
+
+func (s *fakeService) GetRecentProjects() (application.RecentProjectsState, *application.Error) {
+	return s.recentProjects, s.recentProjectsErr
 }
 
 func (s *fakeService) PreflightLaunchProject(request application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error) {

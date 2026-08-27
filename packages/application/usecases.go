@@ -34,6 +34,17 @@ func (s *Service) GetHomeDashboard(request GetHomeDashboardRequest) (HomeDashboa
 	return dashboard, nil
 }
 
+// GetRecentProjects returns successful project launches without reading log
+// files. It is independent of project bindings and the currently selected
+// project.
+func (s *Service) GetRecentProjects() (RecentProjectsState, *Error) {
+	projects, err := s.getRecentProjects()
+	if err != nil {
+		return RecentProjectsState{}, NewError(err)
+	}
+	return RecentProjectsState{Projects: projects}, nil
+}
+
 // LaunchProject builds a launch plan for a selected context and starts the
 // editor process.
 func (s *Service) LaunchProject(request LaunchProjectRequest) (LaunchProjectResult, *Error) {
@@ -135,7 +146,7 @@ func (s *Service) getHomeDashboard(request GetHomeDashboardRequest) (HomeDashboa
 
 	dashboard := HomeDashboardState{
 		Project:        launchState.Project,
-		RecentProjects: []HomeRecentProjectState{},
+		RecentProjects: []RecentProjectState{},
 		Running:        HomeRunningSummary{},
 		Activity:       HomeActivitySummary{},
 	}
@@ -152,6 +163,36 @@ func (s *Service) getHomeDashboard(request GetHomeDashboardRequest) (HomeDashboa
 		break
 	}
 	return dashboard, nil
+}
+
+func (s *Service) getRecentProjects() ([]RecentProjectState, error) {
+	recents, err := s.dependencies.RecentProjects.List()
+	if err != nil {
+		return nil, err
+	}
+
+	contexts, err := s.dependencies.Contexts.List()
+	if err != nil {
+		return nil, err
+	}
+	contextNames := make(map[devcontext.ID]string, len(contexts))
+	for _, configuredContext := range contexts {
+		contextNames[configuredContext.ID] = configuredContext.Name
+	}
+
+	projects := make([]RecentProjectState, 0, len(recents))
+	for _, recent := range recents {
+		projects = append(projects, RecentProjectState{
+			Project:        projectState(recent.ProjectPath),
+			ContextID:      recent.ContextID.String(),
+			ContextName:    contextNames[recent.ContextID],
+			LastLaunchedAt: recent.LastLaunchedAt.UTC(),
+		})
+	}
+	sort.SliceStable(projects, func(i, j int) bool {
+		return projects[i].LastLaunchedAt.After(projects[j].LastLaunchedAt)
+	})
+	return projects, nil
 }
 
 func (s *Service) firstRunLaunchState(projectPath project.Path) LaunchState {

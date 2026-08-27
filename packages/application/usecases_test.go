@@ -146,6 +146,34 @@ func TestLaunchProjectRecordsRecentProjectAfterSuccessfulLaunch(t *testing.T) {
 	}
 }
 
+func TestGetRecentProjectsReturnsNewestFirstWithContextMetadata(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	fixture.writeContext(t, fixture.context("company", "Company"))
+	older := fixture.now.Add(-time.Hour)
+	newer := fixture.now.Add(-time.Minute)
+	if err := project.WriteRecentProjectsFile(fixture.recentsPath, []project.RecentProject{
+		{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "older")), ContextID: devcontext.MustID("personal"), LastLaunchedAt: older},
+		{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "newer")), ContextID: devcontext.MustID("company"), LastLaunchedAt: newer},
+		{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "removed")), ContextID: devcontext.MustID("removed"), LastLaunchedAt: fixture.now},
+	}); err != nil {
+		t.Fatalf("write recents: %v", err)
+	}
+
+	result, appErr := fixture.service().GetRecentProjects()
+	if appErr != nil {
+		t.Fatalf("get recent projects: %v", appErr)
+	}
+	want := []RecentProjectState{
+		{Project: ProjectState{Name: "removed", Path: filepath.Join(fixture.root, "projects", "removed")}, ContextID: "removed", LastLaunchedAt: fixture.now},
+		{Project: ProjectState{Name: "newer", Path: filepath.Join(fixture.root, "projects", "newer")}, ContextID: "company", ContextName: "Company", LastLaunchedAt: newer},
+		{Project: ProjectState{Name: "older", Path: filepath.Join(fixture.root, "projects", "older")}, ContextID: "personal", ContextName: "Personal", LastLaunchedAt: older},
+	}
+	if !reflect.DeepEqual(result.Projects, want) {
+		t.Fatalf("recent projects = %#v, want %#v", result.Projects, want)
+	}
+}
+
 func TestGetLaunchStateDerivesProviderSetupActions(t *testing.T) {
 	tests := []struct {
 		name         string

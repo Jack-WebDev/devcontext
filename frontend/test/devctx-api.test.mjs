@@ -48,6 +48,33 @@ test("adapter normalizes the Home dashboard contract", async () => {
   });
 });
 
+test("adapter normalizes recent projects", async () => {
+  const api = createDevContextApi({
+    async getRecentProjects() {
+      return {
+        projects: [{
+          project: {name: "api", path: "/work/api"},
+          contextId: "personal",
+          contextName: "Personal",
+          lastLaunchedAt: "2026-08-13T12:30:00Z",
+        }],
+      };
+    },
+  });
+
+  assert.deepEqual(await api.getRecentProjects(), {
+    ok: true,
+    data: {
+      projects: [{
+        project: {name: "api", path: "/work/api"},
+        contextId: "personal",
+        contextName: "Personal",
+        lastLaunchedAt: "2026-08-13T12:30:00Z",
+      }],
+    },
+  });
+});
+
 test("adapter normalizes successful Wails calls", async () => {
   const calls = [];
   const api = createDevContextApi({

@@ -9,6 +9,7 @@ import (
 type service interface {
 	GetLaunchState(application.GetLaunchStateRequest) (application.LaunchState, *application.Error)
 	GetHomeDashboard(application.GetHomeDashboardRequest) (application.HomeDashboardState, *application.Error)
+	GetRecentProjects() (application.RecentProjectsState, *application.Error)
 	PreflightLaunchProject(application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error)
 	LaunchProject(application.LaunchProjectRequest) (application.LaunchProjectResult, *application.Error)
 	BindProject(application.BindProjectRequest) (application.ProjectBindingState, *application.Error)
@@ -23,6 +24,15 @@ func (a *App) GetHomeDashboard(request application.GetHomeDashboardRequest) any 
 		return err
 	}
 	return dashboard
+}
+
+// GetRecentProjects returns recent successful launches for presentation.
+func (a *App) GetRecentProjects() any {
+	projects, err := a.service.GetRecentProjects()
+	if err != nil {
+		return err
+	}
+	return projects
 }
 
 // App is the Wails-bound application surface.

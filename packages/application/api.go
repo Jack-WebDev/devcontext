@@ -1,5 +1,7 @@
 package application
 
+import "time"
+
 // GetLaunchStateRequest identifies the project the GUI is rendering.
 type GetLaunchStateRequest struct {
 	ProjectPath string `json:"projectPath,omitempty"`
@@ -17,7 +19,7 @@ type GetHomeDashboardRequest struct {
 type HomeDashboardState struct {
 	Project        ProjectState             `json:"project"`
 	CurrentContext *HomeCurrentContextState `json:"currentContext,omitempty"`
-	RecentProjects []HomeRecentProjectState `json:"recentProjects"`
+	RecentProjects []RecentProjectState     `json:"recentProjects"`
 	Running        HomeRunningSummary       `json:"running"`
 	Activity       HomeActivitySummary      `json:"activity"`
 }
@@ -30,9 +32,20 @@ type HomeCurrentContextState struct {
 	Confidence LaunchConfidenceState `json:"confidence"`
 }
 
-// HomeRecentProjectState reserves the safe presentation shape for Phase 110.
-type HomeRecentProjectState struct {
-	Project ProjectState `json:"project"`
+// RecentProjectsState contains recent successful launches for presentation.
+// Entries are ordered from most to least recently launched.
+type RecentProjectsState struct {
+	Projects []RecentProjectState `json:"projects"`
+}
+
+// RecentProjectState is the presentation-safe record of one successful
+// project launch. Context metadata is retained even when a project has no
+// remembered project binding.
+type RecentProjectState struct {
+	Project        ProjectState `json:"project"`
+	ContextID      string       `json:"contextId"`
+	ContextName    string       `json:"contextName,omitempty"`
+	LastLaunchedAt time.Time    `json:"lastLaunchedAt"`
 }
 
 // HomeRunningSummary reserves aggregate running-environment data for later
