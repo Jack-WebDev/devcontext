@@ -22,6 +22,7 @@ import {
   SelectorConfidenceSummary,
 } from "../.tmp-test/src/components/selector/SelectorConfidenceSummary.js";
 import {SelectorLayout} from "../.tmp-test/src/components/selector/SelectorLayout.js";
+import {recommendationReason} from "../.tmp-test/src/components/selector/recommendation.js";
 import {cancelSelector} from "../.tmp-test/src/components/selector/cancel-action.js";
 import {missingDefaultContextIds} from "../.tmp-test/src/components/selector/default-context-actions.js";
 import {
@@ -285,12 +286,19 @@ test("context card presents a backend-supported recommendation with its reason",
   assert.ok(html.includes("Remembered for this project"));
 });
 
+test("recommendation reasons use plain language for known backend sources", () => {
+  assert.equal(recommendationReason("project_binding"), "Remembered for this project");
+  assert.equal(recommendationReason("remembered_context"), "Remembered context");
+  assert.equal(recommendationReason("last_launch"), "Used for the last launch");
+  assert.equal(recommendationReason("user_selection"), undefined);
+});
+
 test("context card renders backend-provided description and accent metadata", () => {
   const context = {
     ...contextFixture("company", "Company"),
+    description: "Work environment",
     metadata: {
       accent: "slate-blue",
-      description: "Work environment",
     },
   };
   const html = renderToStaticMarkup(ContextCard({context}));
@@ -298,6 +306,29 @@ test("context card renders backend-provided description and accent metadata", ()
   assert.match(html, /data-context-accent="slate-blue"/);
   assert.ok(html.includes("Work environment"));
   assert.match(html, /bg-blue-700/);
+});
+
+test("context card summarizes provider, tool, and isolation health from confidence checks", () => {
+  const context = {
+    ...contextFixture("company", "Company", [providerFixture("provider", "Provider", true, "ready")]),
+    confidence: {
+      contextId: "company",
+      status: "needs_attention",
+      checks: [
+        {component: "provider", providerId: "provider", severity: "ready", label: "Provider", message: "Provider is ready."},
+        {component: "tool", toolId: "vscode", severity: "needs_attention", label: "VS Code", message: "Review VS Code."},
+        {component: "isolation", severity: "ready", label: "Context storage", message: "Context storage is ready."},
+      ],
+    },
+  };
+  const html = renderToStaticMarkup(ContextCard({context}));
+
+  assert.ok(html.includes("Context health"));
+  assert.ok(html.includes("1 provider"));
+  assert.ok(html.includes("VS Code"));
+  assert.ok(html.includes("Needs attention"));
+  assert.ok(html.includes("Isolation"));
+  assert.ok(html.includes("Protected"));
 });
 
 test("context card renders backend-provided coding tool readiness and guidance", () => {

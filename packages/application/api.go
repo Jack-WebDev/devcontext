@@ -31,6 +31,7 @@ type ProjectState struct {
 type ContextState struct {
 	ID             string                `json:"id"`
 	Name           string                `json:"name"`
+	Description    string                `json:"description,omitempty"`
 	Tool           ToolState             `json:"tool"`
 	AvailableTools []ToolOption          `json:"availableTools"`
 	Providers      []ProviderState       `json:"providers"`

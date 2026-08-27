@@ -41,7 +41,7 @@ function ContextCard({
   const className = `min-w-0 border py-0 text-left transition-colors ${selectedClassName} ${focusClassName} ${disabledClassName}`;
   const enabledProviders = context.providers.filter((provider) => provider.enabled);
   const contextNameId = `context-${context.id}-name`;
-  const contextDescription = context.metadata?.description;
+  const contextDescription = context.description;
   const contextAccent = contextAccentName(context.metadata?.accent);
 
   function handleButtonKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
@@ -101,6 +101,7 @@ function ContextCard({
         />
         <ToolStatusRow context={context} />
         <ProviderSummary context={context} providers={enabledProviders} />
+        <ContextHealthSummary context={context} enabledProviderCount={enabledProviders.length} />
       </CardContent>
     </Card>
   );
@@ -121,6 +122,89 @@ function ProviderSummary({ context, providers }: { context: ContextState; provid
       )}
     </section>
   );
+}
+
+function ContextHealthSummary({
+  context,
+  enabledProviderCount,
+}: {
+  context: ContextState;
+  enabledProviderCount: number;
+}) {
+  if (context.confidence === undefined) {
+    return null;
+  }
+
+  const providerChecks = context.confidence.checks.filter((check) => check.component === "provider");
+  const toolCheck = context.confidence.checks.find(
+    (check) => check.component === "tool" && check.toolId === context.tool.id,
+  );
+  const isolationChecks = context.confidence.checks.filter((check) => check.component === "isolation");
+  const providerStatus = mostSevereStatus(providerChecks.map((check) => check.severity));
+  const isolationStatus = mostSevereStatus(isolationChecks.map((check) => check.severity));
+
+  if (providerStatus === undefined && toolCheck === undefined && isolationStatus === undefined) {
+    return null;
+  }
+
+  return (
+    <section className="border-t border-border pt-3" aria-label={`Context health for ${context.name}`}>
+      <p className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Context health</p>
+      <dl className="space-y-2 text-sm">
+        {providerStatus ? (
+          <HealthSummaryItem
+            label={enabledProviderCount === 1 ? "1 provider" : `${enabledProviderCount} providers`}
+            status={providerStatus}
+          />
+        ) : null}
+        {toolCheck ? <HealthSummaryItem label={context.tool.name} status={toolCheck.severity} /> : null}
+        {isolationStatus ? <HealthSummaryItem label="Isolation" status={isolationStatus} isolation /> : null}
+      </dl>
+    </section>
+  );
+}
+
+function HealthSummaryItem({
+  label,
+  status,
+  isolation = false,
+}: {
+  label: string;
+  status: LaunchConfidenceStatus;
+  isolation?: boolean;
+}) {
+  const presentation = healthStatusPresentation(status, isolation);
+
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className={`font-medium ${presentation.className}`}>{presentation.label}</dd>
+    </div>
+  );
+}
+
+function mostSevereStatus(statuses: LaunchConfidenceStatus[]): LaunchConfidenceStatus | undefined {
+  if (statuses.includes("blocked")) {
+    return "blocked";
+  }
+  if (statuses.includes("needs_attention")) {
+    return "needs_attention";
+  }
+  if (statuses.includes("ready")) {
+    return "ready";
+  }
+  return undefined;
+}
+
+function healthStatusPresentation(
+  status: LaunchConfidenceStatus,
+  isolation: boolean,
+): { label: string; className: string } {
+  if (isolation && status === "ready") {
+    return {label: "Protected", className: "text-emerald-700"};
+  }
+
+  return toolStatusPresentation(status);
 }
 
 function ToolStatusRow({ context }: { context: ContextState }) {

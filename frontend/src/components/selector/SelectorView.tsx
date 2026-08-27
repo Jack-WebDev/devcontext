@@ -28,6 +28,7 @@ import { SelectorLayout } from "./SelectorLayout";
 import { cancelSelector } from "./cancel-action";
 import { missingDefaultContextIds } from "./default-context-actions";
 import { createLaunchRequestGuard, launchSelectedContext } from "./launch-action";
+import { recommendationReason } from "./recommendation";
 import {
   initialRovingContextId,
   initialSelectedContextId,
@@ -414,11 +415,11 @@ function MissingDefaultContextActions({
 }
 
 function recommendationForContext(launchState: LaunchState, contextId: string): string | undefined {
-  if (launchState.selectedContextId !== contextId || launchState.resolutionSource !== "project_binding") {
+  if (launchState.selectedContextId !== contextId) {
     return undefined;
   }
 
-  return "Remembered for this project";
+  return recommendationReason(launchState.resolutionSource);
 }
 
 export { SelectorView };

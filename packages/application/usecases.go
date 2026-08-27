@@ -332,6 +332,7 @@ func (s *Service) contextState(ctx devcontext.Context) ContextState {
 	return ContextState{
 		ID:             ctx.ID.String(),
 		Name:           ctx.Name,
+		Description:    ctx.Metadata["description"],
 		Tool:           toolState(ctx.Tool.DefaultTool, confidence),
 		AvailableTools: toolOptions(s.dependencies.ToolRegistry),
 		Providers:      providerStatesFromEntries(providerEntries),

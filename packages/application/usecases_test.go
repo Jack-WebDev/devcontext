@@ -92,6 +92,21 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	}
 }
 
+func TestGetLaunchStateExposesContextDescription(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	ctx := fixture.context("personal", "Personal")
+	ctx.Metadata["description"] = "Personal projects"
+	fixture.writeContext(t, ctx)
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+	if len(state.Contexts) != 1 || state.Contexts[0].Description != "Personal projects" {
+		t.Fatalf("context descriptions = %#v, want Personal projects", state.Contexts)
+	}
+}
+
 func TestSecondRegisteredToolWorksAcrossStateAndLaunch(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	secondTool := &applicationSecondTool{}

@@ -48,6 +48,7 @@ export interface ProjectState {
 export interface ContextState {
   id: string;
   name: string;
+  description?: string;
   tool: ToolState;
   availableTools: ToolOption[];
   providers: ProviderState[];
@@ -417,9 +418,11 @@ function normalizeProjectState(value: unknown): ProjectState {
 
 function normalizeContextState(value: unknown): ContextState {
   const object = objectValue(value);
+	const description = optionalString(object.description);
   return {
     id: stringValue(object.id),
     name: stringValue(object.name),
+    ...(description === undefined ? {} : {description}),
     tool: normalizeToolState(object.tool),
     availableTools: arrayValue(object.availableTools).map(normalizeToolOption),
     providers: arrayValue(object.providers).map(normalizeProviderState),
