@@ -368,6 +368,7 @@ func (s *Service) providerCredentialSessionStates() ([]ProviderCredentialSession
 
 type providerStateEntry struct {
 	providerID provider.ID
+	provider   provider.Provider
 	state      ProviderState
 	status     provider.Status
 }
@@ -407,6 +408,7 @@ func (s *Service) providerStateEntries(ctx devcontext.Context) []providerStateEn
 		runtime := providerRuntimeContext(ctx, config, contextPaths, integration.ID())
 		entries = append(entries, providerStateEntry{
 			providerID: integration.ID(),
+			provider:   integration,
 			status:     status,
 			state: ProviderState{
 				ID:          string(integration.ID()),
@@ -555,7 +557,7 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 		})
 	} else {
 		contextPaths = contextPaths.WithProviderStorageDirs(enabledProviderIDs(ctx))
-		checks = append(checks, launcher.IsolationConfidenceChecks(contextPaths)...)
+		checks = append(checks, launcher.IsolationConfidenceChecks(contextPaths, enabledProviderIntegrations(providerEntries))...)
 	}
 
 	return LaunchConfidenceState{
@@ -563,6 +565,16 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 		Status:    launchConfidenceStatus(checks),
 		Checks:    checks,
 	}
+}
+
+func enabledProviderIntegrations(entries []providerStateEntry) []provider.Provider {
+	providers := make([]provider.Provider, 0, len(entries))
+	for _, entry := range entries {
+		if entry.state.Enabled {
+			providers = append(providers, entry.provider)
+		}
+	}
+	return providers
 }
 
 func launchConfidenceStatus(checks []LaunchConfidenceCheck) LaunchConfidenceStatus {

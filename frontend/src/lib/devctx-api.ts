@@ -319,9 +319,13 @@ function normalizeLaunchConfidenceState(value: unknown): LaunchConfidenceState |
 
 function normalizeLaunchConfidenceCheck(value: unknown): LaunchConfidenceCheck {
   const object = objectValue(value);
+  const component = normalizeLaunchConfidenceCheckComponent(object.component);
   const providerId = optionalString(object.providerId);
+  if (component === "provider" && providerId === undefined) {
+    throw new Error("Invalid Dev Context response.");
+  }
   return {
-    component: normalizeLaunchConfidenceCheckComponent(object.component),
+    component,
     ...(providerId === undefined ? {} : {providerId}),
     severity: normalizeLaunchConfidenceStatus(object.severity),
     label: stringValue(object.label),
