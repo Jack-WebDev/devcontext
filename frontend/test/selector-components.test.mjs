@@ -5,6 +5,11 @@ import {renderToStaticMarkup} from "react-dom/server";
 
 import {ContextMismatchDialog} from "../.tmp-test/src/components/selector/ContextMismatchDialog.js";
 import {ContextCard} from "../.tmp-test/src/components/selector/ContextCard.js";
+import {HomeView, homeConfidenceSummary} from "../.tmp-test/src/components/home/HomeView.js";
+import {
+  ContextAccentIndicator,
+  contextAccentFromMetadata,
+} from "../.tmp-test/src/components/context-accent/ContextAccent.js";
 import {
   FirstRunWelcome,
   shouldRenderFirstRunWelcome,
@@ -17,6 +22,16 @@ import {
 } from "../.tmp-test/src/components/selector/LaunchVerificationProgress.js";
 import {ProviderCredentialClassification} from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
 import {ProjectIdentity} from "../.tmp-test/src/components/selector/ProjectIdentity.js";
+import {AppShell} from "../.tmp-test/src/components/shell/AppShell.js";
+import {
+  appRouteFromHash,
+  appRoutes,
+} from "../.tmp-test/src/components/shell/routes.js";
+import {
+  StatusIndicator,
+  statusPresentation,
+} from "../.tmp-test/src/components/status/StatusIndicator.js";
+import {Card} from "../.tmp-test/src/components/ui/card.js";
 import {
   boundContextName,
   RememberProjectControl,
@@ -315,7 +330,87 @@ test("context card renders backend-provided description and accent metadata", ()
 
   assert.match(html, /data-context-accent="slate-blue"/);
   assert.ok(html.includes("Work environment"));
-  assert.match(html, /bg-blue-700/);
+  assert.match(html, /bg-accent-company/);
+});
+
+test("context accents use shared semantic tokens without changing the full card theme", () => {
+  assert.equal(contextAccentFromMetadata("sage"), "sage");
+  assert.equal(contextAccentFromMetadata("future-accent"), "neutral");
+
+  const html = renderToStaticMarkup(ContextAccentIndicator({accent: "custom"}));
+  assert.match(html, /bg-accent-custom/);
+  assert.doesNotMatch(html, /bg-card/);
+});
+
+test("status indicator renders approved status labels with non-color text", () => {
+  const statuses = ["ready", "needs_attention", "not_configured", "blocked", "running", "protected", "failed"];
+  const labels = statuses.map((status) => statusPresentation(status).label);
+
+  assert.deepEqual(labels, ["Ready", "Needs attention", "Not configured", "Blocked", "Running", "Protected", "Failed"]);
+  const html = renderToStaticMarkup(StatusIndicator({status: "blocked"}));
+  assert.ok(html.includes("Blocked"));
+  assert.match(html, /bg-destructive/);
+});
+
+test("card hierarchy differentiates primary, secondary, and tertiary surfaces", () => {
+  const primary = renderToStaticMarkup(Card({hierarchy: "primary"}));
+  const secondary = renderToStaticMarkup(Card({hierarchy: "secondary"}));
+  const tertiary = renderToStaticMarkup(Card({hierarchy: "tertiary"}));
+
+  assert.match(primary, /shadow-sm/);
+  assert.match(secondary, /bg-surface-muted/);
+  assert.match(tertiary, /bg-transparent/);
+});
+
+test("app shell exposes stable navigation, current project state, and a responsive content boundary", () => {
+  const html = renderToStaticMarkup(AppShell({
+    activeRoute: "projects",
+    onNavigate: () => {},
+    currentProject: {name: "api", path: "/work/api"},
+    children: "Content",
+  }));
+
+  assert.match(html, /data-app-shell="true"/);
+  assert.match(html, /aria-label="Primary navigation"/);
+  assert.match(html, /aria-current="page"/);
+  assert.match(html, /max-w-6xl/);
+  assert.match(html, /min-w-0/);
+  assert.ok(html.includes("Current project"));
+  assert.ok(html.includes("api"));
+  assert.ok(html.includes("/work/api"));
+  assert.deepEqual(appRoutes.map((route) => route.label), ["Home", "Contexts", "Projects", "Running", "History", "Settings"]);
+  assert.equal(appRouteFromHash("#projects"), "projects");
+  assert.equal(appRouteFromHash("#unknown"), "home");
+});
+
+test("Home shows project, selected context, and context-named quick launch", () => {
+  const html = renderToStaticMarkup(HomeView({
+    dashboard: {
+      project: {name: "api", path: "/work/api"},
+      currentContext: {
+        id: "company",
+        name: "Company",
+        tool: {id: "tool", name: "Future Tool", status: "ready", message: "Ready"},
+        confidence: {contextId: "company", status: "ready", checks: []},
+      },
+      recentProjects: [],
+      running: {count: 0},
+      activity: {count: 0},
+    },
+    launchPending: false,
+    onQuickLaunch: () => {},
+    onReviewLaunchOptions: () => {},
+  }));
+
+  assert.ok(html.includes("Selected project"));
+  assert.ok(html.includes("/work/api"));
+  assert.ok(html.includes("Git branch"));
+  assert.ok(html.includes("Last opened"));
+  assert.ok(html.includes("Current context"));
+  assert.ok(html.includes("Company"));
+  assert.ok(html.includes("Future Tool"));
+  assert.ok(html.includes("Launch Company"));
+  assert.equal(homeConfidenceSummary("blocked"), "This context is blocked until its required setup is resolved.");
 });
 
 test("context card summarizes provider, tool, and isolation health from confidence checks", () => {
@@ -428,6 +523,61 @@ test("context card renders generic setup guidance for an unconfigured provider",
   assert.ok(!html.includes("Claude is enabled for Personal"));
   assert.ok(!html.includes("Codex is enabled for Company"));
   assert.ok(html.includes("Connect Internal Tool to Company."));
+});
+
+test("context card offers the backend-supplied provider setup action", () => {
+  const context = contextFixture("personal", "Personal", [{
+    ...providerFixture("codex", "Codex", true, "not_configured"),
+    setupAction: {
+      state: "open_and_configure",
+      label: "Open and configure",
+      message: "Sign in to Codex for this context.",
+    },
+  }]);
+  const html = renderToStaticMarkup(ContextCard({context, onProviderSetup: () => {}}));
+
+  assert.ok(html.includes("Sign in to Codex for this context."));
+  assert.ok(html.includes("Open and configure"));
+  assert.doesNotMatch(html, /Open and configure<\/button>[^]*disabled=""/);
+});
+
+test("context card renders the backend-supplied provider sign-in waiting state", () => {
+  const context = contextFixture("company", "Company", [{
+    ...providerFixture("future", "Future Provider", true, "ready"),
+    setupAction: {
+      state: "waiting_for_sign_in",
+      label: "Waiting for sign-in",
+      message: "Waiting for Future Provider sign-in verification.",
+    },
+  }]);
+  const html = renderToStaticMarkup(ContextCard({context}));
+
+  assert.match(html, /role="status"/);
+  assert.ok(html.includes("Waiting for sign-in"));
+  assert.ok(html.includes("Waiting for Future Provider sign-in verification."));
+  assert.doesNotMatch(html, /Open and configure/);
+});
+
+test("context card shows connected provider identity only after backend verification", () => {
+  const context = contextFixture("personal", "Personal", [{
+    ...providerFixture("future", "Future Provider", true, "ready"),
+    identity: {
+      status: "verified",
+      fields: [{label: "Workspace", value: "Example"}],
+    },
+    setupAction: {
+      state: "verified",
+      label: "Verified",
+      message: "Future Provider account identity is verified for this context.",
+    },
+  }]);
+  const html = renderToStaticMarkup(ContextCard({context}));
+
+  assert.match(html, /role="status"/);
+  assert.ok(html.includes("Verified"));
+  assert.ok(html.includes("Future Provider account identity is verified for this context."));
+  assert.ok(html.includes("Account: Workspace: Example"));
+  assert.ok(!html.includes("Account identity unavailable"));
 });
 
 test("selection initializes from a valid bound context", () => {
@@ -1278,6 +1428,19 @@ test("launch failure view keeps recovery actions available without exposing tech
   assert.ok(html.includes("Open configuration"));
   assert.ok(html.includes("Cancel"));
   assert.doesNotMatch(html, /Technical details/);
+});
+
+test("launch failure view hides technical details until requested", () => {
+  const error = {
+    ...apiError("launch_error", "Unable to launch editor.", "Check the editor command, then retry.").error,
+    technicalDetails: "starting tool in /work/api failed: permission denied",
+  };
+  const html = renderToStaticMarkup(LaunchFailureView({error, onRetry: () => {}, onCancel: () => {}}));
+
+  assert.ok(html.includes("Technical details"));
+  assert.ok(html.includes("/work/api"));
+  assert.match(html, /<details/);
+  assert.doesNotMatch(html, /<details[^>]*open/);
 });
 
 test("launch progress guard allows only one in-flight launch and restores after rejection", async () => {

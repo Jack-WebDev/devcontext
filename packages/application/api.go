@@ -5,6 +5,48 @@ type GetLaunchStateRequest struct {
 	ProjectPath string `json:"projectPath,omitempty"`
 }
 
+// GetHomeDashboardRequest identifies the project represented by the Home
+// dashboard.
+type GetHomeDashboardRequest struct {
+	ProjectPath string `json:"projectPath,omitempty"`
+}
+
+// HomeDashboardState contains backend-owned data for the Home screen. Recent
+// projects, running environments, and activity are intentionally empty until
+// their dedicated persistence contracts are introduced.
+type HomeDashboardState struct {
+	Project        ProjectState             `json:"project"`
+	CurrentContext *HomeCurrentContextState `json:"currentContext,omitempty"`
+	RecentProjects []HomeRecentProjectState `json:"recentProjects"`
+	Running        HomeRunningSummary       `json:"running"`
+	Activity       HomeActivitySummary      `json:"activity"`
+}
+
+// HomeCurrentContextState is the selected context summary for one project.
+type HomeCurrentContextState struct {
+	ID         string                `json:"id"`
+	Name       string                `json:"name"`
+	Tool       ToolState             `json:"tool"`
+	Confidence LaunchConfidenceState `json:"confidence"`
+}
+
+// HomeRecentProjectState reserves the safe presentation shape for Phase 110.
+type HomeRecentProjectState struct {
+	Project ProjectState `json:"project"`
+}
+
+// HomeRunningSummary reserves aggregate running-environment data for later
+// running-environment tracking phases.
+type HomeRunningSummary struct {
+	Count int `json:"count"`
+}
+
+// HomeActivitySummary reserves aggregate activity data for later history
+// phases.
+type HomeActivitySummary struct {
+	Count int `json:"count"`
+}
+
 // LaunchState contains everything the GUI needs to render the selector for one
 // project.
 type LaunchState struct {
@@ -65,7 +107,36 @@ type ProviderState struct {
 	State       ProviderReadinessState `json:"state"`
 	Explanation string                 `json:"explanation,omitempty"`
 	ActionHint  string                 `json:"actionHint,omitempty"`
+	SetupAction *ProviderSetupAction   `json:"setupAction,omitempty"`
 	Identity    ProviderIdentityState  `json:"identity"`
+}
+
+// ProviderSetupAction describes the next backend-derived setup state for an
+// enabled provider. It contains presentation-safe text only; provider-specific
+// setup mechanics remain owned by the provider integration.
+type ProviderSetupAction struct {
+	State   ProviderSetupState `json:"state"`
+	Label   string             `json:"label"`
+	Message string             `json:"message"`
+}
+
+// ProviderSetupState is the UI-facing provider setup vocabulary.
+type ProviderSetupState string
+
+const (
+	ProviderSetupOpenAndConfigure ProviderSetupState = "open_and_configure"
+	ProviderSetupWaitingForSignIn ProviderSetupState = "waiting_for_sign_in"
+	ProviderSetupVerified         ProviderSetupState = "verified"
+)
+
+// Valid reports whether state is one of the bounded API provider setup states.
+func (s ProviderSetupState) Valid() bool {
+	switch s {
+	case ProviderSetupOpenAndConfigure, ProviderSetupWaitingForSignIn, ProviderSetupVerified:
+		return true
+	default:
+		return false
+	}
 }
 
 // ProviderReadinessState is the UI-facing provider readiness vocabulary.

@@ -78,6 +78,11 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 				Name:    "Fake Provider",
 				Enabled: true,
 				State:   ProviderReadinessReady,
+				SetupAction: &ProviderSetupAction{
+					State:   ProviderSetupWaitingForSignIn,
+					Label:   "Waiting for sign-in",
+					Message: "Waiting for Fake Provider sign-in verification.",
+				},
 				Identity: ProviderIdentityState{
 					Status:  ProviderIdentityUnavailable,
 					Message: "Account identity unavailable.",
@@ -89,6 +94,116 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	}
 	if contextState.Confidence.ContextID != "personal" {
 		t.Fatalf("context confidence = %#v, want personal confidence", contextState.Confidence)
+	}
+}
+
+func TestGetHomeDashboardReturnsCurrentProjectAndContextSummary(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.projectDir),
+		ContextID:   devcontext.MustID("personal"),
+		CreatedAt:   fixture.now,
+	})
+
+	dashboard, appErr := fixture.service().GetHomeDashboard(GetHomeDashboardRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get home dashboard: %v", appErr)
+	}
+	if dashboard.Project != (ProjectState{Name: "current", Path: fixture.projectDir}) {
+		t.Fatalf("project = %#v", dashboard.Project)
+	}
+	if dashboard.CurrentContext == nil || dashboard.CurrentContext.ID != "personal" || dashboard.CurrentContext.Name != "Personal" {
+		t.Fatalf("current context = %#v", dashboard.CurrentContext)
+	}
+	if dashboard.CurrentContext.Confidence.ContextID != "personal" {
+		t.Fatalf("current context confidence = %#v", dashboard.CurrentContext.Confidence)
+	}
+	if len(dashboard.RecentProjects) != 0 || dashboard.Running.Count != 0 || dashboard.Activity.Count != 0 {
+		t.Fatalf("future dashboard summaries = %#v", dashboard)
+	}
+}
+
+func TestLaunchProjectRecordsRecentProjectAfterSuccessfulLaunch(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+	_, appErr := fixture.service().LaunchProject(LaunchProjectRequest{ProjectPath: ".", ContextID: "personal"})
+	if appErr != nil {
+		t.Fatalf("launch project: %v", appErr)
+	}
+
+	recents, err := project.NewRecentRepository(fixture.recentsPath).List()
+	if err != nil {
+		t.Fatalf("list recent projects: %v", err)
+	}
+	if !reflect.DeepEqual(recents, []project.RecentProject{{
+		ProjectPath:    project.Path(fixture.projectDir),
+		ContextID:      devcontext.MustID("personal"),
+		LastLaunchedAt: fixture.now,
+	}}) {
+		t.Fatalf("recent projects = %#v", recents)
+	}
+}
+
+func TestGetLaunchStateDerivesProviderSetupActions(t *testing.T) {
+	tests := []struct {
+		name         string
+		status       provider.Status
+		hasIdentity  bool
+		wantState    ProviderSetupState
+		wantLabel    string
+		wantNoAction bool
+	}{
+		{
+			name:      "not configured opens setup",
+			status:    provider.NotConfiguredStatus("credentials are missing"),
+			wantState: ProviderSetupOpenAndConfigure,
+			wantLabel: "Open and configure",
+		},
+		{
+			name:      "configured provider awaits sign-in verification",
+			status:    provider.ConfiguredStatus(),
+			wantState: ProviderSetupWaitingForSignIn,
+			wantLabel: "Waiting for sign-in",
+		},
+		{
+			name:        "configured verified provider is verified",
+			status:      provider.ConfiguredStatus(),
+			hasIdentity: true,
+			wantState:   ProviderSetupVerified,
+			wantLabel:   "Verified",
+		},
+		{
+			name:         "unavailable provider has no setup action",
+			status:       provider.UnavailableStatus("status unavailable"),
+			wantNoAction: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newApplicationFixture(t)
+			fixture.provider.statusByContext = map[string]provider.Status{"personal": tt.status}
+			fixture.provider.hasIdentity = tt.hasIdentity
+			fixture.provider.identity = provider.Identity{Fields: []provider.MetadataField{{Label: "Email", Value: "developer@example.com"}}}
+			fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+			state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+			if appErr != nil {
+				t.Fatalf("get launch state: %v", appErr)
+			}
+			action := state.Contexts[0].Providers[0].SetupAction
+			if tt.wantNoAction {
+				if action != nil {
+					t.Fatalf("setup action = %#v, want nil", action)
+				}
+				return
+			}
+			if action == nil || action.State != tt.wantState || action.Label != tt.wantLabel || action.Message == "" {
+				t.Fatalf("setup action = %#v", action)
+			}
+		})
 	}
 }
 
@@ -1238,6 +1353,7 @@ type applicationFixture struct {
 	contextsDir        string
 	projectDir         string
 	bindingsPath       string
+	recentsPath        string
 	paths              filesystem.PlatformPaths
 	now                time.Time
 	provider           *applicationFakeProvider
@@ -1259,6 +1375,7 @@ func newApplicationFixture(t *testing.T) applicationFixture {
 		contextsDir:  filepath.Join(root, "contexts"),
 		projectDir:   filepath.Join(root, "projects", "current"),
 		bindingsPath: filepath.Join(root, "projects.toml"),
+		recentsPath:  filepath.Join(root, "recents.toml"),
 		now:          time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC),
 		provider:     &applicationFakeProvider{id: "fake"},
 		editor:       &applicationFakeEditor{},
@@ -1292,6 +1409,7 @@ func (f applicationFixture) service() *Service {
 	return NewServiceWithDependencies(Dependencies{
 		Contexts:           devcontext.NewRepository(f.contextsDir),
 		Projects:           project.NewRepository(f.bindingsPath, f.paths),
+		RecentProjects:     project.NewRecentRepository(f.recentsPath),
 		Paths:              f.paths,
 		ProviderRegistry:   registry,
 		ToolRegistry:       toolRegistry,

@@ -11,6 +11,7 @@ import (
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
+	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
 )
 
@@ -41,6 +42,9 @@ type Error struct {
 	Code     ErrorCode `json:"code"`
 	Message  string    `json:"message"`
 	Recovery string    `json:"recovery"`
+	// TechnicalDetails contains sanitized diagnostic information. The GUI must
+	// keep it behind an explicit disclosure.
+	TechnicalDetails string `json:"technicalDetails,omitempty"`
 
 	ContextMismatch *ContextMismatch `json:"contextMismatch,omitempty"`
 
@@ -152,10 +156,11 @@ type ContextMismatch struct {
 
 func applicationError(code ErrorCode, message string, recovery string, cause error) *Error {
 	return &Error{
-		Code:     code,
-		Message:  message,
-		Recovery: recovery,
-		cause:    cause,
+		Code:             code,
+		Message:          message,
+		Recovery:         recovery,
+		TechnicalDetails: devlog.SanitizeError(cause, nil),
+		cause:            cause,
 	}
 }
 

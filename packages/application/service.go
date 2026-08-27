@@ -20,6 +20,7 @@ import (
 type Dependencies struct {
 	Contexts         devcontext.Repository
 	Projects         project.Repository
+	RecentProjects   project.RecentRepository
 	Paths            filesystem.PlatformPaths
 	ProviderRegistry provider.Registry
 	ToolRegistry     codingtool.Registry
@@ -78,6 +79,7 @@ func NewDefaultService(options DefaultOptions) (*Service, error) {
 	return NewServiceWithDependencies(Dependencies{
 		Contexts:           devcontext.NewRepository(layout.ContextsDir),
 		Projects:           project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
+		RecentProjects:     project.NewRecentRepository(filepath.Join(layout.HomeDir, "recents.toml")),
 		Paths:              paths,
 		ProviderRegistry:   provider.BuiltInRegistry(),
 		ToolRegistry:       codingtool.BuiltInRegistry(),

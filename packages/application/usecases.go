@@ -25,6 +25,15 @@ func (s *Service) GetLaunchState(request GetLaunchStateRequest) (LaunchState, *E
 	return state, nil
 }
 
+// GetHomeDashboard returns the backend-owned summary for the Home screen.
+func (s *Service) GetHomeDashboard(request GetHomeDashboardRequest) (HomeDashboardState, *Error) {
+	dashboard, err := s.getHomeDashboard(request)
+	if err != nil {
+		return HomeDashboardState{}, NewError(err)
+	}
+	return dashboard, nil
+}
+
 // LaunchProject builds a launch plan for a selected context and starts the
 // editor process.
 func (s *Service) LaunchProject(request LaunchProjectRequest) (LaunchProjectResult, *Error) {
@@ -116,6 +125,33 @@ func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, er
 		Warnings:                   warningStates(resolution.Warnings),
 		ProviderCredentialSessions: providerCredentialSessions,
 	}, nil
+}
+
+func (s *Service) getHomeDashboard(request GetHomeDashboardRequest) (HomeDashboardState, error) {
+	launchState, err := s.getLaunchState(GetLaunchStateRequest{ProjectPath: request.ProjectPath})
+	if err != nil {
+		return HomeDashboardState{}, err
+	}
+
+	dashboard := HomeDashboardState{
+		Project:        launchState.Project,
+		RecentProjects: []HomeRecentProjectState{},
+		Running:        HomeRunningSummary{},
+		Activity:       HomeActivitySummary{},
+	}
+	for _, context := range launchState.Contexts {
+		if context.ID != launchState.SelectedContextID {
+			continue
+		}
+		dashboard.CurrentContext = &HomeCurrentContextState{
+			ID:         context.ID,
+			Name:       context.Name,
+			Tool:       context.Tool,
+			Confidence: context.Confidence,
+		}
+		break
+	}
+	return dashboard, nil
 }
 
 func (s *Service) firstRunLaunchState(projectPath project.Path) LaunchState {
@@ -212,6 +248,7 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 	}
 
 	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchSucceeded, plan, nil, s.now()))
+	_ = s.dependencies.RecentProjects.Record(plan.ProjectPath, plan.Context.ID, s.now())
 
 	return LaunchProjectResult{
 		Project:  projectState(plan.ProjectPath),
@@ -462,6 +499,7 @@ func (s *Service) providerStateEntries(ctx devcontext.Context) []providerStateEn
 		}
 
 		runtime := providerRuntimeContext(ctx, config, contextPaths, integration.ID())
+		identity := providerIdentityState(integration, enabled, status, runtime, pathsErr)
 		entries = append(entries, providerStateEntry{
 			providerID: integration.ID(),
 			provider:   integration,
@@ -473,11 +511,51 @@ func (s *Service) providerStateEntries(ctx devcontext.Context) []providerStateEn
 				State:       providerReadinessState(status),
 				Explanation: status.Explanation,
 				ActionHint:  providerActionHint(integration, runtime, status),
-				Identity:    providerIdentityState(integration, enabled, status, runtime, pathsErr),
+				SetupAction: providerSetupAction(integration, enabled, status, identity, runtime),
+				Identity:    identity,
 			},
 		})
 	}
 	return entries
+}
+
+func providerSetupAction(integration provider.Provider, enabled bool, status provider.Status, identity ProviderIdentityState, runtime provider.RuntimeContext) *ProviderSetupAction {
+	if !enabled {
+		return nil
+	}
+
+	switch status.State {
+	case provider.StatusNotConfigured, provider.StatusDirectoryMissing:
+		return &ProviderSetupAction{
+			State:   ProviderSetupOpenAndConfigure,
+			Label:   "Open and configure",
+			Message: providerSetupMessage(integration, runtime),
+		}
+	case provider.StatusConfigured:
+		if identity.Status == ProviderIdentityVerified {
+			return &ProviderSetupAction{
+				State:   ProviderSetupVerified,
+				Label:   "Verified",
+				Message: integration.DisplayName() + " account identity is verified for this context.",
+			}
+		}
+		return &ProviderSetupAction{
+			State:   ProviderSetupWaitingForSignIn,
+			Label:   "Waiting for sign-in",
+			Message: "Waiting for " + integration.DisplayName() + " sign-in verification.",
+		}
+	default:
+		return nil
+	}
+}
+
+func providerSetupMessage(integration provider.Provider, runtime provider.RuntimeContext) string {
+	if guidanceProvider, ok := integration.(provider.SetupGuidanceProvider); ok {
+		if message := guidanceProvider.SetupGuidance(runtime).Message; message != "" {
+			return message
+		}
+	}
+	return integration.DisplayName() + " needs to be configured for this context."
 }
 
 func providerActionHint(integration provider.Provider, runtime provider.RuntimeContext, status provider.Status) string {

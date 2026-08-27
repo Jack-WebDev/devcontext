@@ -161,8 +161,9 @@ function SelectorView({
     void cancelSelector({ closeSelector: onCancel });
   }
 
-  async function handleLaunch(confirmContextMismatch = false) {
-    if (selectedContextConfidenceBlocked(selectedContext)) {
+  async function handleLaunch(confirmContextMismatch = false, contextId = selectedContextId) {
+    const contextToLaunch = launchState.contexts.find((context) => context.id === contextId);
+    if (selectedContextConfidenceBlocked(contextToLaunch)) {
       return;
     }
 
@@ -176,7 +177,7 @@ function SelectorView({
       try {
         const result = await launchSelectedContext({
           projectPath: launchState.project.path,
-          selectedContextId,
+          selectedContextId: contextId,
           rememberProject,
           confirmContextMismatch,
           onPreflightComplete: (preflight) => {
@@ -279,6 +280,10 @@ function SelectorView({
                       onSelect={handleSelectContext}
                       onNavigate={handleContextNavigation}
                       onLaunchSelected={keyboardLaunchAvailable ? () => void handleLaunch() : undefined}
+                      onProviderSetup={(contextId) => {
+                        handleSelectContext(contextId);
+                        void handleLaunch(false, contextId);
+                      }}
                     />
                   ))}
                 </div>

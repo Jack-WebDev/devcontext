@@ -1,5 +1,7 @@
 import type { KeyboardEvent, Ref } from "react";
 
+import { ContextAccentIndicator, contextAccentFromMetadata, type ContextAccent } from "../context-accent/ContextAccent.js";
+import { StatusIndicator } from "../status/StatusIndicator.js";
 import type { ContextState, LaunchConfidenceStatus, ProviderState } from "../../lib/devctx-api";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
@@ -16,6 +18,7 @@ interface ContextCardProps {
   onSelect?: (contextId: string) => void;
   onNavigate?: (contextId: string, direction: ContextNavigationDirection) => void;
   onLaunchSelected?: () => void;
+  onProviderSetup?: (contextId: string, providerId: string) => void;
 }
 
 function ContextCard({
@@ -28,6 +31,7 @@ function ContextCard({
   onSelect,
   onNavigate,
   onLaunchSelected,
+  onProviderSetup,
 }: ContextCardProps) {
   const interactive = onSelect !== undefined && !disabled;
   const unselectedClassName = interactive ? "border-border hover:border-foreground/20" : "border-border";
@@ -42,7 +46,7 @@ function ContextCard({
   const enabledProviders = context.providers.filter((provider) => provider.enabled);
   const contextNameId = `context-${context.id}-name`;
   const contextDescription = context.description;
-  const contextAccent = contextAccentName(context.metadata?.accent);
+  const contextAccent = contextAccentFromMetadata(context.metadata?.accent);
 
   function handleButtonKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     const direction = contextNavigationDirectionForKey(event.key);
@@ -100,21 +104,29 @@ function ContextCard({
           recommendation={recommendation}
         />
         <ToolStatusRow context={context} />
-        <ProviderSummary context={context} providers={enabledProviders} />
+        <ProviderSummary context={context} providers={enabledProviders} onProviderSetup={onProviderSetup} />
         <ContextHealthSummary context={context} enabledProviderCount={enabledProviders.length} />
       </CardContent>
     </Card>
   );
 }
 
-function ProviderSummary({ context, providers }: { context: ContextState; providers: ProviderState[] }) {
+function ProviderSummary({
+  context,
+  providers,
+  onProviderSetup,
+}: {
+  context: ContextState;
+  providers: ProviderState[];
+  onProviderSetup?: (contextId: string, providerId: string) => void;
+}) {
   return (
     <section aria-label={`Enabled providers for ${context.name}`}>
       <p className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Enabled providers</p>
       {providers.length > 0 ? (
         <ul className="space-y-2">
           {providers.map((provider) => (
-            <ProviderStatusRow key={provider.id} context={context} provider={provider} />
+            <ProviderStatusRow key={provider.id} context={context} provider={provider} onProviderSetup={onProviderSetup} />
           ))}
         </ul>
       ) : (
@@ -240,14 +252,14 @@ function ContextIdentity({
 }: {
   context: ContextState;
   description?: string;
-  accent: ContextAccentName;
+  accent: ContextAccent;
   selected: boolean;
   recommendation?: string;
 }) {
   return (
     <div className="min-w-0 space-y-2">
       <div className="flex min-w-0 items-start gap-3">
-        <span className={`mt-1.5 size-2 shrink-0 ${contextAccentClassName(accent)}`} aria-hidden="true" />
+        <ContextAccentIndicator accent={accent} className="mt-1.5" />
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-start justify-between gap-3">
             <h3 id={`context-${context.id}-name`} className="truncate text-base font-semibold" title={context.name}>
@@ -290,36 +302,15 @@ function ContextIdentity({
   );
 }
 
-type ContextAccentName = "sage" | "slate-blue" | "amber" | "custom" | "neutral";
-
-function contextAccentName(value: string | undefined): ContextAccentName {
-  switch (value) {
-    case "sage":
-    case "slate-blue":
-    case "amber":
-    case "custom":
-      return value;
-    default:
-      return "neutral";
-  }
-}
-
-function contextAccentClassName(accent: ContextAccentName): string {
-  switch (accent) {
-    case "sage":
-      return "bg-emerald-600";
-    case "slate-blue":
-      return "bg-blue-700";
-    case "amber":
-      return "bg-amber-500";
-    case "custom":
-      return "bg-violet-600";
-    default:
-      return "bg-muted-foreground";
-  }
-}
-
-function ProviderStatusRow({ context, provider }: { context: ContextState; provider: ProviderState }) {
+function ProviderStatusRow({
+  context,
+  provider,
+  onProviderSetup,
+}: {
+  context: ContextState;
+  provider: ProviderState;
+  onProviderSetup?: (contextId: string, providerId: string) => void;
+}) {
   const status = providerStatusPresentation(provider.state);
   const accessibleStatus = `${provider.name} local status: ${status.label}`;
   const setupGuidance = providerSetupGuidance(context, provider);
@@ -353,6 +344,37 @@ function ProviderStatusRow({ context, provider }: { context: ContextState; provi
         <p className="mt-2 border border-border bg-muted/30 p-2 text-xs text-muted-foreground">
           {setupGuidance}
         </p>
+      ) : null}
+      {provider.setupAction?.state === "open_and_configure" ? (
+        <div className="pointer-events-auto relative z-20 mt-2 border border-border bg-muted/30 p-2">
+          <p className="text-xs text-muted-foreground">{provider.setupAction.message}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-2"
+            disabled={onProviderSetup === undefined}
+            onClick={() => onProviderSetup?.(context.id, provider.id)}
+          >
+            {provider.setupAction.label}
+          </Button>
+        </div>
+      ) : null}
+      {provider.setupAction?.state === "waiting_for_sign_in" ? (
+        <div
+          className="mt-2 border border-warning/40 bg-warning/5 p-2 text-xs"
+          role="status"
+          aria-live="polite"
+        >
+          <StatusIndicator status="needs_attention">{provider.setupAction.label}</StatusIndicator>
+          <p className="mt-1 text-muted-foreground">{provider.setupAction.message}</p>
+        </div>
+      ) : null}
+      {provider.setupAction?.state === "verified" && provider.identity.status === "verified" ? (
+        <div className="mt-2 border border-success/40 bg-success/5 p-2 text-xs" role="status">
+          <StatusIndicator status="ready">{provider.setupAction.label}</StatusIndicator>
+          <p className="mt-1 text-muted-foreground">{provider.setupAction.message}</p>
+        </div>
       ) : null}
     </li>
   );

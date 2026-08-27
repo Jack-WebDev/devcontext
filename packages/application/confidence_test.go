@@ -125,6 +125,29 @@ func TestProviderReadinessStateVariantsSerialize(t *testing.T) {
 	}
 }
 
+func TestProviderSetupActionSerializesBoundedState(t *testing.T) {
+	action := application.ProviderSetupAction{
+		State:   application.ProviderSetupOpenAndConfigure,
+		Label:   "Open and configure",
+		Message: "Codex needs to be configured for this context.",
+	}
+	if !action.State.Valid() {
+		t.Fatalf("setup state %q is invalid", action.State)
+	}
+
+	data, err := json.Marshal(action)
+	if err != nil {
+		t.Fatalf("marshal setup action: %v", err)
+	}
+	want := `{"state":"open_and_configure","label":"Open and configure","message":"Codex needs to be configured for this context."}`
+	if string(data) != want {
+		t.Fatalf("json = %s, want %s", data, want)
+	}
+	if application.ProviderSetupState("sign_in").Valid() {
+		t.Fatal("unknown provider setup state is valid")
+	}
+}
+
 func TestProviderIdentityStateVariantsSerialize(t *testing.T) {
 	tests := []struct {
 		name     string

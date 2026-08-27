@@ -6,6 +6,8 @@ export function BindProject(arg1:application.BindProjectRequest):Promise<any>;
 
 export function CreateContext(arg1:application.CreateContextRequest):Promise<any>;
 
+export function GetHomeDashboard(arg1:application.GetHomeDashboardRequest):Promise<any>;
+
 export function GetLaunchState(arg1:application.GetLaunchStateRequest):Promise<any>;
 
 export function LaunchProject(arg1:application.LaunchProjectRequest):Promise<any>;

@@ -36,6 +36,14 @@ function LaunchFailureView({
         </Button>
         <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
       </div>
+      {error.technicalDetails ? (
+        <details className="border-t border-border pt-4 text-sm">
+          <summary className="cursor-pointer font-medium">Technical details</summary>
+          <pre className="mt-3 overflow-x-auto whitespace-pre-wrap wrap-break-word bg-muted/40 p-3 text-xs text-muted-foreground">
+            {error.technicalDetails}
+          </pre>
+        </details>
+      ) : null}
     </section>
   );
 }
