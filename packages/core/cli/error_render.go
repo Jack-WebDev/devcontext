@@ -176,59 +176,59 @@ func classifyError(err error) renderedError {
 			Why:      "The current user's home directory could not be determined.",
 			Recovery: "Check the user environment and try again.",
 		}
-	case errors.As(err, &executableNotFound) && executableNotFound.ToolID == codingtool.VSCodeID:
+	case errors.As(err, &executableNotFound):
 		return renderedError{
-			Title:    "VS Code command not found",
-			Why:      missingVSCodeWhy(executableNotFound.Candidates),
-			Recovery: missingVSCodeRecovery(executableNotFound.Candidates),
+			Title:    toolCommandNotFoundTitle(string(executableNotFound.ToolID)),
+			Why:      missingToolWhy(string(executableNotFound.ToolID), executableNotFound.Candidates),
+			Recovery: missingToolRecovery(string(executableNotFound.ToolID), executableNotFound.Candidates),
 		}
 	case errors.Is(err, codingtool.ErrExecutableNotFound):
 		return renderedError{
-			Title:    "Unable to launch editor",
-			Why:      "Dev Context could not find the configured editor executable.",
-			Recovery: "Install the editor command, add it to PATH, or configure a valid editor executable.",
+			Title:    "Unable to launch coding tool",
+			Why:      "Dev Context could not find the configured coding tool executable.",
+			Recovery: "Install the coding tool command, add it to PATH, or configure a valid executable.",
 		}
 	case errors.Is(err, codingtool.ErrExecutableNotExecutable):
 		return renderedError{
-			Title:    "Unable to launch editor",
-			Why:      "The configured editor executable is not usable.",
-			Recovery: "Configure an executable editor path or install the editor command on PATH.",
+			Title:    "Unable to launch coding tool",
+			Why:      "The configured coding tool executable is not usable.",
+			Recovery: "Configure an executable path or install the coding tool command on PATH.",
 		}
 	case errors.Is(err, codingtool.ErrMissingExecutable), errors.Is(err, launcher.ErrMissingProcessExecutable):
 		return renderedError{
-			Title:    "Unable to launch editor",
-			Why:      "No editor executable was resolved for the selected context.",
-			Recovery: "Configure an editor executable or install the editor command on PATH.",
+			Title:    "Unable to launch coding tool",
+			Why:      "No coding tool executable was resolved for the selected context.",
+			Recovery: "Configure an executable or install the coding tool command on PATH.",
 		}
 	case errors.As(err, &processLaunchError) && errors.Is(err, launcher.ErrProcessExecutableNotFound):
 		return renderedError{
-			Title:    "VS Code command not found",
+			Title:    toolCommandNotFoundTitle(processLaunchError.Tool.DisplayName),
 			Why:      processExecutableWhy(processLaunchError),
-			Recovery: "Install the VS Code command line launcher, add it to PATH, or set codingtool.executable_override in the context to a valid VS Code CLI path.",
+			Recovery: processExecutableRecovery(processLaunchError),
 		}
 	case errors.Is(err, launcher.ErrProcessExecutableNotFound):
 		return renderedError{
-			Title:    "Unable to launch editor",
-			Why:      "Dev Context could not find the configured editor executable.",
-			Recovery: "Install the editor command, add it to PATH, or configure a valid editor executable.",
+			Title:    "Unable to launch coding tool",
+			Why:      "Dev Context could not find the configured coding tool executable.",
+			Recovery: "Install the coding tool command, add it to PATH, or configure a valid executable.",
 		}
 	case errors.Is(err, launcher.ErrProcessPermissionDenied):
 		return renderedError{
-			Title:    "Unable to launch editor",
-			Why:      "The operating system denied permission to start the editor process.",
+			Title:    "Unable to launch coding tool",
+			Why:      "The operating system denied permission to start the coding tool process.",
 			Recovery: "Check executable, project, and Dev Context storage permissions, then retry.",
 		}
 	case errors.Is(err, launcher.ErrProcessWorkingDirectoryInvalid):
 		return renderedError{
-			Title:    "Unable to launch editor",
-			Why:      "The editor working directory is missing or is not a directory.",
+			Title:    "Unable to launch coding tool",
+			Why:      "The coding tool working directory is missing or is not a directory.",
 			Recovery: "Check the project path and run Dev Context from an existing project directory.",
 		}
 	case errors.Is(err, launcher.ErrProcessStartFailed):
 		return renderedError{
-			Title:    "Unable to launch editor",
-			Why:      "The operating system could not start the editor process.",
-			Recovery: "Check the editor command and project path, then retry.",
+			Title:    "Unable to launch coding tool",
+			Why:      "The operating system could not start the coding tool process.",
+			Recovery: "Check the coding tool command and project path, then retry.",
 		}
 	case isPermissionError(err):
 		return renderedError{
@@ -244,9 +244,9 @@ func classifyError(err error) renderedError {
 		}
 	case errors.Is(err, ErrLaunchFailed):
 		return renderedError{
-			Title:    "Unable to launch editor",
-			Why:      "Dev Context could not start the configured editor process.",
-			Recovery: "Check that the editor command is installed and available, then retry.",
+			Title:    "Unable to launch coding tool",
+			Why:      "Dev Context could not start the configured coding tool process.",
+			Recovery: "Check that the coding tool command is installed and available, then retry.",
 		}
 	default:
 		return renderedError{
@@ -305,6 +305,12 @@ func contextStorageWhy(err *filesystem.ContextStorageError) string {
 
 func missingDirectoryLabel(missing filesystem.MissingContextDirectory) string {
 	kind := string(missing.Kind)
+	if missing.ToolID != "" {
+		kind += ":" + missing.ToolID
+		if missing.ToolDisplayName != "" {
+			kind += " (" + missing.ToolDisplayName + ")"
+		}
+	}
 	if missing.ProviderID == "" {
 		return kind
 	}
@@ -355,27 +361,46 @@ func projectPathRenderedError(err *project.PathError) renderedError {
 	}
 }
 
-func missingVSCodeWhy(candidates []string) string {
-	if len(candidates) == 0 {
-		return "Dev Context expected the VS Code CLI command `code` but could not find it on PATH."
-	}
-	return fmt.Sprintf("Dev Context expected the VS Code CLI command on PATH and checked: `%s`.", strings.Join(candidates, "`, `"))
+func toolCommandNotFoundTitle(toolName string) string {
+	return toolNameOrFallback(toolName) + " command not found"
 }
 
-func missingVSCodeRecovery(candidates []string) string {
-	expected := "`code`"
+func missingToolWhy(toolName string, candidates []string) string {
+	if len(candidates) == 0 {
+		return fmt.Sprintf("Dev Context could not find a %s command on PATH.", toolNameOrFallback(toolName))
+	}
+	return fmt.Sprintf("Dev Context expected a %s command on PATH and checked: `%s`.", toolNameOrFallback(toolName), strings.Join(candidates, "`, `"))
+}
+
+func missingToolRecovery(toolName string, candidates []string) string {
+	expected := "the command"
 	if len(candidates) > 0 {
 		expected = "`" + strings.Join(candidates, "`, `") + "`"
 	}
-	return fmt.Sprintf("Install the VS Code command line launcher so %s is on PATH, or set codingtool.executable_override in the context to a valid VS Code CLI path.", expected)
+	return fmt.Sprintf("Install %s for %s, add it to PATH, or configure a valid executable for this context.", expected, toolNameOrFallback(toolName))
 }
 
 func processExecutableWhy(err *launcher.ProcessLaunchError) string {
 	executable := strings.TrimSpace(string(err.Executable))
 	if executable == "" {
-		return "Dev Context could not find the configured VS Code command."
+		return fmt.Sprintf("Dev Context could not find the configured %s command.", toolNameOrFallback(err.Tool.DisplayName))
 	}
-	return fmt.Sprintf("Dev Context could not find the configured VS Code command %q.", executable)
+	return fmt.Sprintf("Dev Context could not find the configured %s command %q.", toolNameOrFallback(err.Tool.DisplayName), executable)
+}
+
+func processExecutableRecovery(err *launcher.ProcessLaunchError) string {
+	executable := strings.TrimSpace(string(err.Executable))
+	if executable == "" {
+		return missingToolRecovery(err.Tool.DisplayName, nil)
+	}
+	return fmt.Sprintf("The configured %s command %q was not found. Install it, add it to PATH, or configure a valid executable for this context.", toolNameOrFallback(err.Tool.DisplayName), executable)
+}
+
+func toolNameOrFallback(name string) string {
+	if strings.TrimSpace(name) == "" {
+		return "selected coding tool"
+	}
+	return name
 }
 
 func contextIDStrings(ids []devcontext.ID) []string {

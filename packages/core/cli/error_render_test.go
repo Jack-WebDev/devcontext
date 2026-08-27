@@ -136,33 +136,34 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 				"Choose a context in the selector or rerun with `--context <id>`.\n",
 		},
 		{
-			name: "editor executable missing",
+			name: "coding tool executable missing",
 			err: &codingtool.ExecutableNotFoundError{
 				ToolID:     codingtool.VSCodeID,
 				Candidates: []string{"code"},
 			},
 			want: "" +
-				"VS Code command not found\n" +
+				"vscode command not found\n" +
 				"\n" +
-				"Dev Context expected the VS Code CLI command on PATH and checked: `code`.\n" +
+				"Dev Context expected a vscode command on PATH and checked: `code`.\n" +
 				"\n" +
 				"Next step:\n" +
-				"Install the VS Code command line launcher so `code` is on PATH, or set codingtool.executable_override in the context to a valid VS Code CLI path.\n",
+				"Install `code` for vscode, add it to PATH, or configure a valid executable for this context.\n",
 		},
 		{
 			name: "process executable missing",
 			err: &launcher.ProcessLaunchError{
+				Tool:       launcher.Tool{ID: "fake-tool", DisplayName: "Fake Tool"},
 				Executable: "/missing/code",
 				Err:        launcher.ErrProcessExecutableNotFound,
 				Cause:      os.ErrNotExist,
 			},
 			want: "" +
-				"VS Code command not found\n" +
+				"Fake Tool command not found\n" +
 				"\n" +
-				"Dev Context could not find the configured VS Code command \"/missing/code\".\n" +
+				"Dev Context could not find the configured Fake Tool command \"/missing/code\".\n" +
 				"\n" +
 				"Next step:\n" +
-				"Install the VS Code command line launcher, add it to PATH, or set codingtool.executable_override in the context to a valid VS Code CLI path.\n",
+				"The configured Fake Tool command \"/missing/code\" was not found. Install it, add it to PATH, or configure a valid executable for this context.\n",
 		},
 		{
 			name: "process permission denied",
@@ -172,9 +173,9 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 				Cause:      os.ErrPermission,
 			},
 			want: "" +
-				"Unable to launch editor\n" +
+				"Unable to launch coding tool\n" +
 				"\n" +
-				"The operating system denied permission to start the editor process.\n" +
+				"The operating system denied permission to start the coding tool process.\n" +
 				"\n" +
 				"Next step:\n" +
 				"Check executable, project, and Dev Context storage permissions, then retry.\n",
@@ -188,9 +189,9 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 				Cause:            os.ErrNotExist,
 			},
 			want: "" +
-				"Unable to launch editor\n" +
+				"Unable to launch coding tool\n" +
 				"\n" +
-				"The editor working directory is missing or is not a directory.\n" +
+				"The coding tool working directory is missing or is not a directory.\n" +
 				"\n" +
 				"Next step:\n" +
 				"Check the project path and run Dev Context from an existing project directory.\n",
@@ -203,12 +204,12 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 				Cause:      errors.New("exit status 1"),
 			},
 			want: "" +
-				"Unable to launch editor\n" +
+				"Unable to launch coding tool\n" +
 				"\n" +
-				"The operating system could not start the editor process.\n" +
+				"The operating system could not start the coding tool process.\n" +
 				"\n" +
 				"Next step:\n" +
-				"Check the editor command and project path, then retry.\n",
+				"Check the coding tool command and project path, then retry.\n",
 		},
 	}
 

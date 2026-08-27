@@ -49,10 +49,10 @@ function FirstRunWelcome({
           title="Local first"
           description="Context files live under your local Dev Context home. Nothing is synced or uploaded by Dev Context."
         />
-        <GuidanceItem
-          title="Isolated tools"
-          description="Each context gets separate Codex and Claude directories while VS Code keeps your normal profile."
-        />
+		<GuidanceItem
+			title="Isolated tools"
+			description="Each context gets separate provider and coding-tool storage for the selected development identity."
+		/>
         <GuidanceItem
           title="Separate authentication"
           description="Classify detected sessions before import, or sign in inside each provider yourself. Dev Context does not store passwords, tokens, or cloud accounts."

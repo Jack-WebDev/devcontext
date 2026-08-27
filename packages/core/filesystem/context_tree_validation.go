@@ -28,6 +28,8 @@ const (
 // MissingContextDirectory describes one absent or non-directory context path.
 type MissingContextDirectory struct {
 	Kind                ContextDirectoryKind
+	ToolID              string
+	ToolDisplayName     string
 	ProviderID          string
 	ProviderDisplayName string
 	Path                string
@@ -48,6 +50,12 @@ func (e *ContextStorageError) Error() string {
 	details := make([]string, 0, len(e.Missing))
 	for _, missing := range e.Missing {
 		kind := string(missing.Kind)
+		if missing.ToolID != "" {
+			kind += ":" + missing.ToolID
+			if missing.ToolDisplayName != "" {
+				kind += " (" + missing.ToolDisplayName + ")"
+			}
+		}
 		if missing.ProviderID != "" {
 			kind += ":" + missing.ProviderID
 			if missing.ProviderDisplayName != "" {
@@ -73,7 +81,7 @@ func (e *ContextStorageError) Unwrap() error {
 // ValidateContextDirectoryTree verifies that all expected context-owned
 // directories exist. It reports incomplete storage instead of recreating paths.
 func ValidateContextDirectoryTree(paths ContextPaths) error {
-	return validateContextDirectoryTree(paths, provider.Registry{})
+	return validateContextDirectoryTree(paths, provider.Registry{}, codingtool.Registry{})
 }
 
 // ValidateContextDirectoryTreeWithProviderRegistry verifies that all expected
@@ -94,17 +102,19 @@ func ValidateContextDirectoryTreeWithRegistries(paths ContextPaths, ctx devconte
 	}
 	paths = paths.WithProviderStorageDirs(registeredEnabledProviderIDs(ctx, providerRegistry))
 	paths = paths.WithToolStorageDirs(registeredSelectedToolIDs(ctx, toolRegistry))
-	return validateContextDirectoryTree(paths, providerRegistry)
+	return validateContextDirectoryTree(paths, providerRegistry, toolRegistry)
 }
 
-func validateContextDirectoryTree(paths ContextPaths, registry provider.Registry) error {
+func validateContextDirectoryTree(paths ContextPaths, providerRegistry provider.Registry, toolRegistry codingtool.Registry) error {
 	missing := make([]MissingContextDirectory, 0)
-	for _, expected := range expectedContextDirectories(paths, registry) {
+	for _, expected := range expectedContextDirectories(paths, providerRegistry, toolRegistry) {
 		info, err := os.Stat(expected.Path)
 		if err != nil {
 			if isMissingContextDirectoryError(err) {
 				missing = append(missing, MissingContextDirectory{
 					Kind:                expected.Kind,
+					ToolID:              expected.ToolID,
+					ToolDisplayName:     expected.ToolDisplayName,
 					ProviderID:          expected.ProviderID,
 					ProviderDisplayName: expected.ProviderDisplayName,
 					Path:                expected.Path,
@@ -120,6 +130,8 @@ func validateContextDirectoryTree(paths ContextPaths, registry provider.Registry
 		if !info.IsDir() {
 			missing = append(missing, MissingContextDirectory{
 				Kind:                expected.Kind,
+				ToolID:              expected.ToolID,
+				ToolDisplayName:     expected.ToolDisplayName,
 				ProviderID:          expected.ProviderID,
 				ProviderDisplayName: expected.ProviderDisplayName,
 				Path:                expected.Path,
@@ -139,28 +151,46 @@ func validateContextDirectoryTree(paths ContextPaths, registry provider.Registry
 
 type expectedContextDirectory struct {
 	Kind                ContextDirectoryKind
+	ToolID              string
+	ToolDisplayName     string
 	ProviderID          string
 	ProviderDisplayName string
 	Path                string
 }
 
-func expectedContextDirectories(paths ContextPaths, registry provider.Registry) []expectedContextDirectory {
+func expectedContextDirectories(paths ContextPaths, providerRegistry provider.Registry, toolRegistry codingtool.Registry) []expectedContextDirectory {
 	expected := []expectedContextDirectory{
 		{Kind: ContextDirectoryRoot, Path: paths.RootDir},
 		{Kind: ContextDirectoryTool, Path: paths.ToolStorageRootDir},
 	}
 	for _, toolID := range sortedToolStorageIDs(paths.ToolStorageDirs) {
-		expected = append(expected, expectedContextDirectory{Kind: ContextDirectoryTool, Path: paths.ToolStorageDirs[toolID]})
+		expected = append(expected, expectedContextDirectory{
+			Kind:            ContextDirectoryTool,
+			ToolID:          string(toolID),
+			ToolDisplayName: toolDisplayName(toolID, toolRegistry),
+			Path:            paths.ToolStorageDirs[toolID],
+		})
 	}
 	for _, providerID := range sortedProviderStorageIDs(paths.ProviderStorageDirs) {
 		expected = append(expected, expectedContextDirectory{
 			Kind:                ContextDirectoryProvider,
 			ProviderID:          string(providerID),
-			ProviderDisplayName: providerDisplayName(providerID, registry),
+			ProviderDisplayName: providerDisplayName(providerID, providerRegistry),
 			Path:                paths.ProviderStorageDirs[providerID],
 		})
 	}
 	return expected
+}
+
+func toolDisplayName(toolID codingtool.ID, registry codingtool.Registry) string {
+	if registry.IsZero() {
+		return ""
+	}
+	registered, ok := registry.Lookup(toolID)
+	if !ok {
+		return ""
+	}
+	return registered.DisplayName
 }
 
 func providerDisplayName(providerID provider.ID, registry provider.Registry) string {

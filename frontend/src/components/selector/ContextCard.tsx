@@ -1,6 +1,6 @@
 import type { KeyboardEvent, Ref } from "react";
 
-import type { ContextState, ProviderState } from "../../lib/devctx-api";
+import type { ContextState, LaunchConfidenceStatus, ProviderState } from "../../lib/devctx-api";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
@@ -85,6 +85,8 @@ function ContextCard({
           <ContextIdentity context={context} selected={selected} />
         )}
 
+        <ToolStatusRow context={context} />
+
         {enabledProviders.length > 0 ? (
           <ul className="space-y-2">
             {enabledProviders.map((provider) => (
@@ -94,6 +96,30 @@ function ContextCard({
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function ToolStatusRow({ context }: { context: ContextState }) {
+  const status = toolStatusPresentation(context.tool.status);
+
+  return (
+    <div className="min-w-0 border border-border bg-muted/30 p-3 text-sm">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate font-medium" title={context.tool.name}>
+            {context.tool.name}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">Coding tool</p>
+        </div>
+        <Badge variant="secondary" className={`shrink-0 text-xs font-medium normal-case tracking-normal ${status.className}`}>
+          {status.label}
+        </Badge>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">{context.tool.message}</p>
+      {context.tool.actionHint ? (
+        <p className="mt-2 border border-border bg-background p-2 text-xs text-muted-foreground">{context.tool.actionHint}</p>
+      ) : null}
+    </div>
   );
 }
 
@@ -181,6 +207,19 @@ function providerStatusPresentation(state: ProviderState["state"]): { label: str
       return { label: "Unavailable", indicatorClassName: "bg-destructive" };
     default:
       return { label: "Unknown", indicatorClassName: "bg-muted-foreground" };
+  }
+}
+
+function toolStatusPresentation(status: LaunchConfidenceStatus): { label: string; className: string } {
+  switch (status) {
+    case "ready":
+      return { label: "Ready", className: "text-emerald-700" };
+    case "needs_attention":
+      return { label: "Needs attention", className: "text-amber-700" };
+    case "blocked":
+      return { label: "Blocked", className: "text-destructive" };
+    default:
+      return { label: "Needs attention", className: "text-muted-foreground" };
   }
 }
 

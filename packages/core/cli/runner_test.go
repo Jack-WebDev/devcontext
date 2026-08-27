@@ -255,6 +255,7 @@ func TestRunnerRootLaunchBuildsPlanAndStartsDetachedProcess(t *testing.T) {
 
 	contextRoot := filepath.Join(fixture.homeDir, ".devctx", "contexts", "personal")
 	wantRequest := launcher.ProcessRequest{
+		Tool:       launcher.Tool{ID: codingtool.VSCodeID, DisplayName: "vscode"},
 		Executable: launcher.Executable("/recording/code"),
 		Arguments:  launcher.Arguments{fixture.workingDir},
 		Environment: launcher.Environment{
