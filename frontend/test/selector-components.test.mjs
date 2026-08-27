@@ -1110,7 +1110,7 @@ function contextFixture(id, name, providers = []) {
   return {
     id,
     name,
-    tool: {type: "vscode"},
+    tool: {id: "vscode", name: "VS Code", status: "ready", message: "VS Code is available for launch."},
     providers,
   };
 }

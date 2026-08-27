@@ -49,13 +49,23 @@ export interface ContextState {
   id: string;
   name: string;
   tool: ToolState;
+  availableTools: ToolOption[];
   providers: ProviderState[];
   confidence?: LaunchConfidenceState;
   metadata?: Record<string, string>;
 }
 
 export interface ToolState {
-  type: string;
+  id: string;
+  name: string;
+  status: LaunchConfidenceStatus;
+  message: string;
+  actionHint?: string;
+}
+
+export interface ToolOption {
+  id: string;
+  name: string;
 }
 
 export interface ProviderState {
@@ -411,6 +421,7 @@ function normalizeContextState(value: unknown): ContextState {
     id: stringValue(object.id),
     name: stringValue(object.name),
     tool: normalizeToolState(object.tool),
+    availableTools: arrayValue(object.availableTools).map(normalizeToolOption),
     providers: arrayValue(object.providers).map(normalizeProviderState),
     confidence: normalizeLaunchConfidenceState(object.confidence),
     metadata: optionalStringRecord(object.metadata),
@@ -419,8 +430,21 @@ function normalizeContextState(value: unknown): ContextState {
 
 function normalizeToolState(value: unknown): ToolState {
   const object = objectValue(value);
+	const actionHint = optionalString(object.actionHint);
   return {
-    type: stringValue(object.type),
+    id: stringValue(object.id),
+    name: stringValue(object.name),
+    status: normalizeLaunchConfidenceStatus(object.status),
+    message: stringValue(object.message),
+    ...(actionHint === undefined ? {} : {actionHint}),
+  };
+}
+
+function normalizeToolOption(value: unknown): ToolOption {
+  const object = objectValue(value);
+  return {
+    id: stringValue(object.id),
+    name: stringValue(object.name),
   };
 }
 

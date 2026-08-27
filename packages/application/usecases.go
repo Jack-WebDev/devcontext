@@ -328,13 +328,15 @@ func (s *Service) contextStates(contexts []devcontext.Context) []ContextState {
 
 func (s *Service) contextState(ctx devcontext.Context) ContextState {
 	providerEntries := s.providerStateEntries(ctx)
+	confidence := s.launchConfidenceStateForContext(ctx, providerEntries)
 	return ContextState{
-		ID:         ctx.ID.String(),
-		Name:       ctx.Name,
-		Tool:       ToolState{Type: string(ctx.Tool.DefaultTool)},
-		Providers:  providerStatesFromEntries(providerEntries),
-		Confidence: s.launchConfidenceStateForContext(ctx, providerEntries),
-		Metadata:   cloneMetadata(ctx.Metadata),
+		ID:             ctx.ID.String(),
+		Name:           ctx.Name,
+		Tool:           toolState(ctx.Tool.DefaultTool, confidence),
+		AvailableTools: toolOptions(s.dependencies.ToolRegistry),
+		Providers:      providerStatesFromEntries(providerEntries),
+		Confidence:     confidence,
+		Metadata:       cloneMetadata(ctx.Metadata),
 	}
 }
 
@@ -579,7 +581,7 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 		})
 	} else {
 		contextPaths = contextPaths.WithProviderStorageDirs(enabledProviderIDs(ctx))
-		checks = append(checks, launcher.IsolationConfidenceChecks(contextPaths, enabledProviderIntegrations(providerEntries))...)
+		checks = append(checks, launcher.IsolationConfidenceChecks(contextPaths, enabledProviderIntegrations(providerEntries), toolID, toolName)...)
 	}
 
 	return LaunchConfidenceState{
@@ -587,6 +589,35 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 		Status:    launchConfidenceStatus(checks),
 		Checks:    checks,
 	}
+}
+
+func toolState(toolID codingtool.ID, confidence LaunchConfidenceState) ToolState {
+	for _, check := range confidence.Checks {
+		if check.Component == LaunchConfidenceCheckTool && check.ToolID == string(toolID) {
+			return ToolState{
+				ID:         check.ToolID,
+				Name:       check.Label,
+				Status:     check.Severity,
+				Message:    check.Message,
+				ActionHint: check.ActionHint,
+			}
+		}
+	}
+	return ToolState{
+		ID:      string(toolID),
+		Name:    string(toolID),
+		Status:  LaunchConfidenceBlocked,
+		Message: "Coding tool readiness could not be determined.",
+	}
+}
+
+func toolOptions(registry codingtool.Registry) []ToolOption {
+	tools := registry.All()
+	options := make([]ToolOption, len(tools))
+	for i, tool := range tools {
+		options[i] = ToolOption{ID: string(tool.Integration.ID()), Name: tool.DisplayName}
+	}
+	return options
 }
 
 func enabledProviderIntegrations(entries []providerStateEntry) []provider.Provider {

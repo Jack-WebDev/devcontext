@@ -90,10 +90,9 @@ func ToolConfidenceCheck(toolID codingtool.ID, displayName string, executable co
 }
 
 // IsolationConfidenceChecks derives readiness checks for the context-owned
-// isolation storage required by launch and editor profile isolation. Provider
-// checks are generated from the enabled registered providers passed by the
-// application layer.
-func IsolationConfidenceChecks(paths filesystem.ContextPaths, providers []provider.Provider) []ConfidenceCheck {
+// isolation storage required by launch. Provider checks are generated from the
+// enabled registered providers passed by the application layer.
+func IsolationConfidenceChecks(paths filesystem.ContextPaths, providers []provider.Provider, toolID codingtool.ID, toolName string) []ConfidenceCheck {
 	checks := []ConfidenceCheck{
 		directoryConfidenceCheck(ConfidenceCheck{
 			Component: ConfidenceCheckIsolation,
@@ -117,12 +116,17 @@ func IsolationConfidenceChecks(paths filesystem.ContextPaths, providers []provid
 			Message:   name + " isolation storage is ready.",
 		}, paths.ProviderStorageDir(integration.ID()), name+" isolation storage is not ready."))
 	}
+	name := strings.TrimSpace(toolName)
+	if name == "" {
+		name = string(toolID)
+	}
 	checks = append(checks, multiDirectoryConfidenceCheck(ConfidenceCheck{
 		Component: ConfidenceCheckIsolation,
-		Label:     "VS Code profile",
+		ToolID:    string(toolID),
+		Label:     name + " isolation",
 		Severity:  ConfidenceReady,
-		Message:   "VS Code profile isolation is ready.",
-	}, []string{paths.ToolStorageRootDir, paths.ToolStorageDir(codingtool.VSCodeID)}, "VS Code profile isolation is not ready."))
+		Message:   name + " isolation storage is ready.",
+	}, []string{paths.ToolStorageRootDir, paths.ToolStorageDir(toolID)}, name+" isolation storage is not ready."))
 	return checks
 }
 
@@ -136,7 +140,7 @@ func confidenceMessage(value string, fallback string) string {
 func multiDirectoryConfidenceCheck(ready ConfidenceCheck, paths []string, blockedMessage string) ConfidenceCheck {
 	for _, path := range paths {
 		if !directoryReady(path) {
-			return blockedIsolationCheck(ready.Label, blockedMessage)
+			return blockedIsolationCheck(ready, blockedMessage)
 		}
 	}
 	return ready
@@ -144,16 +148,17 @@ func multiDirectoryConfidenceCheck(ready ConfidenceCheck, paths []string, blocke
 
 func directoryConfidenceCheck(ready ConfidenceCheck, path string, blockedMessage string) ConfidenceCheck {
 	if !directoryReady(path) {
-		return blockedIsolationCheck(ready.Label, blockedMessage)
+		return blockedIsolationCheck(ready, blockedMessage)
 	}
 	return ready
 }
 
-func blockedIsolationCheck(label string, message string) ConfidenceCheck {
+func blockedIsolationCheck(ready ConfidenceCheck, message string) ConfidenceCheck {
 	return ConfidenceCheck{
 		Component:  ConfidenceCheckIsolation,
+		ToolID:     ready.ToolID,
 		Severity:   ConfidenceBlocked,
-		Label:      label,
+		Label:      ready.Label,
 		Message:    message,
 		ActionHint: "Run diagnostics to repair context storage.",
 	}

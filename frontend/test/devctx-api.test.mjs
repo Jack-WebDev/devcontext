@@ -3,6 +3,15 @@ import test from "node:test";
 
 import {createDevContextApi} from "../.tmp-test/src/lib/devctx-api.js";
 
+const toolFixture = () => ({
+  id: "vscode",
+  name: "VS Code",
+  status: "ready",
+  message: "VS Code is available for launch.",
+});
+
+const toolOptionFixture = () => ({id: "vscode", name: "VS Code"});
+
 test("adapter normalizes successful Wails calls", async () => {
   const calls = [];
   const api = createDevContextApi({
@@ -14,7 +23,8 @@ test("adapter normalizes successful Wails calls", async () => {
           {
             id: "personal",
             name: "Personal",
-            tool: {type: "vscode"},
+            tool: toolFixture(),
+            availableTools: [toolOptionFixture()],
             providers: [
               {
                 id: "codex",
@@ -119,7 +129,8 @@ test("adapter normalizes successful Wails calls", async () => {
         context: {
           id: "personal",
           name: "Personal",
-          tool: {type: "vscode"},
+          tool: toolFixture(),
+          availableTools: [toolOptionFixture()],
           providers: [],
           confidence: {
             contextId: "personal",
@@ -136,7 +147,8 @@ test("adapter normalizes successful Wails calls", async () => {
         context: {
           id: "personal",
           name: "Personal",
-          tool: {type: "vscode"},
+          tool: toolFixture(),
+          availableTools: [toolOptionFixture()],
           providers: [],
           confidence: {
             contextId: "personal",
@@ -174,7 +186,8 @@ test("adapter normalizes successful Wails calls", async () => {
         context: {
           id: "personal",
           name: "Personal",
-          tool: {type: "vscode"},
+          tool: toolFixture(),
+          availableTools: [toolOptionFixture()],
           providers: [],
           confidence: {
             contextId: "personal",
@@ -194,7 +207,8 @@ test("adapter normalizes successful Wails calls", async () => {
         {
           id: "personal",
           name: "Personal",
-          tool: {type: "vscode"},
+          tool: toolFixture(),
+          availableTools: [toolOptionFixture()],
           providers: [
             {
               id: "codex",
@@ -309,7 +323,8 @@ test("adapter normalizes successful Wails calls", async () => {
       context: {
         id: "personal",
         name: "Personal",
-        tool: {type: "vscode"},
+        tool: toolFixture(),
+        availableTools: [toolOptionFixture()],
         providers: [],
         confidence: {
           contextId: "personal",
@@ -333,7 +348,8 @@ test("adapter normalizes successful Wails calls", async () => {
       context: {
         id: "personal",
         name: "Personal",
-        tool: {type: "vscode"},
+        tool: toolFixture(),
+        availableTools: [toolOptionFixture()],
         providers: [],
         confidence: {
           contextId: "personal",
@@ -373,7 +389,8 @@ test("adapter normalizes successful Wails calls", async () => {
       context: {
         id: "personal",
         name: "Personal",
-        tool: {type: "vscode"},
+        tool: toolFixture(),
+        availableTools: [toolOptionFixture()],
         providers: [],
         confidence: {
           contextId: "personal",

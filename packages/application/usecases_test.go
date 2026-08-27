@@ -70,7 +70,8 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	contextState := state.Contexts[0]
 	if contextState.ID != "personal" ||
 		contextState.Name != "Personal" ||
-		contextState.Tool != (ToolState{Type: "fake-editor"}) ||
+		contextState.Tool != (ToolState{ID: "fake-editor", Name: "Fake Tool", Status: LaunchConfidenceReady, Message: "Fake Tool is available for launch."}) ||
+		!reflect.DeepEqual(contextState.AvailableTools, []ToolOption{{ID: "fake-editor", Name: "Fake Tool"}}) ||
 		!reflect.DeepEqual(contextState.Providers, []ProviderState{
 			{
 				ID:      "fake",
@@ -110,7 +111,7 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("derive context paths: %v", err)
 	}
-	removeAll(t, contextPaths.ToolStorageDir(codingtool.VSCodeID))
+	removeAll(t, contextPaths.ToolStorageDir(ctx.Tool.DefaultTool))
 	fixture.writeBindings(t, project.Binding{
 		ProjectPath: project.Path(fixture.projectDir),
 		ContextID:   devcontext.MustID("personal"),
@@ -129,7 +130,7 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 		t.Fatalf("confidence context = %q, want personal", state.Confidence.ContextID)
 	}
 	if state.Confidence.Status != LaunchConfidenceBlocked {
-		t.Fatalf("confidence status = %q, want blocked because VS Code profile storage is absent", state.Confidence.Status)
+		t.Fatalf("confidence status = %q, want blocked because selected tool storage is absent", state.Confidence.Status)
 	}
 	wantChecks := []LaunchConfidenceCheck{
 		{
@@ -162,8 +163,9 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 		{
 			Component:  LaunchConfidenceCheckIsolation,
 			Severity:   LaunchConfidenceBlocked,
-			Label:      "VS Code profile",
-			Message:    "VS Code profile isolation is not ready.",
+			ToolID:     "fake-editor",
+			Label:      "Fake Tool isolation",
+			Message:    "Fake Tool isolation storage is not ready.",
 			ActionHint: "Run diagnostics to repair context storage.",
 		},
 	}
@@ -201,8 +203,8 @@ func TestGetLaunchStateReturnsPerContextConfidenceSummaries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("derive personal paths: %v", err)
 	}
-	removeAll(t, companyPaths.ToolStorageDir(codingtool.VSCodeID))
-	removeAll(t, personalPaths.ToolStorageDir(codingtool.VSCodeID))
+	removeAll(t, companyPaths.ToolStorageDir(company.Tool.DefaultTool))
+	removeAll(t, personalPaths.ToolStorageDir(personal.Tool.DefaultTool))
 
 	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
 	if appErr != nil {
@@ -221,10 +223,10 @@ func TestGetLaunchStateReturnsPerContextConfidenceSummaries(t *testing.T) {
 	}
 
 	if got := confidenceByContext["company"]; got.ContextID != "company" || got.Status != LaunchConfidenceBlocked {
-		t.Fatalf("company confidence = %#v, want company blocked by missing VS Code profile", got)
+		t.Fatalf("company confidence = %#v, want company blocked by missing selected tool storage", got)
 	}
 	if got := confidenceByContext["personal"]; got.ContextID != "personal" || got.Status != LaunchConfidenceBlocked {
-		t.Fatalf("personal confidence = %#v, want personal blocked by missing VS Code profile", got)
+		t.Fatalf("personal confidence = %#v, want personal blocked by missing selected tool storage", got)
 	}
 	assertConfidenceCheck(t, confidenceByContext["company"].Checks, LaunchConfidenceCheck{
 		Component:  LaunchConfidenceCheckProvider,

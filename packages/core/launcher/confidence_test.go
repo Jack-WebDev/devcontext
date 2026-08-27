@@ -397,7 +397,7 @@ func TestIsolationConfidenceChecksRepresentStorageReadiness(t *testing.T) {
 		}
 	}
 
-	got := launcher.IsolationConfidenceChecks(paths, []provider.Provider{provider.ClaudeProvider{}, provider.CodexProvider{}})
+	got := launcher.IsolationConfidenceChecks(paths, []provider.Provider{provider.ClaudeProvider{}, provider.CodexProvider{}}, codingtool.VSCodeID, "VS Code")
 	want := []launcher.ConfidenceCheck{
 		{
 			Component: launcher.ConfidenceCheckIsolation,
@@ -419,9 +419,10 @@ func TestIsolationConfidenceChecksRepresentStorageReadiness(t *testing.T) {
 		},
 		{
 			Component: launcher.ConfidenceCheckIsolation,
+			ToolID:    "vscode",
 			Severity:  launcher.ConfidenceReady,
-			Label:     "VS Code profile",
-			Message:   "VS Code profile isolation is ready.",
+			Label:     "VS Code isolation",
+			Message:   "VS Code isolation storage is ready.",
 		},
 	}
 	if !equalConfidenceChecks(got, want) {
@@ -448,7 +449,7 @@ func TestIsolationConfidenceChecksReportBlockedStorage(t *testing.T) {
 		t.Fatalf("write vscode user data file: %v", err)
 	}
 
-	got := launcher.IsolationConfidenceChecks(paths, []provider.Provider{provider.ClaudeProvider{}, provider.CodexProvider{}})
+	got := launcher.IsolationConfidenceChecks(paths, []provider.Provider{provider.ClaudeProvider{}, provider.CodexProvider{}}, codingtool.VSCodeID, "VS Code")
 	want := []launcher.ConfidenceCheck{
 		{
 			Component: launcher.ConfidenceCheckIsolation,
@@ -471,9 +472,10 @@ func TestIsolationConfidenceChecksReportBlockedStorage(t *testing.T) {
 		},
 		{
 			Component:  launcher.ConfidenceCheckIsolation,
+			ToolID:     "vscode",
 			Severity:   launcher.ConfidenceBlocked,
-			Label:      "VS Code profile",
-			Message:    "VS Code profile isolation is not ready.",
+			Label:      "VS Code isolation",
+			Message:    "VS Code isolation storage is not ready.",
 			ActionHint: "Run diagnostics to repair context storage.",
 		},
 	}
