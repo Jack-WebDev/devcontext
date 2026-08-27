@@ -10,6 +10,7 @@ import {
   shouldRenderFirstRunWelcome,
 } from "../.tmp-test/src/components/selector/FirstRunWelcome.js";
 import {GuiErrorNotice} from "../.tmp-test/src/components/selector/GuiErrorNotice.js";
+import {LaunchFailureView} from "../.tmp-test/src/components/selector/LaunchFailureView.js";
 import {
   LaunchVerificationProgress,
   verificationStepPresentation,
@@ -34,6 +35,10 @@ import {
   launchSelectedContext,
 } from "../.tmp-test/src/components/selector/launch-action.js";
 import {launchActionLabel, launchPendingLabel} from "../.tmp-test/src/components/selector/launch-copy.js";
+import {
+  defaultLaunchSuccessCloseBehavior,
+  shouldCloseSelectorAfterLaunch,
+} from "../.tmp-test/src/components/selector/launch-success-close-behavior.js";
 import {createOnboardingContextAndRefresh} from "../.tmp-test/src/components/selector/onboarding-action.js";
 import {
   initialRovingContextId,
@@ -1254,6 +1259,25 @@ test("gui error notice renders failure and recovery guidance", () => {
     assert.ok(html.includes(error.error.message));
     assert.ok(html.includes(error.error.recovery));
   }
+});
+
+test("launch success close behavior defaults to keeping the selector open", () => {
+  assert.equal(defaultLaunchSuccessCloseBehavior, "keep_open");
+  assert.equal(shouldCloseSelectorAfterLaunch("keep_open"), false);
+  assert.equal(shouldCloseSelectorAfterLaunch("close_selector"), true);
+});
+
+test("launch failure view keeps recovery actions available without exposing technical details", () => {
+  const error = apiError("launch_error", "Unable to launch editor.", "Check the editor command, project path, and permissions, then retry.").error;
+  const html = renderToStaticMarkup(LaunchFailureView({error, onRetry: () => {}, onCancel: () => {}}));
+
+  assert.match(html, /role="alert"/);
+  assert.ok(html.includes("Dev Context is still open"));
+  assert.ok(html.includes("Retry"));
+  assert.ok(html.includes("Run diagnostics"));
+  assert.ok(html.includes("Open configuration"));
+  assert.ok(html.includes("Cancel"));
+  assert.doesNotMatch(html, /Technical details/);
 });
 
 test("launch progress guard allows only one in-flight launch and restores after rejection", async () => {

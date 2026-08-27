@@ -20,6 +20,7 @@ import { ContextMismatchDialog } from "./ContextMismatchDialog";
 import { ContextCard } from "./ContextCard";
 import { FirstRunWelcome, shouldRenderFirstRunWelcome } from "./FirstRunWelcome";
 import { GuiErrorNotice } from "./GuiErrorNotice";
+import { LaunchFailureView } from "./LaunchFailureView";
 import { LaunchVerificationProgress } from "./LaunchVerificationProgress";
 import { ProviderCredentialClassification, type ProviderSessionAssignments } from "./ProviderCredentialClassification.js";
 import { ProjectIdentity } from "./ProjectIdentity";
@@ -30,6 +31,11 @@ import { SelectorLayout } from "./SelectorLayout";
 import { cancelSelector } from "./cancel-action";
 import { missingDefaultContextIds } from "./default-context-actions";
 import { createLaunchRequestGuard, launchSelectedContext } from "./launch-action";
+import {
+  defaultLaunchSuccessCloseBehavior,
+  shouldCloseSelectorAfterLaunch,
+  type LaunchSuccessCloseBehavior,
+} from "./launch-success-close-behavior";
 import { recommendationReason } from "./recommendation";
 import {
   initialRovingContextId,
@@ -46,6 +52,7 @@ interface SelectorViewProps {
   onPreflightLaunchProject: (request: PreflightLaunchProjectRequest) => Promise<ApiResult<PreflightLaunchProjectResult>>;
   onLaunchProject: (request: LaunchProjectRequest) => Promise<ApiResult<LaunchProjectResult>>;
   onCancel: () => Promise<void> | void;
+  launchSuccessCloseBehavior?: LaunchSuccessCloseBehavior;
   onCreatePersonalContext?: (importProviderIds: string[]) => Promise<ApiResult<CreateContextResult>>;
   onCreateCompanyContext?: (importProviderIds: string[]) => Promise<ApiResult<CreateContextResult>>;
 }
@@ -56,6 +63,7 @@ function SelectorView({
   onPreflightLaunchProject,
   onLaunchProject,
   onCancel,
+  launchSuccessCloseBehavior = defaultLaunchSuccessCloseBehavior,
   onCreatePersonalContext,
   onCreateCompanyContext,
 }: SelectorViewProps) {
@@ -179,7 +187,11 @@ function SelectorView({
           launchProject: onLaunchProject,
         });
 
-        if (result && !result.ok) {
+        if (result?.ok) {
+          if (shouldCloseSelectorAfterLaunch(launchSuccessCloseBehavior)) {
+            await cancelSelector({ closeSelector: onCancel });
+          }
+        } else if (result && !result.ok) {
           if (result.error.code === "context_mismatch_requires_confirmation" && result.error.contextMismatch) {
             setMismatchError(result.error);
           } else {
@@ -315,7 +327,13 @@ function SelectorView({
                 </div>
               ) : null}
 
-              {launchError ? <GuiErrorNotice error={launchError} /> : null}
+              {launchError ? (
+                <LaunchFailureView
+                  error={launchError}
+                  onRetry={() => void handleLaunch()}
+                  onCancel={() => void cancelSelector({ closeSelector: onCancel })}
+                />
+              ) : null}
 
               {mismatchError?.contextMismatch ? (
                 <ContextMismatchDialog
