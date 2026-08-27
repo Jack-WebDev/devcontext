@@ -28,11 +28,11 @@ export namespace application {
 	        this.importProviderIds = source["importProviderIds"];
 	    }
 	}
-	export class GetLaunchStateRequest {
+	export class GetHomeDashboardRequest {
 	    projectPath?: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new GetLaunchStateRequest(source);
+	        return new GetHomeDashboardRequest(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -40,14 +40,13 @@ export namespace application {
 	        this.projectPath = source["projectPath"];
 	    }
 	}
-
-	export class GetHomeDashboardRequest {
+	export class GetLaunchStateRequest {
 	    projectPath?: string;
-
+	
 	    static createFrom(source: any = {}) {
-	        return new GetHomeDashboardRequest(source);
+	        return new GetLaunchStateRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.projectPath = source["projectPath"];
@@ -99,3 +98,4 @@ export namespace application {
 	}
 
 }
+
