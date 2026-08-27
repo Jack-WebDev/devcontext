@@ -68,7 +68,7 @@ func TestConfidenceStatusRejectsUnknownValues(t *testing.T) {
 func TestConfidenceCheckComponentsValidate(t *testing.T) {
 	tests := []launcher.ConfidenceCheckComponent{
 		launcher.ConfidenceCheckProvider,
-		launcher.ConfidenceCheckVSCode,
+		launcher.ConfidenceCheckTool,
 		launcher.ConfidenceCheckIsolation,
 	}
 
@@ -148,7 +148,8 @@ func TestConfidenceCheckRejectsIncompleteValues(t *testing.T) {
 		{
 			name: "unknown severity",
 			check: launcher.ConfidenceCheck{
-				Component: launcher.ConfidenceCheckVSCode,
+				Component: launcher.ConfidenceCheckTool,
+				ToolID:    "vscode",
 				Severity:  "configured",
 				Label:     "VS Code",
 				Message:   "VS Code is ready.",
@@ -157,15 +158,26 @@ func TestConfidenceCheckRejectsIncompleteValues(t *testing.T) {
 		{
 			name: "missing label",
 			check: launcher.ConfidenceCheck{
-				Component: launcher.ConfidenceCheckVSCode,
+				Component: launcher.ConfidenceCheckTool,
+				ToolID:    "vscode",
 				Severity:  launcher.ConfidenceReady,
 				Message:   "VS Code is ready.",
 			},
 		},
 		{
+			name: "missing tool ID",
+			check: launcher.ConfidenceCheck{
+				Component: launcher.ConfidenceCheckTool,
+				Severity:  launcher.ConfidenceReady,
+				Label:     "Future Tool",
+				Message:   "Future Tool is ready.",
+			},
+		},
+		{
 			name: "missing message",
 			check: launcher.ConfidenceCheck{
-				Component: launcher.ConfidenceCheckVSCode,
+				Component: launcher.ConfidenceCheckTool,
+				ToolID:    "future-tool",
 				Severity:  launcher.ConfidenceReady,
 				Label:     "VS Code",
 			},
@@ -283,7 +295,7 @@ func TestProviderConfidenceCheckIncludesRegisteredFutureProviders(t *testing.T) 
 	}
 }
 
-func TestVSCodeConfidenceCheckMapsExecutableReadiness(t *testing.T) {
+func TestToolConfidenceCheckMapsExecutableReadiness(t *testing.T) {
 	tests := []struct {
 		name       string
 		executable codingtool.Executable
@@ -294,10 +306,11 @@ func TestVSCodeConfidenceCheckMapsExecutableReadiness(t *testing.T) {
 			name:       "ready",
 			executable: "/usr/local/bin/code",
 			want: launcher.ConfidenceCheck{
-				Component: launcher.ConfidenceCheckVSCode,
+				Component: launcher.ConfidenceCheckTool,
+				ToolID:    "future-tool",
 				Severity:  launcher.ConfidenceReady,
-				Label:     "VS Code",
-				Message:   "VS Code is available for launch.",
+				Label:     "Future Tool",
+				Message:   "Future Tool is available for launch.",
 			},
 		},
 		{
@@ -307,11 +320,12 @@ func TestVSCodeConfidenceCheckMapsExecutableReadiness(t *testing.T) {
 				Candidates: []string{"code"},
 			},
 			want: launcher.ConfidenceCheck{
-				Component:  launcher.ConfidenceCheckVSCode,
+				Component:  launcher.ConfidenceCheckTool,
+				ToolID:     "future-tool",
 				Severity:   launcher.ConfidenceBlocked,
-				Label:      "VS Code",
-				Message:    "Dev Context could not find a VS Code command to launch.",
-				ActionHint: "Install the VS Code command line launcher or configure the VS Code executable.",
+				Label:      "Future Tool",
+				Message:    "Dev Context could not find a Future Tool command to launch.",
+				ActionHint: "Install Future Tool or configure its executable.",
 			},
 		},
 		{
@@ -321,39 +335,42 @@ func TestVSCodeConfidenceCheckMapsExecutableReadiness(t *testing.T) {
 				Path:   "/tmp/code",
 			},
 			want: launcher.ConfidenceCheck{
-				Component:  launcher.ConfidenceCheckVSCode,
+				Component:  launcher.ConfidenceCheckTool,
+				ToolID:     "future-tool",
 				Severity:   launcher.ConfidenceBlocked,
-				Label:      "VS Code",
-				Message:    "The configured VS Code command cannot be run.",
-				ActionHint: "Install the VS Code command line launcher or configure the VS Code executable.",
+				Label:      "Future Tool",
+				Message:    "The configured Future Tool command cannot be run.",
+				ActionHint: "Install Future Tool or configure its executable.",
 			},
 		},
 		{
 			name: "empty executable without error",
 			want: launcher.ConfidenceCheck{
-				Component:  launcher.ConfidenceCheckVSCode,
+				Component:  launcher.ConfidenceCheckTool,
+				ToolID:     "future-tool",
 				Severity:   launcher.ConfidenceBlocked,
-				Label:      "VS Code",
-				Message:    "Dev Context could not find a VS Code command to launch.",
-				ActionHint: "Install the VS Code command line launcher or configure the VS Code executable.",
+				Label:      "Future Tool",
+				Message:    "Dev Context could not find a Future Tool command to launch.",
+				ActionHint: "Install Future Tool or configure its executable.",
 			},
 		},
 		{
 			name: "unexpected error",
 			err:  errors.New("raw path /tmp/code failed"),
 			want: launcher.ConfidenceCheck{
-				Component:  launcher.ConfidenceCheckVSCode,
+				Component:  launcher.ConfidenceCheckTool,
+				ToolID:     "future-tool",
 				Severity:   launcher.ConfidenceBlocked,
-				Label:      "VS Code",
-				Message:    "VS Code readiness could not be checked.",
-				ActionHint: "Install the VS Code command line launcher or configure the VS Code executable.",
+				Label:      "Future Tool",
+				Message:    "Future Tool readiness could not be checked.",
+				ActionHint: "Install Future Tool or configure its executable.",
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := launcher.VSCodeConfidenceCheck(tt.executable, tt.err)
+			got := launcher.ToolConfidenceCheck("future-tool", "Future Tool", tt.executable, tt.err)
 			if got != tt.want {
 				t.Fatalf("check = %#v, want %#v", got, tt.want)
 			}

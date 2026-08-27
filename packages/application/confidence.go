@@ -31,8 +31,8 @@ const (
 	// LaunchConfidenceCheckProvider identifies registered provider readiness.
 	LaunchConfidenceCheckProvider LaunchConfidenceCheckComponent = launcher.ConfidenceCheckProvider
 
-	// LaunchConfidenceCheckVSCode identifies VS Code launch readiness.
-	LaunchConfidenceCheckVSCode LaunchConfidenceCheckComponent = launcher.ConfidenceCheckVSCode
+	// LaunchConfidenceCheckTool identifies selected coding-tool readiness.
+	LaunchConfidenceCheckTool LaunchConfidenceCheckComponent = launcher.ConfidenceCheckTool
 
 	// LaunchConfidenceCheckIsolation identifies context and environment
 	// isolation readiness.

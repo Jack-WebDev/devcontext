@@ -556,15 +556,17 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 
 	toolID := ctx.Tool.DefaultTool
 	toolConfig := ctx.Tool.ConfigFor(toolID)
-	integration, registered := s.dependencies.ToolRegistry.Get(toolID)
+	registeredTool, registered := s.dependencies.ToolRegistry.Lookup(toolID)
+	toolName := string(toolID)
 	var executable codingtool.Executable
-	var editorErr error
+	var toolErr error
 	if !registered {
-		editorErr = fmt.Errorf("selected editor %q is not registered", toolID)
+		toolErr = fmt.Errorf("selected coding tool %q is not registered", toolID)
 	} else {
-		executable, editorErr = integration.DetectExecutable(toolConfig)
+		toolName = registeredTool.DisplayName
+		executable, toolErr = registeredTool.Integration.DetectExecutable(toolConfig)
 	}
-	checks = append(checks, launcher.VSCodeConfidenceCheck(executable, editorErr))
+	checks = append(checks, launcher.ToolConfidenceCheck(toolID, toolName, executable, toolErr))
 
 	contextPaths, pathsErr := filesystem.DeriveContextPaths(s.dependencies.Paths, ctx.ID)
 	if pathsErr != nil {

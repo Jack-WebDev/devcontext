@@ -53,32 +53,37 @@ func ProviderConfidenceCheck(providerID provider.ID, displayName string, status 
 	return check, true
 }
 
-// VSCodeConfidenceCheck derives the VS Code readiness check from executable
-// detection output.
-func VSCodeConfidenceCheck(executable codingtool.Executable, err error) ConfidenceCheck {
+// ToolConfidenceCheck derives the selected coding tool's readiness check from
+// executable detection output.
+func ToolConfidenceCheck(toolID codingtool.ID, displayName string, executable codingtool.Executable, err error) ConfidenceCheck {
+	name := strings.TrimSpace(displayName)
+	if name == "" {
+		name = string(toolID)
+	}
 	check := ConfidenceCheck{
-		Component: ConfidenceCheckVSCode,
-		Label:     "VS Code",
+		Component: ConfidenceCheckTool,
+		ToolID:    string(toolID),
+		Label:     name,
 	}
 
 	if err == nil && strings.TrimSpace(string(executable)) != "" {
 		check.Severity = ConfidenceReady
-		check.Message = "VS Code is available for launch."
+		check.Message = name + " is available for launch."
 		return check
 	}
 
 	check.Severity = ConfidenceBlocked
-	check.ActionHint = "Install the VS Code command line launcher or configure the VS Code executable."
+	check.ActionHint = "Install " + name + " or configure its executable."
 
 	switch {
 	case err == nil:
-		check.Message = "Dev Context could not find a VS Code command to launch."
+		check.Message = "Dev Context could not find a " + name + " command to launch."
 	case errors.Is(err, codingtool.ErrExecutableNotFound):
-		check.Message = "Dev Context could not find a VS Code command to launch."
+		check.Message = "Dev Context could not find a " + name + " command to launch."
 	case errors.Is(err, codingtool.ErrExecutableNotExecutable):
-		check.Message = "The configured VS Code command cannot be run."
+		check.Message = "The configured " + name + " command cannot be run."
 	default:
-		check.Message = "VS Code readiness could not be checked."
+		check.Message = name + " readiness could not be checked."
 	}
 
 	return check

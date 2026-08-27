@@ -84,7 +84,8 @@ test("adapter normalizes successful Wails calls", async () => {
               actionHint: "Sign in to Codex.",
             },
             {
-              component: "vscode",
+              component: "tool",
+              toolId: "vscode",
               severity: "ready",
               label: "VS Code",
               message: "VS Code is available for launch.",
@@ -270,7 +271,8 @@ test("adapter normalizes successful Wails calls", async () => {
             actionHint: "Sign in to Codex.",
           },
           {
-            component: "vscode",
+            component: "tool",
+            toolId: "vscode",
             severity: "ready",
             label: "VS Code",
             message: "VS Code is available for launch.",

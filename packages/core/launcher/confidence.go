@@ -35,8 +35,8 @@ const (
 	// ConfidenceCheckProvider identifies readiness for a registered provider.
 	ConfidenceCheckProvider ConfidenceCheckComponent = "provider"
 
-	// ConfidenceCheckVSCode identifies VS Code launch readiness.
-	ConfidenceCheckVSCode ConfidenceCheckComponent = "vscode"
+	// ConfidenceCheckTool identifies readiness for the selected coding tool.
+	ConfidenceCheckTool ConfidenceCheckComponent = "tool"
 
 	// ConfidenceCheckIsolation identifies context and environment isolation
 	// readiness.
@@ -47,7 +47,7 @@ const (
 // components.
 func (c ConfidenceCheckComponent) Valid() bool {
 	switch c {
-	case ConfidenceCheckProvider, ConfidenceCheckVSCode, ConfidenceCheckIsolation:
+	case ConfidenceCheckProvider, ConfidenceCheckTool, ConfidenceCheckIsolation:
 		return true
 	default:
 		return false
@@ -60,6 +60,7 @@ func (c ConfidenceCheckComponent) Valid() bool {
 type ConfidenceCheck struct {
 	Component  ConfidenceCheckComponent `json:"component"`
 	ProviderID string                   `json:"providerId,omitempty"`
+	ToolID     string                   `json:"toolId,omitempty"`
 	Severity   ConfidenceStatus         `json:"severity"`
 	Label      string                   `json:"label"`
 	Message    string                   `json:"message"`
@@ -72,5 +73,12 @@ func (c ConfidenceCheck) Valid() bool {
 	if !c.Component.Valid() || !c.Severity.Valid() || c.Label == "" || c.Message == "" {
 		return false
 	}
-	return c.Component != ConfidenceCheckProvider || c.ProviderID != ""
+	switch c.Component {
+	case ConfidenceCheckProvider:
+		return c.ProviderID != ""
+	case ConfidenceCheckTool:
+		return c.ToolID != ""
+	default:
+		return true
+	}
 }

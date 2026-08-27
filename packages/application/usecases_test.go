@@ -141,10 +141,11 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 			ActionHint: "Open and configure Codex for this context.",
 		},
 		{
-			Component: LaunchConfidenceCheckVSCode,
+			Component: LaunchConfidenceCheckTool,
+			ToolID:    "fake-editor",
 			Severity:  LaunchConfidenceReady,
-			Label:     "VS Code",
-			Message:   "VS Code is available for launch.",
+			Label:     "Fake Tool",
+			Message:   "Fake Tool is available for launch.",
 		},
 		{
 			Component: LaunchConfidenceCheckIsolation,
