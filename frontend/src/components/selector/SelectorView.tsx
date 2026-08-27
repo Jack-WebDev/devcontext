@@ -247,26 +247,26 @@ function SelectorView({
           projectIdentity={<ProjectIdentity project={launchState.project} />}
           contextCards={
             <>
-              {selectedContextId === undefined ? (
-                <p className="text-sm text-muted-foreground">No context selected</p>
-              ) : null}
-
-              <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="Available contexts">
-                {launchState.contexts.map((context) => (
-                  <ContextCard
-                    key={context.id}
-                    context={context}
-                    selected={selectedContextId === context.id}
-                    recommendation={recommendationForContext(launchState, context.id)}
-                    disabled={launchPending}
-                    tabIndex={rovingContextId === context.id ? 0 : -1}
-                    buttonRef={setContextButtonRef(context.id)}
-                    onSelect={handleSelectContext}
-                    onNavigate={handleContextNavigation}
-                    onLaunchSelected={keyboardLaunchAvailable ? () => void handleLaunch() : undefined}
-                  />
-                ))}
-              </div>
+              {launchState.contexts.length === 0 ? (
+                <SelectorEmptyContextState />
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="Available contexts">
+                  {launchState.contexts.map((context) => (
+                    <ContextCard
+                      key={context.id}
+                      context={context}
+                      selected={selectedContextId === context.id}
+                      recommendation={recommendationForContext(launchState, context.id)}
+                      disabled={launchPending}
+                      tabIndex={rovingContextId === context.id ? 0 : -1}
+                      buttonRef={setContextButtonRef(context.id)}
+                      onSelect={handleSelectContext}
+                      onNavigate={handleContextNavigation}
+                      onLaunchSelected={keyboardLaunchAvailable ? () => void handleLaunch() : undefined}
+                    />
+                  ))}
+                </div>
+              )}
 
               <MissingDefaultContextActions
                 launchState={launchState}
@@ -343,6 +343,22 @@ function SelectorView({
 
 function selectedContextConfidenceBlocked(context: ContextState | undefined): boolean {
   return context?.confidence?.status === "blocked";
+}
+
+function SelectorEmptyContextState() {
+  return (
+    <Card as="section" size="sm" className="border border-border bg-muted/30 p-5" aria-labelledby="empty-context-title">
+      <h3 id="empty-context-title" className="font-medium">Create a development context</h3>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Contexts keep provider accounts and coding-tool storage separate for the projects you open.
+      </p>
+      <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+        <li><span className="font-medium text-foreground">Personal:</span> personal projects and accounts.</li>
+        <li><span className="font-medium text-foreground">Company:</span> work or client projects and accounts.</li>
+        <li><span className="font-medium text-foreground">Custom:</span> create a tailored context from Contexts when custom creation is available.</li>
+      </ul>
+    </Card>
+  );
 }
 
 function MissingDefaultContextActions({

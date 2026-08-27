@@ -582,7 +582,7 @@ test("remember control renders unchecked for unbound selected projects", () => {
   assert.doesNotMatch(html, /checked=""/);
   assert.doesNotMatch(html, /disabled=""/);
   assert.ok(html.includes("Remember Personal for this project"));
-  assert.ok(html.includes("Use this context automatically for this project next time."));
+  assert.ok(html.includes("Dev Context will suggest this context next time"));
 });
 
 test("remember control renders checked user intent for unbound selected projects", () => {
@@ -620,8 +620,9 @@ test("remember control renders existing binding without a checkbox", () => {
   );
 
   assert.doesNotMatch(html, /type="checkbox"/);
-  assert.ok(html.includes("This project is remembered for"));
+  assert.ok(html.includes("Remembered context"));
   assert.ok(html.includes("Company"));
+  assert.ok(html.includes("will be suggested the next time you open this project"));
   assert.equal(boundContextName(state.binding, state.contexts), "Company");
 });
 
@@ -853,7 +854,7 @@ test("selector critical path renders selected context and submits remembered lau
   assert.ok(html.includes("/work/api"));
   assert.ok(html.includes("Personal"));
   assert.match(html, /data-selected="true"/);
-  assert.ok(html.includes("This project is remembered for"));
+  assert.ok(html.includes("Remembered context"));
   assert.ok(html.includes("Launching..."));
 
   const calls = [];
@@ -1177,6 +1178,9 @@ test("gui error notice renders failure and recovery guidance", () => {
     const html = renderToStaticMarkup(GuiErrorNotice({error: error.error}));
 
     assert.match(html, /role="alert"/);
+    assert.ok(html.includes("What happened"));
+    assert.ok(html.includes("Why it matters"));
+    assert.ok(html.includes("What to do"));
     assert.ok(html.includes(error.error.message));
     assert.ok(html.includes(error.error.recovery));
   }

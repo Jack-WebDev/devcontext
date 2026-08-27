@@ -21,8 +21,11 @@ function RememberProjectControl({
   const boundContext = boundContextName(binding, contexts);
   if (boundContext !== undefined) {
     return (
-      <Card as="p" size="sm" className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-        This project is remembered for <span className="font-medium text-foreground">{boundContext}</span>.
+      <Card as="div" size="sm" className="border border-border bg-muted/30 p-3 text-sm">
+        <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Remembered context</p>
+        <p className="mt-1 text-muted-foreground">
+          <span className="font-medium text-foreground">{boundContext}</span> will be suggested the next time you open this project.
+        </p>
       </Card>
     );
   }
@@ -48,7 +51,7 @@ function RememberProjectControl({
             ? disabledByParent
               ? "Remembering is unavailable while launch is in progress."
               : "Select a context before remembering this project."
-            : "Use this context automatically for this project next time."}
+            : "Dev Context will suggest this context next time and still show its launch safety checks."}
         </span>
       </span>
     </Card>
