@@ -8,7 +8,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"devctx/packages/core/editor"
+	codingtool "devctx/packages/core/codingtool"
 )
 
 var (
@@ -120,8 +120,8 @@ func globalConfigFromTOML(raw globalConfigTOML) (GlobalConfig, error) {
 	if raw.DefaultEditor == nil {
 		return GlobalConfig{}, fmt.Errorf("%w: missing default_editor", ErrInvalidGlobalConfig)
 	}
-	defaultEditor := editor.Type(*raw.DefaultEditor)
-	if defaultEditor != editor.TypeVSCode {
+	defaultEditor := codingtool.Type(*raw.DefaultEditor)
+	if defaultEditor != codingtool.TypeVSCode {
 		return GlobalConfig{}, fmt.Errorf("%w: unsupported default_editor %q", ErrInvalidGlobalConfig, defaultEditor)
 	}
 
@@ -152,7 +152,7 @@ func validateGlobalConfig(globalConfig GlobalConfig) error {
 	if globalConfig.Version != CurrentSchemaVersion {
 		return fmt.Errorf("%w: %d", ErrUnsupportedSchemaVersion, globalConfig.Version)
 	}
-	if globalConfig.DefaultEditor != editor.TypeVSCode {
+	if globalConfig.DefaultEditor != codingtool.TypeVSCode {
 		return fmt.Errorf("%w: unsupported default_editor %q", ErrInvalidGlobalConfig, globalConfig.DefaultEditor)
 	}
 	return nil

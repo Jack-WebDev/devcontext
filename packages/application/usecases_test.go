@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	devlog "devctx/packages/core/logging"
@@ -70,7 +70,7 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	contextState := state.Contexts[0]
 	if contextState.ID != "personal" ||
 		contextState.Name != "Personal" ||
-		contextState.Editor != (EditorState{Type: "fake-editor"}) ||
+		contextState.Tool != (EditorState{Type: "fake-editor"}) ||
 		!reflect.DeepEqual(contextState.Providers, []ProviderState{
 			{
 				ID:      "fake",
@@ -110,7 +110,7 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("derive context paths: %v", err)
 	}
-	removeAll(t, contextPaths.VSCodeUserDataDir)
+	removeAll(t, contextPaths.ToolStorageDir(codingtool.VSCodeID))
 	fixture.writeBindings(t, project.Binding{
 		ProjectPath: project.Path(fixture.projectDir),
 		ContextID:   devcontext.MustID("personal"),
@@ -200,8 +200,8 @@ func TestGetLaunchStateReturnsPerContextConfidenceSummaries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("derive personal paths: %v", err)
 	}
-	removeAll(t, companyPaths.VSCodeUserDataDir)
-	removeAll(t, personalPaths.VSCodeUserDataDir)
+	removeAll(t, companyPaths.ToolStorageDir(codingtool.VSCodeID))
+	removeAll(t, personalPaths.ToolStorageDir(codingtool.VSCodeID))
 
 	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
 	if appErr != nil {
@@ -809,12 +809,12 @@ func TestCreateContextCreatesDefaultPersonalAndCompanyContexts(t *testing.T) {
 		{
 			name:      "personal",
 			contextID: "personal",
-			want:      devcontext.Context{ID: devcontext.MustID("personal"), Name: "Personal", Editor: editor.Config{Type: "fake-editor"}, Providers: defaultRegistry.DefaultConfigs(), CreatedAt: now},
+			want:      devcontext.Context{ID: devcontext.MustID("personal"), Name: "Personal", Tool: codingtool.Config{Type: "fake-editor"}, Providers: defaultRegistry.DefaultConfigs(), CreatedAt: now},
 		},
 		{
 			name:      "company",
 			contextID: "company",
-			want:      devcontext.Context{ID: devcontext.MustID("company"), Name: "Company", Editor: editor.Config{Type: "fake-editor"}, Providers: defaultRegistry.DefaultConfigs(), CreatedAt: now},
+			want:      devcontext.Context{ID: devcontext.MustID("company"), Name: "Company", Tool: codingtool.Config{Type: "fake-editor"}, Providers: defaultRegistry.DefaultConfigs(), CreatedAt: now},
 		},
 	}
 
@@ -1214,7 +1214,7 @@ func (f applicationFixture) service() *Service {
 		Projects:           project.NewRepository(f.bindingsPath, f.paths),
 		Paths:              f.paths,
 		ProviderRegistry:   registry,
-		ToolRegistry:       editor.MustNewRegistry([]editor.Tool{{Integration: f.editor, DisplayName: "Fake Editor"}}, f.editor.ID()),
+		ToolRegistry:       codingtool.MustNewRegistry([]codingtool.RegisteredTool{{Integration: f.editor, DisplayName: "Fake Tool"}}, f.editor.ID()),
 		ProcessLauncher:    f.process,
 		StoragePermissions: f.storagePermissions,
 		ParentEnvironment:  []string{"PATH=/fixture/bin"},
@@ -1229,9 +1229,9 @@ func (f applicationFixture) service() *Service {
 
 func (f applicationFixture) context(id string, name string) devcontext.Context {
 	return devcontext.Context{
-		ID:     devcontext.MustID(id),
-		Name:   name,
-		Editor: editor.Config{Type: f.editor.ID()},
+		ID:   devcontext.MustID(id),
+		Name: name,
+		Tool: codingtool.Config{Type: f.editor.ID()},
 		Providers: provider.Configs{
 			"fake": {Enabled: true},
 		},
@@ -1251,8 +1251,8 @@ func (f applicationFixture) writeContext(t *testing.T, ctx devcontext.Context) {
 	}
 	contextPaths = contextPaths.WithProviderStorageDirs(enabledProviderIDs(ctx))
 	mkdir(t, contextPaths.RootDir)
-	mkdir(t, contextPaths.VSCodeDir)
-	mkdir(t, contextPaths.VSCodeUserDataDir)
+	mkdir(t, contextPaths.ToolStorageRootDir)
+	mkdir(t, contextPaths.ToolStorageDir(ctx.Tool.Type))
 	for _, dir := range contextPaths.ProviderStorageDirs {
 		mkdir(t, dir)
 	}

@@ -1,4 +1,4 @@
-package editor_test
+package codingtool_test
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"devctx/packages/core/editor"
+	codingtool "devctx/packages/core/codingtool"
 )
 
 func TestVSCodeEditorDetectsUnixExecutableFromSearchPath(t *testing.T) {
@@ -17,10 +17,10 @@ func TestVSCodeEditorDetectsUnixExecutableFromSearchPath(t *testing.T) {
 		},
 	}
 
-	executable, err := (editor.VSCodeEditor{
+	executable, err := (codingtool.VSCodeEditor{
 		Probe:           &probe,
 		OperatingSystem: "linux",
-	}).DetectExecutable(editor.DefaultConfig())
+	}).DetectExecutable(codingtool.DefaultConfig())
 	if err != nil {
 		t.Fatalf("detect executable: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestVSCodeEditorDetectsWindowsExecutableFormsFromSearchPath(t *testing.T) {
 	tests := []struct {
 		name      string
 		paths     map[string]string
-		want      editor.Executable
+		want      codingtool.Executable
 		wantCalls []string
 	}{
 		{
@@ -70,10 +70,10 @@ func TestVSCodeEditorDetectsWindowsExecutableFormsFromSearchPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			probe := fakeExecutableProbe{paths: tt.paths}
 
-			executable, err := (editor.VSCodeEditor{
+			executable, err := (codingtool.VSCodeEditor{
 				Probe:           &probe,
 				OperatingSystem: "windows",
-			}).DetectExecutable(editor.DefaultConfig())
+			}).DetectExecutable(codingtool.DefaultConfig())
 			if err != nil {
 				t.Fatalf("detect executable: %v", err)
 			}
@@ -91,23 +91,23 @@ func TestVSCodeEditorDetectsWindowsExecutableFormsFromSearchPath(t *testing.T) {
 func TestVSCodeEditorReportsTypedExecutableNotFoundError(t *testing.T) {
 	probe := fakeExecutableProbe{}
 
-	_, err := (editor.VSCodeEditor{
+	_, err := (codingtool.VSCodeEditor{
 		Probe:           &probe,
 		OperatingSystem: "windows",
-	}).DetectExecutable(editor.DefaultConfig())
+	}).DetectExecutable(codingtool.DefaultConfig())
 	if err == nil {
 		t.Fatal("detect executable returned nil error, want not found")
 	}
-	if !errors.Is(err, editor.ErrExecutableNotFound) {
-		t.Fatalf("error = %v, want %v", err, editor.ErrExecutableNotFound)
+	if !errors.Is(err, codingtool.ErrExecutableNotFound) {
+		t.Fatalf("error = %v, want %v", err, codingtool.ErrExecutableNotFound)
 	}
 
-	var notFound *editor.ExecutableNotFoundError
+	var notFound *codingtool.ExecutableNotFoundError
 	if !errors.As(err, &notFound) {
-		t.Fatalf("error = %T, want *editor.ExecutableNotFoundError", err)
+		t.Fatalf("error = %T, want *codingtool.ExecutableNotFoundError", err)
 	}
-	if notFound.EditorID != editor.VSCodeID {
-		t.Fatalf("editor id = %q, want %q", notFound.EditorID, editor.VSCodeID)
+	if notFound.EditorID != codingtool.VSCodeID {
+		t.Fatalf("editor id = %q, want %q", notFound.EditorID, codingtool.VSCodeID)
 	}
 	wantCandidates := []string{"code", "code.cmd", "Code.exe"}
 	if !reflect.DeepEqual(notFound.Candidates, wantCandidates) {
@@ -128,11 +128,11 @@ func TestVSCodeEditorUsesConfiguredExecutableBeforeSearchPath(t *testing.T) {
 		},
 	}
 
-	executable, err := (editor.VSCodeEditor{
+	executable, err := (codingtool.VSCodeEditor{
 		Probe:           &probe,
 		OperatingSystem: "linux",
-	}).DetectExecutable(editor.Config{
-		Type:               editor.TypeVSCode,
+	}).DetectExecutable(codingtool.Config{
+		Type:               codingtool.TypeVSCode,
 		ExecutableOverride: "/opt/visual-studio-code/bin/code",
 	})
 	if err != nil {
@@ -153,18 +153,18 @@ func TestVSCodeEditorUsesConfiguredExecutableBeforeSearchPath(t *testing.T) {
 func TestVSCodeEditorReportsMissingConfiguredExecutable(t *testing.T) {
 	probe := fakeExecutableProbe{}
 
-	_, err := (editor.VSCodeEditor{
+	_, err := (codingtool.VSCodeEditor{
 		Probe:           &probe,
 		OperatingSystem: "linux",
-	}).DetectExecutable(editor.Config{
-		Type:               editor.TypeVSCode,
+	}).DetectExecutable(codingtool.Config{
+		Type:               codingtool.TypeVSCode,
 		ExecutableOverride: "/missing/code",
 	})
 	if err == nil {
 		t.Fatal("detect executable returned nil error, want missing executable")
 	}
-	if !errors.Is(err, editor.ErrExecutableNotFound) {
-		t.Fatalf("error = %v, want %v", err, editor.ErrExecutableNotFound)
+	if !errors.Is(err, codingtool.ErrExecutableNotFound) {
+		t.Fatalf("error = %v, want %v", err, codingtool.ErrExecutableNotFound)
 	}
 	if len(probe.calls) != 0 {
 		t.Fatalf("lookup calls = %#v, want none", probe.calls)
@@ -181,18 +181,18 @@ func TestVSCodeEditorReportsNonExecutableConfiguredExecutable(t *testing.T) {
 		},
 	}
 
-	_, err := (editor.VSCodeEditor{
+	_, err := (codingtool.VSCodeEditor{
 		Probe:           &probe,
 		OperatingSystem: "linux",
-	}).DetectExecutable(editor.Config{
-		Type:               editor.TypeVSCode,
+	}).DetectExecutable(codingtool.Config{
+		Type:               codingtool.TypeVSCode,
 		ExecutableOverride: "/opt/code",
 	})
 	if err == nil {
 		t.Fatal("detect executable returned nil error, want non-executable error")
 	}
-	if !errors.Is(err, editor.ErrExecutableNotExecutable) {
-		t.Fatalf("error = %v, want %v", err, editor.ErrExecutableNotExecutable)
+	if !errors.Is(err, codingtool.ErrExecutableNotExecutable) {
+		t.Fatalf("error = %v, want %v", err, codingtool.ErrExecutableNotExecutable)
 	}
 	if !reflect.DeepEqual(probe.statCalls, []string{"/opt/code"}) {
 		t.Fatalf("stat calls = %#v, want %#v", probe.statCalls, []string{"/opt/code"})
@@ -202,64 +202,64 @@ func TestVSCodeEditorReportsNonExecutableConfiguredExecutable(t *testing.T) {
 func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 	tests := []struct {
 		name    string
-		request editor.CommandRequest
-		want    editor.Command
+		request codingtool.CommandRequest
+		want    codingtool.Command
 	}{
 		{
 			name: "paths with spaces",
-			request: editor.CommandRequest{
-				Config:      editor.DefaultConfig(),
+			request: codingtool.CommandRequest{
+				Config:      codingtool.DefaultConfig(),
 				Executable:  "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
 				ProjectPath: "/Users/Alex/Work/Client A/API",
 			},
-			want: editor.Command{
+			want: codingtool.Command{
 				Executable: "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
-				Arguments: editor.Arguments{
+				Arguments: codingtool.Arguments{
 					"/Users/Alex/Work/Client A/API",
 				},
 			},
 		},
 		{
 			name: "windows separators",
-			request: editor.CommandRequest{
-				Config:      editor.DefaultConfig(),
+			request: codingtool.CommandRequest{
+				Config:      codingtool.DefaultConfig(),
 				Executable:  `C:\Users\Alex\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd`,
 				ProjectPath: `C:\Users\Alex\Projects\Client A\API`,
 			},
-			want: editor.Command{
+			want: codingtool.Command{
 				Executable: `C:\Users\Alex\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd`,
-				Arguments: editor.Arguments{
+				Arguments: codingtool.Arguments{
 					`C:\Users\Alex\Projects\Client A\API`,
 				},
 			},
 		},
 		{
 			name: "non ASCII paths",
-			request: editor.CommandRequest{
-				Config:      editor.DefaultConfig(),
+			request: codingtool.CommandRequest{
+				Config:      codingtool.DefaultConfig(),
 				Executable:  "/usr/local/bin/code",
 				ProjectPath: "/Users/Alex/équipe/Café Portal",
 			},
-			want: editor.Command{
+			want: codingtool.Command{
 				Executable: "/usr/local/bin/code",
-				Arguments: editor.Arguments{
+				Arguments: codingtool.Arguments{
 					"/Users/Alex/équipe/Café Portal",
 				},
 			},
 		},
 		{
 			name: "custom executable",
-			request: editor.CommandRequest{
-				Config: editor.Config{
-					Type:               editor.TypeVSCode,
+			request: codingtool.CommandRequest{
+				Config: codingtool.Config{
+					Type:               codingtool.TypeVSCode,
 					ExecutableOverride: "/opt/vscode-insiders/bin/code-insiders",
 				},
 				Executable:  "/opt/vscode-insiders/bin/code-insiders",
 				ProjectPath: "/work/app",
 			},
-			want: editor.Command{
+			want: codingtool.Command{
 				Executable: "/opt/vscode-insiders/bin/code-insiders",
-				Arguments: editor.Arguments{
+				Arguments: codingtool.Arguments{
 					"/work/app",
 				},
 			},
@@ -268,7 +268,7 @@ func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			command, err := editor.VSCodeEditor{}.BuildLaunchCommand(tt.request)
+			command, err := codingtool.VSCodeEditor{}.BuildLaunchCommand(tt.request)
 			if err != nil {
 				t.Fatalf("build launch command: %v", err)
 			}
@@ -281,40 +281,40 @@ func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 }
 
 func TestVSCodeEditorBuildLaunchCommandRejectsMissingInputs(t *testing.T) {
-	validRequest := editor.CommandRequest{
-		Config:      editor.DefaultConfig(),
+	validRequest := codingtool.CommandRequest{
+		Config:      codingtool.DefaultConfig(),
 		Executable:  "/usr/local/bin/code",
 		ProjectPath: "/work/client-a/api",
 	}
 
 	tests := []struct {
 		name    string
-		request editor.CommandRequest
+		request codingtool.CommandRequest
 		wantErr error
 	}{
 		{
 			name: "missing executable",
-			request: editor.CommandRequest{
+			request: codingtool.CommandRequest{
 				Config:      validRequest.Config,
 				ProjectPath: validRequest.ProjectPath,
 				Paths:       validRequest.Paths,
 			},
-			wantErr: editor.ErrMissingExecutable,
+			wantErr: codingtool.ErrMissingExecutable,
 		},
 		{
 			name: "missing project path",
-			request: editor.CommandRequest{
+			request: codingtool.CommandRequest{
 				Config:     validRequest.Config,
 				Executable: validRequest.Executable,
 				Paths:      validRequest.Paths,
 			},
-			wantErr: editor.ErrMissingProjectPath,
+			wantErr: codingtool.ErrMissingProjectPath,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := editor.VSCodeEditor{}.BuildLaunchCommand(tt.request)
+			_, err := codingtool.VSCodeEditor{}.BuildLaunchCommand(tt.request)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("error = %v, want %v", err, tt.wantErr)
 			}

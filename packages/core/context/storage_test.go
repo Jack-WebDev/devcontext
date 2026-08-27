@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/provider"
 )
 
@@ -300,9 +300,9 @@ func writeFile(t *testing.T, path string, data []byte) {
 
 func storedContext(id string, name string) devcontext.Context {
 	return devcontext.Context{
-		ID:     devcontext.MustID(id),
-		Name:   name,
-		Editor: editor.DefaultConfig(),
+		ID:   devcontext.MustID(id),
+		Name: name,
+		Tool: codingtool.DefaultConfig(),
 		Providers: provider.Configs{
 			"claude": {Enabled: true},
 			"codex":  {Enabled: true},

@@ -31,7 +31,7 @@ type ProjectState struct {
 type ContextState struct {
 	ID         string                `json:"id"`
 	Name       string                `json:"name"`
-	Editor     EditorState           `json:"editor"`
+	Tool       EditorState           `json:"editor"`
 	Providers  []ProviderState       `json:"providers"`
 	Confidence LaunchConfidenceState `json:"confidence"`
 	Metadata   map[string]string     `json:"metadata,omitempty"`

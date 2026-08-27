@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/environment"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
@@ -48,10 +48,10 @@ type Runner struct {
 	WorkingDirectory string
 	Paths            filesystem.PlatformPaths
 	ProviderRegistry provider.Registry
-	ToolRegistry     editor.Registry
-	// Editor is retained temporarily for callers that have not yet moved to the
+	ToolRegistry     codingtool.Registry
+	// Tool is retained temporarily for callers that have not yet moved to the
 	// registry contract. New code must provide ToolRegistry.
-	Editor             editor.Editor
+	Tool               codingtool.CodingTool
 	ProcessLauncher    launcher.ProcessLauncher
 	ParentEnvironment  []string
 	DetachMode         launcher.DetachMode
@@ -237,14 +237,14 @@ func (r Runner) providerRegistry() provider.Registry {
 	return provider.BuiltInRegistry()
 }
 
-func (r Runner) toolRegistry() editor.Registry {
+func (r Runner) toolRegistry() codingtool.Registry {
 	if !r.ToolRegistry.IsZero() {
 		return r.ToolRegistry
 	}
-	if r.Editor != nil {
-		return editor.MustNewRegistry([]editor.Tool{{Integration: r.Editor, DisplayName: string(r.Editor.ID())}}, r.Editor.ID())
+	if r.Tool != nil {
+		return codingtool.MustNewRegistry([]codingtool.RegisteredTool{{Integration: r.Tool, DisplayName: string(r.Tool.ID())}}, r.Tool.ID())
 	}
-	return editor.BuiltInRegistry()
+	return codingtool.BuiltInRegistry()
 }
 
 func (r Runner) processLauncher() launcher.ProcessLauncher {
@@ -394,7 +394,7 @@ func renderDebugLaunchPlan(plan launcher.LaunchPlan) string {
 	var builder strings.Builder
 	builder.WriteString("Debug:\n")
 	fmt.Fprintf(&builder, "resolution_source: %s\n", plan.ResolutionSource)
-	fmt.Fprintf(&builder, "editor_id: %s\n", plan.Editor.Type)
+	fmt.Fprintf(&builder, "editor_id: %s\n", plan.Tool.Type)
 	fmt.Fprintf(&builder, "editor_executable: %s\n", plan.Executable)
 	builder.WriteString("context_directories:\n")
 	fmt.Fprintf(&builder, "  root: %s\n", plan.ContextPaths.RootDir)
@@ -451,7 +451,7 @@ func eventFromPlan(name devlog.EventName, plan launcher.LaunchPlan, err error, t
 		Timestamp:        timestamp,
 		ProjectPath:      string(plan.ProjectPath),
 		ContextID:        plan.Context.ID.String(),
-		EditorID:         string(plan.Editor.Type),
+		EditorID:         string(plan.Tool.Type),
 		ResolutionSource: string(plan.ResolutionSource),
 		Err:              err,
 		KnownEnvironment: plan.Environment.Environ(),

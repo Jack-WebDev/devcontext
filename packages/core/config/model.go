@@ -1,6 +1,6 @@
 package config
 
-import "devctx/packages/core/editor"
+import codingtool "devctx/packages/core/codingtool"
 
 // SchemaVersion identifies the supported shape of global configuration.
 type SchemaVersion int
@@ -8,7 +8,7 @@ type SchemaVersion int
 // GlobalConfig stores application-wide Dev Context settings.
 type GlobalConfig struct {
 	Version       SchemaVersion
-	DefaultEditor editor.Type
+	DefaultEditor codingtool.Type
 	UI            UISettings
 	Safety        SafetySettings
 }

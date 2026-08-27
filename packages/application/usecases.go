@@ -7,8 +7,8 @@ import (
 	"sort"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	devlog "devctx/packages/core/logging"
@@ -330,7 +330,7 @@ func (s *Service) contextState(ctx devcontext.Context) ContextState {
 	return ContextState{
 		ID:         ctx.ID.String(),
 		Name:       ctx.Name,
-		Editor:     EditorState{Type: string(ctx.Editor.Type)},
+		Tool:       EditorState{Type: string(ctx.Tool.Type)},
 		Providers:  providerStatesFromEntries(providerEntries),
 		Confidence: s.launchConfidenceStateForContext(ctx, providerEntries),
 		Metadata:   cloneMetadata(ctx.Metadata),
@@ -394,10 +394,8 @@ func (s *Service) providerStateEntries(ctx devcontext.Context) []providerStateEn
 					ContextID: ctx.ID.String(),
 					Config:    config,
 					Paths: provider.ContextPaths{
-						RootDir:           contextPaths.RootDir,
-						StorageDir:        contextPaths.ProviderStorageDir(integration.ID()),
-						VSCodeDir:         contextPaths.VSCodeDir,
-						VSCodeUserDataDir: contextPaths.VSCodeUserDataDir,
+						RootDir:    contextPaths.RootDir,
+						StorageDir: contextPaths.ProviderStorageDir(integration.ID()),
 					},
 				})
 				if err != nil {
@@ -512,10 +510,8 @@ func providerRuntimeContext(ctx devcontext.Context, config provider.Config, path
 		ContextID: ctx.ID.String(),
 		Config:    config,
 		Paths: provider.ContextPaths{
-			RootDir:           paths.RootDir,
-			StorageDir:        paths.ProviderStorageDir(providerID),
-			VSCodeDir:         paths.VSCodeDir,
-			VSCodeUserDataDir: paths.VSCodeUserDataDir,
+			RootDir:    paths.RootDir,
+			StorageDir: paths.ProviderStorageDir(providerID),
 		},
 	}
 }
@@ -557,13 +553,13 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 		}
 	}
 
-	integration, registered := s.dependencies.ToolRegistry.Get(ctx.Editor.Type)
-	var executable editor.Executable
+	integration, registered := s.dependencies.ToolRegistry.Get(ctx.Tool.Type)
+	var executable codingtool.Executable
 	var editorErr error
 	if !registered {
-		editorErr = fmt.Errorf("selected editor %q is not registered", ctx.Editor.Type)
+		editorErr = fmt.Errorf("selected editor %q is not registered", ctx.Tool.Type)
 	} else {
-		executable, editorErr = integration.DetectExecutable(ctx.Editor)
+		executable, editorErr = integration.DetectExecutable(ctx.Tool)
 	}
 	checks = append(checks, launcher.VSCodeConfidenceCheck(executable, editorErr))
 
@@ -639,7 +635,7 @@ func eventFromLaunchPlan(name devlog.EventName, plan launcher.LaunchPlan, err er
 		Timestamp:        timestamp,
 		ProjectPath:      string(plan.ProjectPath),
 		ContextID:        plan.Context.ID.String(),
-		EditorID:         string(plan.Editor.Type),
+		EditorID:         string(plan.Tool.Type),
 		ResolutionSource: string(plan.ResolutionSource),
 		Err:              err,
 		KnownEnvironment: plan.Environment.Environ(),

@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/provider"
@@ -286,7 +286,7 @@ func TestProviderConfidenceCheckIncludesRegisteredFutureProviders(t *testing.T) 
 func TestVSCodeConfidenceCheckMapsExecutableReadiness(t *testing.T) {
 	tests := []struct {
 		name       string
-		executable editor.Executable
+		executable codingtool.Executable
 		err        error
 		want       launcher.ConfidenceCheck
 	}{
@@ -302,8 +302,8 @@ func TestVSCodeConfidenceCheckMapsExecutableReadiness(t *testing.T) {
 		},
 		{
 			name: "missing executable",
-			err: &editor.ExecutableNotFoundError{
-				EditorID:   editor.VSCodeID,
+			err: &codingtool.ExecutableNotFoundError{
+				EditorID:   codingtool.VSCodeID,
 				Candidates: []string{"code"},
 			},
 			want: launcher.ConfidenceCheck{
@@ -316,8 +316,8 @@ func TestVSCodeConfidenceCheckMapsExecutableReadiness(t *testing.T) {
 		},
 		{
 			name: "invalid executable",
-			err: &editor.ExecutableNotExecutableError{
-				EditorID: editor.VSCodeID,
+			err: &codingtool.ExecutableNotExecutableError{
+				EditorID: codingtool.VSCodeID,
 				Path:     "/tmp/code",
 			},
 			want: launcher.ConfidenceCheck{
@@ -370,11 +370,11 @@ func TestIsolationConfidenceChecksRepresentStorageReadiness(t *testing.T) {
 		ContextID:              devcontext.MustID("personal"),
 		RootDir:                filepath.Join(root, "personal"),
 		ProviderStorageRootDir: filepath.Join(root, "personal", "providers"),
-		VSCodeDir:              filepath.Join(root, "personal", "vscode"),
-		VSCodeUserDataDir:      filepath.Join(root, "personal", "vscode", "user-data"),
+		ToolStorageRootDir:     filepath.Join(root, "personal", "tools"),
+		ToolStorageDirs:        map[codingtool.ID]string{codingtool.VSCodeID: filepath.Join(root, "personal", "tools", "vscode")},
 	}
 	paths = paths.WithProviderStorageDirs([]provider.ID{provider.ClaudeID, provider.CodexID})
-	for _, dir := range []string{paths.RootDir, paths.ProviderStorageDir(provider.ClaudeID), paths.ProviderStorageDir(provider.CodexID), paths.VSCodeDir, paths.VSCodeUserDataDir} {
+	for _, dir := range []string{paths.RootDir, paths.ProviderStorageDir(provider.ClaudeID), paths.ProviderStorageDir(provider.CodexID), paths.ToolStorageRootDir, paths.ToolStorageDir(codingtool.VSCodeID)} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatalf("create directory %q: %v", dir, err)
 		}
@@ -418,16 +418,16 @@ func TestIsolationConfidenceChecksReportBlockedStorage(t *testing.T) {
 		ContextID:              devcontext.MustID("personal"),
 		RootDir:                filepath.Join(root, "personal"),
 		ProviderStorageRootDir: filepath.Join(root, "personal", "providers"),
-		VSCodeDir:              filepath.Join(root, "personal", "vscode"),
-		VSCodeUserDataDir:      filepath.Join(root, "personal", "vscode", "user-data"),
+		ToolStorageRootDir:     filepath.Join(root, "personal", "tools"),
+		ToolStorageDirs:        map[codingtool.ID]string{codingtool.VSCodeID: filepath.Join(root, "personal", "tools", "vscode")},
 	}
 	paths = paths.WithProviderStorageDirs([]provider.ID{provider.ClaudeID, provider.CodexID})
-	for _, dir := range []string{paths.RootDir, paths.ProviderStorageDir(provider.ClaudeID), paths.VSCodeDir} {
+	for _, dir := range []string{paths.RootDir, paths.ProviderStorageDir(provider.ClaudeID), paths.ToolStorageRootDir} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatalf("create directory %q: %v", dir, err)
 		}
 	}
-	if err := os.WriteFile(paths.VSCodeUserDataDir, []byte("not a directory"), 0o600); err != nil {
+	if err := os.WriteFile(paths.ToolStorageDir(codingtool.VSCodeID), []byte("not a directory"), 0o600); err != nil {
 		t.Fatalf("write vscode user data file: %v", err)
 	}
 

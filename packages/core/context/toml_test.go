@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/provider"
 )
 
@@ -37,9 +37,9 @@ enabled = true
 `,
 			expectedID: devcontext.MustID("personal"),
 			want: devcontext.Context{
-				ID:     devcontext.MustID("personal"),
-				Name:   "Personal",
-				Editor: editor.DefaultConfig(),
+				ID:   devcontext.MustID("personal"),
+				Name: "Personal",
+				Tool: codingtool.DefaultConfig(),
 				Providers: provider.Configs{
 					"claude": {Enabled: true},
 					"codex":  {Enabled: true},
@@ -68,9 +68,9 @@ kind = "default"
 `,
 			expectedID: devcontext.MustID("company"),
 			want: devcontext.Context{
-				ID:     devcontext.MustID("company"),
-				Name:   "Company",
-				Editor: editor.DefaultConfig(),
+				ID:   devcontext.MustID("company"),
+				Name: "Company",
+				Tool: codingtool.DefaultConfig(),
 				Providers: provider.Configs{
 					"claude": {Enabled: true},
 					"codex":  {Enabled: true},
@@ -114,8 +114,8 @@ owner = "client-a"
 			want: devcontext.Context{
 				ID:   devcontext.MustID("client-a"),
 				Name: "Client A",
-				Editor: editor.Config{
-					Type:               editor.TypeVSCode,
+				Tool: codingtool.Config{
+					Type:               codingtool.TypeVSCode,
 					ExecutableOverride: "/opt/code",
 				},
 				Providers: provider.Configs{
@@ -225,7 +225,7 @@ created_at = 2026-08-13T10:30:00Z
 
 [editor]
 `,
-			wantMessage: "missing editor.type",
+			wantMessage: "missing codingtool.type",
 		},
 		{
 			name: "provider missing enabled",
@@ -337,7 +337,7 @@ func TestEncodeContextTOMLRoundTripsThroughDecoder(t *testing.T) {
 func TestEncodeContextTOMLRejectsInvalidContext(t *testing.T) {
 	_, err := devcontext.EncodeContextTOML(devcontext.Context{
 		Name:      "Missing ID",
-		Editor:    editor.DefaultConfig(),
+		Tool:      codingtool.DefaultConfig(),
 		CreatedAt: time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC),
 	})
 	if !errors.Is(err, devcontext.ErrInvalidContextConfig) {
@@ -358,8 +358,8 @@ func contextWithClaudeAndCodex() devcontext.Context {
 	return devcontext.Context{
 		ID:   devcontext.MustID("client-a"),
 		Name: "Client A",
-		Editor: editor.Config{
-			Type:               editor.TypeVSCode,
+		Tool: codingtool.Config{
+			Type:               codingtool.TypeVSCode,
 			ExecutableOverride: "/opt/code",
 		},
 		Providers: provider.Configs{

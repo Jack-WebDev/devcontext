@@ -1,16 +1,16 @@
-package editor_test
+package codingtool_test
 
 import (
 	"testing"
 
-	"devctx/packages/core/editor"
+	codingtool "devctx/packages/core/codingtool"
 )
 
 func TestDefaultConfigUsesVSCodeWithoutExecutableOverride(t *testing.T) {
-	config := editor.DefaultConfig()
+	config := codingtool.DefaultConfig()
 
-	if config.Type != editor.TypeVSCode {
-		t.Fatalf("editor type = %q, want %q", config.Type, editor.TypeVSCode)
+	if config.Type != codingtool.TypeVSCode {
+		t.Fatalf("editor type = %q, want %q", config.Type, codingtool.TypeVSCode)
 	}
 	if config.ExecutableOverride != "" {
 		t.Fatalf("executable override = %q, want empty", config.ExecutableOverride)
@@ -18,13 +18,13 @@ func TestDefaultConfigUsesVSCodeWithoutExecutableOverride(t *testing.T) {
 }
 
 func TestConfigStoresCustomExecutableOverride(t *testing.T) {
-	config := editor.Config{
-		Type:               editor.TypeVSCode,
+	config := codingtool.Config{
+		Type:               codingtool.TypeVSCode,
 		ExecutableOverride: "/opt/visual-studio-code/bin/code",
 	}
 
-	if config.Type != editor.TypeVSCode {
-		t.Fatalf("editor type = %q, want %q", config.Type, editor.TypeVSCode)
+	if config.Type != codingtool.TypeVSCode {
+		t.Fatalf("editor type = %q, want %q", config.Type, codingtool.TypeVSCode)
 	}
 	if config.ExecutableOverride != "/opt/visual-studio-code/bin/code" {
 		t.Fatalf("executable override = %q, want %q", config.ExecutableOverride, "/opt/visual-studio-code/bin/code")

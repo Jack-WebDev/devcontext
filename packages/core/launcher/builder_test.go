@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
@@ -19,9 +19,9 @@ import (
 func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 	projectDir := t.TempDir()
 	context := devcontext.Context{
-		ID:     devcontext.MustID("client-a"),
-		Name:   "Client A",
-		Editor: editor.Config{Type: "fake-editor"},
+		ID:   devcontext.MustID("client-a"),
+		Name: "Client A",
+		Tool: codingtool.Config{Type: "fake-editor"},
 		Providers: provider.Configs{
 			"fake":     {Enabled: true},
 			"disabled": {Enabled: false},
@@ -46,6 +46,7 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 	}
 	createContextDirectories(t, contextPaths)
 	contextPaths = contextPaths.WithProviderStorageDirs([]provider.ID{"fake"})
+	contextPaths = contextPaths.WithToolStorageDirs([]codingtool.ID{context.Tool.Type})
 
 	fakeEditor := &builderFakeEditor{}
 	builder := launcher.LaunchPlanBuilder{
@@ -61,9 +62,9 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 			builderFakeProvider{id: "fake"},
 			builderFakeProvider{id: "disabled"},
 		}),
-		ToolRegistry: editor.MustNewRegistry([]editor.Tool{{
+		ToolRegistry: codingtool.MustNewRegistry([]codingtool.RegisteredTool{{
 			Integration: fakeEditor,
-			DisplayName: "Fake Editor",
+			DisplayName: "Fake Tool",
 		}}, fakeEditor.ID()),
 		ParentEnvironment: []string{
 			"PATH=/usr/local/bin",
@@ -85,9 +86,9 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 	want := launcher.LaunchPlan{
 		ProjectPath:      project.Path(projectDir),
 		Context:          context,
-		Editor:           context.Editor,
+		Tool:             context.Tool,
 		Executable:       launcher.Executable("/usr/local/bin/fake-editor"),
-		Arguments:        launcher.Arguments{"--state-dir", contextPaths.VSCodeUserDataDir, projectDir},
+		Arguments:        launcher.Arguments{"--state-dir", contextPaths.ToolStorageDir(context.Tool.Type), projectDir},
 		WorkingDirectory: launcher.WorkingDirectory(projectDir),
 		Environment: launcher.Environment{
 			"PATH":           "/usr/local/bin",
@@ -108,18 +109,18 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 		t.Fatalf("plan = %#v, want %#v", plan, want)
 	}
 
-	wantEditorRequest := editor.CommandRequest{
-		Config:      context.Editor,
+	wantEditorRequest := codingtool.CommandRequest{
+		Config:      context.Tool,
 		Executable:  "/usr/local/bin/fake-editor",
 		ProjectPath: projectDir,
-		Paths: editor.ContextPaths{
+		Paths: codingtool.ContextPaths{
 			RootDir:     contextPaths.RootDir,
-			DataDir:     contextPaths.VSCodeDir,
-			UserDataDir: contextPaths.VSCodeUserDataDir,
+			DataDir:     contextPaths.ToolStorageDir(context.Tool.Type),
+			UserDataDir: contextPaths.ToolStorageDir(context.Tool.Type),
 		},
 	}
-	if !reflect.DeepEqual(fakeEditor.commandRequests, []editor.CommandRequest{wantEditorRequest}) {
-		t.Fatalf("editor requests = %#v, want %#v", fakeEditor.commandRequests, []editor.CommandRequest{wantEditorRequest})
+	if !reflect.DeepEqual(fakeEditor.commandRequests, []codingtool.CommandRequest{wantEditorRequest}) {
+		t.Fatalf("editor requests = %#v, want %#v", fakeEditor.commandRequests, []codingtool.CommandRequest{wantEditorRequest})
 	}
 }
 
@@ -130,7 +131,7 @@ func TestLaunchPlanBuilderDoesNotRequireProviderCLICommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve test executable: %v", err)
 	}
-	context.Editor.ExecutableOverride = executable
+	context.Tool.ExecutableOverride = executable
 	platformPaths := fakePlanPlatformPaths{
 		devContextHome: filepath.Join(t.TempDir(), ".devctx"),
 	}
@@ -149,7 +150,7 @@ func TestLaunchPlanBuilderDoesNotRequireProviderCLICommands(t *testing.T) {
 		},
 		PlatformPaths:     platformPaths,
 		ProviderRegistry:  provider.BuiltInRegistry(),
-		Editor:            editor.VSCodeEditor{},
+		Tool:              codingtool.VSCodeEditor{},
 		ParentEnvironment: []string{"PATH=/path/without/provider-clis"},
 	}
 
@@ -182,8 +183,9 @@ func createContextDirectories(t *testing.T, paths filesystem.ContextPaths) {
 	paths = paths.WithProviderStorageDirs([]provider.ID{provider.ClaudeID, provider.CodexID, "fake"})
 	for _, dir := range []string{
 		paths.RootDir,
-		paths.VSCodeDir,
-		paths.VSCodeUserDataDir,
+		paths.ToolStorageRootDir,
+		paths.ToolStorageDir(codingtool.VSCodeID),
+		paths.ToolStorageDir("fake-editor"),
 	} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatalf("create context directory %q: %v", dir, err)
@@ -205,7 +207,7 @@ func TestLaunchPlanBuilderRequiresResolvedContext(t *testing.T) {
 			},
 		},
 		PlatformPaths: fakePlanPlatformPaths{devContextHome: "/home/alex/.devctx"},
-		Editor:        &builderFakeEditor{},
+		Tool:          &builderFakeEditor{},
 	}
 
 	_, err := builder.Build(launcher.LaunchRequest{
@@ -221,7 +223,7 @@ func TestLaunchPlanBuilderRejectsIncompleteContextStorage(t *testing.T) {
 	context := devcontext.Context{
 		ID:        devcontext.MustID("personal"),
 		Name:      "Personal",
-		Editor:    editor.DefaultConfig(),
+		Tool:      codingtool.DefaultConfig(),
 		CreatedAt: time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC),
 	}
 	platformPaths := fakePlanPlatformPaths{
@@ -249,7 +251,7 @@ func TestLaunchPlanBuilderRejectsIncompleteContextStorage(t *testing.T) {
 			},
 		},
 		PlatformPaths: platformPaths,
-		Editor:        fakeEditor,
+		Tool:          fakeEditor,
 	}
 
 	_, err = builder.Build(launcher.LaunchRequest{
@@ -314,22 +316,22 @@ func (p builderFakeProvider) Status(provider.RuntimeContext) (provider.Status, e
 }
 
 type builderFakeEditor struct {
-	commandRequests []editor.CommandRequest
+	commandRequests []codingtool.CommandRequest
 }
 
-func (e *builderFakeEditor) ID() editor.ID {
+func (e *builderFakeEditor) ID() codingtool.ID {
 	return "fake-editor"
 }
 
-func (e *builderFakeEditor) DetectExecutable(editor.Config) (editor.Executable, error) {
+func (e *builderFakeEditor) DetectExecutable(codingtool.Config) (codingtool.Executable, error) {
 	return "/usr/local/bin/fake-editor", nil
 }
 
-func (e *builderFakeEditor) BuildLaunchCommand(request editor.CommandRequest) (editor.Command, error) {
+func (e *builderFakeEditor) BuildLaunchCommand(request codingtool.CommandRequest) (codingtool.Command, error) {
 	e.commandRequests = append(e.commandRequests, request)
-	return editor.Command{
+	return codingtool.Command{
 		Executable: request.Executable,
-		Arguments: editor.Arguments{
+		Arguments: codingtool.Arguments{
 			"--state-dir",
 			request.Paths.UserDataDir,
 			request.ProjectPath,

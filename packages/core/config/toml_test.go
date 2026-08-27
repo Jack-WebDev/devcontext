@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/config"
-	"devctx/packages/core/editor"
 )
 
 func TestDecodeGlobalConfigTOMLLoadsDocumentedExample(t *testing.T) {
@@ -31,8 +31,8 @@ confirm_unbound_projects = true
 	if globalConfig.Version != config.CurrentSchemaVersion {
 		t.Fatalf("version = %d, want %d", globalConfig.Version, config.CurrentSchemaVersion)
 	}
-	if globalConfig.DefaultEditor != editor.TypeVSCode {
-		t.Fatalf("default editor = %q, want %q", globalConfig.DefaultEditor, editor.TypeVSCode)
+	if globalConfig.DefaultEditor != codingtool.TypeVSCode {
+		t.Fatalf("default editor = %q, want %q", globalConfig.DefaultEditor, codingtool.TypeVSCode)
 	}
 	if !globalConfig.UI.RememberWindowPosition {
 		t.Fatal("remember window position = false, want true")
@@ -197,7 +197,7 @@ func TestDecodeGlobalConfigFileTOMLReportsActionableCorruptConfigError(t *testin
 func TestEncodeGlobalConfigTOMLIsDeterministic(t *testing.T) {
 	globalConfig := config.GlobalConfig{
 		Version:       config.CurrentSchemaVersion,
-		DefaultEditor: editor.TypeVSCode,
+		DefaultEditor: codingtool.TypeVSCode,
 		UI: config.UISettings{
 			RememberWindowPosition: false,
 		},
@@ -249,7 +249,7 @@ func TestEncodeGlobalConfigTOMLRoundTripsThroughDecoder(t *testing.T) {
 func TestEncodeGlobalConfigTOMLRejectsUnsupportedValues(t *testing.T) {
 	_, err := config.EncodeGlobalConfigTOML(config.GlobalConfig{
 		Version:       config.SchemaVersion(99),
-		DefaultEditor: editor.TypeVSCode,
+		DefaultEditor: codingtool.TypeVSCode,
 	})
 	if !errors.Is(err, config.ErrUnsupportedSchemaVersion) {
 		t.Fatalf("error = %v, want %v", err, config.ErrUnsupportedSchemaVersion)
@@ -257,7 +257,7 @@ func TestEncodeGlobalConfigTOMLRejectsUnsupportedValues(t *testing.T) {
 
 	_, err = config.EncodeGlobalConfigTOML(config.GlobalConfig{
 		Version:       config.CurrentSchemaVersion,
-		DefaultEditor: editor.Type("unknown"),
+		DefaultEditor: codingtool.Type("unknown"),
 	})
 	if !errors.Is(err, config.ErrInvalidGlobalConfig) {
 		t.Fatalf("error = %v, want %v", err, config.ErrInvalidGlobalConfig)

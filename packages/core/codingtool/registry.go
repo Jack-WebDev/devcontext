@@ -1,12 +1,12 @@
-package editor
+package codingtool
 
 import "fmt"
 
-// Tool describes one registered editor integration and its user-facing name.
+// RegisteredTool describes one registered editor integration and its user-facing name.
 // The name belongs in the registry so callers do not need integration-specific
 // display-name switches.
-type Tool struct {
-	Integration  Editor
+type RegisteredTool struct {
+	Integration  CodingTool
 	DisplayName  string
 	Capabilities []Capability
 }
@@ -21,19 +21,19 @@ type Capability string
 // It preserves registration order for presentation, resolves persisted editor
 // IDs, and identifies the default integration for newly created contexts.
 type Registry struct {
-	tools       []Tool
-	toolsByID   map[ID]Tool
+	tools       []RegisteredTool
+	toolsByID   map[ID]RegisteredTool
 	defaultTool ID
 }
 
 // NewRegistry creates a registry from an ordered list of editor tools.
-func NewRegistry(tools []Tool, defaultTool ID) (Registry, error) {
+func NewRegistry(tools []RegisteredTool, defaultTool ID) (Registry, error) {
 	if defaultTool == "" {
 		return Registry{}, fmt.Errorf("editor registry has an empty default tool ID")
 	}
 
-	ordered := make([]Tool, 0, len(tools))
-	byID := make(map[ID]Tool, len(tools))
+	ordered := make([]RegisteredTool, 0, len(tools))
+	byID := make(map[ID]RegisteredTool, len(tools))
 	for i, tool := range tools {
 		if tool.Integration == nil {
 			return Registry{}, fmt.Errorf("editor registry contains nil tool at index %d", i)
@@ -60,7 +60,7 @@ func NewRegistry(tools []Tool, defaultTool ID) (Registry, error) {
 }
 
 // MustNewRegistry creates a registry and panics when its definition is invalid.
-func MustNewRegistry(tools []Tool, defaultTool ID) Registry {
+func MustNewRegistry(tools []RegisteredTool, defaultTool ID) Registry {
 	registry, err := NewRegistry(tools, defaultTool)
 	if err != nil {
 		panic(err)
@@ -70,7 +70,7 @@ func MustNewRegistry(tools []Tool, defaultTool ID) Registry {
 
 // BuiltInRegistry returns the currently available built-in editor tools.
 func BuiltInRegistry() Registry {
-	return MustNewRegistry([]Tool{{Integration: VSCodeEditor{}, DisplayName: "VS Code"}}, VSCodeID)
+	return MustNewRegistry([]RegisteredTool{{Integration: VSCodeEditor{}, DisplayName: "VS Code"}}, VSCodeID)
 }
 
 // IsZero reports whether the registry has not been initialized.
@@ -79,8 +79,8 @@ func (r Registry) IsZero() bool {
 }
 
 // All returns tools in stable presentation order.
-func (r Registry) All() []Tool {
-	tools := make([]Tool, len(r.tools))
+func (r Registry) All() []RegisteredTool {
+	tools := make([]RegisteredTool, len(r.tools))
 	for i, tool := range r.tools {
 		tools[i] = tool
 		tools[i].Capabilities = append([]Capability(nil), tool.Capabilities...)
@@ -89,7 +89,7 @@ func (r Registry) All() []Tool {
 }
 
 // Get returns the registered integration for id.
-func (r Registry) Get(id ID) (Editor, bool) {
+func (r Registry) Get(id ID) (CodingTool, bool) {
 	tool, ok := r.toolsByID[id]
 	return tool.Integration, ok
 }

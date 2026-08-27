@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"devctx/packages/core/editor"
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/provider"
 )
 
@@ -44,12 +44,12 @@ func DefaultContextForID(id ID, createdAt time.Time) (Context, error) {
 // DefaultContextForIDWithProviderRegistry returns the built-in context seed for
 // a supported default context ID using the registry's default-enabled providers.
 func DefaultContextForIDWithProviderRegistry(id ID, createdAt time.Time, registry provider.Registry) (Context, error) {
-	return DefaultContextForIDWithRegistries(id, createdAt, registry, editor.BuiltInRegistry())
+	return DefaultContextForIDWithRegistries(id, createdAt, registry, codingtool.BuiltInRegistry())
 }
 
 // DefaultContextForIDWithRegistries returns a default context using the
 // provider and editor defaults owned by their respective registries.
-func DefaultContextForIDWithRegistries(id ID, createdAt time.Time, providerRegistry provider.Registry, editorRegistry editor.Registry) (Context, error) {
+func DefaultContextForIDWithRegistries(id ID, createdAt time.Time, providerRegistry provider.Registry, editorRegistry codingtool.Registry) (Context, error) {
 	switch id.String() {
 	case personalContextID:
 		return defaultContextSeed(MustID(personalContextID), "Personal", createdAt, providerRegistry, editorRegistry), nil
@@ -60,15 +60,15 @@ func DefaultContextForIDWithRegistries(id ID, createdAt time.Time, providerRegis
 	}
 }
 
-func defaultContextSeed(id ID, name string, createdAt time.Time, registry provider.Registry, editorRegistries ...editor.Registry) Context {
-	editorRegistry := editor.BuiltInRegistry()
+func defaultContextSeed(id ID, name string, createdAt time.Time, registry provider.Registry, editorRegistries ...codingtool.Registry) Context {
+	editorRegistry := codingtool.BuiltInRegistry()
 	if len(editorRegistries) > 0 && !editorRegistries[0].IsZero() {
 		editorRegistry = editorRegistries[0]
 	}
 	return Context{
 		ID:        id,
 		Name:      name,
-		Editor:    editor.DefaultConfigForRegistry(editorRegistry),
+		Tool:      codingtool.DefaultConfigForRegistry(editorRegistry),
 		Providers: registry.DefaultConfigs(),
 		CreatedAt: createdAt.UTC(),
 	}

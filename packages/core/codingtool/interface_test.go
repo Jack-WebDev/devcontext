@@ -1,31 +1,31 @@
-package editor_test
+package codingtool_test
 
 import (
 	"reflect"
 	"testing"
 
-	"devctx/packages/core/editor"
+	codingtool "devctx/packages/core/codingtool"
 )
 
 type fakeEditor struct{}
 
-var _ editor.Editor = fakeEditor{}
+var _ codingtool.CodingTool = fakeEditor{}
 
-func (fakeEditor) ID() editor.ID {
+func (fakeEditor) ID() codingtool.ID {
 	return "fake-editor"
 }
 
-func (fakeEditor) DetectExecutable(config editor.Config) (editor.Executable, error) {
+func (fakeEditor) DetectExecutable(config codingtool.Config) (codingtool.Executable, error) {
 	if config.ExecutableOverride != "" {
-		return editor.Executable(config.ExecutableOverride), nil
+		return codingtool.Executable(config.ExecutableOverride), nil
 	}
-	return editor.Executable("/usr/local/bin/fake-editor"), nil
+	return codingtool.Executable("/usr/local/bin/fake-editor"), nil
 }
 
-func (fakeEditor) BuildLaunchCommand(request editor.CommandRequest) (editor.Command, error) {
-	return editor.Command{
+func (fakeEditor) BuildLaunchCommand(request codingtool.CommandRequest) (codingtool.Command, error) {
+	return codingtool.Command{
 		Executable: request.Executable,
-		Arguments: editor.Arguments{
+		Arguments: codingtool.Arguments{
 			"--state-dir",
 			request.Paths.UserDataDir,
 			request.ProjectPath,
@@ -34,8 +34,8 @@ func (fakeEditor) BuildLaunchCommand(request editor.CommandRequest) (editor.Comm
 }
 
 func TestEditorInterfaceAllowsGenericEditorUse(t *testing.T) {
-	var implementation editor.Editor = fakeEditor{}
-	config := editor.Config{
+	var implementation codingtool.CodingTool = fakeEditor{}
+	config := codingtool.Config{
 		Type:               "fake-editor",
 		ExecutableOverride: "/opt/fake-editor/bin/fake-editor",
 	}
@@ -52,11 +52,11 @@ func TestEditorInterfaceAllowsGenericEditorUse(t *testing.T) {
 		t.Fatalf("executable = %q, want %q", executable, "/opt/fake-editor/bin/fake-editor")
 	}
 
-	command, err := implementation.BuildLaunchCommand(editor.CommandRequest{
+	command, err := implementation.BuildLaunchCommand(codingtool.CommandRequest{
 		Config:      config,
 		Executable:  executable,
 		ProjectPath: "/work/client-a/api",
-		Paths: editor.ContextPaths{
+		Paths: codingtool.ContextPaths{
 			RootDir:     "/home/alex/.devctx/contexts/client-a",
 			DataDir:     "/home/alex/.devctx/contexts/client-a/fake-editor",
 			UserDataDir: "/home/alex/.devctx/contexts/client-a/fake-editor/user-data",
@@ -66,9 +66,9 @@ func TestEditorInterfaceAllowsGenericEditorUse(t *testing.T) {
 		t.Fatalf("build launch command: %v", err)
 	}
 
-	want := editor.Command{
+	want := codingtool.Command{
 		Executable: "/opt/fake-editor/bin/fake-editor",
-		Arguments: editor.Arguments{
+		Arguments: codingtool.Arguments{
 			"--state-dir",
 			"/home/alex/.devctx/contexts/client-a/fake-editor/user-data",
 			"/work/client-a/api",

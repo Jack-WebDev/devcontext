@@ -68,12 +68,7 @@ func providerRuntimeContext(t *testing.T, contextID string, providerID provider.
 		Config: provider.Config{
 			Enabled: true,
 		},
-		Paths: provider.ContextPaths{
-			RootDir:           derivedPaths.RootDir,
-			StorageDir:        derivedPaths.ProviderStorageDir(providerID),
-			VSCodeDir:         derivedPaths.VSCodeDir,
-			VSCodeUserDataDir: derivedPaths.VSCodeUserDataDir,
-		},
+		Paths: provider.ContextPaths{RootDir: derivedPaths.RootDir, StorageDir: derivedPaths.ProviderStorageDir(providerID)},
 	}
 }
 

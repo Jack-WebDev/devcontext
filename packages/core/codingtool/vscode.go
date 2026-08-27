@@ -1,4 +1,4 @@
-package editor
+package codingtool
 
 import (
 	"errors"
@@ -83,7 +83,7 @@ type VSCodeEditor struct {
 	OperatingSystem string
 }
 
-var _ Editor = VSCodeEditor{}
+var _ CodingTool = VSCodeEditor{}
 
 // ID returns the persisted editor identifier.
 func (VSCodeEditor) ID() ID {

@@ -1,4 +1,4 @@
-package editor
+package codingtool
 
 // ID identifies an editor implementation.
 type ID string

@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
@@ -29,7 +29,7 @@ const (
 	// binding.
 	ErrorCodeContextMismatch ErrorCode = "context_mismatch_requires_confirmation"
 
-	// ErrorCodeLaunch identifies a failure to start the configured editor.
+	// ErrorCodeLaunch identifies a failure to start the configured codingtool.
 	ErrorCodeLaunch ErrorCode = "launch_error"
 
 	// ErrorCodeInternal identifies an unexpected application failure.
@@ -73,7 +73,7 @@ func NewError(err error) *Error {
 	var projectPathError *project.PathError
 	var missingContextError *devcontext.MissingContextError
 	var contextStorageError *filesystem.ContextStorageError
-	var executableNotFound *editor.ExecutableNotFoundError
+	var executableNotFound *codingtool.ExecutableNotFoundError
 	var processLaunchError *launcher.ProcessLaunchError
 	switch {
 	case errors.As(err, &contextMismatchError) && errors.Is(err, launcher.ErrContextMismatchRequiresConfirmation):
@@ -114,7 +114,7 @@ func NewError(err error) *Error {
 			contextStorageRecovery(contextStorageError),
 			err,
 		)
-	case errors.As(err, &executableNotFound) && executableNotFound.EditorID == editor.VSCodeID:
+	case errors.As(err, &executableNotFound) && executableNotFound.EditorID == codingtool.VSCodeID:
 		return applicationError(
 			ErrorCodeLaunch,
 			"VS Code command not found.",
@@ -129,7 +129,7 @@ func NewError(err error) *Error {
 			err,
 		)
 	case isLaunchError(err):
-		return applicationError(ErrorCodeLaunch, "Unable to launch editor.", "Check the editor command, project path, and permissions, then retry.", err)
+		return applicationError(ErrorCodeLaunch, "Unable to launch codingtool.", "Check the editor command, project path, and permissions, then retry.", err)
 	case isValidationError(err):
 		return applicationError(ErrorCodeValidation, "Unable to complete request.", "Check the selected project and context, then retry.", err)
 	default:
@@ -160,9 +160,9 @@ func applicationError(code ErrorCode, message string, recovery string, cause err
 }
 
 func isLaunchError(err error) bool {
-	return errors.Is(err, editor.ErrExecutableNotFound) ||
-		errors.Is(err, editor.ErrExecutableNotExecutable) ||
-		errors.Is(err, editor.ErrMissingExecutable) ||
+	return errors.Is(err, codingtool.ErrExecutableNotFound) ||
+		errors.Is(err, codingtool.ErrExecutableNotExecutable) ||
+		errors.Is(err, codingtool.ErrMissingExecutable) ||
 		errors.Is(err, launcher.ErrMissingProcessExecutable) ||
 		errors.Is(err, launcher.ErrProcessExecutableNotFound) ||
 		errors.Is(err, launcher.ErrProcessPermissionDenied) ||
@@ -270,7 +270,7 @@ func missingVSCodeRecovery(candidates []string) string {
 		expected = "`" + strings.Join(candidates, "`, `") + "`"
 	}
 	return fmt.Sprintf(
-		"Install the VS Code command line launcher so %s is on PATH, or set editor.executable_override in the context to a valid VS Code CLI path.",
+		"Install the VS Code command line launcher so %s is on PATH, or set codingtool.executable_override in the context to a valid VS Code CLI path.",
 		expected,
 	)
 }
@@ -281,7 +281,7 @@ func processExecutableRecovery(err *launcher.ProcessLaunchError) string {
 		return missingVSCodeRecovery([]string{"code"})
 	}
 	return fmt.Sprintf(
-		"The configured VS Code command %q was not found. Install the VS Code command line launcher, add it to PATH, or set editor.executable_override in the context.",
+		"The configured VS Code command %q was not found. Install the VS Code command line launcher, add it to PATH, or set codingtool.executable_override in the context.",
 		executable,
 	)
 }

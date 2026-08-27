@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"devctx/packages/core/cli"
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	devlog "devctx/packages/core/logging"
@@ -242,7 +242,7 @@ func TestRunnerRootLaunchBuildsPlanAndStartsDetachedProcess(t *testing.T) {
 	processLauncher := &recordingProcessLauncher{}
 	runner := fixture.runner()
 	runner.ProviderRegistry = provider.BuiltInRegistry()
-	runner.Editor = launchEditor
+	runner.Tool = launchEditor
 	runner.ProcessLauncher = processLauncher
 	runner.ParentEnvironment = []string{
 		"PATH=/usr/local/bin",
@@ -270,18 +270,18 @@ func TestRunnerRootLaunchBuildsPlanAndStartsDetachedProcess(t *testing.T) {
 		t.Fatalf("process requests = %#v, want %#v", processLauncher.requests, []launcher.ProcessRequest{wantRequest})
 	}
 
-	wantEditorRequest := editor.CommandRequest{
-		Config:      context.Editor,
+	wantEditorRequest := codingtool.CommandRequest{
+		Config:      context.Tool,
 		Executable:  "/recording/code",
 		ProjectPath: fixture.workingDir,
-		Paths: editor.ContextPaths{
+		Paths: codingtool.ContextPaths{
 			RootDir:     contextRoot,
-			DataDir:     filepath.Join(contextRoot, "vscode"),
-			UserDataDir: filepath.Join(contextRoot, "vscode", "user-data"),
+			DataDir:     filepath.Join(contextRoot, "tools", "vscode"),
+			UserDataDir: filepath.Join(contextRoot, "tools", "vscode"),
 		},
 	}
-	if !reflect.DeepEqual(launchEditor.requests, []editor.CommandRequest{wantEditorRequest}) {
-		t.Fatalf("editor requests = %#v, want %#v", launchEditor.requests, []editor.CommandRequest{wantEditorRequest})
+	if !reflect.DeepEqual(launchEditor.requests, []codingtool.CommandRequest{wantEditorRequest}) {
+		t.Fatalf("editor requests = %#v, want %#v", launchEditor.requests, []codingtool.CommandRequest{wantEditorRequest})
 	}
 }
 
@@ -299,7 +299,7 @@ func TestRunnerRootLaunchWritesLifecycleEvents(t *testing.T) {
 	fixture.writeContext(t, context)
 
 	runner := fixture.runner()
-	runner.Editor = &recordingCLIEditor{}
+	runner.Tool = &recordingCLIEditor{}
 	runner.ProcessLauncher = &recordingProcessLauncher{}
 	runner.ParentEnvironment = []string{"PATH=/usr/local/bin"}
 	runner.Logger = devlog.NewLocalLogger(filepath.Join(fixture.root, "logs"), filesystem.NewDefaultStoragePermissions(), func() time.Time {
@@ -336,7 +336,7 @@ func TestRunnerRootLaunchIgnoresLoggingFailures(t *testing.T) {
 	fixture.writeContext(t, testCLIContext("personal", "Personal"))
 
 	runner := fixture.runner()
-	runner.Editor = &recordingCLIEditor{}
+	runner.Tool = &recordingCLIEditor{}
 	runner.ProcessLauncher = &recordingProcessLauncher{}
 	runner.ParentEnvironment = []string{"PATH=/usr/local/bin"}
 	runner.Logger = failingLogger{}
@@ -350,7 +350,7 @@ func TestRunnerRootLaunchDebugOutputRedactsSensitiveEnvironment(t *testing.T) {
 	fixture.writeContext(t, testCLIContext("personal", "Personal"))
 
 	runner := fixture.runner()
-	runner.Editor = &recordingCLIEditor{}
+	runner.Tool = &recordingCLIEditor{}
 	runner.ProcessLauncher = &recordingProcessLauncher{}
 	runner.ParentEnvironment = []string{
 		"PATH=/usr/local/bin",
@@ -391,7 +391,7 @@ func TestRunnerRootLaunchLogsSanitizedProcessFailure(t *testing.T) {
 		Cause:            fmt.Errorf("API_TOKEN=top-secret-token authorization: Bearer bearer-secret"),
 	}
 	runner := fixture.runner()
-	runner.Editor = &recordingCLIEditor{}
+	runner.Tool = &recordingCLIEditor{}
 	runner.ProcessLauncher = &recordingProcessLauncher{err: processErr}
 	runner.ParentEnvironment = []string{"API_TOKEN=top-secret-token"}
 	runner.Logger = devlog.NewLocalLogger(filepath.Join(fixture.root, "logs"), filesystem.NewDefaultStoragePermissions(), func() time.Time {
@@ -428,7 +428,7 @@ func TestRunnerRootLaunchRequiresMismatchConfirmation(t *testing.T) {
 
 	processLauncher := &recordingProcessLauncher{}
 	runner := fixture.runner()
-	runner.Editor = &recordingCLIEditor{}
+	runner.Tool = &recordingCLIEditor{}
 	runner.ProcessLauncher = processLauncher
 	runner.ParentEnvironment = []string{"PATH=/usr/local/bin"}
 
@@ -455,7 +455,7 @@ func TestRunnerRootLaunchExecutesDirectCLIWithRecordingExecutable(t *testing.T) 
 	recordPath := filepath.Join(fixture.root, "recording.txt")
 
 	runner := fixture.runner()
-	runner.Editor = recordingExecutableEditor{executable: executable}
+	runner.Tool = recordingExecutableEditor{executable: executable}
 	runner.ProcessLauncher = launcher.NativeProcessLauncher{}
 	runner.ParentEnvironment = []string{
 		"DEVCTX_RECORDING_EXECUTABLE=1",
@@ -501,7 +501,7 @@ func TestRunnerRootLaunchExecutesBindingDerivedCLIWithRecordingExecutable(t *tes
 	recordPath := filepath.Join(fixture.root, "binding-recording.txt")
 
 	runner := fixture.runner()
-	runner.Editor = recordingExecutableEditor{executable: executable}
+	runner.Tool = recordingExecutableEditor{executable: executable}
 	runner.ProcessLauncher = launcher.NativeProcessLauncher{}
 	runner.ParentEnvironment = []string{
 		"DEVCTX_RECORDING_EXECUTABLE=1",
@@ -546,7 +546,7 @@ func TestRunnerRootLaunchKeepsSimultaneousContextsIsolated(t *testing.T) {
 	companyProject := fixture.mkdir(t, "projects", "company")
 
 	baseRunner := fixture.runner()
-	baseRunner.Editor = simultaneousIsolationEditor{executable: executable}
+	baseRunner.Tool = simultaneousIsolationEditor{executable: executable}
 	baseRunner.ProcessLauncher = launcher.NativeProcessLauncher{}
 	baseRunner.ParentEnvironment = []string{
 		"DEVCTX_SIMULTANEOUS_ISOLATION_HELPER=1",
@@ -740,8 +740,8 @@ func (f runnerFixture) writeContext(t *testing.T, ctx devcontext.Context) {
 	contextPaths = contextPaths.WithProviderStorageDirs(cliEnabledProviderIDs(ctx))
 	dirs := []string{
 		contextPaths.RootDir,
-		contextPaths.VSCodeDir,
-		contextPaths.VSCodeUserDataDir,
+		contextPaths.ToolStorageRootDir,
+		contextPaths.ToolStorageDir(codingtool.VSCodeID),
 	}
 	for _, dir := range contextPaths.ProviderStorageDirs {
 		dirs = append(dirs, dir)
@@ -778,7 +778,7 @@ func testCLIContext(id string, name string) devcontext.Context {
 	return devcontext.Context{
 		ID:        devcontext.MustID(id),
 		Name:      name,
-		Editor:    editor.DefaultConfig(),
+		Tool:      codingtool.DefaultConfig(),
 		CreatedAt: time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC),
 	}
 }
@@ -852,7 +852,7 @@ func eventNames(events []devlog.Event) []devlog.EventName {
 }
 
 type recordingCLIEditor struct {
-	requests []editor.CommandRequest
+	requests []codingtool.CommandRequest
 }
 
 type failingLogger struct{}
@@ -861,19 +861,19 @@ func (failingLogger) Record(devlog.Event) error {
 	return fmt.Errorf("logging unavailable")
 }
 
-func (e *recordingCLIEditor) ID() editor.ID {
-	return editor.VSCodeID
+func (e *recordingCLIEditor) ID() codingtool.ID {
+	return codingtool.VSCodeID
 }
 
-func (e *recordingCLIEditor) DetectExecutable(editor.Config) (editor.Executable, error) {
+func (e *recordingCLIEditor) DetectExecutable(codingtool.Config) (codingtool.Executable, error) {
 	return "/recording/code", nil
 }
 
-func (e *recordingCLIEditor) BuildLaunchCommand(request editor.CommandRequest) (editor.Command, error) {
+func (e *recordingCLIEditor) BuildLaunchCommand(request codingtool.CommandRequest) (codingtool.Command, error) {
 	e.requests = append(e.requests, request)
-	return editor.Command{
+	return codingtool.Command{
 		Executable: request.Executable,
-		Arguments:  editor.Arguments{request.ProjectPath},
+		Arguments:  codingtool.Arguments{request.ProjectPath},
 	}, nil
 }
 
@@ -891,18 +891,18 @@ type recordingExecutableEditor struct {
 	executable string
 }
 
-func (e recordingExecutableEditor) ID() editor.ID {
-	return editor.VSCodeID
+func (e recordingExecutableEditor) ID() codingtool.ID {
+	return codingtool.VSCodeID
 }
 
-func (e recordingExecutableEditor) DetectExecutable(editor.Config) (editor.Executable, error) {
-	return editor.Executable(e.executable), nil
+func (e recordingExecutableEditor) DetectExecutable(codingtool.Config) (codingtool.Executable, error) {
+	return codingtool.Executable(e.executable), nil
 }
 
-func (e recordingExecutableEditor) BuildLaunchCommand(request editor.CommandRequest) (editor.Command, error) {
-	return editor.Command{
+func (e recordingExecutableEditor) BuildLaunchCommand(request codingtool.CommandRequest) (codingtool.Command, error) {
+	return codingtool.Command{
 		Executable: request.Executable,
-		Arguments: editor.Arguments{
+		Arguments: codingtool.Arguments{
 			"-test.run=TestDirectCLIRecordingExecutableHelper",
 			"--",
 			request.ProjectPath,
@@ -914,18 +914,18 @@ type simultaneousIsolationEditor struct {
 	executable string
 }
 
-func (e simultaneousIsolationEditor) ID() editor.ID {
-	return editor.VSCodeID
+func (e simultaneousIsolationEditor) ID() codingtool.ID {
+	return codingtool.VSCodeID
 }
 
-func (e simultaneousIsolationEditor) DetectExecutable(editor.Config) (editor.Executable, error) {
-	return editor.Executable(e.executable), nil
+func (e simultaneousIsolationEditor) DetectExecutable(codingtool.Config) (codingtool.Executable, error) {
+	return codingtool.Executable(e.executable), nil
 }
 
-func (e simultaneousIsolationEditor) BuildLaunchCommand(request editor.CommandRequest) (editor.Command, error) {
-	return editor.Command{
+func (e simultaneousIsolationEditor) BuildLaunchCommand(request codingtool.CommandRequest) (codingtool.Command, error) {
+	return codingtool.Command{
 		Executable: request.Executable,
-		Arguments: editor.Arguments{
+		Arguments: codingtool.Arguments{
 			"-test.run=TestSimultaneousContextIsolationHelper",
 			"--",
 			request.ProjectPath,

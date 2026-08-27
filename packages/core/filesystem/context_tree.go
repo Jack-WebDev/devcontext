@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/provider"
 )
@@ -84,12 +85,7 @@ func importProviderCredentials(platformPaths PlatformPaths, paths ContextPaths, 
 			Runtime: provider.RuntimeContext{
 				ContextID: ctx.ID.String(),
 				Config:    config,
-				Paths: provider.ContextPaths{
-					RootDir:           paths.RootDir,
-					StorageDir:        paths.ProviderStorageDir(integration.ID()),
-					VSCodeDir:         paths.VSCodeDir,
-					VSCodeUserDataDir: paths.VSCodeUserDataDir,
-				},
+				Paths:     provider.ContextPaths{RootDir: paths.RootDir, StorageDir: paths.ProviderStorageDir(integration.ID())},
 			},
 			Files: files,
 		}); err != nil {
@@ -113,6 +109,7 @@ func createContextDirectoryTree(paths ContextPaths, ctx devcontext.Context, regi
 		registry = provider.BuiltInRegistry()
 	}
 	paths = paths.WithProviderStorageDirs(registeredEnabledProviderIDs(ctx, registry))
+	paths = paths.WithToolStorageDirs([]codingtool.ID{ctx.Tool.Type})
 	if err := validateContextTree(paths, ctx); err != nil {
 		return err
 	}
@@ -214,13 +211,24 @@ func bootstrapDefaultContext(paths PlatformPaths, ctx devcontext.Context, permis
 func contextTreeDirectories(paths ContextPaths) []string {
 	dirs := []string{
 		paths.RootDir,
-		paths.VSCodeDir,
-		paths.VSCodeUserDataDir,
+		paths.ToolStorageRootDir,
+	}
+	for _, toolID := range sortedToolStorageIDs(paths.ToolStorageDirs) {
+		dirs = append(dirs, paths.ToolStorageDirs[toolID])
 	}
 	for _, providerID := range sortedProviderStorageIDs(paths.ProviderStorageDirs) {
 		dirs = append(dirs, paths.ProviderStorageDirs[providerID])
 	}
 	return dirs
+}
+
+func sortedToolStorageIDs(toolDirs map[codingtool.ID]string) []codingtool.ID {
+	ids := make([]codingtool.ID, 0, len(toolDirs))
+	for toolID := range toolDirs {
+		ids = append(ids, toolID)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids
 }
 
 func registeredEnabledProviderIDs(ctx devcontext.Context, registry provider.Registry) []provider.ID {

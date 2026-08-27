@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	devlog "devctx/packages/core/logging"
@@ -22,10 +22,10 @@ type Dependencies struct {
 	Projects         project.Repository
 	Paths            filesystem.PlatformPaths
 	ProviderRegistry provider.Registry
-	ToolRegistry     editor.Registry
-	// Editor is retained temporarily for callers that have not yet moved to the
+	ToolRegistry     codingtool.Registry
+	// Tool is retained temporarily for callers that have not yet moved to the
 	// registry contract. New code must provide ToolRegistry.
-	Editor             editor.Editor
+	Tool               codingtool.CodingTool
 	ProcessLauncher    launcher.ProcessLauncher
 	StoragePermissions filesystem.StoragePermissions
 	ParentEnvironment  []string
@@ -80,7 +80,7 @@ func NewDefaultService(options DefaultOptions) (*Service, error) {
 		Projects:           project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
 		Paths:              paths,
 		ProviderRegistry:   provider.BuiltInRegistry(),
-		ToolRegistry:       editor.BuiltInRegistry(),
+		ToolRegistry:       codingtool.BuiltInRegistry(),
 		ProcessLauncher:    launcher.NativeProcessLauncher{},
 		StoragePermissions: filesystem.NewDefaultStoragePermissions(),
 		ParentEnvironment:  options.ParentEnvironment,
@@ -130,10 +130,10 @@ func normalizeDependencies(dependencies Dependencies) Dependencies {
 		dependencies.ProviderRegistry = provider.BuiltInRegistry()
 	}
 	if dependencies.ToolRegistry.IsZero() {
-		if dependencies.Editor != nil {
-			dependencies.ToolRegistry = editor.MustNewRegistry([]editor.Tool{{Integration: dependencies.Editor, DisplayName: string(dependencies.Editor.ID())}}, dependencies.Editor.ID())
+		if dependencies.Tool != nil {
+			dependencies.ToolRegistry = codingtool.MustNewRegistry([]codingtool.RegisteredTool{{Integration: dependencies.Tool, DisplayName: string(dependencies.Tool.ID())}}, dependencies.Tool.ID())
 		} else {
-			dependencies.ToolRegistry = editor.BuiltInRegistry()
+			dependencies.ToolRegistry = codingtool.BuiltInRegistry()
 		}
 	}
 	if dependencies.ProcessLauncher == nil {

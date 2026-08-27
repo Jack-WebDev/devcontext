@@ -40,7 +40,7 @@ func (a *App) GetLaunchState(request application.GetLaunchStateRequest) any {
 	return state
 }
 
-// PreflightLaunchProject checks the selected launch without opening an editor.
+// PreflightLaunchProject checks the selected launch without opening an codingtool.
 func (a *App) PreflightLaunchProject(request application.PreflightLaunchProjectRequest) any {
 	result, err := a.service.PreflightLaunchProject(request)
 	if err != nil {

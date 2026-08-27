@@ -3,9 +3,9 @@ package cli
 import (
 	"errors"
 
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
@@ -39,7 +39,7 @@ const (
 	// ExitCanceled identifies a user-canceled operation.
 	ExitCanceled ExitCode = 4
 
-	// ExitLaunchFailure identifies a failure to launch the target editor.
+	// ExitLaunchFailure identifies a failure to launch the target codingtool.
 	ExitLaunchFailure ExitCode = 5
 )
 
@@ -51,9 +51,9 @@ func ExitCodeForError(err error) ExitCode {
 	case errors.Is(err, ErrCanceled), errors.Is(err, launcher.ErrContextMismatchRejected):
 		return ExitCanceled
 	case errors.Is(err, ErrLaunchFailed),
-		errors.Is(err, editor.ErrExecutableNotFound),
-		errors.Is(err, editor.ErrExecutableNotExecutable),
-		errors.Is(err, editor.ErrMissingExecutable),
+		errors.Is(err, codingtool.ErrExecutableNotFound),
+		errors.Is(err, codingtool.ErrExecutableNotExecutable),
+		errors.Is(err, codingtool.ErrMissingExecutable),
 		errors.Is(err, launcher.ErrMissingProcessExecutable),
 		errors.Is(err, launcher.ErrProcessExecutableNotFound),
 		errors.Is(err, launcher.ErrProcessPermissionDenied),
