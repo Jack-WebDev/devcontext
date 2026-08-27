@@ -16,6 +16,7 @@ interface ContextCardProps {
   onSelect?: (contextId: string) => void;
   onNavigate?: (contextId: string, direction: ContextNavigationDirection) => void;
   onLaunchSelected?: () => void;
+  onProviderSetup?: (contextId: string, providerId: string) => void;
 }
 
 function ContextCard({
@@ -28,6 +29,7 @@ function ContextCard({
   onSelect,
   onNavigate,
   onLaunchSelected,
+  onProviderSetup,
 }: ContextCardProps) {
   const interactive = onSelect !== undefined && !disabled;
   const unselectedClassName = interactive ? "border-border hover:border-foreground/20" : "border-border";
@@ -100,21 +102,29 @@ function ContextCard({
           recommendation={recommendation}
         />
         <ToolStatusRow context={context} />
-        <ProviderSummary context={context} providers={enabledProviders} />
+        <ProviderSummary context={context} providers={enabledProviders} onProviderSetup={onProviderSetup} />
         <ContextHealthSummary context={context} enabledProviderCount={enabledProviders.length} />
       </CardContent>
     </Card>
   );
 }
 
-function ProviderSummary({ context, providers }: { context: ContextState; providers: ProviderState[] }) {
+function ProviderSummary({
+  context,
+  providers,
+  onProviderSetup,
+}: {
+  context: ContextState;
+  providers: ProviderState[];
+  onProviderSetup?: (contextId: string, providerId: string) => void;
+}) {
   return (
     <section aria-label={`Enabled providers for ${context.name}`}>
       <p className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Enabled providers</p>
       {providers.length > 0 ? (
         <ul className="space-y-2">
           {providers.map((provider) => (
-            <ProviderStatusRow key={provider.id} context={context} provider={provider} />
+            <ProviderStatusRow key={provider.id} context={context} provider={provider} onProviderSetup={onProviderSetup} />
           ))}
         </ul>
       ) : (
@@ -319,7 +329,15 @@ function contextAccentClassName(accent: ContextAccentName): string {
   }
 }
 
-function ProviderStatusRow({ context, provider }: { context: ContextState; provider: ProviderState }) {
+function ProviderStatusRow({
+  context,
+  provider,
+  onProviderSetup,
+}: {
+  context: ContextState;
+  provider: ProviderState;
+  onProviderSetup?: (contextId: string, providerId: string) => void;
+}) {
   const status = providerStatusPresentation(provider.state);
   const accessibleStatus = `${provider.name} local status: ${status.label}`;
   const setupGuidance = providerSetupGuidance(context, provider);
@@ -353,6 +371,21 @@ function ProviderStatusRow({ context, provider }: { context: ContextState; provi
         <p className="mt-2 border border-border bg-muted/30 p-2 text-xs text-muted-foreground">
           {setupGuidance}
         </p>
+      ) : null}
+      {provider.setupAction?.state === "open_and_configure" ? (
+        <div className="pointer-events-auto relative z-20 mt-2 border border-border bg-muted/30 p-2">
+          <p className="text-xs text-muted-foreground">{provider.setupAction.message}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-2"
+            disabled={onProviderSetup === undefined}
+            onClick={() => onProviderSetup?.(context.id, provider.id)}
+          >
+            {provider.setupAction.label}
+          </Button>
+        </div>
       ) : null}
     </li>
   );

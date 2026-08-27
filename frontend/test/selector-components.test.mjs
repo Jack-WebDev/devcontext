@@ -430,6 +430,22 @@ test("context card renders generic setup guidance for an unconfigured provider",
   assert.ok(html.includes("Connect Internal Tool to Company."));
 });
 
+test("context card offers the backend-supplied provider setup action", () => {
+  const context = contextFixture("personal", "Personal", [{
+    ...providerFixture("codex", "Codex", true, "not_configured"),
+    setupAction: {
+      state: "open_and_configure",
+      label: "Open and configure",
+      message: "Sign in to Codex for this context.",
+    },
+  }]);
+  const html = renderToStaticMarkup(ContextCard({context, onProviderSetup: () => {}}));
+
+  assert.ok(html.includes("Sign in to Codex for this context."));
+  assert.ok(html.includes("Open and configure"));
+  assert.doesNotMatch(html, /Open and configure<\/button>[^]*disabled=""/);
+});
+
 test("selection initializes from a valid bound context", () => {
   const state = launchStateFixture({
     binding: {
