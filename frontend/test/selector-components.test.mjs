@@ -463,6 +463,28 @@ test("context card renders the backend-supplied provider sign-in waiting state",
   assert.doesNotMatch(html, /Open and configure/);
 });
 
+test("context card shows connected provider identity only after backend verification", () => {
+  const context = contextFixture("personal", "Personal", [{
+    ...providerFixture("future", "Future Provider", true, "ready"),
+    identity: {
+      status: "verified",
+      fields: [{label: "Workspace", value: "Example"}],
+    },
+    setupAction: {
+      state: "verified",
+      label: "Verified",
+      message: "Future Provider account identity is verified for this context.",
+    },
+  }]);
+  const html = renderToStaticMarkup(ContextCard({context}));
+
+  assert.match(html, /role="status"/);
+  assert.ok(html.includes("Verified"));
+  assert.ok(html.includes("Future Provider account identity is verified for this context."));
+  assert.ok(html.includes("Account: Workspace: Example"));
+  assert.ok(!html.includes("Account identity unavailable"));
+});
+
 test("selection initializes from a valid bound context", () => {
   const state = launchStateFixture({
     binding: {
