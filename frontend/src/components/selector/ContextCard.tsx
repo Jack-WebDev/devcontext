@@ -1,5 +1,7 @@
 import type { KeyboardEvent, Ref } from "react";
 
+import { ContextAccentIndicator, contextAccentFromMetadata, type ContextAccent } from "../context-accent/ContextAccent.js";
+import { StatusIndicator } from "../status/StatusIndicator.js";
 import type { ContextState, LaunchConfidenceStatus, ProviderState } from "../../lib/devctx-api";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
@@ -44,7 +46,7 @@ function ContextCard({
   const enabledProviders = context.providers.filter((provider) => provider.enabled);
   const contextNameId = `context-${context.id}-name`;
   const contextDescription = context.description;
-  const contextAccent = contextAccentName(context.metadata?.accent);
+  const contextAccent = contextAccentFromMetadata(context.metadata?.accent);
 
   function handleButtonKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     const direction = contextNavigationDirectionForKey(event.key);
@@ -250,14 +252,14 @@ function ContextIdentity({
 }: {
   context: ContextState;
   description?: string;
-  accent: ContextAccentName;
+  accent: ContextAccent;
   selected: boolean;
   recommendation?: string;
 }) {
   return (
     <div className="min-w-0 space-y-2">
       <div className="flex min-w-0 items-start gap-3">
-        <span className={`mt-1.5 size-2 shrink-0 ${contextAccentClassName(accent)}`} aria-hidden="true" />
+        <ContextAccentIndicator accent={accent} className="mt-1.5" />
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-start justify-between gap-3">
             <h3 id={`context-${context.id}-name`} className="truncate text-base font-semibold" title={context.name}>
@@ -298,35 +300,6 @@ function ContextIdentity({
       </p>
     </div>
   );
-}
-
-type ContextAccentName = "sage" | "slate-blue" | "amber" | "custom" | "neutral";
-
-function contextAccentName(value: string | undefined): ContextAccentName {
-  switch (value) {
-    case "sage":
-    case "slate-blue":
-    case "amber":
-    case "custom":
-      return value;
-    default:
-      return "neutral";
-  }
-}
-
-function contextAccentClassName(accent: ContextAccentName): string {
-  switch (accent) {
-    case "sage":
-      return "bg-emerald-600";
-    case "slate-blue":
-      return "bg-blue-700";
-    case "amber":
-      return "bg-amber-500";
-    case "custom":
-      return "bg-violet-600";
-    default:
-      return "bg-muted-foreground";
-  }
 }
 
 function ProviderStatusRow({
@@ -393,13 +366,13 @@ function ProviderStatusRow({
           role="status"
           aria-live="polite"
         >
-          <p className="font-medium text-foreground">{provider.setupAction.label}</p>
+          <StatusIndicator status="needs_attention">{provider.setupAction.label}</StatusIndicator>
           <p className="mt-1 text-muted-foreground">{provider.setupAction.message}</p>
         </div>
       ) : null}
       {provider.setupAction?.state === "verified" && provider.identity.status === "verified" ? (
         <div className="mt-2 border border-success/40 bg-success/5 p-2 text-xs" role="status">
-          <p className="font-medium text-foreground">{provider.setupAction.label}</p>
+          <StatusIndicator status="ready">{provider.setupAction.label}</StatusIndicator>
           <p className="mt-1 text-muted-foreground">{provider.setupAction.message}</p>
         </div>
       ) : null}

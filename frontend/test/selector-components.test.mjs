@@ -6,6 +6,10 @@ import {renderToStaticMarkup} from "react-dom/server";
 import {ContextMismatchDialog} from "../.tmp-test/src/components/selector/ContextMismatchDialog.js";
 import {ContextCard} from "../.tmp-test/src/components/selector/ContextCard.js";
 import {
+  ContextAccentIndicator,
+  contextAccentFromMetadata,
+} from "../.tmp-test/src/components/context-accent/ContextAccent.js";
+import {
   FirstRunWelcome,
   shouldRenderFirstRunWelcome,
 } from "../.tmp-test/src/components/selector/FirstRunWelcome.js";
@@ -17,6 +21,16 @@ import {
 } from "../.tmp-test/src/components/selector/LaunchVerificationProgress.js";
 import {ProviderCredentialClassification} from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
 import {ProjectIdentity} from "../.tmp-test/src/components/selector/ProjectIdentity.js";
+import {AppShell} from "../.tmp-test/src/components/shell/AppShell.js";
+import {
+  appRouteFromHash,
+  appRoutes,
+} from "../.tmp-test/src/components/shell/routes.js";
+import {
+  StatusIndicator,
+  statusPresentation,
+} from "../.tmp-test/src/components/status/StatusIndicator.js";
+import {Card} from "../.tmp-test/src/components/ui/card.js";
 import {
   boundContextName,
   RememberProjectControl,
@@ -315,7 +329,49 @@ test("context card renders backend-provided description and accent metadata", ()
 
   assert.match(html, /data-context-accent="slate-blue"/);
   assert.ok(html.includes("Work environment"));
-  assert.match(html, /bg-blue-700/);
+  assert.match(html, /bg-accent-company/);
+});
+
+test("context accents use shared semantic tokens without changing the full card theme", () => {
+  assert.equal(contextAccentFromMetadata("sage"), "sage");
+  assert.equal(contextAccentFromMetadata("future-accent"), "neutral");
+
+  const html = renderToStaticMarkup(ContextAccentIndicator({accent: "custom"}));
+  assert.match(html, /bg-accent-custom/);
+  assert.doesNotMatch(html, /bg-card/);
+});
+
+test("status indicator renders approved status labels with non-color text", () => {
+  const statuses = ["ready", "needs_attention", "not_configured", "blocked", "running", "protected", "failed"];
+  const labels = statuses.map((status) => statusPresentation(status).label);
+
+  assert.deepEqual(labels, ["Ready", "Needs attention", "Not configured", "Blocked", "Running", "Protected", "Failed"]);
+  const html = renderToStaticMarkup(StatusIndicator({status: "blocked"}));
+  assert.ok(html.includes("Blocked"));
+  assert.match(html, /bg-destructive/);
+});
+
+test("card hierarchy differentiates primary, secondary, and tertiary surfaces", () => {
+  const primary = renderToStaticMarkup(Card({hierarchy: "primary"}));
+  const secondary = renderToStaticMarkup(Card({hierarchy: "secondary"}));
+  const tertiary = renderToStaticMarkup(Card({hierarchy: "tertiary"}));
+
+  assert.match(primary, /shadow-sm/);
+  assert.match(secondary, /bg-surface-muted/);
+  assert.match(tertiary, /bg-transparent/);
+});
+
+test("app shell exposes stable primary navigation and a responsive content boundary", () => {
+  const html = renderToStaticMarkup(AppShell({activeRoute: "projects", onNavigate: () => {}, children: "Content"}));
+
+  assert.match(html, /data-app-shell="true"/);
+  assert.match(html, /aria-label="Primary navigation"/);
+  assert.match(html, /aria-current="page"/);
+  assert.match(html, /max-w-6xl/);
+  assert.match(html, /min-w-0/);
+  assert.deepEqual(appRoutes.map((route) => route.label), ["Home", "Contexts", "Projects", "Running", "History", "Settings"]);
+  assert.equal(appRouteFromHash("#projects"), "projects");
+  assert.equal(appRouteFromHash("#unknown"), "home");
 });
 
 test("context card summarizes provider, tool, and isolation health from confidence checks", () => {

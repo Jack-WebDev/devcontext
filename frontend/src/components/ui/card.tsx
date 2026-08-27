@@ -3,25 +3,40 @@ import * as React from "react"
 import { cn } from "../../lib/utils.js"
 
 type CardElement = "article" | "div" | "label" | "p" | "section"
+type CardHierarchy = "primary" | "secondary" | "tertiary"
 
 function Card({
   as: Component = "div",
   className,
   size = "default",
+  hierarchy = "primary",
   ...props
 }: React.HTMLAttributes<HTMLElement> & {
   as?: CardElement
   size?: "default" | "sm"
+  hierarchy?: CardHierarchy
 }) {
   return React.createElement(Component, {
     ...props,
     "data-slot": "card",
     "data-size": size,
     className: cn(
-      "group/card flex flex-col gap-(--card-spacing) overflow-hidden bg-card py-(--card-spacing) text-sm text-card-foreground shadow-sm ring-1 ring-foreground/5 [--card-spacing:--spacing(8)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(5)] *:[img:first-child]:rounded-none *:[img:last-child]:rounded-none",
+      "group/card flex flex-col gap-(--card-spacing) overflow-hidden py-(--card-spacing) text-sm text-card-foreground [--card-spacing:--spacing(8)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(5)] *:[img:first-child]:rounded-none *:[img:last-child]:rounded-none",
+      cardHierarchyClassName(hierarchy),
       className
     ),
   })
+}
+
+function cardHierarchyClassName(hierarchy: CardHierarchy): string {
+  switch (hierarchy) {
+    case "primary":
+      return "bg-card shadow-sm ring-1 ring-foreground/5";
+    case "secondary":
+      return "border border-border bg-surface-muted shadow-none";
+    case "tertiary":
+      return "border border-border/70 bg-transparent shadow-none";
+  }
 }
 
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
@@ -104,4 +119,7 @@ export {
   CardAction,
   CardDescription,
   CardContent,
+  cardHierarchyClassName,
 }
+
+export type { CardHierarchy }

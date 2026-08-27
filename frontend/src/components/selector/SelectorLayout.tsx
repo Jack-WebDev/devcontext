@@ -16,7 +16,7 @@ function SelectorLayout({
   launchActions,
 }: SelectorLayoutProps) {
   return (
-    <div className="space-y-6" data-selector-layout="context-selector">
+    <div className="mx-auto max-w-5xl space-y-6" data-selector-layout="context-selector">
       <div data-selector-layout-section="project-identity">{projectIdentity}</div>
       <section className="space-y-3" aria-label="Context choices" data-selector-layout-section="context-cards">
         {contextCards}

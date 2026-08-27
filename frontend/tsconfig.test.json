@@ -13,6 +13,8 @@
     "src/lib/devctx-api.ts",
     "src/lib/devctx-window.ts",
     "src/components/selector/*.tsx",
-    "src/components/selector/*.ts"
+    "src/components/selector/*.ts",
+    "src/components/shell/*.tsx",
+    "src/components/shell/*.ts"
   ]
 }

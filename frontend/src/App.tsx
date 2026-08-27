@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
 import { SelectorView } from "./components/selector/SelectorView";
 import { createOnboardingContextAndRefresh } from "./components/selector/onboarding-action";
+import { AppShell } from "./components/shell/AppShell";
+import { appRouteDefinition, appRouteFromHash, type AppRoute } from "./components/shell/routes";
 import {
   devContextApi,
   type ApiResult,
@@ -21,6 +23,7 @@ function App() {
   const [launchState, setLaunchState] = useState<LaunchStateLoad>({
     status: "loading",
   });
+  const [activeRoute, setActiveRoute] = useState<AppRoute>(() => appRouteFromHash(window.location.hash));
 
   useEffect(() => {
     let active = true;
@@ -43,6 +46,21 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    function syncRouteFromHash() {
+      setActiveRoute(appRouteFromHash(window.location.hash));
+    }
+
+    window.addEventListener("hashchange", syncRouteFromHash);
+    return () => window.removeEventListener("hashchange", syncRouteFromHash);
+  }, []);
+
+  function handleNavigate(route: AppRoute) {
+    if (route !== activeRoute) {
+      window.location.hash = route;
+    }
+  }
+
   async function handleCreateContext(
     contextId: string,
     importProviderIds: string[] = [],
@@ -63,31 +81,30 @@ function App() {
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border bg-background">
-        <div className="mx-auto flex h-16 max-w-5xl items-center px-6">
-          <h1 className="text-base font-semibold">Dev Context</h1>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-5xl px-6 py-8">
-        <section
-          aria-labelledby="context-selector-heading"
-          className="space-y-6"
-        >
+    <AppShell activeRoute={activeRoute} onNavigate={handleNavigate}>
+      {activeRoute === "home" ? (
+        <section aria-labelledby="context-selector-heading" className="space-y-6">
           <div>
-            <h2
-              id="context-selector-heading"
-              className="text-2xl font-semibold"
-            >
-              Context selector
-            </h2>
+            <p className="text-sm text-muted-foreground">{appRouteDefinition(activeRoute).label}</p>
+            <h2 id="context-selector-heading" className="text-2xl font-semibold">Context selector</h2>
           </div>
-
           {renderSelectorContent(launchState, handleCreateContext)}
         </section>
-      </div>
-    </main>
+      ) : (
+        <PlaceholderScreen route={activeRoute} />
+      )}
+    </AppShell>
+  );
+}
+
+function PlaceholderScreen({ route }: { route: AppRoute }) {
+  const definition = appRouteDefinition(route);
+  return (
+    <section className="max-w-2xl space-y-2" aria-labelledby={`${route}-heading`}>
+      <p className="text-sm text-muted-foreground">{definition.label}</p>
+      <h2 id={`${route}-heading`} className="text-2xl font-semibold">{definition.label}</h2>
+      <p className="text-sm text-muted-foreground">This section will be available as its supporting API is added.</p>
+    </section>
   );
 }
 
