@@ -80,10 +80,21 @@ func ValidateContextDirectoryTree(paths ContextPaths) error {
 // context-owned directories exist for registered providers enabled in ctx. It
 // reports incomplete storage instead of recreating paths.
 func ValidateContextDirectoryTreeWithProviderRegistry(paths ContextPaths, ctx devcontext.Context, registry provider.Registry) error {
-	if registry.IsZero() {
-		registry = provider.BuiltInRegistry()
+	return ValidateContextDirectoryTreeWithRegistries(paths, ctx, registry, codingtool.BuiltInRegistry())
+}
+
+// ValidateContextDirectoryTreeWithRegistries verifies all storage required by
+// registered providers enabled in ctx and its registered selected coding tool.
+func ValidateContextDirectoryTreeWithRegistries(paths ContextPaths, ctx devcontext.Context, providerRegistry provider.Registry, toolRegistry codingtool.Registry) error {
+	if providerRegistry.IsZero() {
+		providerRegistry = provider.BuiltInRegistry()
 	}
-	return validateContextDirectoryTree(paths.WithProviderStorageDirs(registeredEnabledProviderIDs(ctx, registry)).WithToolStorageDirs([]codingtool.ID{ctx.Tool.Type}), registry)
+	if toolRegistry.IsZero() {
+		toolRegistry = codingtool.BuiltInRegistry()
+	}
+	paths = paths.WithProviderStorageDirs(registeredEnabledProviderIDs(ctx, providerRegistry))
+	paths = paths.WithToolStorageDirs(registeredSelectedToolIDs(ctx, toolRegistry))
+	return validateContextDirectoryTree(paths, providerRegistry)
 }
 
 func validateContextDirectoryTree(paths ContextPaths, registry provider.Registry) error {

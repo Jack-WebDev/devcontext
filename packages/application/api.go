@@ -29,18 +29,30 @@ type ProjectState struct {
 // ContextState is the presentation-safe identity and readiness summary for one
 // configured context.
 type ContextState struct {
-	ID         string                `json:"id"`
-	Name       string                `json:"name"`
-	Tool       ToolState             `json:"tool"`
-	Providers  []ProviderState       `json:"providers"`
-	Confidence LaunchConfidenceState `json:"confidence"`
-	Metadata   map[string]string     `json:"metadata,omitempty"`
+	ID             string                `json:"id"`
+	Name           string                `json:"name"`
+	Tool           ToolState             `json:"tool"`
+	AvailableTools []ToolOption          `json:"availableTools"`
+	Providers      []ProviderState       `json:"providers"`
+	Confidence     LaunchConfidenceState `json:"confidence"`
+	Metadata       map[string]string     `json:"metadata,omitempty"`
 }
 
-// ToolState describes the coding tool selected by a context without exposing
-// execution details.
+// ToolState describes the coding tool selected by a context, including
+// presentation-safe readiness and recovery guidance.
 type ToolState struct {
-	Type string `json:"type"`
+	ID         string                 `json:"id"`
+	Name       string                 `json:"name"`
+	Status     LaunchConfidenceStatus `json:"status"`
+	Message    string                 `json:"message"`
+	ActionHint string                 `json:"actionHint,omitempty"`
+}
+
+// ToolOption describes a registered coding tool that can be selected for a
+// context without exposing its executable or storage configuration.
+type ToolOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // ProviderState describes one provider's participation and local readiness for

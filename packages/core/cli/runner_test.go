@@ -271,7 +271,7 @@ func TestRunnerRootLaunchBuildsPlanAndStartsDetachedProcess(t *testing.T) {
 	}
 
 	wantEditorRequest := codingtool.CommandRequest{
-		Config:      context.Tool,
+		Config:      context.Tool.ConfigFor(context.Tool.DefaultTool),
 		Executable:  "/recording/code",
 		ProjectPath: fixture.workingDir,
 		Paths: codingtool.ContextPaths{
@@ -363,8 +363,9 @@ func TestRunnerRootLaunchDebugOutputRedactsSensitiveEnvironment(t *testing.T) {
 	for _, want := range []string{
 		"Debug:\n",
 		"resolution_source: explicit\n",
-		"editor_id: vscode\n",
-		"editor_executable: /recording/code\n",
+		"tool_id: vscode\n",
+		"tool_name: vscode\n",
+		"tool_executable: /recording/code\n",
 		"context_directories:\n",
 		"arguments:\n",
 		"environment:\n",
@@ -777,7 +778,7 @@ func testCLIContext(id string, name string) devcontext.Context {
 	return devcontext.Context{
 		ID:        devcontext.MustID(id),
 		Name:      name,
-		Tool:      codingtool.DefaultConfig(),
+		Tool:      codingtool.DefaultLaunchTarget(),
 		CreatedAt: time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC),
 	}
 }

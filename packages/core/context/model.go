@@ -17,7 +17,7 @@ type Context struct {
 	// Name is the user-facing display name.
 	Name string
 
-	Tool      codingtool.Config
+	Tool      codingtool.LaunchTarget
 	Providers provider.Configs
 	Metadata  Metadata
 	CreatedAt time.Time

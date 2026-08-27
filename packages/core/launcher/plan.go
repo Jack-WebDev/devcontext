@@ -8,7 +8,7 @@ import (
 	"devctx/packages/core/provider"
 )
 
-// Executable identifies the editor executable to start.
+// Executable identifies the coding-tool executable to start.
 type Executable string
 
 // Arguments stores structured process arguments.
@@ -17,14 +17,20 @@ type Arguments []string
 // Environment stores the process environment by variable name.
 type Environment map[string]string
 
-// WorkingDirectory identifies the directory used to start the editor process.
+// WorkingDirectory identifies the directory used to start the coding-tool process.
 type WorkingDirectory string
 
-// LaunchPlan represents the deterministic operation needed to launch an codingtool.
+// Tool identifies the coding tool selected for a launch.
+type Tool struct {
+	ID          codingtool.ID
+	DisplayName string
+}
+
+// LaunchPlan represents the deterministic operation needed to launch a coding tool.
 type LaunchPlan struct {
 	ProjectPath        project.Path
 	Context            devcontext.Context
-	Tool               codingtool.Config
+	Tool               Tool
 	Executable         Executable
 	Arguments          Arguments
 	WorkingDirectory   WorkingDirectory

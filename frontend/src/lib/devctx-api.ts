@@ -49,13 +49,23 @@ export interface ContextState {
   id: string;
   name: string;
   tool: ToolState;
+  availableTools: ToolOption[];
   providers: ProviderState[];
   confidence?: LaunchConfidenceState;
   metadata?: Record<string, string>;
 }
 
 export interface ToolState {
-  type: string;
+  id: string;
+  name: string;
+  status: LaunchConfidenceStatus;
+  message: string;
+  actionHint?: string;
+}
+
+export interface ToolOption {
+  id: string;
+  name: string;
 }
 
 export interface ProviderState {
@@ -85,7 +95,7 @@ export interface ProviderMetadataField {
 
 export type LaunchConfidenceStatus = "ready" | "needs_attention" | "blocked";
 
-export type LaunchConfidenceCheckComponent = "provider" | "vscode" | "isolation";
+export type LaunchConfidenceCheckComponent = "provider" | "tool" | "isolation";
 
 export interface LaunchConfidenceState {
   contextId: string;
@@ -96,6 +106,7 @@ export interface LaunchConfidenceState {
 export interface LaunchConfidenceCheck {
   component: LaunchConfidenceCheckComponent;
   providerId?: string;
+  toolId?: string;
   severity: LaunchConfidenceStatus;
   label: string;
   message: string;
@@ -322,12 +333,17 @@ function normalizeLaunchConfidenceCheck(value: unknown): LaunchConfidenceCheck {
   const object = objectValue(value);
   const component = normalizeLaunchConfidenceCheckComponent(object.component);
   const providerId = optionalString(object.providerId);
+  const toolId = optionalString(object.toolId);
   if (component === "provider" && providerId === undefined) {
-    throw new Error("Invalid Dev Context response.");
+	throw new Error("Invalid Dev Context response.");
   }
+	if (component === "tool" && toolId === undefined) {
+		throw new Error("Invalid Dev Context response.");
+	}
   return {
     component,
     ...(providerId === undefined ? {} : {providerId}),
+	...(toolId === undefined ? {} : {toolId}),
     severity: normalizeLaunchConfidenceStatus(object.severity),
     label: stringValue(object.label),
     message: stringValue(object.message),
@@ -349,7 +365,7 @@ function normalizeLaunchConfidenceStatus(value: unknown): LaunchConfidenceStatus
 function normalizeLaunchConfidenceCheckComponent(value: unknown): LaunchConfidenceCheckComponent {
   switch (value) {
     case "provider":
-    case "vscode":
+	case "tool":
     case "isolation":
       return value;
     default:
@@ -405,6 +421,7 @@ function normalizeContextState(value: unknown): ContextState {
     id: stringValue(object.id),
     name: stringValue(object.name),
     tool: normalizeToolState(object.tool),
+    availableTools: arrayValue(object.availableTools).map(normalizeToolOption),
     providers: arrayValue(object.providers).map(normalizeProviderState),
     confidence: normalizeLaunchConfidenceState(object.confidence),
     metadata: optionalStringRecord(object.metadata),
@@ -413,8 +430,21 @@ function normalizeContextState(value: unknown): ContextState {
 
 function normalizeToolState(value: unknown): ToolState {
   const object = objectValue(value);
+	const actionHint = optionalString(object.actionHint);
   return {
-    type: stringValue(object.type),
+    id: stringValue(object.id),
+    name: stringValue(object.name),
+    status: normalizeLaunchConfidenceStatus(object.status),
+    message: stringValue(object.message),
+    ...(actionHint === undefined ? {} : {actionHint}),
+  };
+}
+
+function normalizeToolOption(value: unknown): ToolOption {
+  const object = objectValue(value);
+  return {
+    id: stringValue(object.id),
+    name: stringValue(object.name),
   };
 }
 

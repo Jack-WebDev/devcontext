@@ -163,7 +163,7 @@ func (r Runner) runContext(command ContextCommand) Result {
 		if err != nil {
 			return r.errorResult(err)
 		}
-		if err := filesystem.CreateContextDirectoryTreeWithProviderRegistryCredentialsAndPermissions(paths, contextPaths, ctx, r.providerRegistry(), nil, r.storagePermissions()); err != nil {
+		if err := filesystem.CreateContextDirectoryTreeWithRegistriesCredentialsAndPermissions(paths, contextPaths, ctx, r.providerRegistry(), r.toolRegistry(), nil, r.storagePermissions()); err != nil {
 			return r.errorResult(err)
 		}
 		return successResult(renderContextCreate(ctx))
@@ -394,8 +394,9 @@ func renderDebugLaunchPlan(plan launcher.LaunchPlan) string {
 	var builder strings.Builder
 	builder.WriteString("Debug:\n")
 	fmt.Fprintf(&builder, "resolution_source: %s\n", plan.ResolutionSource)
-	fmt.Fprintf(&builder, "editor_id: %s\n", plan.Tool.Type)
-	fmt.Fprintf(&builder, "editor_executable: %s\n", plan.Executable)
+	fmt.Fprintf(&builder, "tool_id: %s\n", plan.Tool.ID)
+	fmt.Fprintf(&builder, "tool_name: %s\n", plan.Tool.DisplayName)
+	fmt.Fprintf(&builder, "tool_executable: %s\n", plan.Executable)
 	builder.WriteString("context_directories:\n")
 	fmt.Fprintf(&builder, "  root: %s\n", plan.ContextPaths.RootDir)
 	builder.WriteString("  providers:\n")
@@ -451,7 +452,7 @@ func eventFromPlan(name devlog.EventName, plan launcher.LaunchPlan, err error, t
 		Timestamp:        timestamp,
 		ProjectPath:      string(plan.ProjectPath),
 		ContextID:        plan.Context.ID.String(),
-		ToolID:           string(plan.Tool.Type),
+		ToolID:           string(plan.Tool.ID),
 		ResolutionSource: string(plan.ResolutionSource),
 		Err:              err,
 		KnownEnvironment: plan.Environment.Environ(),

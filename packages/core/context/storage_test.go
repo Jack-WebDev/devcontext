@@ -302,7 +302,7 @@ func storedContext(id string, name string) devcontext.Context {
 	return devcontext.Context{
 		ID:   devcontext.MustID(id),
 		Name: name,
-		Tool: codingtool.DefaultConfig(),
+		Tool: codingtool.DefaultLaunchTarget(),
 		Providers: provider.Configs{
 			"claude": {Enabled: true},
 			"codex":  {Enabled: true},

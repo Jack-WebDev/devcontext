@@ -70,7 +70,8 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	contextState := state.Contexts[0]
 	if contextState.ID != "personal" ||
 		contextState.Name != "Personal" ||
-		contextState.Tool != (ToolState{Type: "fake-editor"}) ||
+		contextState.Tool != (ToolState{ID: "fake-editor", Name: "Fake Tool", Status: LaunchConfidenceReady, Message: "Fake Tool is available for launch."}) ||
+		!reflect.DeepEqual(contextState.AvailableTools, []ToolOption{{ID: "fake-editor", Name: "Fake Tool"}}) ||
 		!reflect.DeepEqual(contextState.Providers, []ProviderState{
 			{
 				ID:      "fake",
@@ -110,7 +111,7 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("derive context paths: %v", err)
 	}
-	removeAll(t, contextPaths.ToolStorageDir(codingtool.VSCodeID))
+	removeAll(t, contextPaths.ToolStorageDir(ctx.Tool.DefaultTool))
 	fixture.writeBindings(t, project.Binding{
 		ProjectPath: project.Path(fixture.projectDir),
 		ContextID:   devcontext.MustID("personal"),
@@ -129,7 +130,7 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 		t.Fatalf("confidence context = %q, want personal", state.Confidence.ContextID)
 	}
 	if state.Confidence.Status != LaunchConfidenceBlocked {
-		t.Fatalf("confidence status = %q, want blocked because VS Code profile storage is absent", state.Confidence.Status)
+		t.Fatalf("confidence status = %q, want blocked because selected tool storage is absent", state.Confidence.Status)
 	}
 	wantChecks := []LaunchConfidenceCheck{
 		{
@@ -141,10 +142,11 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 			ActionHint: "Open and configure Codex for this context.",
 		},
 		{
-			Component: LaunchConfidenceCheckVSCode,
+			Component: LaunchConfidenceCheckTool,
+			ToolID:    "fake-editor",
 			Severity:  LaunchConfidenceReady,
-			Label:     "VS Code",
-			Message:   "VS Code is available for launch.",
+			Label:     "Fake Tool",
+			Message:   "Fake Tool is available for launch.",
 		},
 		{
 			Component: LaunchConfidenceCheckIsolation,
@@ -161,8 +163,9 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 		{
 			Component:  LaunchConfidenceCheckIsolation,
 			Severity:   LaunchConfidenceBlocked,
-			Label:      "VS Code profile",
-			Message:    "VS Code profile isolation is not ready.",
+			ToolID:     "fake-editor",
+			Label:      "Fake Tool isolation",
+			Message:    "Fake Tool isolation storage is not ready.",
 			ActionHint: "Run diagnostics to repair context storage.",
 		},
 	}
@@ -200,8 +203,8 @@ func TestGetLaunchStateReturnsPerContextConfidenceSummaries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("derive personal paths: %v", err)
 	}
-	removeAll(t, companyPaths.ToolStorageDir(codingtool.VSCodeID))
-	removeAll(t, personalPaths.ToolStorageDir(codingtool.VSCodeID))
+	removeAll(t, companyPaths.ToolStorageDir(company.Tool.DefaultTool))
+	removeAll(t, personalPaths.ToolStorageDir(personal.Tool.DefaultTool))
 
 	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
 	if appErr != nil {
@@ -220,10 +223,10 @@ func TestGetLaunchStateReturnsPerContextConfidenceSummaries(t *testing.T) {
 	}
 
 	if got := confidenceByContext["company"]; got.ContextID != "company" || got.Status != LaunchConfidenceBlocked {
-		t.Fatalf("company confidence = %#v, want company blocked by missing VS Code profile", got)
+		t.Fatalf("company confidence = %#v, want company blocked by missing selected tool storage", got)
 	}
 	if got := confidenceByContext["personal"]; got.ContextID != "personal" || got.Status != LaunchConfidenceBlocked {
-		t.Fatalf("personal confidence = %#v, want personal blocked by missing VS Code profile", got)
+		t.Fatalf("personal confidence = %#v, want personal blocked by missing selected tool storage", got)
 	}
 	assertConfidenceCheck(t, confidenceByContext["company"].Checks, LaunchConfidenceCheck{
 		Component:  LaunchConfidenceCheckProvider,
@@ -809,12 +812,12 @@ func TestCreateContextCreatesDefaultPersonalAndCompanyContexts(t *testing.T) {
 		{
 			name:      "personal",
 			contextID: "personal",
-			want:      devcontext.Context{ID: devcontext.MustID("personal"), Name: "Personal", Tool: codingtool.Config{Type: "fake-editor"}, Providers: defaultRegistry.DefaultConfigs(), CreatedAt: now},
+			want:      devcontext.Context{ID: devcontext.MustID("personal"), Name: "Personal", Tool: codingtool.LaunchTarget{DefaultTool: "fake-editor", Tools: map[codingtool.ID]codingtool.Config{"fake-editor": {}}}, Providers: defaultRegistry.DefaultConfigs(), CreatedAt: now},
 		},
 		{
 			name:      "company",
 			contextID: "company",
-			want:      devcontext.Context{ID: devcontext.MustID("company"), Name: "Company", Tool: codingtool.Config{Type: "fake-editor"}, Providers: defaultRegistry.DefaultConfigs(), CreatedAt: now},
+			want:      devcontext.Context{ID: devcontext.MustID("company"), Name: "Company", Tool: codingtool.LaunchTarget{DefaultTool: "fake-editor", Tools: map[codingtool.ID]codingtool.Config{"fake-editor": {}}}, Providers: defaultRegistry.DefaultConfigs(), CreatedAt: now},
 		},
 	}
 
@@ -1231,7 +1234,7 @@ func (f applicationFixture) context(id string, name string) devcontext.Context {
 	return devcontext.Context{
 		ID:   devcontext.MustID(id),
 		Name: name,
-		Tool: codingtool.Config{Type: f.editor.ID()},
+		Tool: codingtool.LaunchTarget{DefaultTool: f.editor.ID(), Tools: map[codingtool.ID]codingtool.Config{f.editor.ID(): {}}},
 		Providers: provider.Configs{
 			"fake": {Enabled: true},
 		},
@@ -1252,7 +1255,7 @@ func (f applicationFixture) writeContext(t *testing.T, ctx devcontext.Context) {
 	contextPaths = contextPaths.WithProviderStorageDirs(enabledProviderIDs(ctx))
 	mkdir(t, contextPaths.RootDir)
 	mkdir(t, contextPaths.ToolStorageRootDir)
-	mkdir(t, contextPaths.ToolStorageDir(ctx.Tool.Type))
+	mkdir(t, contextPaths.ToolStorageDir(ctx.Tool.DefaultTool))
 	for _, dir := range contextPaths.ProviderStorageDirs {
 		mkdir(t, dir)
 	}

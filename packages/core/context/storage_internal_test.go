@@ -61,7 +61,7 @@ func testStoredContext(id string, name string) Context {
 	return Context{
 		ID:   MustID(id),
 		Name: name,
-		Tool: codingtool.DefaultConfig(),
+		Tool: codingtool.DefaultLaunchTarget(),
 		Providers: provider.Configs{
 			"claude": {Enabled: true},
 			"codex":  {Enabled: true},

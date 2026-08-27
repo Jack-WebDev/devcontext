@@ -1,6 +1,7 @@
 package context_test
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -43,8 +44,8 @@ func TestDefaultContextSeeds(t *testing.T) {
 			if tt.context.Name != tt.wantName {
 				t.Fatalf("name = %q, want %q", tt.context.Name, tt.wantName)
 			}
-			if tt.context.Tool != codingtool.DefaultConfig() {
-				t.Fatalf("editor = %#v, want %#v", tt.context.Tool, codingtool.DefaultConfig())
+			if !reflect.DeepEqual(tt.context.Tool, codingtool.DefaultLaunchTarget()) {
+				t.Fatalf("launch target = %#v, want %#v", tt.context.Tool, codingtool.DefaultLaunchTarget())
 			}
 			assertEnabledProvider(t, tt.context.Providers, "claude")
 			assertEnabledProvider(t, tt.context.Providers, "codex")

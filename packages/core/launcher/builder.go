@@ -22,9 +22,9 @@ var (
 	// path resolution.
 	ErrMissingPlatformPaths = errors.New("missing platform paths")
 
-	// ErrMissingTool identifies a launch-plan builder without an editor
+	// ErrMissingTool identifies a launch-plan builder without a coding-tool
 	// implementation.
-	ErrMissingTool = errors.New("missing editor")
+	ErrMissingTool = errors.New("missing coding tool")
 
 	// ErrLaunchSelectionRequired identifies a request that cannot produce a full
 	// launch plan until the user selects a context.
@@ -50,7 +50,7 @@ type LaunchPlanBuilder struct {
 }
 
 // Build validates the project, resolves the context, builds provider
-// environment, and constructs the editor command for one launch.
+// environment, and constructs the coding-tool command for one launch.
 func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 	if b.Resolver == nil {
 		return LaunchPlan{}, ErrMissingContextResolver
@@ -78,11 +78,14 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 		return LaunchPlan{}, err
 	}
 	providerRegistry := b.providerRegistry()
-	contextPaths = contextPaths.WithProviderStorageDirs(registeredEnabledProviderIDs(*resolution.Context, providerRegistry))
-	contextPaths = contextPaths.WithToolStorageDirs([]codingtool.ID{resolution.Context.Tool.Type})
-	if err := filesystem.ValidateContextDirectoryTreeWithProviderRegistry(contextPaths, *resolution.Context, providerRegistry); err != nil {
+	toolRegistry := b.toolRegistry()
+	if err := filesystem.ValidateContextDirectoryTreeWithRegistries(contextPaths, *resolution.Context, providerRegistry, toolRegistry); err != nil {
 		return LaunchPlan{}, err
 	}
+	contextPaths = contextPaths.WithProviderStorageDirs(registeredEnabledProviderIDs(*resolution.Context, providerRegistry))
+	toolID := resolution.Context.Tool.DefaultTool
+	toolConfig := resolution.Context.Tool.ConfigFor(toolID)
+	contextPaths = contextPaths.WithToolStorageDirs([]codingtool.ID{toolID})
 
 	contributions, missingProviderIDs, err := b.providerContributions(*resolution.Context, contextPaths, providerRegistry)
 	if err != nil {
@@ -93,21 +96,21 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 		return LaunchPlan{}, err
 	}
 
-	integration, ok := b.toolRegistry().Get(resolution.Context.Tool.Type)
+	registeredTool, ok := toolRegistry.Lookup(toolID)
 	if !ok {
-		return LaunchPlan{}, fmt.Errorf("%w: %s", ErrMissingTool, resolution.Context.Tool.Type)
+		return LaunchPlan{}, fmt.Errorf("%w: %s", ErrMissingTool, toolID)
 	}
-	executable, err := integration.DetectExecutable(resolution.Context.Tool)
+	executable, err := registeredTool.Integration.DetectExecutable(toolConfig)
 	if err != nil {
 		return LaunchPlan{}, err
 	}
-	command, err := integration.BuildLaunchCommand(codingtool.CommandRequest{
-		Config:      resolution.Context.Tool,
+	command, err := registeredTool.Integration.BuildLaunchCommand(codingtool.CommandRequest{
+		Config:      toolConfig,
 		Executable:  executable,
 		ProjectPath: string(request.ProjectPath),
 		Paths: codingtool.ContextPaths{
 			RootDir:    contextPaths.RootDir,
-			StorageDir: contextPaths.ToolStorageDir(resolution.Context.Tool.Type),
+			StorageDir: contextPaths.ToolStorageDir(toolID),
 		},
 	})
 	if err != nil {
@@ -115,9 +118,12 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 	}
 
 	return LaunchPlan{
-		ProjectPath:        request.ProjectPath,
-		Context:            *resolution.Context,
-		Tool:               resolution.Context.Tool,
+		ProjectPath: request.ProjectPath,
+		Context:     *resolution.Context,
+		Tool: Tool{
+			ID:          toolID,
+			DisplayName: registeredTool.DisplayName,
+		},
 		Executable:         Executable(command.Executable),
 		Arguments:          launchArguments(command.Arguments),
 		WorkingDirectory:   WorkingDirectory(request.ProjectPath),

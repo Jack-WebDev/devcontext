@@ -53,42 +53,46 @@ func ProviderConfidenceCheck(providerID provider.ID, displayName string, status 
 	return check, true
 }
 
-// VSCodeConfidenceCheck derives the VS Code readiness check from executable
-// detection output.
-func VSCodeConfidenceCheck(executable codingtool.Executable, err error) ConfidenceCheck {
+// ToolConfidenceCheck derives the selected coding tool's readiness check from
+// executable detection output.
+func ToolConfidenceCheck(toolID codingtool.ID, displayName string, executable codingtool.Executable, err error) ConfidenceCheck {
+	name := strings.TrimSpace(displayName)
+	if name == "" {
+		name = string(toolID)
+	}
 	check := ConfidenceCheck{
-		Component: ConfidenceCheckVSCode,
-		Label:     "VS Code",
+		Component: ConfidenceCheckTool,
+		ToolID:    string(toolID),
+		Label:     name,
 	}
 
 	if err == nil && strings.TrimSpace(string(executable)) != "" {
 		check.Severity = ConfidenceReady
-		check.Message = "VS Code is available for launch."
+		check.Message = name + " is available for launch."
 		return check
 	}
 
 	check.Severity = ConfidenceBlocked
-	check.ActionHint = "Install the VS Code command line launcher or configure the VS Code executable."
+	check.ActionHint = "Install " + name + " or configure its executable."
 
 	switch {
 	case err == nil:
-		check.Message = "Dev Context could not find a VS Code command to launch."
+		check.Message = "Dev Context could not find a " + name + " command to launch."
 	case errors.Is(err, codingtool.ErrExecutableNotFound):
-		check.Message = "Dev Context could not find a VS Code command to launch."
+		check.Message = "Dev Context could not find a " + name + " command to launch."
 	case errors.Is(err, codingtool.ErrExecutableNotExecutable):
-		check.Message = "The configured VS Code command cannot be run."
+		check.Message = "The configured " + name + " command cannot be run."
 	default:
-		check.Message = "VS Code readiness could not be checked."
+		check.Message = name + " readiness could not be checked."
 	}
 
 	return check
 }
 
 // IsolationConfidenceChecks derives readiness checks for the context-owned
-// isolation storage required by launch and editor profile isolation. Provider
-// checks are generated from the enabled registered providers passed by the
-// application layer.
-func IsolationConfidenceChecks(paths filesystem.ContextPaths, providers []provider.Provider) []ConfidenceCheck {
+// isolation storage required by launch. Provider checks are generated from the
+// enabled registered providers passed by the application layer.
+func IsolationConfidenceChecks(paths filesystem.ContextPaths, providers []provider.Provider, toolID codingtool.ID, toolName string) []ConfidenceCheck {
 	checks := []ConfidenceCheck{
 		directoryConfidenceCheck(ConfidenceCheck{
 			Component: ConfidenceCheckIsolation,
@@ -112,12 +116,17 @@ func IsolationConfidenceChecks(paths filesystem.ContextPaths, providers []provid
 			Message:   name + " isolation storage is ready.",
 		}, paths.ProviderStorageDir(integration.ID()), name+" isolation storage is not ready."))
 	}
+	name := strings.TrimSpace(toolName)
+	if name == "" {
+		name = string(toolID)
+	}
 	checks = append(checks, multiDirectoryConfidenceCheck(ConfidenceCheck{
 		Component: ConfidenceCheckIsolation,
-		Label:     "VS Code profile",
+		ToolID:    string(toolID),
+		Label:     name + " isolation",
 		Severity:  ConfidenceReady,
-		Message:   "VS Code profile isolation is ready.",
-	}, []string{paths.ToolStorageRootDir, paths.ToolStorageDir(codingtool.VSCodeID)}, "VS Code profile isolation is not ready."))
+		Message:   name + " isolation storage is ready.",
+	}, []string{paths.ToolStorageRootDir, paths.ToolStorageDir(toolID)}, name+" isolation storage is not ready."))
 	return checks
 }
 
@@ -131,7 +140,7 @@ func confidenceMessage(value string, fallback string) string {
 func multiDirectoryConfidenceCheck(ready ConfidenceCheck, paths []string, blockedMessage string) ConfidenceCheck {
 	for _, path := range paths {
 		if !directoryReady(path) {
-			return blockedIsolationCheck(ready.Label, blockedMessage)
+			return blockedIsolationCheck(ready, blockedMessage)
 		}
 	}
 	return ready
@@ -139,16 +148,17 @@ func multiDirectoryConfidenceCheck(ready ConfidenceCheck, paths []string, blocke
 
 func directoryConfidenceCheck(ready ConfidenceCheck, path string, blockedMessage string) ConfidenceCheck {
 	if !directoryReady(path) {
-		return blockedIsolationCheck(ready.Label, blockedMessage)
+		return blockedIsolationCheck(ready, blockedMessage)
 	}
 	return ready
 }
 
-func blockedIsolationCheck(label string, message string) ConfidenceCheck {
+func blockedIsolationCheck(ready ConfidenceCheck, message string) ConfidenceCheck {
 	return ConfidenceCheck{
 		Component:  ConfidenceCheckIsolation,
+		ToolID:     ready.ToolID,
 		Severity:   ConfidenceBlocked,
-		Label:      label,
+		Label:      ready.Label,
 		Message:    message,
 		ActionHint: "Run diagnostics to repair context storage.",
 	}

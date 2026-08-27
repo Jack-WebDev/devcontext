@@ -26,7 +26,7 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 			context: devcontext.Context{
 				ID:   devcontext.MustID("personal"),
 				Name: "Personal",
-				Tool: codingtool.DefaultConfig(),
+				Tool: codingtool.DefaultLaunchTarget(),
 				Providers: provider.Configs{
 					"claude": {Enabled: true},
 					"codex":  {Enabled: true},
@@ -51,7 +51,7 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 			context: devcontext.Context{
 				ID:   devcontext.MustID("company"),
 				Name: "Company",
-				Tool: codingtool.DefaultConfig(),
+				Tool: codingtool.DefaultLaunchTarget(),
 				Providers: provider.Configs{
 					"claude": {Enabled: true},
 					"codex":  {Enabled: true},
@@ -76,7 +76,7 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 			context: devcontext.Context{
 				ID:   devcontext.MustID("client-a"),
 				Name: "Client A",
-				Tool: codingtool.DefaultConfig(),
+				Tool: codingtool.DefaultLaunchTarget(),
 				Providers: provider.Configs{
 					"claude": {
 						Enabled: true,
@@ -126,8 +126,8 @@ func TestContextModelConstructsNamedDevelopmentIdentities(t *testing.T) {
 			if tt.context.Name != tt.wantDisplayName {
 				t.Fatalf("context name = %q, want %q", tt.context.Name, tt.wantDisplayName)
 			}
-			if tt.context.Tool.Type != codingtool.TypeVSCode {
-				t.Fatalf("editor type = %q, want %q", tt.context.Tool.Type, codingtool.TypeVSCode)
+			if tt.context.Tool.DefaultTool != codingtool.VSCodeID {
+				t.Fatalf("default tool = %q, want %q", tt.context.Tool.DefaultTool, codingtool.VSCodeID)
 			}
 			if len(tt.context.Providers) != len(tt.wantProviderState) {
 				t.Fatalf("provider count = %d, want %d", len(tt.context.Providers), len(tt.wantProviderState))

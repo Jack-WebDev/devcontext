@@ -32,6 +32,10 @@ func TestRegistryPreservesOrderAndResolvesToolMetadata(t *testing.T) {
 	if registry.DisplayName(second.ID()) != "Second RegisteredTool" {
 		t.Fatalf("display name = %q, want Second RegisteredTool", registry.DisplayName(second.ID()))
 	}
+	registered, ok := registry.Lookup(second.ID())
+	if !ok || registered.Integration != second || registered.DisplayName != "Second RegisteredTool" {
+		t.Fatalf("lookup = %#v, found = %t", registered, ok)
+	}
 	if registry.DisplayName("missing") != "missing" {
 		t.Fatalf("unknown display name = %q, want raw ID", registry.DisplayName("missing"))
 	}

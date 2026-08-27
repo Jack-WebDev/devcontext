@@ -132,7 +132,6 @@ func TestVSCodeEditorUsesConfiguredExecutableBeforeSearchPath(t *testing.T) {
 		Probe:           &probe,
 		OperatingSystem: "linux",
 	}).DetectExecutable(codingtool.Config{
-		Type:               codingtool.TypeVSCode,
 		ExecutableOverride: "/opt/visual-studio-code/bin/code",
 	})
 	if err != nil {
@@ -157,7 +156,6 @@ func TestVSCodeEditorReportsMissingConfiguredExecutable(t *testing.T) {
 		Probe:           &probe,
 		OperatingSystem: "linux",
 	}).DetectExecutable(codingtool.Config{
-		Type:               codingtool.TypeVSCode,
 		ExecutableOverride: "/missing/code",
 	})
 	if err == nil {
@@ -185,7 +183,6 @@ func TestVSCodeEditorReportsNonExecutableConfiguredExecutable(t *testing.T) {
 		Probe:           &probe,
 		OperatingSystem: "linux",
 	}).DetectExecutable(codingtool.Config{
-		Type:               codingtool.TypeVSCode,
 		ExecutableOverride: "/opt/code",
 	})
 	if err == nil {
@@ -251,7 +248,6 @@ func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 			name: "custom executable",
 			request: codingtool.CommandRequest{
 				Config: codingtool.Config{
-					Type:               codingtool.TypeVSCode,
 					ExecutableOverride: "/opt/vscode-insiders/bin/code-insiders",
 				},
 				Executable:  "/opt/vscode-insiders/bin/code-insiders",

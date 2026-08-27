@@ -68,7 +68,7 @@ func defaultContextSeed(id ID, name string, createdAt time.Time, registry provid
 	return Context{
 		ID:        id,
 		Name:      name,
-		Tool:      codingtool.DefaultConfigForRegistry(editorRegistry),
+		Tool:      codingtool.DefaultLaunchTargetForRegistry(editorRegistry),
 		Providers: registry.DefaultConfigs(),
 		CreatedAt: createdAt.UTC(),
 	}

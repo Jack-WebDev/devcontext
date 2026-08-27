@@ -110,7 +110,7 @@ func testContext(id string, name string) devcontext.Context {
 	return devcontext.Context{
 		ID:        devcontext.MustID(id),
 		Name:      name,
-		Tool:      codingtool.DefaultConfig(),
+		Tool:      codingtool.DefaultLaunchTarget(),
 		CreatedAt: time.Date(2026, 8, 13, 12, 0, 0, 0, time.UTC),
 	}
 }
