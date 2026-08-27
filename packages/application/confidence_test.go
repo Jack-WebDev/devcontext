@@ -131,28 +131,12 @@ func TestProviderIdentityStateVariantsSerialize(t *testing.T) {
 		want     string
 	}{
 		{
-			name: "verified codex",
+			name: "verified identity fields",
 			identity: application.ProviderIdentityState{
 				Status: application.ProviderIdentityVerified,
-				Codex: &application.CodexProviderIdentityState{
-					Email:            "user@example.com",
-					ChatGPTPlanType:  "Business",
-					ChatGPTAccountID: "acct_123",
-				},
+				Fields: []application.ProviderMetadataField{{Label: "Email", Value: "user@example.com"}, {Label: "Plan", Value: "Business"}, {Label: "Account", Value: "acct_123"}},
 			},
-			want: `{"status":"verified","codex":{"email":"user@example.com","chatgptPlanType":"Business","chatgptAccountId":"acct_123"}}`,
-		},
-		{
-			name: "verified claude",
-			identity: application.ProviderIdentityState{
-				Status: application.ProviderIdentityVerified,
-				Claude: &application.ClaudeProviderIdentityState{
-					SubscriptionType: "Pro",
-					OrganizationUUID: "e783",
-					OrganizationName: "Jishin Labs",
-				},
-			},
-			want: `{"status":"verified","claude":{"subscriptionType":"Pro","organizationUuid":"e783","organizationName":"Jishin Labs"}}`,
+			want: `{"status":"verified","fields":[{"label":"Email","value":"user@example.com"},{"label":"Plan","value":"Business"},{"label":"Account","value":"acct_123"}]}`,
 		},
 		{
 			name: "unavailable",

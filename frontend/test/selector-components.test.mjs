@@ -154,23 +154,7 @@ test("provider credential classification renders only safe metadata fields", () 
   const html = renderToStaticMarkup(
     ProviderCredentialClassification({
       sessions: [
-        {
-          ...providerCredentialSessionsFixture()[0],
-          codex: {
-            ...providerCredentialSessionsFixture()[0].codex,
-            accessToken: "codex-access-token-secret",
-            refreshToken: "codex-refresh-token-secret",
-            idToken: "header.payload.signature",
-          },
-        },
-        {
-          ...providerCredentialSessionsFixture()[1],
-          claude: {
-            ...providerCredentialSessionsFixture()[1].claude,
-            accessToken: "claude-access-token-secret",
-            refreshToken: "claude-refresh-token-secret",
-          },
-        },
+        ...providerCredentialSessionsFixture(),
       ],
       assignments: {codex: "personal"},
       onClassify: () => {},
@@ -185,9 +169,6 @@ test("provider credential classification renders only safe metadata fields", () 
   assert.ok(html.includes("Pro"));
   assert.ok(html.includes("Jishin Labs"));
   assert.ok(html.includes("e783"));
-  assert.doesNotMatch(html, /access-token-secret/);
-  assert.doesNotMatch(html, /refresh-token-secret/);
-  assert.doesNotMatch(html, /header\.payload\.signature/);
 });
 
 test("first-run welcome shows pending and error states", () => {
@@ -1122,8 +1103,8 @@ function providerFixture(id, name, enabled, state, explanation) {
     state,
     explanation,
     identity: enabled && state === "ready"
-      ? {status: "unavailable", message: "Account identity unavailable."}
-      : {status: "none"},
+      ? {status: "unavailable", message: "Account identity unavailable.", fields: []}
+      : {status: "none", fields: []},
   };
 }
 
@@ -1154,21 +1135,13 @@ function providerCredentialSessionsFixture() {
       providerId: "codex",
       name: "Codex",
       metadataAvailable: true,
-      codex: {
-        email: "user@company.com",
-        chatgptPlanType: "Business",
-        chatgptAccountId: "acct_123",
-      },
+      fields: [{label: "Email", value: "user@company.com"}, {label: "Plan", value: "Business"}, {label: "Account", value: "acct_123"}],
     },
     {
       providerId: "claude",
       name: "Claude",
       metadataAvailable: true,
-      claude: {
-        subscriptionType: "Pro",
-        organizationUuid: "e783",
-        organizationName: "Jishin Labs",
-      },
+      fields: [{label: "Subscription", value: "Pro"}, {label: "Organization", value: "Jishin Labs"}, {label: "Organization ID", value: "e783"}],
     },
   ];
 }

@@ -359,22 +359,7 @@ func (s *Service) providerCredentialSessionStates() ([]ProviderCredentialSession
 			ProviderID:        string(integration.ID()),
 			Name:              integration.DisplayName(),
 			MetadataAvailable: session.MetadataAvailable,
-		}
-		switch integration.ID() {
-		case provider.CodexID:
-			state.Codex = &CodexCredentialSessionState{
-				Email:            metadataValue(session.Fields, "Email"),
-				ChatGPTPlanType:  metadataValue(session.Fields, "ChatGPT plan"),
-				ChatGPTAccountID: metadataValue(session.Fields, "ChatGPT account ID"),
-			}
-		case provider.ClaudeID:
-			state.Claude = &ClaudeCredentialSessionState{
-				SubscriptionType: metadataValue(session.Fields, "Subscription"),
-				OrganizationUUID: metadataValue(session.Fields, "Organization UUID"),
-				OrganizationName: metadataValue(session.Fields, "Organization"),
-			}
-		default:
-			continue
+			Fields:            providerMetadataFields(session.Fields),
 		}
 		states = append(states, state)
 	}
@@ -500,27 +485,9 @@ func verifiedProviderIdentity(integration provider.Provider, runtime provider.Ru
 		return unavailableProviderIdentity()
 	}
 
-	switch integration.ID() {
-	case provider.CodexID:
-		return ProviderIdentityState{
-			Status: ProviderIdentityVerified,
-			Codex: &CodexProviderIdentityState{
-				Email:            metadataValue(identity.Fields, "Email"),
-				ChatGPTPlanType:  metadataValue(identity.Fields, "ChatGPT plan"),
-				ChatGPTAccountID: metadataValue(identity.Fields, "ChatGPT account ID"),
-			},
-		}
-	case provider.ClaudeID:
-		return ProviderIdentityState{
-			Status: ProviderIdentityVerified,
-			Claude: &ClaudeProviderIdentityState{
-				SubscriptionType: metadataValue(identity.Fields, "Subscription"),
-				OrganizationUUID: metadataValue(identity.Fields, "Organization UUID"),
-				OrganizationName: metadataValue(identity.Fields, "Organization"),
-			},
-		}
-	default:
-		return unavailableProviderIdentity()
+	return ProviderIdentityState{
+		Status: ProviderIdentityVerified,
+		Fields: providerMetadataFields(identity.Fields),
 	}
 }
 
@@ -537,13 +504,14 @@ func providerRuntimeContext(ctx devcontext.Context, config provider.Config, path
 	}
 }
 
-func metadataValue(fields []provider.MetadataField, label string) string {
+func providerMetadataFields(fields []provider.MetadataField) []ProviderMetadataField {
+	result := make([]ProviderMetadataField, 0, len(fields))
 	for _, field := range fields {
-		if field.Label == label {
-			return field.Value
+		if field.Label != "" && field.Value != "" {
+			result = append(result, ProviderMetadataField{Label: field.Label, Value: field.Value})
 		}
 	}
-	return ""
+	return result
 }
 
 func unavailableProviderIdentity() ProviderIdentityState {

@@ -125,24 +125,15 @@ func (s ProviderIdentityStatus) Valid() bool {
 // Verified provider-specific fields are added by provider extraction phases;
 // until then, the status tells the UI not to guess.
 type ProviderIdentityState struct {
-	Status  ProviderIdentityStatus       `json:"status"`
-	Message string                       `json:"message,omitempty"`
-	Codex   *CodexProviderIdentityState  `json:"codex,omitempty"`
-	Claude  *ClaudeProviderIdentityState `json:"claude,omitempty"`
+	Status  ProviderIdentityStatus  `json:"status"`
+	Message string                  `json:"message,omitempty"`
+	Fields  []ProviderMetadataField `json:"fields,omitempty"`
 }
 
-// CodexProviderIdentityState is safe verified Codex identity metadata.
-type CodexProviderIdentityState struct {
-	Email            string `json:"email,omitempty"`
-	ChatGPTPlanType  string `json:"chatgptPlanType,omitempty"`
-	ChatGPTAccountID string `json:"chatgptAccountId,omitempty"`
-}
-
-// ClaudeProviderIdentityState is safe verified Claude identity metadata.
-type ClaudeProviderIdentityState struct {
-	SubscriptionType string `json:"subscriptionType,omitempty"`
-	OrganizationUUID string `json:"organizationUuid,omitempty"`
-	OrganizationName string `json:"organizationName,omitempty"`
+// ProviderMetadataField contains one safe provider-supplied value for display.
+type ProviderMetadataField struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
 }
 
 // PreflightLaunchProjectRequest asks the service to check launch readiness for
@@ -194,27 +185,10 @@ type CreateContextResult struct {
 // ProviderCredentialSessionState describes a detected global provider session
 // using only non-secret metadata that helps the user classify the session.
 type ProviderCredentialSessionState struct {
-	ProviderID        string                        `json:"providerId"`
-	Name              string                        `json:"name"`
-	MetadataAvailable bool                          `json:"metadataAvailable"`
-	Codex             *CodexCredentialSessionState  `json:"codex,omitempty"`
-	Claude            *ClaudeCredentialSessionState `json:"claude,omitempty"`
-}
-
-// CodexCredentialSessionState is safe Codex identity metadata decoded from the
-// id_token payload.
-type CodexCredentialSessionState struct {
-	Email            string `json:"email,omitempty"`
-	ChatGPTPlanType  string `json:"chatgptPlanType,omitempty"`
-	ChatGPTAccountID string `json:"chatgptAccountId,omitempty"`
-}
-
-// ClaudeCredentialSessionState is safe Claude identity metadata decoded from
-// the global credentials file.
-type ClaudeCredentialSessionState struct {
-	SubscriptionType string `json:"subscriptionType,omitempty"`
-	OrganizationUUID string `json:"organizationUuid,omitempty"`
-	OrganizationName string `json:"organizationName,omitempty"`
+	ProviderID        string                  `json:"providerId"`
+	Name              string                  `json:"name"`
+	MetadataAvailable bool                    `json:"metadataAvailable"`
+	Fields            []ProviderMetadataField `json:"fields,omitempty"`
 }
 
 // ResolutionWarning is a presentation-safe launch warning.

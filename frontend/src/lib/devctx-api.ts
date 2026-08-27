@@ -74,20 +74,12 @@ export type ProviderIdentityStatus = "verified" | "unavailable" | "none" | "mism
 export interface ProviderIdentityState {
   status: ProviderIdentityStatus;
   message?: string;
-  codex?: CodexProviderIdentity;
-  claude?: ClaudeProviderIdentity;
+  fields: ProviderMetadataField[];
 }
 
-export interface CodexProviderIdentity {
-  email?: string;
-  chatgptPlanType?: string;
-  chatgptAccountId?: string;
-}
-
-export interface ClaudeProviderIdentity {
-  subscriptionType?: string;
-  organizationUuid?: string;
-  organizationName?: string;
+export interface ProviderMetadataField {
+  label: string;
+  value: string;
 }
 
 export type LaunchConfidenceStatus = "ready" | "needs_attention" | "blocked";
@@ -172,20 +164,7 @@ export interface ProviderCredentialSession {
   providerId: string;
   name: string;
   metadataAvailable: boolean;
-  codex?: CodexCredentialSession;
-  claude?: ClaudeCredentialSession;
-}
-
-export interface CodexCredentialSession {
-  email?: string;
-  chatgptPlanType?: string;
-  chatgptAccountId?: string;
-}
-
-export interface ClaudeCredentialSession {
-  subscriptionType?: string;
-  organizationUuid?: string;
-  organizationName?: string;
+  fields: ProviderMetadataField[];
 }
 
 export interface DevContextApi {
@@ -458,15 +437,14 @@ function normalizeProviderReadinessState(value: unknown): ProviderReadinessState
 
 function normalizeProviderIdentityState(value: unknown): ProviderIdentityState {
   if (value === undefined || value === null) {
-    return { status: "none" };
+    return { status: "none", fields: [] };
   }
 
   const object = objectValue(value);
   return {
     status: normalizeProviderIdentityStatus(object.status),
     message: optionalString(object.message),
-    codex: normalizeCodexProviderIdentity(object.codex),
-    claude: normalizeClaudeProviderIdentity(object.claude),
+    fields: arrayValue(object.fields).map(normalizeProviderMetadataField),
   };
 }
 
@@ -482,62 +460,21 @@ function normalizeProviderIdentityStatus(value: unknown): ProviderIdentityStatus
   }
 }
 
-function normalizeCodexProviderIdentity(value: unknown): CodexProviderIdentity | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-  const object = objectValue(value);
-  return {
-    email: optionalString(object.email),
-    chatgptPlanType: optionalString(object.chatgptPlanType),
-    chatgptAccountId: optionalString(object.chatgptAccountId),
-  };
-}
-
-function normalizeClaudeProviderIdentity(value: unknown): ClaudeProviderIdentity | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-  const object = objectValue(value);
-  return {
-    subscriptionType: optionalString(object.subscriptionType),
-    organizationUuid: optionalString(object.organizationUuid),
-    organizationName: optionalString(object.organizationName),
-  };
-}
-
 function normalizeProviderCredentialSession(value: unknown): ProviderCredentialSession {
   const object = objectValue(value);
   return {
     providerId: stringValue(object.providerId),
     name: stringValue(object.name),
     metadataAvailable: booleanValue(object.metadataAvailable),
-    codex: normalizeCodexCredentialSession(object.codex),
-    claude: normalizeClaudeCredentialSession(object.claude),
+    fields: arrayValue(object.fields).map(normalizeProviderMetadataField),
   };
 }
 
-function normalizeCodexCredentialSession(value: unknown): CodexCredentialSession | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
+function normalizeProviderMetadataField(value: unknown): ProviderMetadataField {
   const object = objectValue(value);
   return {
-    email: optionalString(object.email),
-    chatgptPlanType: optionalString(object.chatgptPlanType),
-    chatgptAccountId: optionalString(object.chatgptAccountId),
-  };
-}
-
-function normalizeClaudeCredentialSession(value: unknown): ClaudeCredentialSession | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-  const object = objectValue(value);
-  return {
-    subscriptionType: optionalString(object.subscriptionType),
-    organizationUuid: optionalString(object.organizationUuid),
-    organizationName: optionalString(object.organizationName),
+    label: stringValue(object.label),
+    value: stringValue(object.value),
   };
 }
 
