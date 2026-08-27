@@ -331,7 +331,7 @@ func (s *Service) contextState(ctx devcontext.Context) ContextState {
 	return ContextState{
 		ID:         ctx.ID.String(),
 		Name:       ctx.Name,
-		Tool:       ToolState{Type: string(ctx.Tool.Type)},
+		Tool:       ToolState{Type: string(ctx.Tool.DefaultTool)},
 		Providers:  providerStatesFromEntries(providerEntries),
 		Confidence: s.launchConfidenceStateForContext(ctx, providerEntries),
 		Metadata:   cloneMetadata(ctx.Metadata),
@@ -554,13 +554,15 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 		}
 	}
 
-	integration, registered := s.dependencies.ToolRegistry.Get(ctx.Tool.Type)
+	toolID := ctx.Tool.DefaultTool
+	toolConfig := ctx.Tool.ConfigFor(toolID)
+	integration, registered := s.dependencies.ToolRegistry.Get(toolID)
 	var executable codingtool.Executable
 	var editorErr error
 	if !registered {
-		editorErr = fmt.Errorf("selected editor %q is not registered", ctx.Tool.Type)
+		editorErr = fmt.Errorf("selected editor %q is not registered", toolID)
 	} else {
-		executable, editorErr = integration.DetectExecutable(ctx.Tool)
+		executable, editorErr = integration.DetectExecutable(toolConfig)
 	}
 	checks = append(checks, launcher.VSCodeConfidenceCheck(executable, editorErr))
 
@@ -636,7 +638,7 @@ func eventFromLaunchPlan(name devlog.EventName, plan launcher.LaunchPlan, err er
 		Timestamp:        timestamp,
 		ProjectPath:      string(plan.ProjectPath),
 		ContextID:        plan.Context.ID.String(),
-		ToolID:           string(plan.Tool.Type),
+		ToolID:           string(plan.Context.Tool.DefaultTool),
 		ResolutionSource: string(plan.ResolutionSource),
 		Err:              err,
 		KnownEnvironment: plan.Environment.Environ(),

@@ -83,7 +83,9 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 		return LaunchPlan{}, err
 	}
 	contextPaths = contextPaths.WithProviderStorageDirs(registeredEnabledProviderIDs(*resolution.Context, providerRegistry))
-	contextPaths = contextPaths.WithToolStorageDirs([]codingtool.ID{resolution.Context.Tool.Type})
+	toolID := resolution.Context.Tool.DefaultTool
+	toolConfig := resolution.Context.Tool.ConfigFor(toolID)
+	contextPaths = contextPaths.WithToolStorageDirs([]codingtool.ID{toolID})
 
 	contributions, missingProviderIDs, err := b.providerContributions(*resolution.Context, contextPaths, providerRegistry)
 	if err != nil {
@@ -94,21 +96,21 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 		return LaunchPlan{}, err
 	}
 
-	integration, ok := toolRegistry.Get(resolution.Context.Tool.Type)
+	integration, ok := toolRegistry.Get(toolID)
 	if !ok {
-		return LaunchPlan{}, fmt.Errorf("%w: %s", ErrMissingTool, resolution.Context.Tool.Type)
+		return LaunchPlan{}, fmt.Errorf("%w: %s", ErrMissingTool, toolID)
 	}
-	executable, err := integration.DetectExecutable(resolution.Context.Tool)
+	executable, err := integration.DetectExecutable(toolConfig)
 	if err != nil {
 		return LaunchPlan{}, err
 	}
 	command, err := integration.BuildLaunchCommand(codingtool.CommandRequest{
-		Config:      resolution.Context.Tool,
+		Config:      toolConfig,
 		Executable:  executable,
 		ProjectPath: string(request.ProjectPath),
 		Paths: codingtool.ContextPaths{
 			RootDir:    contextPaths.RootDir,
-			StorageDir: contextPaths.ToolStorageDir(resolution.Context.Tool.Type),
+			StorageDir: contextPaths.ToolStorageDir(toolID),
 		},
 	})
 	if err != nil {
@@ -118,7 +120,7 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 	return LaunchPlan{
 		ProjectPath:        request.ProjectPath,
 		Context:            *resolution.Context,
-		Tool:               resolution.Context.Tool,
+		Tool:               toolConfig,
 		Executable:         Executable(command.Executable),
 		Arguments:          launchArguments(command.Arguments),
 		WorkingDirectory:   WorkingDirectory(request.ProjectPath),

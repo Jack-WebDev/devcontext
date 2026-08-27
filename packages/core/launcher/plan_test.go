@@ -16,7 +16,7 @@ func TestLaunchPlanRepresentsCompleteEditorLaunchOperation(t *testing.T) {
 	context := devcontext.Context{
 		ID:   devcontext.MustID("client-a"),
 		Name: "Client A",
-		Tool: codingtool.DefaultConfig(),
+		Tool: codingtool.DefaultLaunchTarget(),
 		Providers: provider.Configs{
 			"claude": {Enabled: true},
 			"codex":  {Enabled: true},
@@ -27,7 +27,7 @@ func TestLaunchPlanRepresentsCompleteEditorLaunchOperation(t *testing.T) {
 	plan := launcher.LaunchPlan{
 		ProjectPath:      project.Path("/work/client-a/api"),
 		Context:          context,
-		Tool:             context.Tool,
+		Tool:             context.Tool.ConfigFor(context.Tool.DefaultTool),
 		Executable:       launcher.Executable("/usr/local/bin/code"),
 		Arguments:        launcher.Arguments{"/work/client-a/api"},
 		WorkingDirectory: launcher.WorkingDirectory("/work/client-a/api"),

@@ -36,7 +36,6 @@ func (fakeEditor) BuildLaunchCommand(request codingtool.CommandRequest) (codingt
 func TestEditorInterfaceAllowsGenericEditorUse(t *testing.T) {
 	var implementation codingtool.CodingTool = fakeEditor{}
 	config := codingtool.Config{
-		Type:               "fake-editor",
 		ExecutableOverride: "/opt/fake-editor/bin/fake-editor",
 	}
 

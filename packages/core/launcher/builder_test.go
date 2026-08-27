@@ -21,7 +21,7 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 	context := devcontext.Context{
 		ID:   devcontext.MustID("client-a"),
 		Name: "Client A",
-		Tool: codingtool.Config{Type: "fake-editor"},
+		Tool: codingtool.LaunchTarget{DefaultTool: "fake-editor", Tools: map[codingtool.ID]codingtool.Config{"fake-editor": {}}},
 		Providers: provider.Configs{
 			"fake":     {Enabled: true},
 			"disabled": {Enabled: false},
@@ -46,7 +46,7 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 	}
 	createContextDirectories(t, contextPaths)
 	contextPaths = contextPaths.WithProviderStorageDirs([]provider.ID{"fake"})
-	contextPaths = contextPaths.WithToolStorageDirs([]codingtool.ID{context.Tool.Type})
+	contextPaths = contextPaths.WithToolStorageDirs([]codingtool.ID{context.Tool.DefaultTool})
 
 	fakeEditor := &builderFakeEditor{}
 	builder := launcher.LaunchPlanBuilder{
@@ -86,9 +86,9 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 	want := launcher.LaunchPlan{
 		ProjectPath:      project.Path(projectDir),
 		Context:          context,
-		Tool:             context.Tool,
+		Tool:             context.Tool.ConfigFor(context.Tool.DefaultTool),
 		Executable:       launcher.Executable("/usr/local/bin/fake-editor"),
-		Arguments:        launcher.Arguments{"--state-dir", contextPaths.ToolStorageDir(context.Tool.Type), projectDir},
+		Arguments:        launcher.Arguments{"--state-dir", contextPaths.ToolStorageDir(context.Tool.DefaultTool), projectDir},
 		WorkingDirectory: launcher.WorkingDirectory(projectDir),
 		Environment: launcher.Environment{
 			"PATH":           "/usr/local/bin",
@@ -110,12 +110,12 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 	}
 
 	wantEditorRequest := codingtool.CommandRequest{
-		Config:      context.Tool,
+		Config:      context.Tool.ConfigFor(context.Tool.DefaultTool),
 		Executable:  "/usr/local/bin/fake-editor",
 		ProjectPath: projectDir,
 		Paths: codingtool.ContextPaths{
 			RootDir:    contextPaths.RootDir,
-			StorageDir: contextPaths.ToolStorageDir(context.Tool.Type),
+			StorageDir: contextPaths.ToolStorageDir(context.Tool.DefaultTool),
 		},
 	}
 	if !reflect.DeepEqual(fakeEditor.commandRequests, []codingtool.CommandRequest{wantEditorRequest}) {
@@ -130,7 +130,7 @@ func TestLaunchPlanBuilderDoesNotRequireProviderCLICommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve test executable: %v", err)
 	}
-	context.Tool.ExecutableOverride = executable
+	context.Tool.Tools[context.Tool.DefaultTool] = codingtool.Config{ExecutableOverride: executable}
 	platformPaths := fakePlanPlatformPaths{
 		devContextHome: filepath.Join(t.TempDir(), ".devctx"),
 	}
@@ -222,7 +222,7 @@ func TestLaunchPlanBuilderRejectsIncompleteContextStorage(t *testing.T) {
 	context := devcontext.Context{
 		ID:        devcontext.MustID("personal"),
 		Name:      "Personal",
-		Tool:      codingtool.DefaultConfig(),
+		Tool:      codingtool.DefaultLaunchTarget(),
 		CreatedAt: time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC),
 	}
 	platformPaths := fakePlanPlatformPaths{

@@ -265,8 +265,8 @@ func registeredEnabledProviderIDs(ctx devcontext.Context, registry provider.Regi
 
 func registeredSelectedToolIDs(ctx devcontext.Context, registry codingtool.Registry) []codingtool.ID {
 	for _, registered := range registry.All() {
-		if registered.Integration.ID() == ctx.Tool.Type {
-			return []codingtool.ID{ctx.Tool.Type}
+		if registered.Integration.ID() == ctx.Tool.DefaultTool {
+			return []codingtool.ID{ctx.Tool.DefaultTool}
 		}
 	}
 	return nil

@@ -27,14 +27,19 @@ type contextTOML struct {
 	ID        *string                 `toml:"id"`
 	Name      *string                 `toml:"name"`
 	CreatedAt *time.Time              `toml:"created_at"`
-	Tool      editorTOML              `toml:"editor"`
+	Tool      launchTargetTOML        `toml:"launch_target"`
 	Providers map[string]providerTOML `toml:"providers"`
 	Metadata  map[string]string       `toml:"metadata"`
 }
 
-type editorTOML struct {
-	Type               *string `toml:"type"`
-	ExecutableOverride *string `toml:"executable_override"`
+type launchTargetTOML struct {
+	DefaultTool *string                   `toml:"default_tool"`
+	Tools       map[string]toolConfigTOML `toml:"tools"`
+}
+
+type toolConfigTOML struct {
+	ExecutableOverride *string           `toml:"executable_override"`
+	Options            map[string]string `toml:"options"`
 }
 
 type providerTOML struct {
@@ -75,10 +80,24 @@ func EncodeContextTOML(ctx Context) ([]byte, error) {
 	writeStringValue(&builder, "name", ctx.Name)
 	writeTimeValue(&builder, "created_at", ctx.CreatedAt)
 
-	builder.WriteString("\n[editor]\n")
-	writeStringValue(&builder, "type", string(ctx.Tool.Type))
-	if ctx.Tool.ExecutableOverride != "" {
-		writeStringValue(&builder, "executable_override", ctx.Tool.ExecutableOverride)
+	builder.WriteString("\n[launch_target]\n")
+	writeStringValue(&builder, "default_tool", string(ctx.Tool.DefaultTool))
+	for _, toolID := range sortedToolIDs(ctx.Tool.Tools) {
+		toolConfig := ctx.Tool.Tools[toolID]
+		builder.WriteString("\n[launch_target.tools.")
+		builder.WriteString(tomlKeySegment(string(toolID)))
+		builder.WriteString("]\n")
+		if toolConfig.ExecutableOverride != "" {
+			writeStringValue(&builder, "executable_override", toolConfig.ExecutableOverride)
+		}
+		if len(toolConfig.Options) > 0 {
+			builder.WriteString("\n[launch_target.tools.")
+			builder.WriteString(tomlKeySegment(string(toolID)))
+			builder.WriteString(".options]\n")
+			for _, key := range sortedOptionKeys(toolConfig.Options) {
+				writeStringValue(&builder, key, toolConfig.Options[key])
+			}
+		}
 	}
 
 	for _, providerID := range sortedProviderIDs(ctx.Providers) {
@@ -137,7 +156,7 @@ func contextFromTOML(raw contextTOML, expectedID ID) (Context, error) {
 		return Context{}, fmt.Errorf("%w: created_at cannot be zero", ErrInvalidContextConfig)
 	}
 
-	editorConfig, err := editorConfigFromTOML(raw.Tool)
+	toolConfig, err := launchTargetFromTOML(raw.Tool)
 	if err != nil {
 		return Context{}, err
 	}
@@ -153,28 +172,55 @@ func contextFromTOML(raw contextTOML, expectedID ID) (Context, error) {
 	return Context{
 		ID:        id,
 		Name:      *raw.Name,
-		Tool:      editorConfig,
+		Tool:      toolConfig,
 		Providers: providerConfigs,
 		Metadata:  metadata,
 		CreatedAt: raw.CreatedAt.UTC(),
 	}, nil
 }
 
-func editorConfigFromTOML(raw editorTOML) (codingtool.Config, error) {
-	if raw.Type == nil {
-		return codingtool.Config{}, fmt.Errorf("%w: missing codingtool.type", ErrInvalidContextConfig)
+func launchTargetFromTOML(raw launchTargetTOML) (codingtool.LaunchTarget, error) {
+	if raw.DefaultTool == nil {
+		return codingtool.LaunchTarget{}, fmt.Errorf("%w: missing launch_target.default_tool", ErrInvalidContextConfig)
 	}
-	if *raw.Type == "" {
-		return codingtool.Config{}, fmt.Errorf("%w: codingtool.type cannot be empty", ErrInvalidContextConfig)
+	if *raw.DefaultTool == "" {
+		return codingtool.LaunchTarget{}, fmt.Errorf("%w: launch_target.default_tool cannot be empty", ErrInvalidContextConfig)
 	}
 
-	editorConfig := codingtool.Config{
-		Type: codingtool.Type(*raw.Type),
+	configs := make(map[codingtool.ID]codingtool.Config, len(raw.Tools)+1)
+	for toolID, rawConfig := range raw.Tools {
+		if toolID == "" {
+			return codingtool.LaunchTarget{}, fmt.Errorf("%w: tool ID cannot be empty", ErrInvalidContextConfig)
+		}
+		options, err := toolOptionsFromTOML(toolID, rawConfig.Options)
+		if err != nil {
+			return codingtool.LaunchTarget{}, err
+		}
+		config := codingtool.Config{Options: options}
+		if rawConfig.ExecutableOverride != nil {
+			config.ExecutableOverride = *rawConfig.ExecutableOverride
+		}
+		configs[codingtool.ID(toolID)] = config
 	}
-	if raw.ExecutableOverride != nil {
-		editorConfig.ExecutableOverride = *raw.ExecutableOverride
+	defaultTool := codingtool.ID(*raw.DefaultTool)
+	if _, ok := configs[defaultTool]; !ok {
+		configs[defaultTool] = codingtool.Config{}
 	}
-	return editorConfig, nil
+	return codingtool.LaunchTarget{DefaultTool: defaultTool, Tools: configs}, nil
+}
+
+func toolOptionsFromTOML(toolID string, raw map[string]string) (map[string]string, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	options := make(map[string]string, len(raw))
+	for key, value := range raw {
+		if key == "" {
+			return nil, fmt.Errorf("%w: tool %q option key cannot be empty", ErrInvalidContextConfig, toolID)
+		}
+		options[key] = value
+	}
+	return options, nil
 }
 
 func providerConfigsFromTOML(raw map[string]providerTOML) (provider.Configs, error) {
@@ -244,8 +290,21 @@ func validateContextForTOML(ctx Context) error {
 	if ctx.CreatedAt.IsZero() {
 		return fmt.Errorf("%w: created_at cannot be zero", ErrInvalidContextConfig)
 	}
-	if ctx.Tool.Type == "" {
-		return fmt.Errorf("%w: codingtool.type cannot be empty", ErrInvalidContextConfig)
+	if ctx.Tool.DefaultTool == "" {
+		return fmt.Errorf("%w: launch_target.default_tool cannot be empty", ErrInvalidContextConfig)
+	}
+	if _, ok := ctx.Tool.Tools[ctx.Tool.DefaultTool]; !ok {
+		return fmt.Errorf("%w: missing configuration for default tool %q", ErrInvalidContextConfig, ctx.Tool.DefaultTool)
+	}
+	for toolID, toolConfig := range ctx.Tool.Tools {
+		if toolID == "" {
+			return fmt.Errorf("%w: tool ID cannot be empty", ErrInvalidContextConfig)
+		}
+		for key := range toolConfig.Options {
+			if key == "" {
+				return fmt.Errorf("%w: tool %q option key cannot be empty", ErrInvalidContextConfig, toolID)
+			}
+		}
 	}
 
 	for providerID, providerConfig := range ctx.Providers {
@@ -307,6 +366,17 @@ func isBareTOMLKey(key string) bool {
 
 func sortedProviderIDs(configs provider.Configs) []provider.ID {
 	ids := make([]provider.ID, 0, len(configs))
+	for id := range configs {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool {
+		return ids[i] < ids[j]
+	})
+	return ids
+}
+
+func sortedToolIDs(configs map[codingtool.ID]codingtool.Config) []codingtool.ID {
+	ids := make([]codingtool.ID, 0, len(configs))
 	for id := range configs {
 		ids = append(ids, id)
 	}

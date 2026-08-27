@@ -102,7 +102,8 @@ func TestContextDirectoryTreeUsesRegisteredSelectedTool(t *testing.T) {
 		t.Fatalf("derive context paths: %v", err)
 	}
 	ctx := contextTreeContext(contextID, "Client A")
-	ctx.Tool.Type = "future-tool"
+	ctx.Tool.DefaultTool = "future-tool"
+	ctx.Tool.Tools = map[codingtool.ID]codingtool.Config{"future-tool": {}}
 	toolRegistry := codingtool.MustNewRegistry([]codingtool.RegisteredTool{
 		{Integration: contextTreeFakeTool{id: "other-tool"}, DisplayName: "Other Tool"},
 		{Integration: contextTreeFakeTool{id: "future-tool"}, DisplayName: "Future Tool"},
@@ -454,7 +455,7 @@ func contextTreeContext(id devcontext.ID, name string) devcontext.Context {
 	return devcontext.Context{
 		ID:   id,
 		Name: name,
-		Tool: codingtool.DefaultConfig(),
+		Tool: codingtool.DefaultLaunchTarget(),
 		Providers: provider.Configs{
 			"claude": {Enabled: true},
 			"codex":  {Enabled: true},

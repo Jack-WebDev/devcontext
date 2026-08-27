@@ -809,12 +809,12 @@ func TestCreateContextCreatesDefaultPersonalAndCompanyContexts(t *testing.T) {
 		{
 			name:      "personal",
 			contextID: "personal",
-			want:      devcontext.Context{ID: devcontext.MustID("personal"), Name: "Personal", Tool: codingtool.Config{Type: "fake-editor"}, Providers: defaultRegistry.DefaultConfigs(), CreatedAt: now},
+			want:      devcontext.Context{ID: devcontext.MustID("personal"), Name: "Personal", Tool: codingtool.LaunchTarget{DefaultTool: "fake-editor", Tools: map[codingtool.ID]codingtool.Config{"fake-editor": {}}}, Providers: defaultRegistry.DefaultConfigs(), CreatedAt: now},
 		},
 		{
 			name:      "company",
 			contextID: "company",
-			want:      devcontext.Context{ID: devcontext.MustID("company"), Name: "Company", Tool: codingtool.Config{Type: "fake-editor"}, Providers: defaultRegistry.DefaultConfigs(), CreatedAt: now},
+			want:      devcontext.Context{ID: devcontext.MustID("company"), Name: "Company", Tool: codingtool.LaunchTarget{DefaultTool: "fake-editor", Tools: map[codingtool.ID]codingtool.Config{"fake-editor": {}}}, Providers: defaultRegistry.DefaultConfigs(), CreatedAt: now},
 		},
 	}
 
@@ -1231,7 +1231,7 @@ func (f applicationFixture) context(id string, name string) devcontext.Context {
 	return devcontext.Context{
 		ID:   devcontext.MustID(id),
 		Name: name,
-		Tool: codingtool.Config{Type: f.editor.ID()},
+		Tool: codingtool.LaunchTarget{DefaultTool: f.editor.ID(), Tools: map[codingtool.ID]codingtool.Config{f.editor.ID(): {}}},
 		Providers: provider.Configs{
 			"fake": {Enabled: true},
 		},
@@ -1252,7 +1252,7 @@ func (f applicationFixture) writeContext(t *testing.T, ctx devcontext.Context) {
 	contextPaths = contextPaths.WithProviderStorageDirs(enabledProviderIDs(ctx))
 	mkdir(t, contextPaths.RootDir)
 	mkdir(t, contextPaths.ToolStorageRootDir)
-	mkdir(t, contextPaths.ToolStorageDir(ctx.Tool.Type))
+	mkdir(t, contextPaths.ToolStorageDir(ctx.Tool.DefaultTool))
 	for _, dir := range contextPaths.ProviderStorageDirs {
 		mkdir(t, dir)
 	}

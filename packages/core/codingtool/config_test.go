@@ -1,32 +1,36 @@
 package codingtool_test
 
 import (
+	"reflect"
 	"testing"
 
 	codingtool "devctx/packages/core/codingtool"
 )
 
-func TestDefaultConfigUsesVSCodeWithoutExecutableOverride(t *testing.T) {
-	config := codingtool.DefaultConfig()
+func TestDefaultLaunchTargetUsesRegistryDefault(t *testing.T) {
+	target := codingtool.DefaultLaunchTarget()
 
-	if config.Type != codingtool.TypeVSCode {
-		t.Fatalf("editor type = %q, want %q", config.Type, codingtool.TypeVSCode)
+	if target.DefaultTool != codingtool.VSCodeID {
+		t.Fatalf("default tool = %q, want %q", target.DefaultTool, codingtool.VSCodeID)
 	}
-	if config.ExecutableOverride != "" {
-		t.Fatalf("executable override = %q, want empty", config.ExecutableOverride)
+	if !reflect.DeepEqual(target.Tools, map[codingtool.ID]codingtool.Config{codingtool.VSCodeID: {}}) {
+		t.Fatalf("tool settings = %#v", target.Tools)
 	}
 }
 
-func TestConfigStoresCustomExecutableOverride(t *testing.T) {
-	config := codingtool.Config{
-		Type:               codingtool.TypeVSCode,
-		ExecutableOverride: "/opt/visual-studio-code/bin/code",
+func TestLaunchTargetStoresSettingsPerTool(t *testing.T) {
+	target := codingtool.LaunchTarget{
+		DefaultTool: codingtool.VSCodeID,
+		Tools: map[codingtool.ID]codingtool.Config{
+			codingtool.VSCodeID: {ExecutableOverride: "/opt/visual-studio-code/bin/code"},
+			"cursor":            {Options: map[string]string{"profile": "work"}},
+		},
 	}
 
-	if config.Type != codingtool.TypeVSCode {
-		t.Fatalf("editor type = %q, want %q", config.Type, codingtool.TypeVSCode)
+	if target.ConfigFor(codingtool.VSCodeID).ExecutableOverride != "/opt/visual-studio-code/bin/code" {
+		t.Fatal("default tool configuration was not returned")
 	}
-	if config.ExecutableOverride != "/opt/visual-studio-code/bin/code" {
-		t.Fatalf("executable override = %q, want %q", config.ExecutableOverride, "/opt/visual-studio-code/bin/code")
+	if target.ConfigFor("cursor").Options["profile"] != "work" {
+		t.Fatal("non-default tool configuration was not returned")
 	}
 }

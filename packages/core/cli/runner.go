@@ -394,7 +394,7 @@ func renderDebugLaunchPlan(plan launcher.LaunchPlan) string {
 	var builder strings.Builder
 	builder.WriteString("Debug:\n")
 	fmt.Fprintf(&builder, "resolution_source: %s\n", plan.ResolutionSource)
-	fmt.Fprintf(&builder, "editor_id: %s\n", plan.Tool.Type)
+	fmt.Fprintf(&builder, "editor_id: %s\n", plan.Context.Tool.DefaultTool)
 	fmt.Fprintf(&builder, "editor_executable: %s\n", plan.Executable)
 	builder.WriteString("context_directories:\n")
 	fmt.Fprintf(&builder, "  root: %s\n", plan.ContextPaths.RootDir)
@@ -451,7 +451,7 @@ func eventFromPlan(name devlog.EventName, plan launcher.LaunchPlan, err error, t
 		Timestamp:        timestamp,
 		ProjectPath:      string(plan.ProjectPath),
 		ContextID:        plan.Context.ID.String(),
-		ToolID:           string(plan.Tool.Type),
+		ToolID:           string(plan.Context.Tool.DefaultTool),
 		ResolutionSource: string(plan.ResolutionSource),
 		Err:              err,
 		KnownEnvironment: plan.Environment.Environ(),
