@@ -330,7 +330,7 @@ func (s *Service) contextState(ctx devcontext.Context) ContextState {
 	return ContextState{
 		ID:         ctx.ID.String(),
 		Name:       ctx.Name,
-		Tool:       EditorState{Type: string(ctx.Tool.Type)},
+		Tool:       ToolState{Type: string(ctx.Tool.Type)},
 		Providers:  providerStatesFromEntries(providerEntries),
 		Confidence: s.launchConfidenceStateForContext(ctx, providerEntries),
 		Metadata:   cloneMetadata(ctx.Metadata),
@@ -635,7 +635,7 @@ func eventFromLaunchPlan(name devlog.EventName, plan launcher.LaunchPlan, err er
 		Timestamp:        timestamp,
 		ProjectPath:      string(plan.ProjectPath),
 		ContextID:        plan.Context.ID.String(),
-		EditorID:         string(plan.Tool.Type),
+		ToolID:         string(plan.Tool.Type),
 		ResolutionSource: string(plan.ResolutionSource),
 		Err:              err,
 		KnownEnvironment: plan.Environment.Environ(),

@@ -2,7 +2,7 @@ package codingtool
 
 import "fmt"
 
-// RegisteredTool describes one registered editor integration and its user-facing name.
+// RegisteredTool describes one registered coding-tool integration and its user-facing name.
 // The name belongs in the registry so callers do not need integration-specific
 // display-name switches.
 type RegisteredTool struct {
@@ -16,9 +16,9 @@ type RegisteredTool struct {
 // implementations that need them.
 type Capability string
 
-// Registry owns the editor integrations available to Dev Context.
+// Registry owns the coding-tool integrations available to Dev Context.
 //
-// It preserves registration order for presentation, resolves persisted editor
+// It preserves registration order for presentation, resolves persisted tool
 // IDs, and identifies the default integration for newly created contexts.
 type Registry struct {
 	tools       []RegisteredTool
@@ -26,34 +26,34 @@ type Registry struct {
 	defaultTool ID
 }
 
-// NewRegistry creates a registry from an ordered list of editor tools.
+// NewRegistry creates a registry from an ordered list of coding tools.
 func NewRegistry(tools []RegisteredTool, defaultTool ID) (Registry, error) {
 	if defaultTool == "" {
-		return Registry{}, fmt.Errorf("editor registry has an empty default tool ID")
+		return Registry{}, fmt.Errorf("coding tool registry has an empty default tool ID")
 	}
 
 	ordered := make([]RegisteredTool, 0, len(tools))
 	byID := make(map[ID]RegisteredTool, len(tools))
 	for i, tool := range tools {
 		if tool.Integration == nil {
-			return Registry{}, fmt.Errorf("editor registry contains nil tool at index %d", i)
+			return Registry{}, fmt.Errorf("coding tool registry contains nil tool at index %d", i)
 		}
 		id := tool.Integration.ID()
 		if id == "" {
-			return Registry{}, fmt.Errorf("editor registry contains tool with empty ID at index %d", i)
+			return Registry{}, fmt.Errorf("coding tool registry contains tool with empty ID at index %d", i)
 		}
 		if _, exists := byID[id]; exists {
-			return Registry{}, fmt.Errorf("editor registry contains duplicate tool ID %q", id)
+			return Registry{}, fmt.Errorf("coding tool registry contains duplicate tool ID %q", id)
 		}
 		if tool.DisplayName == "" {
-			return Registry{}, fmt.Errorf("editor registry contains tool %q with empty display name", id)
+			return Registry{}, fmt.Errorf("coding tool registry contains tool %q with empty display name", id)
 		}
 		tool.Capabilities = append([]Capability(nil), tool.Capabilities...)
 		ordered = append(ordered, tool)
 		byID[id] = tool
 	}
 	if _, ok := byID[defaultTool]; !ok {
-		return Registry{}, fmt.Errorf("editor registry default tool %q is not registered", defaultTool)
+		return Registry{}, fmt.Errorf("coding tool registry default tool %q is not registered", defaultTool)
 	}
 
 	return Registry{tools: ordered, toolsByID: byID, defaultTool: defaultTool}, nil
@@ -68,9 +68,16 @@ func MustNewRegistry(tools []RegisteredTool, defaultTool ID) Registry {
 	return registry
 }
 
-// BuiltInRegistry returns the currently available built-in editor tools.
+// BuiltInRegistry returns the currently available built-in coding tools.
 func BuiltInRegistry() Registry {
 	return MustNewRegistry([]RegisteredTool{{Integration: VSCodeEditor{}, DisplayName: "VS Code"}}, VSCodeID)
+}
+
+// PlannedBuiltInToolIDs documents the stable registration order for built-in
+// tools. Only VS Code is implemented today; later adapters register here
+// without requiring application, CLI, or launcher changes.
+func PlannedBuiltInToolIDs() []ID {
+	return []ID{VSCodeID, "cursor", "windsurf", "jetbrains", "zed", "neovim"}
 }
 
 // IsZero reports whether the registry has not been initialized.

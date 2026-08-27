@@ -22,9 +22,9 @@ var (
 	// path resolution.
 	ErrMissingPlatformPaths = errors.New("missing platform paths")
 
-	// ErrMissingEditor identifies a launch-plan builder without an editor
+	// ErrMissingTool identifies a launch-plan builder without an editor
 	// implementation.
-	ErrMissingEditor = errors.New("missing editor")
+	ErrMissingTool = errors.New("missing editor")
 
 	// ErrLaunchSelectionRequired identifies a request that cannot produce a full
 	// launch plan until the user selects a context.
@@ -59,7 +59,7 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 		return LaunchPlan{}, ErrMissingPlatformPaths
 	}
 	if b.ToolRegistry.IsZero() && b.Tool == nil {
-		return LaunchPlan{}, ErrMissingEditor
+		return LaunchPlan{}, ErrMissingTool
 	}
 	if err := project.ValidateProjectDirectory(request.ProjectPath); err != nil {
 		return LaunchPlan{}, err
@@ -95,7 +95,7 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 
 	integration, ok := b.toolRegistry().Get(resolution.Context.Tool.Type)
 	if !ok {
-		return LaunchPlan{}, fmt.Errorf("%w: %s", ErrMissingEditor, resolution.Context.Tool.Type)
+		return LaunchPlan{}, fmt.Errorf("%w: %s", ErrMissingTool, resolution.Context.Tool.Type)
 	}
 	executable, err := integration.DetectExecutable(resolution.Context.Tool)
 	if err != nil {

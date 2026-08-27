@@ -11,7 +11,7 @@ const (
 func DefaultGlobalConfig() GlobalConfig {
 	return GlobalConfig{
 		Version:       CurrentSchemaVersion,
-		DefaultEditor: codingtool.TypeVSCode,
+		DefaultTool: codingtool.TypeVSCode,
 		UI: UISettings{
 			RememberWindowPosition: true,
 		},

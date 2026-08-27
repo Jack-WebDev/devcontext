@@ -303,7 +303,7 @@ func TestVSCodeConfidenceCheckMapsExecutableReadiness(t *testing.T) {
 		{
 			name: "missing executable",
 			err: &codingtool.ExecutableNotFoundError{
-				EditorID:   codingtool.VSCodeID,
+				ToolID:   codingtool.VSCodeID,
 				Candidates: []string{"code"},
 			},
 			want: launcher.ConfidenceCheck{
@@ -317,7 +317,7 @@ func TestVSCodeConfidenceCheckMapsExecutableReadiness(t *testing.T) {
 		{
 			name: "invalid executable",
 			err: &codingtool.ExecutableNotExecutableError{
-				EditorID: codingtool.VSCodeID,
+				ToolID: codingtool.VSCodeID,
 				Path:     "/tmp/code",
 			},
 			want: launcher.ConfidenceCheck{

@@ -22,7 +22,7 @@ func TestLocalLoggerAppendsParseableRecordsWithRestrictedPermissions(t *testing.
 
 	events := []devlog.Event{
 		{Name: devlog.EventContextResolution, ProjectPath: "/work/app", ContextID: "personal"},
-		{Name: devlog.EventLaunchSucceeded, ProjectPath: "/work/app", ContextID: "personal", EditorID: "vscode"},
+		{Name: devlog.EventLaunchSucceeded, ProjectPath: "/work/app", ContextID: "personal", ToolID: "vscode"},
 	}
 	for _, event := range events {
 		if err := logger.Record(event); err != nil {

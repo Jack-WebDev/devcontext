@@ -176,7 +176,7 @@ func classifyError(err error) renderedError {
 			Why:      "The current user's home directory could not be determined.",
 			Recovery: "Check the user environment and try again.",
 		}
-	case errors.As(err, &executableNotFound) && executableNotFound.EditorID == codingtool.VSCodeID:
+	case errors.As(err, &executableNotFound) && executableNotFound.ToolID == codingtool.VSCodeID:
 		return renderedError{
 			Title:    "VS Code command not found",
 			Why:      missingVSCodeWhy(executableNotFound.Candidates),

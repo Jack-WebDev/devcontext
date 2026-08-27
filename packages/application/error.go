@@ -114,7 +114,7 @@ func NewError(err error) *Error {
 			contextStorageRecovery(contextStorageError),
 			err,
 		)
-	case errors.As(err, &executableNotFound) && executableNotFound.EditorID == codingtool.VSCodeID:
+	case errors.As(err, &executableNotFound) && executableNotFound.ToolID == codingtool.VSCodeID:
 		return applicationError(
 			ErrorCodeLaunch,
 			"VS Code command not found.",

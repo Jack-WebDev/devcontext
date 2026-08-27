@@ -10,7 +10,7 @@ import (
 func TestGlobalConfigConstructsVersionedApplicationSettings(t *testing.T) {
 	globalConfig := config.GlobalConfig{
 		Version:       config.CurrentSchemaVersion,
-		DefaultEditor: codingtool.TypeVSCode,
+		DefaultTool: codingtool.TypeVSCode,
 		UI: config.UISettings{
 			RememberWindowPosition: true,
 		},
@@ -23,8 +23,8 @@ func TestGlobalConfigConstructsVersionedApplicationSettings(t *testing.T) {
 	if globalConfig.Version != config.CurrentSchemaVersion {
 		t.Fatalf("version = %d, want %d", globalConfig.Version, config.CurrentSchemaVersion)
 	}
-	if globalConfig.DefaultEditor != codingtool.TypeVSCode {
-		t.Fatalf("default editor = %q, want %q", globalConfig.DefaultEditor, codingtool.TypeVSCode)
+	if globalConfig.DefaultTool != codingtool.TypeVSCode {
+		t.Fatalf("default editor = %q, want %q", globalConfig.DefaultTool, codingtool.TypeVSCode)
 	}
 	if !globalConfig.UI.RememberWindowPosition {
 		t.Fatal("remember window position = false, want true")

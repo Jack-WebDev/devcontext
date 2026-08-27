@@ -70,7 +70,7 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	contextState := state.Contexts[0]
 	if contextState.ID != "personal" ||
 		contextState.Name != "Personal" ||
-		contextState.Tool != (EditorState{Type: "fake-editor"}) ||
+		contextState.Tool != (ToolState{Type: "fake-editor"}) ||
 		!reflect.DeepEqual(contextState.Providers, []ProviderState{
 			{
 				ID:      "fake",

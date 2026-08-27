@@ -44,15 +44,15 @@ func (defaultExecutableProbe) Stat(path string) (os.FileInfo, error) {
 
 // ExecutableNotFoundError describes a failed editor executable lookup.
 type ExecutableNotFoundError struct {
-	EditorID   ID
+	ToolID   ID
 	Candidates []string
 }
 
 func (e *ExecutableNotFoundError) Error() string {
 	if len(e.Candidates) == 0 {
-		return fmt.Sprintf("%s executable was not found", e.EditorID)
+		return fmt.Sprintf("%s executable was not found", e.ToolID)
 	}
-	return fmt.Sprintf("%s executable was not found; checked: %s", e.EditorID, strings.Join(e.Candidates, ", "))
+	return fmt.Sprintf("%s executable was not found; checked: %s", e.ToolID, strings.Join(e.Candidates, ", "))
 }
 
 func (e *ExecutableNotFoundError) Unwrap() error {
@@ -62,12 +62,12 @@ func (e *ExecutableNotFoundError) Unwrap() error {
 // ExecutableNotExecutableError describes an unusable configured executable
 // path.
 type ExecutableNotExecutableError struct {
-	EditorID ID
+	ToolID ID
 	Path     string
 }
 
 func (e *ExecutableNotExecutableError) Error() string {
-	return fmt.Sprintf("%s executable %q is not executable", e.EditorID, e.Path)
+	return fmt.Sprintf("%s executable %q is not executable", e.ToolID, e.Path)
 }
 
 func (e *ExecutableNotExecutableError) Unwrap() error {
@@ -108,7 +108,7 @@ func (e VSCodeEditor) DetectExecutable(config Config) (Executable, error) {
 	}
 
 	return "", &ExecutableNotFoundError{
-		EditorID:   VSCodeID,
+		ToolID:   VSCodeID,
 		Candidates: candidates,
 	}
 }
@@ -154,7 +154,7 @@ func validateConfiguredExecutable(probe ExecutableProbe, goos string, editorID I
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return "", &ExecutableNotFoundError{
-				EditorID:   editorID,
+				ToolID:   editorID,
 				Candidates: []string{path},
 			}
 		}
@@ -163,7 +163,7 @@ func validateConfiguredExecutable(probe ExecutableProbe, goos string, editorID I
 
 	if !isUsableExecutable(info, goos) {
 		return "", &ExecutableNotExecutableError{
-			EditorID: editorID,
+			ToolID: editorID,
 			Path:     path,
 		}
 	}

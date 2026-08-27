@@ -138,7 +138,7 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 		{
 			name: "editor executable missing",
 			err: &codingtool.ExecutableNotFoundError{
-				EditorID:   codingtool.VSCodeID,
+				ToolID:   codingtool.VSCodeID,
 				Candidates: []string{"code"},
 			},
 			want: "" +

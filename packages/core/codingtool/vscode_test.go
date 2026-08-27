@@ -106,8 +106,8 @@ func TestVSCodeEditorReportsTypedExecutableNotFoundError(t *testing.T) {
 	if !errors.As(err, &notFound) {
 		t.Fatalf("error = %T, want *codingtool.ExecutableNotFoundError", err)
 	}
-	if notFound.EditorID != codingtool.VSCodeID {
-		t.Fatalf("editor id = %q, want %q", notFound.EditorID, codingtool.VSCodeID)
+	if notFound.ToolID != codingtool.VSCodeID {
+		t.Fatalf("editor id = %q, want %q", notFound.ToolID, codingtool.VSCodeID)
 	}
 	wantCandidates := []string{"code", "code.cmd", "Code.exe"}
 	if !reflect.DeepEqual(notFound.Candidates, wantCandidates) {

@@ -268,7 +268,7 @@ func TestNewErrorReturnsActionableRecoveryDetails(t *testing.T) {
 		{
 			name: "missing vscode command",
 			err: &codingtool.ExecutableNotFoundError{
-				EditorID:   codingtool.VSCodeID,
+				ToolID:   codingtool.VSCodeID,
 				Candidates: []string{"code"},
 			},
 			wantCode:     ErrorCodeLaunch,
