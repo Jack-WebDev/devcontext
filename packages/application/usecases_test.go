@@ -92,6 +92,54 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	}
 }
 
+func TestSecondRegisteredToolWorksAcrossStateAndLaunch(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	secondTool := &applicationSecondTool{}
+	fixture.toolRegistry = codingtool.MustNewRegistry([]codingtool.RegisteredTool{
+		{Integration: fixture.editor, DisplayName: "Fake Tool"},
+		{Integration: secondTool, DisplayName: "Second Tool"},
+	}, fixture.editor.ID())
+
+	ctx := fixture.context("personal", "Personal")
+	ctx.Tool = codingtool.LaunchTarget{
+		DefaultTool: secondTool.ID(),
+		Tools: map[codingtool.ID]codingtool.Config{
+			secondTool.ID(): {Options: map[string]string{"mode": "isolated"}},
+		},
+	}
+	fixture.writeContext(t, ctx)
+	fixture.writeBindings(t, project.Binding{ProjectPath: project.Path(fixture.projectDir), ContextID: ctx.ID, CreatedAt: fixture.now})
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+	contextState := state.Contexts[0]
+	if contextState.Tool != (ToolState{ID: "second-tool", Name: "Second Tool", Status: LaunchConfidenceReady, Message: "Second Tool is available for launch."}) {
+		t.Fatalf("tool state = %#v", contextState.Tool)
+	}
+	if !reflect.DeepEqual(contextState.AvailableTools, []ToolOption{{ID: "fake-editor", Name: "Fake Tool"}, {ID: "second-tool", Name: "Second Tool"}}) {
+		t.Fatalf("available tools = %#v", contextState.AvailableTools)
+	}
+	assertConfidenceCheck(t, contextState.Confidence.Checks, LaunchConfidenceCheck{Component: LaunchConfidenceCheckTool, ToolID: "second-tool", Severity: LaunchConfidenceReady, Label: "Second Tool", Message: "Second Tool is available for launch."})
+	assertConfidenceCheck(t, contextState.Confidence.Checks, LaunchConfidenceCheck{Component: LaunchConfidenceCheckIsolation, ToolID: "second-tool", Severity: LaunchConfidenceReady, Label: "Second Tool isolation", Message: "Second Tool isolation storage is ready."})
+
+	_, appErr = fixture.service().LaunchProject(LaunchProjectRequest{ProjectPath: ".", ContextID: "personal"})
+	if appErr != nil {
+		t.Fatalf("launch project: %v", appErr)
+	}
+	if len(secondTool.requests) != 1 {
+		t.Fatalf("second tool requests = %#v", secondTool.requests)
+	}
+	request := secondTool.requests[0]
+	if request.Config.Options["mode"] != "isolated" || request.Paths.StorageDir == "" {
+		t.Fatalf("second tool command request = %#v", request)
+	}
+	if len(fixture.process.requests) != 1 || fixture.process.requests[0].Tool != (launcher.Tool{ID: "second-tool", DisplayName: "Second Tool"}) {
+		t.Fatalf("process requests = %#v", fixture.process.requests)
+	}
+}
+
 func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.provider = &applicationFakeProvider{
@@ -1172,6 +1220,7 @@ type applicationFixture struct {
 	provider           *applicationFakeProvider
 	providerRegistry   provider.Registry
 	editor             *applicationFakeEditor
+	toolRegistry       codingtool.Registry
 	process            *applicationFakeProcessLauncher
 	storagePermissions filesystem.StoragePermissions
 	logger             devlog.Logger
@@ -1212,12 +1261,17 @@ func (f applicationFixture) service() *Service {
 		registry = provider.MustNewRegistry([]provider.Provider{f.provider}, f.provider.ID())
 	}
 
+	toolRegistry := f.toolRegistry
+	if toolRegistry.IsZero() {
+		toolRegistry = codingtool.MustNewRegistry([]codingtool.RegisteredTool{{Integration: f.editor, DisplayName: "Fake Tool"}}, f.editor.ID())
+	}
+
 	return NewServiceWithDependencies(Dependencies{
 		Contexts:           devcontext.NewRepository(f.contextsDir),
 		Projects:           project.NewRepository(f.bindingsPath, f.paths),
 		Paths:              f.paths,
 		ProviderRegistry:   registry,
-		ToolRegistry:       codingtool.MustNewRegistry([]codingtool.RegisteredTool{{Integration: f.editor, DisplayName: "Fake Tool"}}, f.editor.ID()),
+		ToolRegistry:       toolRegistry,
 		ProcessLauncher:    f.process,
 		StoragePermissions: f.storagePermissions,
 		ParentEnvironment:  []string{"PATH=/fixture/bin"},
@@ -1307,6 +1361,30 @@ func writeApplicationJSONFixture(t *testing.T, path string, value any) {
 		t.Fatalf("create fixture directory %q: %v", filepath.Dir(path), err)
 	}
 	writeFile(t, path, data)
+}
+
+type applicationSecondTool struct {
+	requests []codingtool.CommandRequest
+}
+
+func (applicationSecondTool) ID() codingtool.ID {
+	return "second-tool"
+}
+
+func (t *applicationSecondTool) DetectExecutable(codingtool.Config) (codingtool.Executable, error) {
+	return "/fixture/second-tool", nil
+}
+
+func (t *applicationSecondTool) BuildLaunchCommand(request codingtool.CommandRequest) (codingtool.Command, error) {
+	t.requests = append(t.requests, request)
+	return codingtool.Command{
+		Executable: request.Executable,
+		Arguments: codingtool.Arguments{
+			"--state-dir", request.Paths.StorageDir,
+			"--mode", request.Config.Options["mode"],
+			request.ProjectPath,
+		},
+	}, nil
 }
 
 func applicationTestJWT(t *testing.T, claims map[string]string) string {
