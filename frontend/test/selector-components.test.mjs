@@ -967,6 +967,44 @@ test("launch action launches the selected context when remember is off", async (
   ]);
 });
 
+test("launch action exposes preflight verification steps before starting the coding tool", async () => {
+  const calls = [];
+  const verificationSteps = [{
+    id: "prepare_environment",
+    label: "Prepare isolated environment",
+    status: "ready",
+    message: "Environment is ready.",
+  }];
+
+  const result = await launchSelectedContext({
+    projectPath: "/work/api",
+    selectedContextId: "personal",
+    rememberProject: false,
+    bindProject: () => Promise.resolve(projectBindingResult()),
+    preflightLaunchProject(request) {
+      calls.push(["preflight", request]);
+      return Promise.resolve({
+        ok: true,
+        data: {...preflightLaunchProjectResult().data, verificationSteps},
+      });
+    },
+    onPreflightComplete(preflight) {
+      calls.push(["verification", preflight.verificationSteps]);
+    },
+    launchProject(request) {
+      calls.push(["launch", request]);
+      return Promise.resolve(launchProjectResult());
+    },
+  });
+
+  assert.equal(result?.ok, true);
+  assert.deepEqual(calls, [
+    ["preflight", {projectPath: "/work/api", contextId: "personal"}],
+    ["verification", verificationSteps],
+    ["launch", {projectPath: "/work/api", contextId: "personal"}],
+  ]);
+});
+
 test("launch action binds before launch when remember is on", async () => {
   const calls = [];
   const result = await launchSelectedContext({

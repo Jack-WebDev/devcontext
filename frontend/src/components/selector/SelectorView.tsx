@@ -66,7 +66,7 @@ function SelectorView({
     initialRovingContextId(launchState),
   );
   const [rememberProject, setRememberProject] = useState(false);
-  const [launchPending, setLaunchPending] = useState(false);
+  const [launchLifecycle, setLaunchLifecycle] = useState<LaunchLifecycleState>({status: "idle"});
   const [launchError, setLaunchError] = useState<DisplayError | undefined>(undefined);
   const [mismatchError, setMismatchError] = useState<DisplayError | undefined>(undefined);
   const [onboardingPendingContextId, setOnboardingPendingContextId] = useState<string | undefined>(undefined);
@@ -76,6 +76,7 @@ function SelectorView({
   const launchGuard = useRef(createLaunchRequestGuard());
   const mismatchDialogOpen = mismatchError?.contextMismatch !== undefined;
   const selectedContext = launchState.contexts.find((context) => context.id === selectedContextId);
+  const launchPending = launchLifecycle.status !== "idle";
   const launchBlocked = selectedContextConfidenceBlocked(selectedContext);
   const keyboardLaunchAvailable = canLaunchSelectedContextFromKeyboard({
     selectedContextId,
@@ -87,7 +88,7 @@ function SelectorView({
     setSelectedContextId(initialSelectedContextId(launchState));
     setRovingContextId(initialRovingContextId(launchState));
     setRememberProject(false);
-    setLaunchPending(false);
+    setLaunchLifecycle({status: "idle"});
     setLaunchError(undefined);
     setMismatchError(undefined);
     setOnboardingPendingContextId(undefined);
@@ -158,7 +159,7 @@ function SelectorView({
     }
 
     await launchGuard.current.run(async () => {
-      setLaunchPending(true);
+      setLaunchLifecycle({status: "preflighting"});
       setLaunchError(undefined);
       if (confirmContextMismatch) {
         setMismatchError(undefined);
@@ -170,6 +171,9 @@ function SelectorView({
           selectedContextId,
           rememberProject,
           confirmContextMismatch,
+          onPreflightComplete: (preflight) => {
+            setLaunchLifecycle({status: "launching", steps: preflight.verificationSteps});
+          },
           bindProject: onBindProject,
           preflightLaunchProject: onPreflightLaunchProject,
           launchProject: onLaunchProject,
@@ -183,7 +187,7 @@ function SelectorView({
           }
         }
       } finally {
-        setLaunchPending(false);
+        setLaunchLifecycle({status: "idle"});
       }
     });
   }
@@ -306,6 +310,7 @@ function SelectorView({
                   <LaunchVerificationProgress
                     projectName={launchState.project.name}
                     contextName={selectedContext?.name ?? "selected context"}
+                    steps={launchLifecycle.status === "launching" ? launchLifecycle.steps : undefined}
                   />
                 </div>
               ) : null}
@@ -338,6 +343,11 @@ function SelectorView({
     </div>
   );
 }
+
+type LaunchLifecycleState =
+  | {status: "idle"}
+  | {status: "preflighting"}
+  | {status: "launching"; steps?: PreflightLaunchProjectResult["verificationSteps"]};
 
 function selectedContextConfidenceBlocked(context: ContextState | undefined): boolean {
   return context?.confidence?.status === "blocked";
