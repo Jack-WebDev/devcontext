@@ -97,6 +97,33 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	}
 }
 
+func TestGetHomeDashboardReturnsCurrentProjectAndContextSummary(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.projectDir),
+		ContextID:   devcontext.MustID("personal"),
+		CreatedAt:   fixture.now,
+	})
+
+	dashboard, appErr := fixture.service().GetHomeDashboard(GetHomeDashboardRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get home dashboard: %v", appErr)
+	}
+	if dashboard.Project != (ProjectState{Name: "current", Path: fixture.projectDir}) {
+		t.Fatalf("project = %#v", dashboard.Project)
+	}
+	if dashboard.CurrentContext == nil || dashboard.CurrentContext.ID != "personal" || dashboard.CurrentContext.Name != "Personal" {
+		t.Fatalf("current context = %#v", dashboard.CurrentContext)
+	}
+	if dashboard.CurrentContext.Confidence.ContextID != "personal" {
+		t.Fatalf("current context confidence = %#v", dashboard.CurrentContext.Confidence)
+	}
+	if len(dashboard.RecentProjects) != 0 || dashboard.Running.Count != 0 || dashboard.Activity.Count != 0 {
+		t.Fatalf("future dashboard summaries = %#v", dashboard)
+	}
+}
+
 func TestGetLaunchStateDerivesProviderSetupActions(t *testing.T) {
 	tests := []struct {
 		name         string

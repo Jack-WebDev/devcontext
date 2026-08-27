@@ -25,6 +25,15 @@ func (s *Service) GetLaunchState(request GetLaunchStateRequest) (LaunchState, *E
 	return state, nil
 }
 
+// GetHomeDashboard returns the backend-owned summary for the Home screen.
+func (s *Service) GetHomeDashboard(request GetHomeDashboardRequest) (HomeDashboardState, *Error) {
+	dashboard, err := s.getHomeDashboard(request)
+	if err != nil {
+		return HomeDashboardState{}, NewError(err)
+	}
+	return dashboard, nil
+}
+
 // LaunchProject builds a launch plan for a selected context and starts the
 // editor process.
 func (s *Service) LaunchProject(request LaunchProjectRequest) (LaunchProjectResult, *Error) {
@@ -116,6 +125,33 @@ func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, er
 		Warnings:                   warningStates(resolution.Warnings),
 		ProviderCredentialSessions: providerCredentialSessions,
 	}, nil
+}
+
+func (s *Service) getHomeDashboard(request GetHomeDashboardRequest) (HomeDashboardState, error) {
+	launchState, err := s.getLaunchState(GetLaunchStateRequest{ProjectPath: request.ProjectPath})
+	if err != nil {
+		return HomeDashboardState{}, err
+	}
+
+	dashboard := HomeDashboardState{
+		Project:        launchState.Project,
+		RecentProjects: []HomeRecentProjectState{},
+		Running:        HomeRunningSummary{},
+		Activity:       HomeActivitySummary{},
+	}
+	for _, context := range launchState.Contexts {
+		if context.ID != launchState.SelectedContextID {
+			continue
+		}
+		dashboard.CurrentContext = &HomeCurrentContextState{
+			ID:         context.ID,
+			Name:       context.Name,
+			Tool:       context.Tool,
+			Confidence: context.Confidence,
+		}
+		break
+	}
+	return dashboard, nil
 }
 
 func (s *Service) firstRunLaunchState(projectPath project.Path) LaunchState {

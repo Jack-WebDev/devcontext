@@ -28,6 +28,37 @@ export interface GetLaunchStateRequest {
   projectPath?: string;
 }
 
+export interface GetHomeDashboardRequest {
+  projectPath?: string;
+}
+
+export interface HomeDashboardState {
+  project: ProjectState;
+  currentContext?: HomeCurrentContextState;
+  recentProjects: HomeRecentProjectState[];
+  running: HomeRunningSummary;
+  activity: HomeActivitySummary;
+}
+
+export interface HomeCurrentContextState {
+  id: string;
+  name: string;
+  tool: ToolState;
+  confidence: LaunchConfidenceState;
+}
+
+export interface HomeRecentProjectState {
+  project: ProjectState;
+}
+
+export interface HomeRunningSummary {
+  count: number;
+}
+
+export interface HomeActivitySummary {
+  count: number;
+}
+
 export interface LaunchState {
   project: ProjectState;
   contexts: ContextState[];
@@ -203,6 +234,7 @@ export interface ProviderCredentialSession {
 
 export interface DevContextApi {
   getLaunchState(request?: GetLaunchStateRequest): Promise<ApiResult<LaunchState>>;
+  getHomeDashboard(request?: GetHomeDashboardRequest): Promise<ApiResult<HomeDashboardState>>;
   preflightLaunchProject(request: PreflightLaunchProjectRequest): Promise<ApiResult<PreflightLaunchProjectResult>>;
   launchProject(request: LaunchProjectRequest): Promise<ApiResult<LaunchProjectResult>>;
   bindProject(request: BindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
@@ -212,6 +244,7 @@ export interface DevContextApi {
 
 export interface WailsBindings {
   getLaunchState(request: GetLaunchStateRequest): Promise<unknown>;
+  getHomeDashboard(request: GetHomeDashboardRequest): Promise<unknown>;
   preflightLaunchProject(request: PreflightLaunchProjectRequest): Promise<unknown>;
   launchProject(request: LaunchProjectRequest): Promise<unknown>;
   bindProject(request: BindProjectRequest): Promise<unknown>;
@@ -223,6 +256,9 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
   return {
     getLaunchState(request = {}) {
       return callBinding(() => bindings.getLaunchState(request), normalizeLaunchState);
+    },
+    getHomeDashboard(request = {}) {
+      return callBinding(() => bindings.getHomeDashboard(request), normalizeHomeDashboardState);
     },
     preflightLaunchProject(request) {
       return callBinding(
@@ -260,6 +296,10 @@ const generatedBindings: WailsBindings = {
   async getLaunchState(request) {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
     return bindings.GetLaunchState(request);
+  },
+  async getHomeDashboard(request) {
+    const bindings = await import("../../wailsjs/go/wailsapp/App");
+    return bindings.GetHomeDashboard(request);
   },
   async preflightLaunchProject(request) {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
@@ -335,6 +375,44 @@ function normalizeLaunchState(value: unknown): LaunchState {
     firstRun: booleanValue(object.firstRun),
     providerCredentialSessions: arrayValue(object.providerCredentialSessions).map(normalizeProviderCredentialSession),
   };
+}
+
+function normalizeHomeDashboardState(value: unknown): HomeDashboardState {
+  const object = objectValue(value);
+  const currentContext = normalizeHomeCurrentContextState(object.currentContext);
+  return {
+    project: normalizeProjectState(object.project),
+    ...(currentContext === undefined ? {} : {currentContext}),
+    recentProjects: arrayValue(object.recentProjects).map(normalizeHomeRecentProjectState),
+    running: normalizeHomeRunningSummary(object.running),
+    activity: normalizeHomeActivitySummary(object.activity),
+  };
+}
+
+function normalizeHomeCurrentContextState(value: unknown): HomeCurrentContextState | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const object = objectValue(value);
+  return {
+    id: stringValue(object.id),
+    name: stringValue(object.name),
+    tool: normalizeToolState(object.tool),
+    confidence: requiredLaunchConfidenceState(object.confidence),
+  };
+}
+
+function normalizeHomeRecentProjectState(value: unknown): HomeRecentProjectState {
+  return {project: normalizeProjectState(objectValue(value).project)};
+}
+
+function normalizeHomeRunningSummary(value: unknown): HomeRunningSummary {
+  return {count: numberValue(objectValue(value).count)};
+}
+
+function normalizeHomeActivitySummary(value: unknown): HomeActivitySummary {
+  return {count: numberValue(objectValue(value).count)};
 }
 
 function normalizeLaunchConfidenceState(value: unknown): LaunchConfidenceState | undefined {
@@ -708,6 +786,13 @@ function optionalString(value: unknown): string | undefined {
 
 function booleanValue(value: unknown): boolean {
   if (typeof value === "boolean") {
+    return value;
+  }
+  throw new Error("Invalid Dev Context response.");
+}
+
+function numberValue(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
     return value;
   }
   throw new Error("Invalid Dev Context response.");

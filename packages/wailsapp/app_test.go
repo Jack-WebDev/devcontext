@@ -14,6 +14,9 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 		launchState: application.LaunchState{
 			Project: application.ProjectState{Name: "api", Path: "/work/api"},
 		},
+		homeDashboard: application.HomeDashboardState{
+			Project: application.ProjectState{Name: "api", Path: "/work/api"},
+		},
 		launchResult: application.LaunchProjectResult{
 			Project: application.ProjectState{Name: "api", Path: "/work/api"},
 			Context: application.ContextState{ID: "personal", Name: "Personal"},
@@ -50,6 +53,15 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	}
 	if service.launchStateRequest != stateRequest {
 		t.Fatalf("launch state request = %#v, want %#v", service.launchStateRequest, stateRequest)
+	}
+
+	dashboardRequest := application.GetHomeDashboardRequest{ProjectPath: "/work/api"}
+	dashboard := app.GetHomeDashboard(dashboardRequest)
+	if !reflect.DeepEqual(dashboard, service.homeDashboard) {
+		t.Fatalf("home dashboard = %#v, want %#v", dashboard, service.homeDashboard)
+	}
+	if service.homeDashboardRequest != dashboardRequest {
+		t.Fatalf("home dashboard request = %#v, want %#v", service.homeDashboardRequest, dashboardRequest)
 	}
 
 	preflightRequest := application.PreflightLaunchProjectRequest{ProjectPath: "/work/api", ContextID: "personal"}
@@ -113,6 +125,10 @@ type fakeService struct {
 	launchState        application.LaunchState
 	launchStateErr     *application.Error
 
+	homeDashboardRequest application.GetHomeDashboardRequest
+	homeDashboard        application.HomeDashboardState
+	homeDashboardErr     *application.Error
+
 	preflightRequest application.PreflightLaunchProjectRequest
 	preflightResult  application.PreflightLaunchProjectResult
 	preflightErr     *application.Error
@@ -137,6 +153,11 @@ type fakeService struct {
 func (s *fakeService) GetLaunchState(request application.GetLaunchStateRequest) (application.LaunchState, *application.Error) {
 	s.launchStateRequest = request
 	return s.launchState, s.launchStateErr
+}
+
+func (s *fakeService) GetHomeDashboard(request application.GetHomeDashboardRequest) (application.HomeDashboardState, *application.Error) {
+	s.homeDashboardRequest = request
+	return s.homeDashboard, s.homeDashboardErr
 }
 
 func (s *fakeService) PreflightLaunchProject(request application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error) {

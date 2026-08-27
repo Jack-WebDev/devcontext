@@ -5,6 +5,48 @@ type GetLaunchStateRequest struct {
 	ProjectPath string `json:"projectPath,omitempty"`
 }
 
+// GetHomeDashboardRequest identifies the project represented by the Home
+// dashboard.
+type GetHomeDashboardRequest struct {
+	ProjectPath string `json:"projectPath,omitempty"`
+}
+
+// HomeDashboardState contains backend-owned data for the Home screen. Recent
+// projects, running environments, and activity are intentionally empty until
+// their dedicated persistence contracts are introduced.
+type HomeDashboardState struct {
+	Project        ProjectState             `json:"project"`
+	CurrentContext *HomeCurrentContextState `json:"currentContext,omitempty"`
+	RecentProjects []HomeRecentProjectState `json:"recentProjects"`
+	Running        HomeRunningSummary       `json:"running"`
+	Activity       HomeActivitySummary      `json:"activity"`
+}
+
+// HomeCurrentContextState is the selected context summary for one project.
+type HomeCurrentContextState struct {
+	ID         string                `json:"id"`
+	Name       string                `json:"name"`
+	Tool       ToolState             `json:"tool"`
+	Confidence LaunchConfidenceState `json:"confidence"`
+}
+
+// HomeRecentProjectState reserves the safe presentation shape for Phase 110.
+type HomeRecentProjectState struct {
+	Project ProjectState `json:"project"`
+}
+
+// HomeRunningSummary reserves aggregate running-environment data for later
+// running-environment tracking phases.
+type HomeRunningSummary struct {
+	Count int `json:"count"`
+}
+
+// HomeActivitySummary reserves aggregate activity data for later history
+// phases.
+type HomeActivitySummary struct {
+	Count int `json:"count"`
+}
+
 // LaunchState contains everything the GUI needs to render the selector for one
 // project.
 type LaunchState struct {

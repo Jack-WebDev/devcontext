@@ -8,11 +8,21 @@ import (
 
 type service interface {
 	GetLaunchState(application.GetLaunchStateRequest) (application.LaunchState, *application.Error)
+	GetHomeDashboard(application.GetHomeDashboardRequest) (application.HomeDashboardState, *application.Error)
 	PreflightLaunchProject(application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error)
 	LaunchProject(application.LaunchProjectRequest) (application.LaunchProjectResult, *application.Error)
 	BindProject(application.BindProjectRequest) (application.ProjectBindingState, *application.Error)
 	UnbindProject(application.UnbindProjectRequest) (application.ProjectBindingState, *application.Error)
 	CreateContext(application.CreateContextRequest) (application.CreateContextResult, *application.Error)
+}
+
+// GetHomeDashboard returns the Home screen state for the requested project.
+func (a *App) GetHomeDashboard(request application.GetHomeDashboardRequest) any {
+	dashboard, err := a.service.GetHomeDashboard(request)
+	if err != nil {
+		return err
+	}
+	return dashboard
 }
 
 // App is the Wails-bound application surface.

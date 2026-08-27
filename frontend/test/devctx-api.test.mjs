@@ -12,6 +12,42 @@ const toolFixture = () => ({
 
 const toolOptionFixture = () => ({id: "second-tool", name: "Second Tool"});
 
+test("adapter normalizes the Home dashboard contract", async () => {
+  const api = createDevContextApi({
+    async getHomeDashboard(request) {
+      assert.deepEqual(request, {projectPath: "/work/api"});
+      return {
+        project: {name: "api", path: "/work/api"},
+        currentContext: {
+          id: "personal",
+          name: "Personal",
+          tool: toolFixture(),
+          confidence: {contextId: "personal", status: "ready", checks: []},
+        },
+        recentProjects: [],
+        running: {count: 0},
+        activity: {count: 0},
+      };
+    },
+  });
+
+  assert.deepEqual(await api.getHomeDashboard({projectPath: "/work/api"}), {
+    ok: true,
+    data: {
+      project: {name: "api", path: "/work/api"},
+      currentContext: {
+        id: "personal",
+        name: "Personal",
+        tool: toolFixture(),
+        confidence: {contextId: "personal", status: "ready", checks: []},
+      },
+      recentProjects: [],
+      running: {count: 0},
+      activity: {count: 0},
+    },
+  });
+});
+
 test("adapter normalizes successful Wails calls", async () => {
   const calls = [];
   const api = createDevContextApi({

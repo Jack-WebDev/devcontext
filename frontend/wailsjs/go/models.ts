@@ -40,6 +40,19 @@ export namespace application {
 	        this.projectPath = source["projectPath"];
 	    }
 	}
+
+	export class GetHomeDashboardRequest {
+	    projectPath?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new GetHomeDashboardRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectPath = source["projectPath"];
+	    }
+	}
 	export class LaunchProjectRequest {
 	    projectPath?: string;
 	    contextId: string;
@@ -86,4 +99,3 @@ export namespace application {
 	}
 
 }
-
