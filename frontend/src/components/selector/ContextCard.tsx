@@ -9,6 +9,7 @@ import type { ContextNavigationDirection } from "./selection-state";
 interface ContextCardProps {
   context: ContextState;
   selected?: boolean;
+  recommendation?: string;
   disabled?: boolean;
   tabIndex?: number;
   buttonRef?: Ref<HTMLButtonElement>;
@@ -20,6 +21,7 @@ interface ContextCardProps {
 function ContextCard({
   context,
   selected = false,
+  recommendation,
   disabled = false,
   tabIndex = 0,
   buttonRef,
@@ -65,6 +67,13 @@ function ContextCard({
       data-selected={selected ? "true" : undefined}
       data-context-accent={contextAccent}
     >
+      {selected ? (
+        <span
+          className="pointer-events-none absolute inset-y-0 left-0 z-20 w-1 bg-primary"
+          data-context-selection-marker
+          aria-hidden="true"
+        />
+      ) : null}
       {onSelect ? (
         <Button
           ref={buttonRef}
@@ -72,6 +81,7 @@ function ContextCard({
           variant="ghost"
           className="absolute inset-0 z-10 h-auto w-full p-0 focus-visible:ring-0 disabled:cursor-not-allowed"
           aria-labelledby={contextNameId}
+          aria-current={selected ? "true" : undefined}
           aria-pressed={selected}
           disabled={disabled}
           tabIndex={disabled ? undefined : tabIndex}
@@ -82,7 +92,13 @@ function ContextCard({
         </Button>
       ) : null}
       <CardContent className="pointer-events-none min-w-0 space-y-4 p-5">
-        <ContextIdentity context={context} description={contextDescription} accent={contextAccent} selected={selected} />
+        <ContextIdentity
+          context={context}
+          description={contextDescription}
+          accent={contextAccent}
+          selected={selected}
+          recommendation={recommendation}
+        />
         <ToolStatusRow context={context} />
         <ProviderSummary context={context} providers={enabledProviders} />
       </CardContent>
@@ -136,11 +152,13 @@ function ContextIdentity({
   description,
   accent,
   selected,
+  recommendation,
 }: {
   context: ContextState;
   description?: string;
   accent: ContextAccentName;
   selected: boolean;
+  recommendation?: string;
 }) {
   return (
     <div className="min-w-0 space-y-2">
@@ -151,22 +169,34 @@ function ContextIdentity({
             <h3 id={`context-${context.id}-name`} className="truncate text-base font-semibold" title={context.name}>
               {context.name}
             </h3>
-            <Badge
-              variant={selected ? "default" : "secondary"}
-              className={`shrink-0 border px-2 py-0.5 text-xs font-semibold ${
-                selected
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-muted/30 text-muted-foreground"
-              }`}
-            >
-              {selected ? "Selected" : "Not selected"}
-            </Badge>
+            <div className="flex shrink-0 items-center gap-2">
+              {recommendation ? (
+                <Badge
+                  variant="secondary"
+                  className="border border-foreground/20 bg-muted/50 px-2 py-0.5 text-xs font-semibold text-foreground"
+                  title={recommendation}
+                >
+                  Recommended
+                </Badge>
+              ) : null}
+              <Badge
+                variant={selected ? "default" : "secondary"}
+                className={`border px-2 py-0.5 text-xs font-semibold ${
+                  selected
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-muted/30 text-muted-foreground"
+                }`}
+              >
+                {selected ? "Selected" : "Not selected"}
+              </Badge>
+            </div>
           </div>
           {description ? (
             <p className="mt-1 truncate text-sm text-muted-foreground" title={description}>
               {description}
             </p>
           ) : null}
+          {recommendation ? <p className="mt-2 text-xs text-muted-foreground">{recommendation}</p> : null}
         </div>
       </div>
       <p className="truncate font-mono text-xs text-muted-foreground" title={context.id}>

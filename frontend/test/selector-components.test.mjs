@@ -266,10 +266,23 @@ test("context card renders generic context names and ids", () => {
 
 test("context card can represent a selected context", () => {
   const context = contextFixture("personal", "Personal");
-  const html = renderToStaticMarkup(ContextCard({context, selected: true}));
+  const html = renderToStaticMarkup(ContextCard({context, selected: true, onSelect: () => {}}));
 
   assert.match(html, /data-selected="true"/);
   assert.match(html, /border-primary/);
+  assert.match(html, /data-context-selection-marker="true"/);
+  assert.match(html, /aria-current="true"/);
+  assert.match(html, />Selected</);
+});
+
+test("context card presents a backend-supported recommendation with its reason", () => {
+  const context = contextFixture("company", "Company");
+  const html = renderToStaticMarkup(
+    ContextCard({context, recommendation: "Remembered for this project"}),
+  );
+
+  assert.match(html, />Recommended</);
+  assert.ok(html.includes("Remembered for this project"));
 });
 
 test("context card renders backend-provided description and accent metadata", () => {

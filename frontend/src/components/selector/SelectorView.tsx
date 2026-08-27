@@ -249,6 +249,7 @@ function SelectorView({
                     key={context.id}
                     context={context}
                     selected={selectedContextId === context.id}
+                    recommendation={recommendationForContext(launchState, context.id)}
                     disabled={launchPending}
                     tabIndex={rovingContextId === context.id ? 0 : -1}
                     buttonRef={setContextButtonRef(context.id)}
@@ -410,6 +411,14 @@ function MissingDefaultContextActions({
       </CardContent>
     </Card>
   );
+}
+
+function recommendationForContext(launchState: LaunchState, contextId: string): string | undefined {
+  if (launchState.selectedContextId !== contextId || launchState.resolutionSource !== "project_binding") {
+    return undefined;
+  }
+
+  return "Remembered for this project";
 }
 
 export { SelectorView };
