@@ -81,7 +81,11 @@ function App() {
   }
 
   return (
-    <AppShell activeRoute={activeRoute} onNavigate={handleNavigate}>
+    <AppShell
+      activeRoute={activeRoute}
+      onNavigate={handleNavigate}
+      currentProject={launchState.status === "loaded" ? launchState.data.project : undefined}
+    >
       {activeRoute === "home" ? (
         <section aria-labelledby="context-selector-heading" className="space-y-6">
           <div>

@@ -361,14 +361,22 @@ test("card hierarchy differentiates primary, secondary, and tertiary surfaces", 
   assert.match(tertiary, /bg-transparent/);
 });
 
-test("app shell exposes stable primary navigation and a responsive content boundary", () => {
-  const html = renderToStaticMarkup(AppShell({activeRoute: "projects", onNavigate: () => {}, children: "Content"}));
+test("app shell exposes stable navigation, current project state, and a responsive content boundary", () => {
+  const html = renderToStaticMarkup(AppShell({
+    activeRoute: "projects",
+    onNavigate: () => {},
+    currentProject: {name: "api", path: "/work/api"},
+    children: "Content",
+  }));
 
   assert.match(html, /data-app-shell="true"/);
   assert.match(html, /aria-label="Primary navigation"/);
   assert.match(html, /aria-current="page"/);
   assert.match(html, /max-w-6xl/);
   assert.match(html, /min-w-0/);
+  assert.ok(html.includes("Current project"));
+  assert.ok(html.includes("api"));
+  assert.ok(html.includes("/work/api"));
   assert.deepEqual(appRoutes.map((route) => route.label), ["Home", "Contexts", "Projects", "Running", "History", "Settings"]);
   assert.equal(appRouteFromHash("#projects"), "projects");
   assert.equal(appRouteFromHash("#unknown"), "home");

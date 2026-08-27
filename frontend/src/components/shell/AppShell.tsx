@@ -1,14 +1,16 @@
 import type { ReactNode } from "react";
 
+import type { ProjectState } from "../../lib/devctx-api";
 import { appRoutes, type AppRoute } from "./routes.js";
 
 interface AppShellProps {
   activeRoute: AppRoute;
   onNavigate: (route: AppRoute) => void;
+  currentProject?: ProjectState;
   children: ReactNode;
 }
 
-function AppShell({ activeRoute, onNavigate, children }: AppShellProps) {
+function AppShell({ activeRoute, onNavigate, currentProject, children }: AppShellProps) {
   return (
     <div className="flex min-h-screen min-w-0 bg-background text-foreground" data-app-shell>
       <aside className="flex w-48 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground sm:w-56">
@@ -32,6 +34,7 @@ function AppShell({ activeRoute, onNavigate, children }: AppShellProps) {
             </button>
           ))}
         </nav>
+        <CurrentProjectSummary project={currentProject} />
       </aside>
       <main className="min-w-0 flex-1 overflow-x-hidden">
         <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">{children}</div>
@@ -40,5 +43,25 @@ function AppShell({ activeRoute, onNavigate, children }: AppShellProps) {
   );
 }
 
-export { AppShell };
+function CurrentProjectSummary({ project }: { project?: ProjectState }) {
+  if (project === undefined) {
+    return (
+      <div className="border-t border-sidebar-border px-4 py-4 text-xs text-sidebar-foreground/70">
+        Current project unavailable
+      </div>
+    );
+  }
+
+  return (
+    <section className="min-w-0 border-t border-sidebar-border px-4 py-4" aria-labelledby="shell-current-project-title">
+      <p id="shell-current-project-title" className="text-xs font-semibold tracking-wide text-sidebar-foreground/70 uppercase">
+        Current project
+      </p>
+      <p className="mt-1 truncate text-sm font-medium" title={project.name}>{project.name}</p>
+      <p className="mt-1 truncate font-mono text-xs text-sidebar-foreground/70" title={project.path}>{project.path}</p>
+    </section>
+  );
+}
+
+export { AppShell, CurrentProjectSummary };
 export type { AppShellProps };
