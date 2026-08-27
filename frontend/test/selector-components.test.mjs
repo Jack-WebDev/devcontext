@@ -378,6 +378,27 @@ test("context card renders enabled provider status variants with accessible name
   assert.ok(!html.includes("Disabled Provider"));
 });
 
+test("context card renders only backend-provided provider identity information", () => {
+  const context = contextFixture("personal", "Personal", [
+    {
+      ...providerFixture("verified", "Verified Provider", true, "ready"),
+      identity: {
+        status: "verified",
+        fields: [{label: "Email", value: "developer@example.com"}],
+      },
+    },
+    {
+      ...providerFixture("unavailable", "Unavailable Provider", true, "ready"),
+      identity: {status: "unavailable", fields: []},
+    },
+  ]);
+  const html = renderToStaticMarkup(ContextCard({context}));
+
+  assert.ok(html.includes("Account: Email: developer@example.com"));
+  assert.ok(html.includes("Account identity unavailable"));
+  assert.ok(!html.includes("Personal account"));
+});
+
 test("context card renders generic setup guidance for an unconfigured provider", () => {
   const personal = contextFixture("personal", "Personal", [
     providerFixture("codex", "Codex", true, "not_configured", "Codex isolated provider state was not found"),
@@ -688,20 +709,31 @@ test("selector layout keeps project, contexts, confidence, remember, and actions
 test("selector confidence summary renders selected context readiness", () => {
   const selected = renderToStaticMarkup(
     SelectorConfidenceSummary({
+      project: {name: "api", path: "/work/api"},
       context: {
         ...contextFixture("personal", "Personal"),
         confidence: {
           contextId: "personal",
           status: "needs_attention",
-          checks: [],
+          checks: [
+            {component: "provider", providerId: "provider", severity: "ready", label: "Provider", message: "Provider is ready."},
+            {component: "tool", toolId: "vscode", severity: "needs_attention", label: "VS Code", message: "Review VS Code."},
+            {component: "isolation", severity: "ready", label: "Context storage", message: "Context storage is ready."},
+          ],
         },
       },
     }),
   );
   const empty = renderToStaticMarkup(SelectorConfidenceSummary({}));
 
-  assert.ok(selected.includes("Confidence summary"));
+  assert.ok(selected.includes("Launch confidence"));
+  assert.ok(selected.includes("Project"));
+  assert.ok(selected.includes("api"));
   assert.ok(selected.includes("Personal"));
+  assert.ok(selected.includes("Provider"));
+  assert.ok(selected.includes("VS Code"));
+  assert.ok(selected.includes("Isolation"));
+  assert.ok(selected.includes("Protected"));
   assert.ok(selected.includes("Needs attention"));
   assert.ok(empty.includes("Select a context to review launch readiness."));
   assert.deepEqual(

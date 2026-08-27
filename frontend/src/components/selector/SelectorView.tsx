@@ -281,7 +281,7 @@ function SelectorView({
               />
             </>
           }
-          confidenceSummary={<SelectorConfidenceSummary context={selectedContext} />}
+          confidenceSummary={<SelectorConfidenceSummary context={selectedContext} project={launchState.project} />}
           rememberControl={
             <RememberProjectControl
               binding={launchState.binding}

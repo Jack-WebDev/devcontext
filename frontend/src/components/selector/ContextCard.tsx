@@ -336,6 +336,7 @@ function ProviderStatusRow({ context, provider }: { context: ContextState; provi
               {provider.explanation}
             </p>
           ) : null}
+          <ProviderIdentityLine provider={provider} />
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <span
@@ -355,6 +356,21 @@ function ProviderStatusRow({ context, provider }: { context: ContextState; provi
       ) : null}
     </li>
   );
+}
+
+function ProviderIdentityLine({ provider }: { provider: ProviderState }) {
+  const { identity } = provider;
+
+  if (identity.status === "verified" && identity.fields.length > 0) {
+    const details = identity.fields.map((field) => `${field.label}: ${field.value}`).join(" · ");
+    return <p className="mt-1 truncate text-xs text-muted-foreground" title={details}>Account: {details}</p>;
+  }
+
+  if (identity.status === "mismatch_evidence" && identity.message) {
+    return <p className="mt-1 text-xs text-muted-foreground">{identity.message}</p>;
+  }
+
+  return <p className="mt-1 text-xs text-muted-foreground">Account identity unavailable</p>;
 }
 
 function providerSetupGuidance(context: ContextState, provider: ProviderState): string | undefined {
