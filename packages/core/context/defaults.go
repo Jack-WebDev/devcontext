@@ -44,21 +44,31 @@ func DefaultContextForID(id ID, createdAt time.Time) (Context, error) {
 // DefaultContextForIDWithProviderRegistry returns the built-in context seed for
 // a supported default context ID using the registry's default-enabled providers.
 func DefaultContextForIDWithProviderRegistry(id ID, createdAt time.Time, registry provider.Registry) (Context, error) {
+	return DefaultContextForIDWithRegistries(id, createdAt, registry, editor.BuiltInRegistry())
+}
+
+// DefaultContextForIDWithRegistries returns a default context using the
+// provider and editor defaults owned by their respective registries.
+func DefaultContextForIDWithRegistries(id ID, createdAt time.Time, providerRegistry provider.Registry, editorRegistry editor.Registry) (Context, error) {
 	switch id.String() {
 	case personalContextID:
-		return DefaultPersonalContextWithProviderRegistry(createdAt, registry), nil
+		return defaultContextSeed(MustID(personalContextID), "Personal", createdAt, providerRegistry, editorRegistry), nil
 	case companyContextID:
-		return DefaultCompanyContextWithProviderRegistry(createdAt, registry), nil
+		return defaultContextSeed(MustID(companyContextID), "Company", createdAt, providerRegistry, editorRegistry), nil
 	default:
 		return Context{}, fmt.Errorf("%w: unsupported default context %q", ErrContextNotFound, id.String())
 	}
 }
 
-func defaultContextSeed(id ID, name string, createdAt time.Time, registry provider.Registry) Context {
+func defaultContextSeed(id ID, name string, createdAt time.Time, registry provider.Registry, editorRegistries ...editor.Registry) Context {
+	editorRegistry := editor.BuiltInRegistry()
+	if len(editorRegistries) > 0 && !editorRegistries[0].IsZero() {
+		editorRegistry = editorRegistries[0]
+	}
 	return Context{
 		ID:        id,
 		Name:      name,
-		Editor:    editor.DefaultConfig(),
+		Editor:    editor.DefaultConfigForRegistry(editorRegistry),
 		Providers: registry.DefaultConfigs(),
 		CreatedAt: createdAt.UTC(),
 	}

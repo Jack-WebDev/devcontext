@@ -21,7 +21,7 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 	context := devcontext.Context{
 		ID:     devcontext.MustID("client-a"),
 		Name:   "Client A",
-		Editor: editor.DefaultConfig(),
+		Editor: editor.Config{Type: "fake-editor"},
 		Providers: provider.Configs{
 			"fake":     {Enabled: true},
 			"disabled": {Enabled: false},
@@ -61,7 +61,10 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 			builderFakeProvider{id: "fake"},
 			builderFakeProvider{id: "disabled"},
 		}),
-		Editor: fakeEditor,
+		ToolRegistry: editor.MustNewRegistry([]editor.Tool{{
+			Integration: fakeEditor,
+			DisplayName: "Fake Editor",
+		}}, fakeEditor.ID()),
 		ParentEnvironment: []string{
 			"PATH=/usr/local/bin",
 			"CODEX_HOME=/old/codex",

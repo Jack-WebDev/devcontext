@@ -8,6 +8,7 @@ import (
 	"time"
 
 	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	devlog "devctx/packages/core/logging"
@@ -140,7 +141,7 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 		return CreateContextResult{}, err
 	}
 
-	ctx, err := devcontext.DefaultContextForIDWithProviderRegistry(contextID, s.now(), s.dependencies.ProviderRegistry)
+	ctx, err := devcontext.DefaultContextForIDWithRegistries(contextID, s.now(), s.dependencies.ProviderRegistry, s.dependencies.ToolRegistry)
 	if err != nil {
 		return CreateContextResult{}, err
 	}
@@ -556,7 +557,14 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 		}
 	}
 
-	executable, editorErr := s.dependencies.Editor.DetectExecutable(ctx.Editor)
+	integration, registered := s.dependencies.ToolRegistry.Get(ctx.Editor.Type)
+	var executable editor.Executable
+	var editorErr error
+	if !registered {
+		editorErr = fmt.Errorf("selected editor %q is not registered", ctx.Editor.Type)
+	} else {
+		executable, editorErr = integration.DetectExecutable(ctx.Editor)
+	}
 	checks = append(checks, launcher.VSCodeConfidenceCheck(executable, editorErr))
 
 	contextPaths, pathsErr := filesystem.DeriveContextPaths(s.dependencies.Paths, ctx.ID)

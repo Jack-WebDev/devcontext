@@ -70,7 +70,7 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	contextState := state.Contexts[0]
 	if contextState.ID != "personal" ||
 		contextState.Name != "Personal" ||
-		contextState.Editor != (EditorState{Type: string(editor.TypeVSCode)}) ||
+		contextState.Editor != (EditorState{Type: "fake-editor"}) ||
 		!reflect.DeepEqual(contextState.Providers, []ProviderState{
 			{
 				ID:      "fake",
@@ -809,12 +809,12 @@ func TestCreateContextCreatesDefaultPersonalAndCompanyContexts(t *testing.T) {
 		{
 			name:      "personal",
 			contextID: "personal",
-			want:      devcontext.DefaultPersonalContextWithProviderRegistry(now, defaultRegistry),
+			want:      devcontext.Context{ID: devcontext.MustID("personal"), Name: "Personal", Editor: editor.Config{Type: "fake-editor"}, Providers: defaultRegistry.DefaultConfigs(), CreatedAt: now},
 		},
 		{
 			name:      "company",
 			contextID: "company",
-			want:      devcontext.DefaultCompanyContextWithProviderRegistry(now, defaultRegistry),
+			want:      devcontext.Context{ID: devcontext.MustID("company"), Name: "Company", Editor: editor.Config{Type: "fake-editor"}, Providers: defaultRegistry.DefaultConfigs(), CreatedAt: now},
 		},
 	}
 
@@ -1214,7 +1214,7 @@ func (f applicationFixture) service() *Service {
 		Projects:           project.NewRepository(f.bindingsPath, f.paths),
 		Paths:              f.paths,
 		ProviderRegistry:   registry,
-		Editor:             f.editor,
+		ToolRegistry:       editor.MustNewRegistry([]editor.Tool{{Integration: f.editor, DisplayName: "Fake Editor"}}, f.editor.ID()),
 		ProcessLauncher:    f.process,
 		StoragePermissions: f.storagePermissions,
 		ParentEnvironment:  []string{"PATH=/fixture/bin"},
@@ -1231,7 +1231,7 @@ func (f applicationFixture) context(id string, name string) devcontext.Context {
 	return devcontext.Context{
 		ID:     devcontext.MustID(id),
 		Name:   name,
-		Editor: editor.DefaultConfig(),
+		Editor: editor.Config{Type: f.editor.ID()},
 		Providers: provider.Configs{
 			"fake": {Enabled: true},
 		},

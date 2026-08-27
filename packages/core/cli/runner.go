@@ -43,11 +43,14 @@ func (r Result) Write(stdout io.Writer, stderr io.Writer) error {
 
 // Runner executes implemented CLI commands against core repositories.
 type Runner struct {
-	Contexts           devcontext.Repository
-	Projects           project.Repository
-	WorkingDirectory   string
-	Paths              filesystem.PlatformPaths
-	ProviderRegistry   provider.Registry
+	Contexts         devcontext.Repository
+	Projects         project.Repository
+	WorkingDirectory string
+	Paths            filesystem.PlatformPaths
+	ProviderRegistry provider.Registry
+	ToolRegistry     editor.Registry
+	// Editor is retained temporarily for callers that have not yet moved to the
+	// registry contract. New code must provide ToolRegistry.
 	Editor             editor.Editor
 	ProcessLauncher    launcher.ProcessLauncher
 	ParentEnvironment  []string
@@ -101,7 +104,7 @@ func (r Runner) runRootLaunch(command RootLaunchCommand) Result {
 		Resolver:          launcher.NewResolver(r.Contexts, r.Projects),
 		PlatformPaths:     paths,
 		ProviderRegistry:  r.providerRegistry(),
-		Editor:            r.editor(),
+		ToolRegistry:      r.toolRegistry(),
 		ParentEnvironment: r.parentEnvironment(),
 	}
 	plan, err := builder.Build(request)
@@ -151,7 +154,7 @@ func (r Runner) runContext(command ContextCommand) Result {
 		if err != nil {
 			return r.errorResult(err)
 		}
-		ctx, err := devcontext.DefaultContextForIDWithProviderRegistry(contextID, r.now(), r.providerRegistry())
+		ctx, err := devcontext.DefaultContextForIDWithRegistries(contextID, r.now(), r.providerRegistry(), r.toolRegistry())
 		if err != nil {
 			return r.errorResult(err)
 		}
@@ -234,11 +237,14 @@ func (r Runner) providerRegistry() provider.Registry {
 	return provider.BuiltInRegistry()
 }
 
-func (r Runner) editor() editor.Editor {
-	if r.Editor != nil {
-		return r.Editor
+func (r Runner) toolRegistry() editor.Registry {
+	if !r.ToolRegistry.IsZero() {
+		return r.ToolRegistry
 	}
-	return editor.VSCodeEditor{}
+	if r.Editor != nil {
+		return editor.MustNewRegistry([]editor.Tool{{Integration: r.Editor, DisplayName: string(r.Editor.ID())}}, r.Editor.ID())
+	}
+	return editor.BuiltInRegistry()
 }
 
 func (r Runner) processLauncher() launcher.ProcessLauncher {

@@ -112,7 +112,7 @@ func runCLI(args []string) cli.ExitCode {
 		WorkingDirectory:  workingDirectory,
 		Paths:             paths,
 		ProviderRegistry:  provider.BuiltInRegistry(),
-		Editor:            editor.VSCodeEditor{},
+		ToolRegistry:      editor.BuiltInRegistry(),
 		ProcessLauncher:   launcher.NativeProcessLauncher{},
 		ParentEnvironment: os.Environ(),
 		DetachMode:        launcher.DetachModeDetached,

@@ -2,6 +2,7 @@ package launcher
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 
 	devcontext "devctx/packages/core/context"
@@ -38,9 +39,12 @@ type ContextResolver interface {
 
 // LaunchPlanBuilder builds a complete launch plan without starting a process.
 type LaunchPlanBuilder struct {
-	Resolver          ContextResolver
-	PlatformPaths     filesystem.PlatformPaths
-	ProviderRegistry  provider.Registry
+	Resolver         ContextResolver
+	PlatformPaths    filesystem.PlatformPaths
+	ProviderRegistry provider.Registry
+	ToolRegistry     editor.Registry
+	// Editor is retained temporarily for callers that have not yet moved to the
+	// registry contract. New code must provide ToolRegistry.
 	Editor            editor.Editor
 	ParentEnvironment []string
 }
@@ -54,7 +58,7 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 	if b.PlatformPaths == nil {
 		return LaunchPlan{}, ErrMissingPlatformPaths
 	}
-	if b.Editor == nil {
+	if b.ToolRegistry.IsZero() && b.Editor == nil {
 		return LaunchPlan{}, ErrMissingEditor
 	}
 	if err := project.ValidateProjectDirectory(request.ProjectPath); err != nil {
@@ -88,11 +92,15 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 		return LaunchPlan{}, err
 	}
 
-	executable, err := b.Editor.DetectExecutable(resolution.Context.Editor)
+	integration, ok := b.toolRegistry().Get(resolution.Context.Editor.Type)
+	if !ok {
+		return LaunchPlan{}, fmt.Errorf("%w: %s", ErrMissingEditor, resolution.Context.Editor.Type)
+	}
+	executable, err := integration.DetectExecutable(resolution.Context.Editor)
 	if err != nil {
 		return LaunchPlan{}, err
 	}
-	command, err := b.Editor.BuildLaunchCommand(editor.CommandRequest{
+	command, err := integration.BuildLaunchCommand(editor.CommandRequest{
 		Config:      resolution.Context.Editor,
 		Executable:  executable,
 		ProjectPath: string(request.ProjectPath),
@@ -172,6 +180,13 @@ func (b LaunchPlanBuilder) providerRegistry() provider.Registry {
 		return provider.BuiltInRegistry()
 	}
 	return b.ProviderRegistry
+}
+
+func (b LaunchPlanBuilder) toolRegistry() editor.Registry {
+	if !b.ToolRegistry.IsZero() {
+		return b.ToolRegistry
+	}
+	return editor.MustNewRegistry([]editor.Tool{{Integration: b.Editor, DisplayName: string(b.Editor.ID())}}, b.Editor.ID())
 }
 
 func registeredEnabledProviderIDs(ctx devcontext.Context, registry provider.Registry) []provider.ID {

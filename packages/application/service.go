@@ -18,10 +18,13 @@ import (
 
 // Dependencies contains the core collaborators used by application use cases.
 type Dependencies struct {
-	Contexts           devcontext.Repository
-	Projects           project.Repository
-	Paths              filesystem.PlatformPaths
-	ProviderRegistry   provider.Registry
+	Contexts         devcontext.Repository
+	Projects         project.Repository
+	Paths            filesystem.PlatformPaths
+	ProviderRegistry provider.Registry
+	ToolRegistry     editor.Registry
+	// Editor is retained temporarily for callers that have not yet moved to the
+	// registry contract. New code must provide ToolRegistry.
 	Editor             editor.Editor
 	ProcessLauncher    launcher.ProcessLauncher
 	StoragePermissions filesystem.StoragePermissions
@@ -77,7 +80,7 @@ func NewDefaultService(options DefaultOptions) (*Service, error) {
 		Projects:           project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
 		Paths:              paths,
 		ProviderRegistry:   provider.BuiltInRegistry(),
-		Editor:             editor.VSCodeEditor{},
+		ToolRegistry:       editor.BuiltInRegistry(),
 		ProcessLauncher:    launcher.NativeProcessLauncher{},
 		StoragePermissions: filesystem.NewDefaultStoragePermissions(),
 		ParentEnvironment:  options.ParentEnvironment,
@@ -102,7 +105,7 @@ func (s *Service) launchPlanBuilder() launcher.LaunchPlanBuilder {
 		Resolver:          launcher.NewResolver(s.dependencies.Contexts, s.dependencies.Projects),
 		PlatformPaths:     s.dependencies.Paths,
 		ProviderRegistry:  s.dependencies.ProviderRegistry,
-		Editor:            s.dependencies.Editor,
+		ToolRegistry:      s.dependencies.ToolRegistry,
 		ParentEnvironment: s.dependencies.ParentEnvironment,
 	}
 }
@@ -126,8 +129,12 @@ func normalizeDependencies(dependencies Dependencies) Dependencies {
 	if dependencies.ProviderRegistry.IsZero() {
 		dependencies.ProviderRegistry = provider.BuiltInRegistry()
 	}
-	if dependencies.Editor == nil {
-		dependencies.Editor = editor.VSCodeEditor{}
+	if dependencies.ToolRegistry.IsZero() {
+		if dependencies.Editor != nil {
+			dependencies.ToolRegistry = editor.MustNewRegistry([]editor.Tool{{Integration: dependencies.Editor, DisplayName: string(dependencies.Editor.ID())}}, dependencies.Editor.ID())
+		} else {
+			dependencies.ToolRegistry = editor.BuiltInRegistry()
+		}
 	}
 	if dependencies.ProcessLauncher == nil {
 		dependencies.ProcessLauncher = launcher.NativeProcessLauncher{}
