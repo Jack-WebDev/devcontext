@@ -306,11 +306,15 @@ func TestNewErrorReturnsActionableRecoveryDetails(t *testing.T) {
 }
 
 type applicationFakeProvider struct {
-	id              provider.ID
-	displayName     string
-	statusByContext map[string]provider.Status
-	statusErr       error
-	environment     provider.EnvironmentContribution
+	id               provider.ID
+	displayName      string
+	statusByContext  map[string]provider.Status
+	statusErr        error
+	environment      provider.EnvironmentContribution
+	globalSession    provider.CredentialSession
+	hasGlobalSession bool
+	identity         provider.Identity
+	hasIdentity      bool
 }
 
 func contextStateIDs(contexts []ContextState) []string {
@@ -347,6 +351,24 @@ func (p applicationFakeProvider) Status(ctx provider.RuntimeContext) (provider.S
 		return status, nil
 	}
 	return provider.ReadyStatus(), nil
+}
+
+func (p applicationFakeProvider) DetectContextIdentity(ctx provider.RuntimeContext) (provider.Identity, bool, error) {
+	if p.hasIdentity {
+		return p.identity, true, nil
+	}
+	switch p.id {
+	case provider.CodexID:
+		return provider.CodexProvider{}.DetectContextIdentity(ctx)
+	case provider.ClaudeID:
+		return provider.ClaudeProvider{}.DetectContextIdentity(ctx)
+	default:
+		return provider.Identity{}, false, nil
+	}
+}
+
+func (p applicationFakeProvider) DetectGlobalCredentialSession(provider.GlobalCredentialContext) (provider.CredentialSession, bool, error) {
+	return p.globalSession, p.hasGlobalSession, nil
 }
 
 type applicationFakeEditor struct {

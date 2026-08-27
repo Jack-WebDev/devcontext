@@ -51,7 +51,8 @@ func TestLaunchConfidenceStatusVariantsSerialize(t *testing.T) {
 
 func TestLaunchConfidenceCheckAliasesCoreContract(t *testing.T) {
 	check := application.LaunchConfidenceCheck{
-		Component:  application.LaunchConfidenceCheckClaude,
+		Component:  application.LaunchConfidenceCheckProvider,
+		ProviderID: "claude",
 		Severity:   application.LaunchConfidenceBlocked,
 		Label:      "Claude",
 		Message:    "Claude cannot be checked for this context.",
@@ -67,7 +68,7 @@ func TestLaunchConfidenceCheckAliasesCoreContract(t *testing.T) {
 		t.Fatalf("marshal check: %v", err)
 	}
 
-	want := `{"component":"claude","severity":"blocked","label":"Claude","message":"Claude cannot be checked for this context.","actionHint":"Open diagnostics."}`
+	want := `{"component":"provider","providerId":"claude","severity":"blocked","label":"Claude","message":"Claude cannot be checked for this context.","actionHint":"Open diagnostics."}`
 	if string(data) != want {
 		t.Fatalf("json = %s, want %s", data, want)
 	}
@@ -131,28 +132,12 @@ func TestProviderIdentityStateVariantsSerialize(t *testing.T) {
 		want     string
 	}{
 		{
-			name: "verified codex",
+			name: "verified identity fields",
 			identity: application.ProviderIdentityState{
 				Status: application.ProviderIdentityVerified,
-				Codex: &application.CodexProviderIdentityState{
-					Email:            "user@example.com",
-					ChatGPTPlanType:  "Business",
-					ChatGPTAccountID: "acct_123",
-				},
+				Fields: []application.ProviderMetadataField{{Label: "Email", Value: "user@example.com"}, {Label: "Plan", Value: "Business"}, {Label: "Account", Value: "acct_123"}},
 			},
-			want: `{"status":"verified","codex":{"email":"user@example.com","chatgptPlanType":"Business","chatgptAccountId":"acct_123"}}`,
-		},
-		{
-			name: "verified claude",
-			identity: application.ProviderIdentityState{
-				Status: application.ProviderIdentityVerified,
-				Claude: &application.ClaudeProviderIdentityState{
-					SubscriptionType: "Pro",
-					OrganizationUUID: "e783",
-					OrganizationName: "Jishin Labs",
-				},
-			},
-			want: `{"status":"verified","claude":{"subscriptionType":"Pro","organizationUuid":"e783","organizationName":"Jishin Labs"}}`,
+			want: `{"status":"verified","fields":[{"label":"Email","value":"user@example.com"},{"label":"Plan","value":"Business"},{"label":"Account","value":"acct_123"}]}`,
 		},
 		{
 			name: "unavailable",

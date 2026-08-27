@@ -23,11 +23,7 @@ test("adapter normalizes successful Wails calls", async () => {
                 state: "ready",
                 identity: {
                   status: "verified",
-                  codex: {
-                    email: "user@company.com",
-                    chatgptPlanType: "Business",
-                    chatgptAccountId: "acct_123",
-                  },
+                  fields: [{label: "Email", value: "user@company.com"}, {label: "Plan", value: "Business"}, {label: "Account", value: "acct_123"}],
                 },
               },
               {
@@ -37,11 +33,7 @@ test("adapter normalizes successful Wails calls", async () => {
                 state: "ready",
                 identity: {
                   status: "verified",
-                  claude: {
-                    subscriptionType: "Pro",
-                    organizationUuid: "e783",
-                    organizationName: "Jishin Labs",
-                  },
+                  fields: [{label: "Subscription", value: "Pro"}, {label: "Organization UUID", value: "e783"}, {label: "Organization", value: "Jishin Labs"}],
                 },
               },
               {
@@ -52,6 +44,7 @@ test("adapter normalizes successful Wails calls", async () => {
                 identity: {
                   status: "mismatch_evidence",
                   message: "Different account identity detected.",
+                  fields: [],
                 },
               },
             ],
@@ -60,7 +53,8 @@ test("adapter normalizes successful Wails calls", async () => {
               status: "needs_attention",
               checks: [
                 {
-                  component: "codex",
+                  component: "provider",
+                  providerId: "codex",
                   severity: "needs_attention",
                   label: "Codex",
                   message: "Codex is not authenticated for this context.",
@@ -82,7 +76,8 @@ test("adapter normalizes successful Wails calls", async () => {
           status: "needs_attention",
           checks: [
             {
-              component: "codex",
+              component: "provider",
+              providerId: "codex",
               severity: "needs_attention",
               label: "Codex",
               message: "Codex is not authenticated for this context.",
@@ -105,21 +100,13 @@ test("adapter normalizes successful Wails calls", async () => {
             providerId: "codex",
             name: "Codex",
             metadataAvailable: true,
-            codex: {
-              email: "user@company.com",
-              chatgptPlanType: "Business",
-              chatgptAccountId: "acct_123",
-            },
+            fields: [{label: "Email", value: "user@company.com"}, {label: "Plan", value: "Business"}, {label: "Account", value: "acct_123"}],
           },
           {
             providerId: "claude",
             name: "Claude",
             metadataAvailable: true,
-            claude: {
-              subscriptionType: "Pro",
-              organizationUuid: "e783",
-              organizationName: "Jishin Labs",
-            },
+            fields: [{label: "Subscription", value: "Pro"}, {label: "Organization UUID", value: "e783"}, {label: "Organization", value: "Jishin Labs"}],
           },
         ],
       };
@@ -217,12 +204,7 @@ test("adapter normalizes successful Wails calls", async () => {
               identity: {
                 status: "verified",
                 message: undefined,
-                codex: {
-                  email: "user@company.com",
-                  chatgptPlanType: "Business",
-                  chatgptAccountId: "acct_123",
-                },
-                claude: undefined,
+                fields: [{label: "Email", value: "user@company.com"}, {label: "Plan", value: "Business"}, {label: "Account", value: "acct_123"}],
               },
             },
             {
@@ -234,12 +216,7 @@ test("adapter normalizes successful Wails calls", async () => {
               identity: {
                 status: "verified",
                 message: undefined,
-                codex: undefined,
-                claude: {
-                  subscriptionType: "Pro",
-                  organizationUuid: "e783",
-                  organizationName: "Jishin Labs",
-                },
+                fields: [{label: "Subscription", value: "Pro"}, {label: "Organization UUID", value: "e783"}, {label: "Organization", value: "Jishin Labs"}],
               },
             },
             {
@@ -251,8 +228,7 @@ test("adapter normalizes successful Wails calls", async () => {
               identity: {
                 status: "mismatch_evidence",
                 message: "Different account identity detected.",
-                codex: undefined,
-                claude: undefined,
+                fields: [],
               },
             },
           ],
@@ -261,7 +237,8 @@ test("adapter normalizes successful Wails calls", async () => {
             status: "needs_attention",
             checks: [
               {
-                component: "codex",
+                component: "provider",
+                providerId: "codex",
                 severity: "needs_attention",
                 label: "Codex",
                 message: "Codex is not authenticated for this context.",
@@ -285,7 +262,8 @@ test("adapter normalizes successful Wails calls", async () => {
         status: "needs_attention",
         checks: [
           {
-            component: "codex",
+            component: "provider",
+            providerId: "codex",
             severity: "needs_attention",
             label: "Codex",
             message: "Codex is not authenticated for this context.",
@@ -310,23 +288,13 @@ test("adapter normalizes successful Wails calls", async () => {
           providerId: "codex",
           name: "Codex",
           metadataAvailable: true,
-          codex: {
-            email: "user@company.com",
-            chatgptPlanType: "Business",
-            chatgptAccountId: "acct_123",
-          },
-          claude: undefined,
+          fields: [{label: "Email", value: "user@company.com"}, {label: "Plan", value: "Business"}, {label: "Account", value: "acct_123"}],
         },
         {
           providerId: "claude",
           name: "Claude",
           metadataAvailable: true,
-          codex: undefined,
-          claude: {
-            subscriptionType: "Pro",
-            organizationUuid: "e783",
-            organizationName: "Jishin Labs",
-          },
+          fields: [{label: "Subscription", value: "Pro"}, {label: "Organization UUID", value: "e783"}, {label: "Organization", value: "Jishin Labs"}],
         },
       ],
     },

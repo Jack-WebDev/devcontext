@@ -1,6 +1,7 @@
 package application
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -336,37 +337,29 @@ func (s *Service) contextState(ctx devcontext.Context) ContextState {
 }
 
 func (s *Service) providerCredentialSessionStates() ([]ProviderCredentialSessionState, error) {
-	sessions, err := filesystem.DetectProviderCredentialSessions(s.dependencies.Paths)
+	homeDir, err := s.dependencies.Paths.UserHomeDir()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("resolve provider credential source directory: %w", err)
 	}
 
-	states := make([]ProviderCredentialSessionState, 0, len(sessions))
-	for _, session := range sessions {
-		integration, ok := s.dependencies.ProviderRegistry.Get(provider.ID(session.ProviderID))
+	states := make([]ProviderCredentialSessionState, 0)
+	for _, integration := range s.dependencies.ProviderRegistry.All() {
+		detector, ok := integration.(provider.GlobalCredentialDetector)
 		if !ok {
 			continue
 		}
+		session, found, err := detector.DetectGlobalCredentialSession(provider.GlobalCredentialContext{UserHomeDir: homeDir})
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			continue
+		}
 		state := ProviderCredentialSessionState{
-			ProviderID:        session.ProviderID,
+			ProviderID:        string(integration.ID()),
 			Name:              integration.DisplayName(),
 			MetadataAvailable: session.MetadataAvailable,
-		}
-		switch session.ProviderID {
-		case string(provider.CodexID):
-			state.Codex = &CodexCredentialSessionState{
-				Email:            session.Codex.Email,
-				ChatGPTPlanType:  session.Codex.ChatGPTPlanType,
-				ChatGPTAccountID: session.Codex.ChatGPTAccountID,
-			}
-		case string(provider.ClaudeID):
-			state.Claude = &ClaudeCredentialSessionState{
-				SubscriptionType: session.Claude.SubscriptionType,
-				OrganizationUUID: session.Claude.OrganizationUUID,
-				OrganizationName: session.Claude.OrganizationName,
-			}
-		default:
-			continue
+			Fields:            providerMetadataFields(session.Fields),
 		}
 		states = append(states, state)
 	}
@@ -411,6 +404,7 @@ func (s *Service) providerStateEntries(ctx devcontext.Context) []providerStateEn
 			}
 		}
 
+		runtime := providerRuntimeContext(ctx, config, contextPaths, integration.ID())
 		entries = append(entries, providerStateEntry{
 			providerID: integration.ID(),
 			status:     status,
@@ -420,7 +414,7 @@ func (s *Service) providerStateEntries(ctx devcontext.Context) []providerStateEn
 				Enabled:     enabled,
 				State:       providerReadinessState(status),
 				Explanation: status.Explanation,
-				Identity:    providerIdentityState(integration.ID(), enabled, status, contextPaths, pathsErr),
+				Identity:    providerIdentityState(integration, enabled, status, runtime, pathsErr),
 			},
 		})
 	}
@@ -463,7 +457,7 @@ func providerReadinessState(status provider.Status) ProviderReadinessState {
 	}
 }
 
-func providerIdentityState(providerID provider.ID, enabled bool, status provider.Status, contextPaths filesystem.ContextPaths, pathsErr error) ProviderIdentityState {
+func providerIdentityState(integration provider.Provider, enabled bool, status provider.Status, runtime provider.RuntimeContext, pathsErr error) ProviderIdentityState {
 	if !enabled {
 		return ProviderIdentityState{Status: ProviderIdentityNone}
 	}
@@ -473,7 +467,7 @@ func providerIdentityState(providerID provider.ID, enabled bool, status provider
 		if pathsErr != nil {
 			return unavailableProviderIdentity()
 		}
-		return verifiedProviderIdentity(providerID, contextPaths)
+		return verifiedProviderIdentity(integration, runtime)
 	case provider.StatusUnavailable:
 		return unavailableProviderIdentity()
 	default:
@@ -481,37 +475,43 @@ func providerIdentityState(providerID provider.ID, enabled bool, status provider
 	}
 }
 
-func verifiedProviderIdentity(providerID provider.ID, contextPaths filesystem.ContextPaths) ProviderIdentityState {
-	switch providerID {
-	case provider.CodexID:
-		metadata, available, err := filesystem.DetectCodexContextCredentialMetadata(contextPaths)
-		if err != nil || !available {
-			return unavailableProviderIdentity()
-		}
-		return ProviderIdentityState{
-			Status: ProviderIdentityVerified,
-			Codex: &CodexProviderIdentityState{
-				Email:            metadata.Email,
-				ChatGPTPlanType:  metadata.ChatGPTPlanType,
-				ChatGPTAccountID: metadata.ChatGPTAccountID,
-			},
-		}
-	case provider.ClaudeID:
-		metadata, available, err := filesystem.DetectClaudeContextCredentialMetadata(contextPaths)
-		if err != nil || !available {
-			return unavailableProviderIdentity()
-		}
-		return ProviderIdentityState{
-			Status: ProviderIdentityVerified,
-			Claude: &ClaudeProviderIdentityState{
-				SubscriptionType: metadata.SubscriptionType,
-				OrganizationUUID: metadata.OrganizationUUID,
-				OrganizationName: metadata.OrganizationName,
-			},
-		}
-	default:
+func verifiedProviderIdentity(integration provider.Provider, runtime provider.RuntimeContext) ProviderIdentityState {
+	detector, ok := integration.(provider.ContextIdentityDetector)
+	if !ok {
 		return unavailableProviderIdentity()
 	}
+	identity, available, err := detector.DetectContextIdentity(runtime)
+	if err != nil || !available {
+		return unavailableProviderIdentity()
+	}
+
+	return ProviderIdentityState{
+		Status: ProviderIdentityVerified,
+		Fields: providerMetadataFields(identity.Fields),
+	}
+}
+
+func providerRuntimeContext(ctx devcontext.Context, config provider.Config, paths filesystem.ContextPaths, providerID provider.ID) provider.RuntimeContext {
+	return provider.RuntimeContext{
+		ContextID: ctx.ID.String(),
+		Config:    config,
+		Paths: provider.ContextPaths{
+			RootDir:           paths.RootDir,
+			StorageDir:        paths.ProviderStorageDir(providerID),
+			VSCodeDir:         paths.VSCodeDir,
+			VSCodeUserDataDir: paths.VSCodeUserDataDir,
+		},
+	}
+}
+
+func providerMetadataFields(fields []provider.MetadataField) []ProviderMetadataField {
+	result := make([]ProviderMetadataField, 0, len(fields))
+	for _, field := range fields {
+		if field.Label != "" && field.Value != "" {
+			result = append(result, ProviderMetadataField{Label: field.Label, Value: field.Value})
+		}
+	}
+	return result
 }
 
 func unavailableProviderIdentity() ProviderIdentityState {

@@ -125,34 +125,11 @@ function ProviderCredentialMetadata({ session }: { session: ProviderCredentialSe
 }
 
 function providerCredentialRows(session: ProviderCredentialSession): Array<{ label: string; value: string }> {
-  if (session.providerId === "codex" && session.codex) {
-    return [
-      { label: "Email", value: session.codex.email },
-      { label: "Plan", value: session.codex.chatgptPlanType },
-      { label: "Account", value: session.codex.chatgptAccountId },
-    ].filter(rowHasValue);
-  }
-
-  if (session.providerId === "claude" && session.claude) {
-    return [
-      { label: "Subscription", value: session.claude.subscriptionType },
-      { label: "Organization", value: session.claude.organizationName },
-      { label: "Organization ID", value: session.claude.organizationUuid },
-    ].filter(rowHasValue);
-  }
-
-  return [];
+  return session.fields.filter(rowHasValue);
 }
 
 function providerSessionSourceLabel(session: ProviderCredentialSession): string {
-  switch (session.providerId) {
-    case "codex":
-      return "Current global Codex session";
-    case "claude":
-      return "Current global Claude session";
-    default:
-      return "Current global provider session";
-  }
+  return `Current global ${session.name} session`;
 }
 
 function rowHasValue(row: { label: string; value?: string }): row is { label: string; value: string } {

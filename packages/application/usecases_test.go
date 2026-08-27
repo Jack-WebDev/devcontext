@@ -20,6 +20,15 @@ import (
 	"devctx/packages/core/provider"
 )
 
+func metadataValueForTest(fields []ProviderMetadataField, label string) string {
+	for _, field := range fields {
+		if field.Label == label {
+			return field.Value
+		}
+	}
+	return ""
+}
+
 func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.writeContext(t, fixture.context("personal", "Personal"))
@@ -124,7 +133,8 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 	}
 	wantChecks := []LaunchConfidenceCheck{
 		{
-			Component:  LaunchConfidenceCheckCodex,
+			Component:  LaunchConfidenceCheckProvider,
+			ProviderID: "codex",
 			Severity:   LaunchConfidenceNeedsAttention,
 			Label:      "Codex",
 			Message:    "Codex is not authenticated.",
@@ -216,13 +226,15 @@ func TestGetLaunchStateReturnsPerContextConfidenceSummaries(t *testing.T) {
 		t.Fatalf("personal confidence = %#v, want personal blocked by missing VS Code profile", got)
 	}
 	assertConfidenceCheck(t, confidenceByContext["company"].Checks, LaunchConfidenceCheck{
-		Component: LaunchConfidenceCheckCodex,
-		Severity:  LaunchConfidenceReady,
-		Label:     "Codex",
-		Message:   "Codex is ready for this context.",
+		Component:  LaunchConfidenceCheckProvider,
+		ProviderID: "codex",
+		Severity:   LaunchConfidenceReady,
+		Label:      "Codex",
+		Message:    "Codex is ready for this context.",
 	})
 	assertConfidenceCheck(t, confidenceByContext["personal"].Checks, LaunchConfidenceCheck{
-		Component:  LaunchConfidenceCheckCodex,
+		Component:  LaunchConfidenceCheckProvider,
+		ProviderID: "codex",
 		Severity:   LaunchConfidenceNeedsAttention,
 		Label:      "Codex",
 		Message:    "Codex is not authenticated.",
@@ -370,14 +382,64 @@ func TestGetLaunchStateDetectsProviderCredentialSessionsForContextCreation(t *te
 	if session.ProviderID != "claude" || session.Name != "Claude" || !session.MetadataAvailable {
 		t.Fatalf("provider credential session = %#v, want available Claude session", session)
 	}
-	if session.Claude == nil ||
-		session.Claude.SubscriptionType != "Pro" ||
-		session.Claude.OrganizationUUID != "e783" ||
-		session.Claude.OrganizationName != "Jishin Labs" {
-		t.Fatalf("claude metadata = %#v", session.Claude)
+	if metadataValueForTest(session.Fields, "Subscription") != "Pro" ||
+		metadataValueForTest(session.Fields, "Organization UUID") != "e783" ||
+		metadataValueForTest(session.Fields, "Organization") != "Jishin Labs" {
+		t.Fatalf("claude metadata = %#v", session.Fields)
 	}
 	if rendered := fmt.Sprintf("%#v", state.ProviderCredentialSessions); strings.Contains(rendered, "not-presented") {
 		t.Fatalf("provider credential sessions exposed credential value: %#v", state.ProviderCredentialSessions)
+	}
+}
+
+func TestGetLaunchStateIncludesRegisteredProviderCredentialMetadata(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.provider = &applicationFakeProvider{
+		id:               "future",
+		displayName:      "Future Provider",
+		hasGlobalSession: true,
+		globalSession: provider.CredentialSession{
+			MetadataAvailable: true,
+			Fields:            []provider.MetadataField{{Label: "Workspace", Value: "Example"}},
+		},
+	}
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+	if len(state.ProviderCredentialSessions) != 1 {
+		t.Fatalf("provider credential sessions = %#v", state.ProviderCredentialSessions)
+	}
+	session := state.ProviderCredentialSessions[0]
+	if session.ProviderID != "future" || session.Name != "Future Provider" || metadataValueForTest(session.Fields, "Workspace") != "Example" {
+		t.Fatalf("provider credential session = %#v", session)
+	}
+}
+
+func TestGetLaunchStateIncludesRegisteredProviderIdentityMetadata(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.provider = &applicationFakeProvider{
+		id:          "future",
+		displayName: "Future Provider",
+		statusByContext: map[string]provider.Status{
+			"personal": provider.ConfiguredStatus(),
+		},
+		hasIdentity: true,
+		identity:    provider.Identity{Fields: []provider.MetadataField{{Label: "Workspace", Value: "Example"}}},
+	}
+	ctx := fixture.context("personal", "Personal")
+	ctx.Providers = provider.Configs{"future": {Enabled: true}}
+	fixture.writeContext(t, ctx)
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+	identity := state.Contexts[0].Providers[0].Identity
+	if identity.Status != ProviderIdentityVerified || metadataValueForTest(identity.Fields, "Workspace") != "Example" {
+		t.Fatalf("provider identity = %#v", identity)
 	}
 }
 
@@ -405,7 +467,7 @@ func TestGetLaunchStateReportsMissingProviderStatus(t *testing.T) {
 			Message: "Account identity unavailable.",
 		},
 	}
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("provider status = %#v, want %#v", got, want)
 	}
 }
@@ -582,23 +644,23 @@ func TestGetLaunchStateReturnsVerifiedProviderIdentitiesForIsolatedContexts(t *t
 	}
 
 	codex := providersByID["codex"].Identity
-	if codex.Status != ProviderIdentityVerified || codex.Codex == nil {
+	if codex.Status != ProviderIdentityVerified {
 		t.Fatalf("codex identity = %#v, want verified codex identity", codex)
 	}
-	if codex.Codex.Email != "user@company.com" ||
-		codex.Codex.ChatGPTPlanType != "business" ||
-		codex.Codex.ChatGPTAccountID != "acct-123" {
-		t.Fatalf("codex identity metadata = %#v", codex.Codex)
+	if metadataValueForTest(codex.Fields, "Email") != "user@company.com" ||
+		metadataValueForTest(codex.Fields, "ChatGPT plan") != "business" ||
+		metadataValueForTest(codex.Fields, "ChatGPT account ID") != "acct-123" {
+		t.Fatalf("codex identity metadata = %#v", codex.Fields)
 	}
 
 	claude := providersByID["claude"].Identity
-	if claude.Status != ProviderIdentityVerified || claude.Claude == nil {
+	if claude.Status != ProviderIdentityVerified {
 		t.Fatalf("claude identity = %#v, want verified claude identity", claude)
 	}
-	if claude.Claude.SubscriptionType != "Pro" ||
-		claude.Claude.OrganizationUUID != "e783-organization" ||
-		claude.Claude.OrganizationName != "Jishin Labs" {
-		t.Fatalf("claude identity metadata = %#v", claude.Claude)
+	if metadataValueForTest(claude.Fields, "Subscription") != "Pro" ||
+		metadataValueForTest(claude.Fields, "Organization UUID") != "e783-organization" ||
+		metadataValueForTest(claude.Fields, "Organization") != "Jishin Labs" {
+		t.Fatalf("claude identity metadata = %#v", claude.Fields)
 	}
 
 	rendered := fmt.Sprintf("%#v", state.Contexts[0].Providers)

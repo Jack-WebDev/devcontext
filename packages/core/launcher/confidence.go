@@ -32,11 +32,8 @@ func (s ConfidenceStatus) Valid() bool {
 type ConfidenceCheckComponent string
 
 const (
-	// ConfidenceCheckClaude identifies Claude provider readiness.
-	ConfidenceCheckClaude ConfidenceCheckComponent = "claude"
-
-	// ConfidenceCheckCodex identifies Codex provider readiness.
-	ConfidenceCheckCodex ConfidenceCheckComponent = "codex"
+	// ConfidenceCheckProvider identifies readiness for a registered provider.
+	ConfidenceCheckProvider ConfidenceCheckComponent = "provider"
 
 	// ConfidenceCheckVSCode identifies VS Code launch readiness.
 	ConfidenceCheckVSCode ConfidenceCheckComponent = "vscode"
@@ -50,7 +47,7 @@ const (
 // components.
 func (c ConfidenceCheckComponent) Valid() bool {
 	switch c {
-	case ConfidenceCheckClaude, ConfidenceCheckCodex, ConfidenceCheckVSCode, ConfidenceCheckIsolation:
+	case ConfidenceCheckProvider, ConfidenceCheckVSCode, ConfidenceCheckIsolation:
 		return true
 	default:
 		return false
@@ -62,6 +59,7 @@ func (c ConfidenceCheckComponent) Valid() bool {
 // filesystem details, or environment internals.
 type ConfidenceCheck struct {
 	Component  ConfidenceCheckComponent `json:"component"`
+	ProviderID string                   `json:"providerId,omitempty"`
 	Severity   ConfidenceStatus         `json:"severity"`
 	Label      string                   `json:"label"`
 	Message    string                   `json:"message"`
@@ -71,5 +69,8 @@ type ConfidenceCheck struct {
 // Valid reports whether check has a known component, known severity, and the
 // user-facing text required for display.
 func (c ConfidenceCheck) Valid() bool {
-	return c.Component.Valid() && c.Severity.Valid() && c.Label != "" && c.Message != ""
+	if !c.Component.Valid() || !c.Severity.Valid() || c.Label == "" || c.Message == "" {
+		return false
+	}
+	return c.Component != ConfidenceCheckProvider || c.ProviderID != ""
 }
