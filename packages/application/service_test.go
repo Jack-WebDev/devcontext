@@ -349,6 +349,17 @@ func (p applicationFakeProvider) Status(ctx provider.RuntimeContext) (provider.S
 	return provider.ReadyStatus(), nil
 }
 
+func (p applicationFakeProvider) DetectContextIdentity(ctx provider.RuntimeContext) (provider.Identity, bool, error) {
+	switch p.id {
+	case provider.CodexID:
+		return provider.CodexProvider{}.DetectContextIdentity(ctx)
+	case provider.ClaudeID:
+		return provider.ClaudeProvider{}.DetectContextIdentity(ctx)
+	default:
+		return provider.Identity{}, false, nil
+	}
+}
+
 type applicationFakeEditor struct {
 	executable editor.Executable
 	err        error

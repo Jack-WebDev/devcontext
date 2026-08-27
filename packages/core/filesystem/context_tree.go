@@ -49,8 +49,54 @@ func CreateContextDirectoryTreeWithProviderCredentialsAndPermissions(platformPat
 // supplied storage permission policy.
 func CreateContextDirectoryTreeWithProviderRegistryCredentialsAndPermissions(platformPaths PlatformPaths, paths ContextPaths, ctx devcontext.Context, registry provider.Registry, providerIDs []string, permissions StoragePermissions) error {
 	return createContextDirectoryTree(paths, ctx, registry, permissions, func(createdPaths ContextPaths) error {
-		return ImportProviderCredentialsWithPermissions(platformPaths, createdPaths, providerIDs, permissions)
+		return importProviderCredentials(platformPaths, createdPaths, ctx, registry, providerIDs, permissions)
 	})
+}
+
+func importProviderCredentials(platformPaths PlatformPaths, paths ContextPaths, ctx devcontext.Context, registry provider.Registry, providerIDs []string, permissions StoragePermissions) error {
+	if platformPaths == nil {
+		return ErrUserHomeUnavailable
+	}
+	homeDir, err := platformPaths.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("resolve provider credential source directory: %w", err)
+	}
+
+	selected := make(map[provider.ID]bool, len(providerIDs))
+	for _, id := range providerIDs {
+		selected[provider.ID(id)] = true
+	}
+	files := NewProviderCredentialFileOperations(permissions)
+	for _, integration := range registry.All() {
+		if !selected[integration.ID()] {
+			continue
+		}
+		importer, ok := integration.(provider.CredentialImporter)
+		if !ok {
+			continue
+		}
+		config, ok := ctx.Providers[integration.ID()]
+		if !ok {
+			continue
+		}
+		if err := importer.ImportCredentials(provider.CredentialImportContext{
+			UserHomeDir: homeDir,
+			Runtime: provider.RuntimeContext{
+				ContextID: ctx.ID.String(),
+				Config:    config,
+				Paths: provider.ContextPaths{
+					RootDir:           paths.RootDir,
+					StorageDir:        paths.ProviderStorageDir(integration.ID()),
+					VSCodeDir:         paths.VSCodeDir,
+					VSCodeUserDataDir: paths.VSCodeUserDataDir,
+				},
+			},
+			Files: files,
+		}); err != nil {
+			return fmt.Errorf("import %s credentials: %w", integration.DisplayName(), err)
+		}
+	}
+	return nil
 }
 
 // CreateContextDirectoryTreeWithPermissions creates the isolated storage tree

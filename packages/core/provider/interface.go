@@ -65,6 +65,15 @@ type GlobalCredentialContext struct {
 type CredentialImportContext struct {
 	UserHomeDir string
 	Runtime     RuntimeContext
+	Files       CredentialFileOperations
+}
+
+// CredentialFileOperations provides the small set of filesystem operations a
+// provider needs to import opaque credential files. The filesystem package
+// supplies the implementation and owns the storage-permission policy.
+type CredentialFileOperations interface {
+	FileExists(path string) (bool, error)
+	CopyOpaqueFile(source string, destination string) error
 }
 
 // SetupGuidance describes safe provider setup copy and optional action text.
