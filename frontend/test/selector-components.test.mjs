@@ -66,12 +66,14 @@ test("project identity presents the current project name and path in a compact b
 
     assert.match(html, /data-selector-project-identity="true"/);
     assert.ok(html.includes("Current project"));
+    assert.ok(html.includes("Git branch"));
+    assert.ok(html.includes("Last opened"));
+    assert.match(html, />Unavailable</);
     assert.match(html, /class="[^"]*truncate[^"]*"/);
     assert.match(html, new RegExp(`title="${escapeRegExp(project.name)}"`));
     assert.match(html, new RegExp(`title="${escapeRegExp(project.path)}"`));
     assert.ok(html.includes(project.name));
     assert.ok(html.includes(project.path));
-    assert.doesNotMatch(html, /Git branch|Last opened/);
   }
 });
 
@@ -257,6 +259,8 @@ test("context card renders generic context names and ids", () => {
     assert.ok(html.includes(context.id));
     assert.match(html, new RegExp(`title="${escapeRegExp(context.name)}"`));
     assert.match(html, new RegExp(`title="${escapeRegExp(context.id)}"`));
+    assert.ok(html.includes("Enabled providers"));
+    assert.ok(html.includes("No providers enabled."));
   }
 });
 
@@ -266,7 +270,21 @@ test("context card can represent a selected context", () => {
 
   assert.match(html, /data-selected="true"/);
   assert.match(html, /border-primary/);
-  assert.match(html, />Selected</);
+});
+
+test("context card renders backend-provided description and accent metadata", () => {
+  const context = {
+    ...contextFixture("company", "Company"),
+    metadata: {
+      accent: "slate-blue",
+      description: "Work environment",
+    },
+  };
+  const html = renderToStaticMarkup(ContextCard({context}));
+
+  assert.match(html, /data-context-accent="slate-blue"/);
+  assert.ok(html.includes("Work environment"));
+  assert.match(html, /bg-blue-700/);
 });
 
 test("context card renders backend-provided coding tool readiness and guidance", () => {
@@ -294,7 +312,8 @@ test("context card renders as a selectable control when wired", () => {
   assert.match(html, /<button/);
   assert.match(html, /aria-pressed="false"/);
   assert.match(html, /tabindex="-1"/);
-  assert.match(html, />Not selected</);
+  assert.match(html, /absolute inset-0/);
+  assert.ok(html.includes("Select Client A"));
 });
 
 test("context card renders enabled provider status variants with accessible names", () => {

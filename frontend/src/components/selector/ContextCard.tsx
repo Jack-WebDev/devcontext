@@ -39,7 +39,8 @@ function ContextCard({
   const className = `min-w-0 border py-0 text-left transition-colors ${selectedClassName} ${focusClassName} ${disabledClassName}`;
   const enabledProviders = context.providers.filter((provider) => provider.enabled);
   const contextNameId = `context-${context.id}-name`;
-  const contextSelectionId = `context-${context.id}-selection`;
+  const contextDescription = context.metadata?.description;
+  const contextAccent = contextAccentName(context.metadata?.accent);
 
   function handleButtonKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     const direction = contextNavigationDirectionForKey(event.key);
@@ -59,43 +60,50 @@ function ContextCard({
     <Card
       as="article"
       size="sm"
-      className={className}
+      className={`relative ${className}`}
       aria-labelledby={contextNameId}
-      aria-describedby={contextSelectionId}
       data-selected={selected ? "true" : undefined}
+      data-context-accent={contextAccent}
     >
-      <CardContent className="min-w-0 space-y-4 p-5">
-        {onSelect ? (
-          <Button
-            ref={buttonRef}
-            type="button"
-            variant="ghost"
-            className="block h-auto w-full min-w-0 justify-start whitespace-normal p-0 text-left font-normal tracking-normal normal-case hover:bg-transparent focus-visible:ring-0 disabled:cursor-not-allowed"
-            aria-labelledby={contextNameId}
-            aria-describedby={contextSelectionId}
-            aria-pressed={selected}
-            disabled={disabled}
-            tabIndex={disabled ? undefined : tabIndex}
-            onClick={() => onSelect(context.id)}
-            onKeyDown={handleButtonKeyDown}
-          >
-            <ContextIdentity context={context} selected={selected} />
-          </Button>
-        ) : (
-          <ContextIdentity context={context} selected={selected} />
-        )}
-
+      {onSelect ? (
+        <Button
+          ref={buttonRef}
+          type="button"
+          variant="ghost"
+          className="absolute inset-0 z-10 h-auto w-full p-0 focus-visible:ring-0 disabled:cursor-not-allowed"
+          aria-labelledby={contextNameId}
+          aria-pressed={selected}
+          disabled={disabled}
+          tabIndex={disabled ? undefined : tabIndex}
+          onClick={() => onSelect(context.id)}
+          onKeyDown={handleButtonKeyDown}
+        >
+          <span className="sr-only">Select {context.name}</span>
+        </Button>
+      ) : null}
+      <CardContent className="pointer-events-none min-w-0 space-y-4 p-5">
+        <ContextIdentity context={context} description={contextDescription} accent={contextAccent} selected={selected} />
         <ToolStatusRow context={context} />
-
-        {enabledProviders.length > 0 ? (
-          <ul className="space-y-2">
-            {enabledProviders.map((provider) => (
-              <ProviderStatusRow key={provider.id} context={context} provider={provider} />
-            ))}
-          </ul>
-        ) : null}
+        <ProviderSummary context={context} providers={enabledProviders} />
       </CardContent>
     </Card>
+  );
+}
+
+function ProviderSummary({ context, providers }: { context: ContextState; providers: ProviderState[] }) {
+  return (
+    <section aria-label={`Enabled providers for ${context.name}`}>
+      <p className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Enabled providers</p>
+      {providers.length > 0 ? (
+        <ul className="space-y-2">
+          {providers.map((provider) => (
+            <ProviderStatusRow key={provider.id} context={context} provider={provider} />
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground">No providers enabled.</p>
+      )}
+    </section>
   );
 }
 
@@ -123,30 +131,78 @@ function ToolStatusRow({ context }: { context: ContextState }) {
   );
 }
 
-function ContextIdentity({ context, selected }: { context: ContextState; selected: boolean }) {
+function ContextIdentity({
+  context,
+  description,
+  accent,
+  selected,
+}: {
+  context: ContextState;
+  description?: string;
+  accent: ContextAccentName;
+  selected: boolean;
+}) {
   return (
     <div className="min-w-0 space-y-2">
-      <div className="flex min-w-0 items-start justify-between gap-3">
-        <h3 id={`context-${context.id}-name`} className="truncate text-base font-semibold" title={context.name}>
-          {context.name}
-        </h3>
-        <Badge
-          id={`context-${context.id}-selection`}
-          variant={selected ? "default" : "secondary"}
-          className={`shrink-0 border px-2 py-0.5 text-xs font-semibold ${
-            selected
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-border bg-muted/30 text-muted-foreground"
-          }`}
-        >
-          {selected ? "Selected" : "Not selected"}
-        </Badge>
+      <div className="flex min-w-0 items-start gap-3">
+        <span className={`mt-1.5 size-2 shrink-0 ${contextAccentClassName(accent)}`} aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <h3 id={`context-${context.id}-name`} className="truncate text-base font-semibold" title={context.name}>
+              {context.name}
+            </h3>
+            <Badge
+              variant={selected ? "default" : "secondary"}
+              className={`shrink-0 border px-2 py-0.5 text-xs font-semibold ${
+                selected
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-muted/30 text-muted-foreground"
+              }`}
+            >
+              {selected ? "Selected" : "Not selected"}
+            </Badge>
+          </div>
+          {description ? (
+            <p className="mt-1 truncate text-sm text-muted-foreground" title={description}>
+              {description}
+            </p>
+          ) : null}
+        </div>
       </div>
       <p className="truncate font-mono text-xs text-muted-foreground" title={context.id}>
         {context.id}
       </p>
     </div>
   );
+}
+
+type ContextAccentName = "sage" | "slate-blue" | "amber" | "custom" | "neutral";
+
+function contextAccentName(value: string | undefined): ContextAccentName {
+  switch (value) {
+    case "sage":
+    case "slate-blue":
+    case "amber":
+    case "custom":
+      return value;
+    default:
+      return "neutral";
+  }
+}
+
+function contextAccentClassName(accent: ContextAccentName): string {
+  switch (accent) {
+    case "sage":
+      return "bg-emerald-600";
+    case "slate-blue":
+      return "bg-blue-700";
+    case "amber":
+      return "bg-amber-500";
+    case "custom":
+      return "bg-violet-600";
+    default:
+      return "bg-muted-foreground";
+  }
 }
 
 function ProviderStatusRow({ context, provider }: { context: ContextState; provider: ProviderState }) {
