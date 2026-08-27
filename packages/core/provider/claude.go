@@ -28,6 +28,7 @@ var _ GlobalCredentialDetector = ClaudeProvider{}
 var _ CredentialMetadataExtractor = ClaudeProvider{}
 var _ CredentialImporter = ClaudeProvider{}
 var _ ContextIdentityDetector = ClaudeProvider{}
+var _ SetupGuidanceProvider = ClaudeProvider{}
 
 // ID returns the persisted provider identifier.
 func (ClaudeProvider) ID() ID {
@@ -106,6 +107,11 @@ func (ClaudeProvider) DetectContextIdentity(ctx RuntimeContext) (Identity, bool,
 		return Identity{}, false, err
 	}
 	return Identity{Fields: fields}, true, nil
+}
+
+// SetupGuidance describes the next safe setup action for Claude.
+func (ClaudeProvider) SetupGuidance(RuntimeContext) SetupGuidance {
+	return SetupGuidance{ActionHint: "Sign in to Claude for this context."}
 }
 
 func claudeMetadataFromFile(path string) ([]MetadataField, bool, bool, error) {

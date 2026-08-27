@@ -28,6 +28,7 @@ var _ GlobalCredentialDetector = CodexProvider{}
 var _ CredentialMetadataExtractor = CodexProvider{}
 var _ CredentialImporter = CodexProvider{}
 var _ ContextIdentityDetector = CodexProvider{}
+var _ SetupGuidanceProvider = CodexProvider{}
 
 // ID returns the persisted provider identifier.
 func (CodexProvider) ID() ID {
@@ -88,6 +89,11 @@ func (CodexProvider) DetectContextIdentity(ctx RuntimeContext) (Identity, bool, 
 		return Identity{}, false, err
 	}
 	return Identity{Fields: fields}, true, nil
+}
+
+// SetupGuidance describes the next safe setup action for Codex.
+func (CodexProvider) SetupGuidance(RuntimeContext) SetupGuidance {
+	return SetupGuidance{ActionHint: "Sign in to Codex for this context."}
 }
 
 type codexIDTokenClaims struct {

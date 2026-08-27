@@ -416,11 +416,24 @@ func (s *Service) providerStateEntries(ctx devcontext.Context) []providerStateEn
 				Enabled:     enabled,
 				State:       providerReadinessState(status),
 				Explanation: status.Explanation,
+				ActionHint:  providerActionHint(integration, runtime, status),
 				Identity:    providerIdentityState(integration, enabled, status, runtime, pathsErr),
 			},
 		})
 	}
 	return entries
+}
+
+func providerActionHint(integration provider.Provider, runtime provider.RuntimeContext, status provider.Status) string {
+	if status.State != provider.StatusNotConfigured {
+		return ""
+	}
+	if guidanceProvider, ok := integration.(provider.SetupGuidanceProvider); ok {
+		if guidance := guidanceProvider.SetupGuidance(runtime); guidance.ActionHint != "" {
+			return guidance.ActionHint
+		}
+	}
+	return "Open " + integration.DisplayName() + " and complete its setup for this context."
 }
 
 func providerStatesFromEntries(entries []providerStateEntry) []ProviderState {

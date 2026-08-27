@@ -64,6 +64,7 @@ export interface ProviderState {
   enabled: boolean;
   state: ProviderReadinessState;
   explanation?: string;
+  actionHint?: string;
   identity: ProviderIdentityState;
 }
 
@@ -419,12 +420,14 @@ function normalizeEditorState(value: unknown): EditorState {
 
 function normalizeProviderState(value: unknown): ProviderState {
   const object = objectValue(value);
+	const actionHint = optionalString(object.actionHint);
   return {
     id: stringValue(object.id),
     name: stringValue(object.name),
     enabled: booleanValue(object.enabled),
     state: normalizeProviderReadinessState(object.state),
     explanation: optionalString(object.explanation),
+    ...(actionHint === undefined ? {} : {actionHint}),
     identity: normalizeProviderIdentityState(object.identity),
   };
 }

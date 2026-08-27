@@ -126,7 +126,7 @@ function ContextIdentity({ context, selected }: { context: ContextState; selecte
 function ProviderStatusRow({ context, provider }: { context: ContextState; provider: ProviderState }) {
   const status = providerStatusPresentation(provider.state);
   const accessibleStatus = `${provider.name} local status: ${status.label}`;
-  const authenticationGuidance = providerAuthenticationGuidance(context, provider);
+  const setupGuidance = providerSetupGuidance(context, provider);
 
   return (
     <li className="min-w-0 text-sm">
@@ -152,27 +152,21 @@ function ProviderStatusRow({ context, provider }: { context: ContextState; provi
           </Badge>
         </div>
       </div>
-      {authenticationGuidance ? (
+      {setupGuidance ? (
         <p className="mt-2 border border-border bg-muted/30 p-2 text-xs text-muted-foreground">
-          {authenticationGuidance}
+          {setupGuidance}
         </p>
       ) : null}
     </li>
   );
 }
 
-function providerAuthenticationGuidance(context: ContextState, provider: ProviderState): string | undefined {
+function providerSetupGuidance(context: ContextState, provider: ProviderState): string | undefined {
   if (provider.state !== "not_configured") {
     return undefined;
   }
 
-  switch (provider.id) {
-    case "claude":
-    case "codex":
-      return `${provider.name} is enabled for ${context.name} but no isolated provider state was found. Open ${context.name}, then sign in with the ${provider.name} VS Code extension.`;
-    default:
-      return undefined;
-  }
+	return provider.actionHint ?? `${provider.name} is enabled for ${context.name} but is not configured. Open ${context.name} and complete ${provider.name} setup.`;
 }
 
 function providerStatusPresentation(state: ProviderState["state"]): { label: string; indicatorClassName: string } {
