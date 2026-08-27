@@ -133,7 +133,8 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 	}
 	wantChecks := []LaunchConfidenceCheck{
 		{
-			Component:  LaunchConfidenceCheckCodex,
+			Component:  LaunchConfidenceCheckProvider,
+			ProviderID: "codex",
 			Severity:   LaunchConfidenceNeedsAttention,
 			Label:      "Codex",
 			Message:    "Codex is not authenticated.",
@@ -225,13 +226,15 @@ func TestGetLaunchStateReturnsPerContextConfidenceSummaries(t *testing.T) {
 		t.Fatalf("personal confidence = %#v, want personal blocked by missing VS Code profile", got)
 	}
 	assertConfidenceCheck(t, confidenceByContext["company"].Checks, LaunchConfidenceCheck{
-		Component: LaunchConfidenceCheckCodex,
-		Severity:  LaunchConfidenceReady,
-		Label:     "Codex",
-		Message:   "Codex is ready for this context.",
+		Component:  LaunchConfidenceCheckProvider,
+		ProviderID: "codex",
+		Severity:   LaunchConfidenceReady,
+		Label:      "Codex",
+		Message:    "Codex is ready for this context.",
 	})
 	assertConfidenceCheck(t, confidenceByContext["personal"].Checks, LaunchConfidenceCheck{
-		Component:  LaunchConfidenceCheckCodex,
+		Component:  LaunchConfidenceCheckProvider,
+		ProviderID: "codex",
 		Severity:   LaunchConfidenceNeedsAttention,
 		Label:      "Codex",
 		Message:    "Codex is not authenticated.",
@@ -386,6 +389,57 @@ func TestGetLaunchStateDetectsProviderCredentialSessionsForContextCreation(t *te
 	}
 	if rendered := fmt.Sprintf("%#v", state.ProviderCredentialSessions); strings.Contains(rendered, "not-presented") {
 		t.Fatalf("provider credential sessions exposed credential value: %#v", state.ProviderCredentialSessions)
+	}
+}
+
+func TestGetLaunchStateIncludesRegisteredProviderCredentialMetadata(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.provider = &applicationFakeProvider{
+		id:               "future",
+		displayName:      "Future Provider",
+		hasGlobalSession: true,
+		globalSession: provider.CredentialSession{
+			MetadataAvailable: true,
+			Fields:            []provider.MetadataField{{Label: "Workspace", Value: "Example"}},
+		},
+	}
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+	if len(state.ProviderCredentialSessions) != 1 {
+		t.Fatalf("provider credential sessions = %#v", state.ProviderCredentialSessions)
+	}
+	session := state.ProviderCredentialSessions[0]
+	if session.ProviderID != "future" || session.Name != "Future Provider" || metadataValueForTest(session.Fields, "Workspace") != "Example" {
+		t.Fatalf("provider credential session = %#v", session)
+	}
+}
+
+func TestGetLaunchStateIncludesRegisteredProviderIdentityMetadata(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.provider = &applicationFakeProvider{
+		id:          "future",
+		displayName: "Future Provider",
+		statusByContext: map[string]provider.Status{
+			"personal": provider.ConfiguredStatus(),
+		},
+		hasIdentity: true,
+		identity:    provider.Identity{Fields: []provider.MetadataField{{Label: "Workspace", Value: "Example"}}},
+	}
+	ctx := fixture.context("personal", "Personal")
+	ctx.Providers = provider.Configs{"future": {Enabled: true}}
+	fixture.writeContext(t, ctx)
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+	identity := state.Contexts[0].Providers[0].Identity
+	if identity.Status != ProviderIdentityVerified || metadataValueForTest(identity.Fields, "Workspace") != "Example" {
+		t.Fatalf("provider identity = %#v", identity)
 	}
 }
 

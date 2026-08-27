@@ -84,7 +84,7 @@ export interface ProviderMetadataField {
 
 export type LaunchConfidenceStatus = "ready" | "needs_attention" | "blocked";
 
-export type LaunchConfidenceCheckComponent = "claude" | "codex" | "vscode" | "isolation";
+export type LaunchConfidenceCheckComponent = "provider" | "vscode" | "isolation";
 
 export interface LaunchConfidenceState {
   contextId: string;
@@ -94,6 +94,7 @@ export interface LaunchConfidenceState {
 
 export interface LaunchConfidenceCheck {
   component: LaunchConfidenceCheckComponent;
+  providerId?: string;
   severity: LaunchConfidenceStatus;
   label: string;
   message: string;
@@ -318,8 +319,10 @@ function normalizeLaunchConfidenceState(value: unknown): LaunchConfidenceState |
 
 function normalizeLaunchConfidenceCheck(value: unknown): LaunchConfidenceCheck {
   const object = objectValue(value);
+  const providerId = optionalString(object.providerId);
   return {
     component: normalizeLaunchConfidenceCheckComponent(object.component),
+    ...(providerId === undefined ? {} : {providerId}),
     severity: normalizeLaunchConfidenceStatus(object.severity),
     label: stringValue(object.label),
     message: stringValue(object.message),
@@ -340,8 +343,7 @@ function normalizeLaunchConfidenceStatus(value: unknown): LaunchConfidenceStatus
 
 function normalizeLaunchConfidenceCheckComponent(value: unknown): LaunchConfidenceCheckComponent {
   switch (value) {
-    case "claude":
-    case "codex":
+    case "provider":
     case "vscode":
     case "isolation":
       return value;

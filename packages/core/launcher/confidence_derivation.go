@@ -11,12 +11,10 @@ import (
 	"devctx/packages/core/provider"
 )
 
-// ProviderConfidenceCheck derives a UI-safe confidence check for one supported
-// provider status. Unknown providers return false because the current UI
-// confidence contract only names Claude and Codex provider checks.
+// ProviderConfidenceCheck derives a UI-safe confidence check for one registered
+// provider status.
 func ProviderConfidenceCheck(providerID provider.ID, displayName string, status provider.Status) (ConfidenceCheck, bool) {
-	component, ok := providerConfidenceComponent(providerID)
-	if !ok {
+	if strings.TrimSpace(string(providerID)) == "" {
 		return ConfidenceCheck{}, false
 	}
 
@@ -26,8 +24,9 @@ func ProviderConfidenceCheck(providerID provider.ID, displayName string, status 
 	}
 
 	check := ConfidenceCheck{
-		Component: component,
-		Label:     name,
+		Component:  ConfidenceCheckProvider,
+		ProviderID: string(providerID),
+		Label:      name,
 	}
 
 	switch status.State {
@@ -125,17 +124,6 @@ func providerStorageDirectories(paths filesystem.ContextPaths) []string {
 		dirs = append(dirs, paths.ProviderStorageDirs[providerID])
 	}
 	return dirs
-}
-
-func providerConfidenceComponent(providerID provider.ID) (ConfidenceCheckComponent, bool) {
-	switch providerID {
-	case provider.ClaudeID:
-		return ConfidenceCheckClaude, true
-	case provider.CodexID:
-		return ConfidenceCheckCodex, true
-	default:
-		return "", false
-	}
 }
 
 func confidenceMessage(value string, fallback string) string {

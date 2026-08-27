@@ -51,7 +51,8 @@ func TestLaunchConfidenceStatusVariantsSerialize(t *testing.T) {
 
 func TestLaunchConfidenceCheckAliasesCoreContract(t *testing.T) {
 	check := application.LaunchConfidenceCheck{
-		Component:  application.LaunchConfidenceCheckClaude,
+		Component:  application.LaunchConfidenceCheckProvider,
+		ProviderID: "claude",
 		Severity:   application.LaunchConfidenceBlocked,
 		Label:      "Claude",
 		Message:    "Claude cannot be checked for this context.",
@@ -67,7 +68,7 @@ func TestLaunchConfidenceCheckAliasesCoreContract(t *testing.T) {
 		t.Fatalf("marshal check: %v", err)
 	}
 
-	want := `{"component":"claude","severity":"blocked","label":"Claude","message":"Claude cannot be checked for this context.","actionHint":"Open diagnostics."}`
+	want := `{"component":"provider","providerId":"claude","severity":"blocked","label":"Claude","message":"Claude cannot be checked for this context.","actionHint":"Open diagnostics."}`
 	if string(data) != want {
 		t.Fatalf("json = %s, want %s", data, want)
 	}

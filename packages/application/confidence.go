@@ -28,11 +28,8 @@ const (
 	// safe launch, so the UI must not offer the launch action.
 	LaunchConfidenceBlocked LaunchConfidenceStatus = launcher.ConfidenceBlocked
 
-	// LaunchConfidenceCheckClaude identifies Claude provider readiness.
-	LaunchConfidenceCheckClaude LaunchConfidenceCheckComponent = launcher.ConfidenceCheckClaude
-
-	// LaunchConfidenceCheckCodex identifies Codex provider readiness.
-	LaunchConfidenceCheckCodex LaunchConfidenceCheckComponent = launcher.ConfidenceCheckCodex
+	// LaunchConfidenceCheckProvider identifies registered provider readiness.
+	LaunchConfidenceCheckProvider LaunchConfidenceCheckComponent = launcher.ConfidenceCheckProvider
 
 	// LaunchConfidenceCheckVSCode identifies VS Code launch readiness.
 	LaunchConfidenceCheckVSCode LaunchConfidenceCheckComponent = launcher.ConfidenceCheckVSCode

@@ -53,7 +53,8 @@ test("adapter normalizes successful Wails calls", async () => {
               status: "needs_attention",
               checks: [
                 {
-                  component: "codex",
+                  component: "provider",
+                  providerId: "codex",
                   severity: "needs_attention",
                   label: "Codex",
                   message: "Codex is not authenticated for this context.",
@@ -75,7 +76,8 @@ test("adapter normalizes successful Wails calls", async () => {
           status: "needs_attention",
           checks: [
             {
-              component: "codex",
+              component: "provider",
+              providerId: "codex",
               severity: "needs_attention",
               label: "Codex",
               message: "Codex is not authenticated for this context.",
@@ -235,7 +237,8 @@ test("adapter normalizes successful Wails calls", async () => {
             status: "needs_attention",
             checks: [
               {
-                component: "codex",
+                component: "provider",
+                providerId: "codex",
                 severity: "needs_attention",
                 label: "Codex",
                 message: "Codex is not authenticated for this context.",
@@ -259,7 +262,8 @@ test("adapter normalizes successful Wails calls", async () => {
         status: "needs_attention",
         checks: [
           {
-            component: "codex",
+            component: "provider",
+            providerId: "codex",
             severity: "needs_attention",
             label: "Codex",
             message: "Codex is not authenticated for this context.",

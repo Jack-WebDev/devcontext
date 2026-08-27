@@ -67,8 +67,7 @@ func TestConfidenceStatusRejectsUnknownValues(t *testing.T) {
 
 func TestConfidenceCheckComponentsValidate(t *testing.T) {
 	tests := []launcher.ConfidenceCheckComponent{
-		launcher.ConfidenceCheckClaude,
-		launcher.ConfidenceCheckCodex,
+		launcher.ConfidenceCheckProvider,
 		launcher.ConfidenceCheckVSCode,
 		launcher.ConfidenceCheckIsolation,
 	}
@@ -86,7 +85,8 @@ func TestConfidenceCheckComponentsValidate(t *testing.T) {
 
 func TestConfidenceCheckSerializesWithOptionalActionHint(t *testing.T) {
 	check := launcher.ConfidenceCheck{
-		Component:  launcher.ConfidenceCheckCodex,
+		Component:  launcher.ConfidenceCheckProvider,
+		ProviderID: "codex",
 		Severity:   launcher.ConfidenceNeedsAttention,
 		Label:      "Codex",
 		Message:    "Codex is not authenticated for this context.",
@@ -102,7 +102,7 @@ func TestConfidenceCheckSerializesWithOptionalActionHint(t *testing.T) {
 		t.Fatalf("marshal check: %v", err)
 	}
 
-	want := `{"component":"codex","severity":"needs_attention","label":"Codex","message":"Codex is not authenticated for this context.","actionHint":"Sign in to Codex for this context."}`
+	want := `{"component":"provider","providerId":"codex","severity":"needs_attention","label":"Codex","message":"Codex is not authenticated for this context.","actionHint":"Sign in to Codex for this context."}`
 	if string(data) != want {
 		t.Fatalf("json = %s, want %s", data, want)
 	}
@@ -195,10 +195,11 @@ func TestProviderConfidenceCheckMapsProviderStatus(t *testing.T) {
 			displayName: "Claude",
 			status:      provider.ConfiguredStatus(),
 			want: launcher.ConfidenceCheck{
-				Component: launcher.ConfidenceCheckClaude,
-				Severity:  launcher.ConfidenceReady,
-				Label:     "Claude",
-				Message:   "Claude is ready for this context.",
+				Component:  launcher.ConfidenceCheckProvider,
+				ProviderID: "claude",
+				Severity:   launcher.ConfidenceReady,
+				Label:      "Claude",
+				Message:    "Claude is ready for this context.",
 			},
 		},
 		{
@@ -207,7 +208,8 @@ func TestProviderConfidenceCheckMapsProviderStatus(t *testing.T) {
 			displayName: "Codex",
 			status:      provider.NotConfiguredStatus("Codex is not authenticated."),
 			want: launcher.ConfidenceCheck{
-				Component:  launcher.ConfidenceCheckCodex,
+				Component:  launcher.ConfidenceCheckProvider,
+				ProviderID: "codex",
 				Severity:   launcher.ConfidenceNeedsAttention,
 				Label:      "Codex",
 				Message:    "Codex is not authenticated.",
@@ -220,7 +222,8 @@ func TestProviderConfidenceCheckMapsProviderStatus(t *testing.T) {
 			displayName: "Claude",
 			status:      provider.DirectoryMissingStatus("Claude isolated provider directory is missing."),
 			want: launcher.ConfidenceCheck{
-				Component:  launcher.ConfidenceCheckClaude,
+				Component:  launcher.ConfidenceCheckProvider,
+				ProviderID: "claude",
 				Severity:   launcher.ConfidenceBlocked,
 				Label:      "Claude",
 				Message:    "Claude isolated provider directory is missing.",
@@ -233,7 +236,8 @@ func TestProviderConfidenceCheckMapsProviderStatus(t *testing.T) {
 			displayName: "Codex",
 			status:      provider.UnavailableStatus("Codex context directory could not be inspected."),
 			want: launcher.ConfidenceCheck{
-				Component:  launcher.ConfidenceCheckCodex,
+				Component:  launcher.ConfidenceCheckProvider,
+				ProviderID: "codex",
 				Severity:   launcher.ConfidenceNeedsAttention,
 				Label:      "Codex",
 				Message:    "Codex context directory could not be inspected.",
@@ -246,7 +250,8 @@ func TestProviderConfidenceCheckMapsProviderStatus(t *testing.T) {
 			displayName: "Codex",
 			status:      provider.Status{State: "expired"},
 			want: launcher.ConfidenceCheck{
-				Component:  launcher.ConfidenceCheckCodex,
+				Component:  launcher.ConfidenceCheckProvider,
+				ProviderID: "codex",
 				Severity:   launcher.ConfidenceNeedsAttention,
 				Label:      "Codex",
 				Message:    "Codex readiness could not be determined.",
@@ -271,10 +276,10 @@ func TestProviderConfidenceCheckMapsProviderStatus(t *testing.T) {
 	}
 }
 
-func TestProviderConfidenceCheckSkipsUnknownProviders(t *testing.T) {
-	_, ok := launcher.ProviderConfidenceCheck("fake", "Fake Provider", provider.ConfiguredStatus())
-	if ok {
-		t.Fatal("unknown provider produced confidence check")
+func TestProviderConfidenceCheckIncludesRegisteredFutureProviders(t *testing.T) {
+	check, ok := launcher.ProviderConfidenceCheck("fake", "Fake Provider", provider.ConfiguredStatus())
+	if !ok || check.Component != launcher.ConfidenceCheckProvider || check.ProviderID != "fake" {
+		t.Fatalf("future provider confidence check = %#v ok=%t", check, ok)
 	}
 }
 
