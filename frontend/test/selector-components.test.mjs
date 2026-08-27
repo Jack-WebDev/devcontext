@@ -171,6 +171,26 @@ test("provider credential classification renders only safe metadata fields", () 
   assert.ok(html.includes("e783"));
 });
 
+test("provider credential classification renders a future provider without a provider-specific branch", () => {
+  const html = renderToStaticMarkup(
+    ProviderCredentialClassification({
+      sessions: [{
+        providerId: "future",
+        name: "Future Provider",
+        metadataAvailable: true,
+        fields: [{label: "Workspace", value: "Example"}],
+      }],
+      assignments: {future: "company"},
+      onClassify: () => {},
+    }),
+  );
+
+  assert.ok(html.includes("Future Provider"));
+  assert.ok(html.includes("Workspace:"));
+  assert.ok(html.includes("Example"));
+  assert.ok(html.includes("Current global Future Provider session"));
+});
+
 test("first-run welcome shows pending and error states", () => {
   const state = launchStateFixture({
     contexts: [],
