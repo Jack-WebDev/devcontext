@@ -4,13 +4,13 @@ import test from "node:test";
 import {createDevContextApi} from "../.tmp-test/src/lib/devctx-api.js";
 
 const toolFixture = () => ({
-  id: "vscode",
-  name: "VS Code",
+  id: "second-tool",
+  name: "Second Tool",
   status: "ready",
-  message: "VS Code is available for launch.",
+  message: "Second Tool is available for launch.",
 });
 
-const toolOptionFixture = () => ({id: "vscode", name: "VS Code"});
+const toolOptionFixture = () => ({id: "second-tool", name: "Second Tool"});
 
 test("adapter normalizes successful Wails calls", async () => {
   const calls = [];

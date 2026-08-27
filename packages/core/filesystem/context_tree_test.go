@@ -130,9 +130,11 @@ func TestContextDirectoryTreeUsesRegisteredSelectedTool(t *testing.T) {
 	}
 	wantMissing := []filesystem.MissingContextDirectory{
 		{
-			Kind:   filesystem.ContextDirectoryTool,
-			Path:   contextPaths.ToolStorageDir("future-tool"),
-			Reason: "missing",
+			Kind:            filesystem.ContextDirectoryTool,
+			ToolID:          "future-tool",
+			ToolDisplayName: "Future Tool",
+			Path:            contextPaths.ToolStorageDir("future-tool"),
+			Reason:          "missing",
 		},
 	}
 	if !reflect.DeepEqual(storageErr.Missing, wantMissing) {
@@ -270,9 +272,11 @@ func TestValidateContextDirectoryTreeChecksToolStorage(t *testing.T) {
 	}
 	wantMissing := []filesystem.MissingContextDirectory{
 		{
-			Kind:   filesystem.ContextDirectoryTool,
-			Path:   contextPaths.ToolStorageDir(codingtool.VSCodeID),
-			Reason: "missing",
+			Kind:            filesystem.ContextDirectoryTool,
+			ToolID:          string(codingtool.VSCodeID),
+			ToolDisplayName: "VS Code",
+			Path:            contextPaths.ToolStorageDir(codingtool.VSCodeID),
+			Reason:          "missing",
 		},
 	}
 	if !reflect.DeepEqual(storageErr.Missing, wantMissing) {

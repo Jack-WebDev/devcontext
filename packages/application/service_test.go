@@ -266,14 +266,14 @@ func TestNewErrorReturnsActionableRecoveryDetails(t *testing.T) {
 			wantRecovery: []string{"company", "personal", "will not launch under a different context"},
 		},
 		{
-			name: "missing vscode command",
+			name: "missing coding tool command",
 			err: &codingtool.ExecutableNotFoundError{
 				ToolID:     codingtool.VSCodeID,
 				Candidates: []string{"code"},
 			},
 			wantCode:     ErrorCodeLaunch,
-			wantMessage:  "VS Code command not found.",
-			wantRecovery: []string{"VS Code command line launcher", "code", "codingtool.executable_override"},
+			wantMessage:  "vscode command not found.",
+			wantRecovery: []string{"code", "vscode", "valid executable"},
 		},
 		{
 			name: "storage permission",

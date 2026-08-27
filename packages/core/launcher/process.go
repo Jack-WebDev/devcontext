@@ -30,7 +30,7 @@ var (
 	ErrProcessStartFailed = errors.New("process start failed")
 )
 
-// DetachMode describes whether Dev Context should wait on the launched editor
+// DetachMode describes whether Dev Context should wait on the launched coding tool
 // process. Platform-specific detached behavior is implemented in a later phase.
 type DetachMode string
 
@@ -38,12 +38,13 @@ const (
 	// DetachModeAttached keeps the launched process attached to Dev Context.
 	DetachModeAttached DetachMode = "attached"
 
-	// DetachModeDetached allows Dev Context to exit after the editor starts.
+	// DetachModeDetached allows Dev Context to exit after the coding tool starts.
 	DetachModeDetached DetachMode = "detached"
 )
 
 // ProcessRequest describes one native process launch without starting it.
 type ProcessRequest struct {
+	Tool             Tool
 	Executable       Executable
 	Arguments        Arguments
 	Environment      Environment
@@ -58,6 +59,7 @@ type ProcessLauncher interface {
 
 // ProcessLaunchError describes a categorized native process launch failure.
 type ProcessLaunchError struct {
+	Tool             Tool
 	Executable       Executable
 	WorkingDirectory WorkingDirectory
 	Err              error
@@ -78,7 +80,7 @@ func (e *ProcessLaunchError) Unwrap() []error {
 	return []error{e.Err, e.Cause}
 }
 
-// NativeProcessLauncher starts editor processes through the operating system.
+// NativeProcessLauncher starts coding-tool processes through the operating system.
 type NativeProcessLauncher struct{}
 
 var _ ProcessLauncher = NativeProcessLauncher{}
@@ -170,6 +172,7 @@ func mapProcessLaunchError(request ProcessRequest, err error) error {
 
 func newProcessLaunchError(request ProcessRequest, category error, cause error) error {
 	return &ProcessLaunchError{
+		Tool:             request.Tool,
 		Executable:       request.Executable,
 		WorkingDirectory: request.WorkingDirectory,
 		Err:              category,

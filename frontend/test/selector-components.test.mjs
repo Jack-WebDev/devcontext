@@ -266,6 +266,24 @@ test("context card can represent a selected context", () => {
   assert.match(html, />Selected</);
 });
 
+test("context card renders backend-provided coding tool readiness and guidance", () => {
+  const context = contextFixture("client-a", "Client A");
+  context.tool = {
+    id: "future-tool",
+    name: "Future Tool",
+    status: "blocked",
+    message: "Future Tool is not available for launch.",
+    actionHint: "Install Future Tool or configure its executable.",
+  };
+
+  const html = renderToStaticMarkup(ContextCard({context}));
+
+  assert.ok(html.includes("Future Tool"));
+  assert.ok(html.includes("Blocked"));
+  assert.ok(html.includes("Future Tool is not available for launch."));
+  assert.ok(html.includes("Install Future Tool or configure its executable."));
+});
+
 test("context card renders as a selectable control when wired", () => {
   const context = contextFixture("client-a", "Client A");
   const html = renderToStaticMarkup(ContextCard({context, tabIndex: -1, onSelect: () => {}}));

@@ -288,6 +288,7 @@ func (r Runner) recordLaunchEvent(event devlog.Event) {
 
 func processRequestFromLaunchPlan(plan launcher.LaunchPlan, detachMode launcher.DetachMode) launcher.ProcessRequest {
 	return launcher.ProcessRequest{
+		Tool:             plan.Tool,
 		Executable:       plan.Executable,
 		Arguments:        append(launcher.Arguments(nil), plan.Arguments...),
 		Environment:      cloneLaunchEnvironment(plan.Environment),

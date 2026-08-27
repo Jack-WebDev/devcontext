@@ -114,22 +114,22 @@ func NewError(err error) *Error {
 			contextStorageRecovery(contextStorageError),
 			err,
 		)
-	case errors.As(err, &executableNotFound) && executableNotFound.ToolID == codingtool.VSCodeID:
+	case errors.As(err, &executableNotFound):
 		return applicationError(
 			ErrorCodeLaunch,
-			"VS Code command not found.",
-			missingVSCodeRecovery(executableNotFound.Candidates),
+			toolCommandNotFoundMessage(string(executableNotFound.ToolID)),
+			missingToolRecovery(string(executableNotFound.ToolID), executableNotFound.Candidates),
 			err,
 		)
 	case errors.As(err, &processLaunchError) && errors.Is(err, launcher.ErrProcessExecutableNotFound):
 		return applicationError(
 			ErrorCodeLaunch,
-			"VS Code command not found.",
+			toolCommandNotFoundMessage(processLaunchError.Tool.DisplayName),
 			processExecutableRecovery(processLaunchError),
 			err,
 		)
 	case isLaunchError(err):
-		return applicationError(ErrorCodeLaunch, "Unable to launch codingtool.", "Check the editor command, project path, and permissions, then retry.", err)
+		return applicationError(ErrorCodeLaunch, "Unable to launch coding tool.", "Check the selected coding tool command, project path, and permissions, then retry.", err)
 	case isValidationError(err):
 		return applicationError(ErrorCodeValidation, "Unable to complete request.", "Check the selected project and context, then retry.", err)
 	default:
@@ -254,6 +254,12 @@ func contextStorageRecovery(err *filesystem.ContextStorageError) string {
 
 func missingDirectoryLabel(missing filesystem.MissingContextDirectory) string {
 	kind := string(missing.Kind)
+	if missing.ToolID != "" {
+		kind += ":" + missing.ToolID
+		if missing.ToolDisplayName != "" {
+			kind += " (" + missing.ToolDisplayName + ")"
+		}
+	}
 	if missing.ProviderID == "" {
 		return kind
 	}
@@ -264,26 +270,37 @@ func missingDirectoryLabel(missing filesystem.MissingContextDirectory) string {
 	return kind
 }
 
-func missingVSCodeRecovery(candidates []string) string {
-	expected := "`code`"
+func toolCommandNotFoundMessage(toolName string) string {
+	return toolNameOrFallback(toolName) + " command not found."
+}
+
+func missingToolRecovery(toolName string, candidates []string) string {
+	expected := "the command"
 	if len(candidates) > 0 {
 		expected = "`" + strings.Join(candidates, "`, `") + "`"
 	}
 	return fmt.Sprintf(
-		"Install the VS Code command line launcher so %s is on PATH, or set codingtool.executable_override in the context to a valid VS Code CLI path.",
-		expected,
+		"Install %s for %s, add it to PATH, or configure a valid executable for this context.",
+		expected, toolNameOrFallback(toolName),
 	)
 }
 
 func processExecutableRecovery(err *launcher.ProcessLaunchError) string {
 	executable := strings.TrimSpace(string(err.Executable))
 	if executable == "" {
-		return missingVSCodeRecovery([]string{"code"})
+		return missingToolRecovery(err.Tool.DisplayName, nil)
 	}
 	return fmt.Sprintf(
-		"The configured VS Code command %q was not found. Install the VS Code command line launcher, add it to PATH, or set codingtool.executable_override in the context.",
-		executable,
+		"The configured %s command %q was not found. Install it, add it to PATH, or configure a valid executable for this context.",
+		toolNameOrFallback(err.Tool.DisplayName), executable,
 	)
+}
+
+func toolNameOrFallback(name string) string {
+	if strings.TrimSpace(name) == "" {
+		return "selected coding tool"
+	}
+	return name
 }
 
 func contextIDStrings(ids []devcontext.ID) []string {
