@@ -97,8 +97,18 @@ func (r Registry) All() []RegisteredTool {
 
 // Get returns the registered integration for id.
 func (r Registry) Get(id ID) (CodingTool, bool) {
-	tool, ok := r.toolsByID[id]
+	tool, ok := r.Lookup(id)
 	return tool.Integration, ok
+}
+
+// Lookup returns the registered tool metadata and integration for id.
+func (r Registry) Lookup(id ID) (RegisteredTool, bool) {
+	tool, ok := r.toolsByID[id]
+	if !ok {
+		return RegisteredTool{}, false
+	}
+	tool.Capabilities = append([]Capability(nil), tool.Capabilities...)
+	return tool, true
 }
 
 // DefaultID returns the ID selected for newly created contexts.

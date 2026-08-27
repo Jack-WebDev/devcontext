@@ -363,8 +363,9 @@ func TestRunnerRootLaunchDebugOutputRedactsSensitiveEnvironment(t *testing.T) {
 	for _, want := range []string{
 		"Debug:\n",
 		"resolution_source: explicit\n",
-		"editor_id: vscode\n",
-		"editor_executable: /recording/code\n",
+		"tool_id: vscode\n",
+		"tool_name: vscode\n",
+		"tool_executable: /recording/code\n",
 		"context_directories:\n",
 		"arguments:\n",
 		"environment:\n",

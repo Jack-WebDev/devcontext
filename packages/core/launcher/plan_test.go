@@ -12,7 +12,7 @@ import (
 	"devctx/packages/core/provider"
 )
 
-func TestLaunchPlanRepresentsCompleteEditorLaunchOperation(t *testing.T) {
+func TestLaunchPlanRepresentsCompleteCodingToolLaunchOperation(t *testing.T) {
 	context := devcontext.Context{
 		ID:   devcontext.MustID("client-a"),
 		Name: "Client A",
@@ -27,7 +27,7 @@ func TestLaunchPlanRepresentsCompleteEditorLaunchOperation(t *testing.T) {
 	plan := launcher.LaunchPlan{
 		ProjectPath:      project.Path("/work/client-a/api"),
 		Context:          context,
-		Tool:             context.Tool.ConfigFor(context.Tool.DefaultTool),
+		Tool:             launcher.Tool{ID: codingtool.VSCodeID, DisplayName: "VS Code"},
 		Executable:       launcher.Executable("/usr/local/bin/code"),
 		Arguments:        launcher.Arguments{"/work/client-a/api"},
 		WorkingDirectory: launcher.WorkingDirectory("/work/client-a/api"),
@@ -48,7 +48,7 @@ func TestLaunchPlanRepresentsCompleteEditorLaunchOperation(t *testing.T) {
 	want := launcher.LaunchPlan{
 		ProjectPath:      project.Path("/work/client-a/api"),
 		Context:          context,
-		Tool:             codingtool.DefaultConfig(),
+		Tool:             launcher.Tool{ID: codingtool.VSCodeID, DisplayName: "VS Code"},
 		Executable:       launcher.Executable("/usr/local/bin/code"),
 		Arguments:        launcher.Arguments{"/work/client-a/api"},
 		WorkingDirectory: launcher.WorkingDirectory("/work/client-a/api"),

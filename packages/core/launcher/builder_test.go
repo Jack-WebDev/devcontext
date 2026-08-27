@@ -84,9 +84,12 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 	}
 
 	want := launcher.LaunchPlan{
-		ProjectPath:      project.Path(projectDir),
-		Context:          context,
-		Tool:             context.Tool.ConfigFor(context.Tool.DefaultTool),
+		ProjectPath: project.Path(projectDir),
+		Context:     context,
+		Tool: launcher.Tool{
+			ID:          "fake-editor",
+			DisplayName: "Fake Tool",
+		},
 		Executable:       launcher.Executable("/usr/local/bin/fake-editor"),
 		Arguments:        launcher.Arguments{"--state-dir", contextPaths.ToolStorageDir(context.Tool.DefaultTool), projectDir},
 		WorkingDirectory: launcher.WorkingDirectory(projectDir),
