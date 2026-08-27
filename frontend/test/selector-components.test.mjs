@@ -5,6 +5,7 @@ import {renderToStaticMarkup} from "react-dom/server";
 
 import {ContextMismatchDialog} from "../.tmp-test/src/components/selector/ContextMismatchDialog.js";
 import {ContextCard} from "../.tmp-test/src/components/selector/ContextCard.js";
+import {HomeView, homeConfidenceSummary} from "../.tmp-test/src/components/home/HomeView.js";
 import {
   ContextAccentIndicator,
   contextAccentFromMetadata,
@@ -380,6 +381,36 @@ test("app shell exposes stable navigation, current project state, and a responsi
   assert.deepEqual(appRoutes.map((route) => route.label), ["Home", "Contexts", "Projects", "Running", "History", "Settings"]);
   assert.equal(appRouteFromHash("#projects"), "projects");
   assert.equal(appRouteFromHash("#unknown"), "home");
+});
+
+test("Home shows project, selected context, and context-named quick launch", () => {
+  const html = renderToStaticMarkup(HomeView({
+    dashboard: {
+      project: {name: "api", path: "/work/api"},
+      currentContext: {
+        id: "company",
+        name: "Company",
+        tool: {id: "tool", name: "Future Tool", status: "ready", message: "Ready"},
+        confidence: {contextId: "company", status: "ready", checks: []},
+      },
+      recentProjects: [],
+      running: {count: 0},
+      activity: {count: 0},
+    },
+    launchPending: false,
+    onQuickLaunch: () => {},
+    onReviewLaunchOptions: () => {},
+  }));
+
+  assert.ok(html.includes("Selected project"));
+  assert.ok(html.includes("/work/api"));
+  assert.ok(html.includes("Git branch"));
+  assert.ok(html.includes("Last opened"));
+  assert.ok(html.includes("Current context"));
+  assert.ok(html.includes("Company"));
+  assert.ok(html.includes("Future Tool"));
+  assert.ok(html.includes("Launch Company"));
+  assert.equal(homeConfidenceSummary("blocked"), "This context is blocked until its required setup is resolved.");
 });
 
 test("context card summarizes provider, tool, and isolation health from confidence checks", () => {

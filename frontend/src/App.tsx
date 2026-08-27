@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
 import { SelectorView } from "./components/selector/SelectorView";
 import { createOnboardingContextAndRefresh } from "./components/selector/onboarding-action";
+import { HomeView } from "./components/home/HomeView";
 import { AppShell } from "./components/shell/AppShell";
 import { appRouteDefinition, appRouteFromHash, type AppRoute } from "./components/shell/routes";
 import {
@@ -10,6 +11,7 @@ import {
   type ApiResult,
   type CreateContextResult,
   type DisplayError,
+  type HomeDashboardState,
   type LaunchState,
 } from "./lib/devctx-api";
 import { devContextWindow } from "./lib/devctx-window";
@@ -19,10 +21,18 @@ type LaunchStateLoad =
   | { status: "loaded"; data: LaunchState }
   | { status: "error"; error: DisplayError };
 
+type HomeDashboardLoad =
+  | { status: "loading" }
+  | { status: "loaded"; data: HomeDashboardState }
+  | { status: "error"; error: DisplayError };
+
 function App() {
   const [launchState, setLaunchState] = useState<LaunchStateLoad>({
     status: "loading",
   });
+  const [homeDashboard, setHomeDashboard] = useState<HomeDashboardLoad>({status: "loading"});
+  const [homeLaunchPending, setHomeLaunchPending] = useState(false);
+  const [homeLaunchError, setHomeLaunchError] = useState<DisplayError | undefined>(undefined);
   const [activeRoute, setActiveRoute] = useState<AppRoute>(() => appRouteFromHash(window.location.hash));
 
   useEffect(() => {
@@ -41,6 +51,19 @@ function App() {
       setLaunchState({ status: "error", error: result.error });
     });
 
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    devContextApi.getHomeDashboard().then((result) => {
+      if (!active) {
+        return;
+      }
+      setHomeDashboard(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error});
+    });
     return () => {
       active = false;
     };
@@ -74,10 +97,46 @@ function App() {
     });
     if (result.ok) {
       setLaunchState({ status: "loaded", data: result.launchState });
+      void refreshHomeDashboard();
       return { ok: true, data: result.created };
     }
 
     return { ok: false, error: result.error };
+  }
+
+  async function refreshHomeDashboard() {
+    const result = await devContextApi.getHomeDashboard();
+    setHomeDashboard(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error});
+  }
+
+  async function handleHomeQuickLaunch() {
+    if (homeDashboard.status !== "loaded" || homeDashboard.data.currentContext === undefined || homeLaunchPending) {
+      return;
+    }
+
+    const {project, currentContext} = homeDashboard.data;
+    setHomeLaunchPending(true);
+    setHomeLaunchError(undefined);
+    try {
+      const request = {projectPath: project.path, contextId: currentContext.id};
+      const preflight = await devContextApi.preflightLaunchProject(request);
+      if (!preflight.ok) {
+        setHomeLaunchError(preflight.error);
+        return;
+      }
+      const launch = await devContextApi.launchProject(request);
+      if (!launch.ok) {
+        setHomeLaunchError(launch.error);
+        return;
+      }
+      await refreshHomeDashboard();
+    } finally {
+      setHomeLaunchPending(false);
+    }
+  }
+
+  function handleReviewLaunchOptions() {
+    document.getElementById("context-selector")?.scrollIntoView({behavior: "smooth", block: "start"});
   }
 
   return (
@@ -87,17 +146,48 @@ function App() {
       currentProject={launchState.status === "loaded" ? launchState.data.project : undefined}
     >
       {activeRoute === "home" ? (
-        <section aria-labelledby="context-selector-heading" className="space-y-6">
+        <section aria-labelledby="home-heading" className="space-y-8">
           <div>
             <p className="text-sm text-muted-foreground">{appRouteDefinition(activeRoute).label}</p>
-            <h2 id="context-selector-heading" className="text-2xl font-semibold">Context selector</h2>
+            <h2 id="home-heading" className="text-2xl font-semibold">Home</h2>
           </div>
+          {renderHomeDashboard(homeDashboard, homeLaunchPending, homeLaunchError, handleHomeQuickLaunch, handleReviewLaunchOptions)}
+          <section id="context-selector" aria-labelledby="context-selector-heading" className="space-y-6">
+            <div>
+              <p className="text-sm text-muted-foreground">Launch options</p>
+              <h2 id="context-selector-heading" className="text-xl font-semibold">Context selector</h2>
+            </div>
           {renderSelectorContent(launchState, handleCreateContext)}
+          </section>
         </section>
       ) : (
         <PlaceholderScreen route={activeRoute} />
       )}
     </AppShell>
+  );
+}
+
+function renderHomeDashboard(
+  dashboard: HomeDashboardLoad,
+  launchPending: boolean,
+  launchError: DisplayError | undefined,
+  onQuickLaunch: () => void,
+  onReviewLaunchOptions: () => void,
+) {
+  if (dashboard.status === "loading") {
+    return <p className="text-sm text-muted-foreground">Loading Home dashboard...</p>;
+  }
+  if (dashboard.status === "error") {
+    return <GuiErrorNotice error={dashboard.error} />;
+  }
+  return (
+    <HomeView
+      dashboard={dashboard.data}
+      launchPending={launchPending}
+      launchError={launchError}
+      onQuickLaunch={onQuickLaunch}
+      onReviewLaunchOptions={onReviewLaunchOptions}
+    />
   );
 }
 

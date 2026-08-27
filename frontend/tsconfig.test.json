@@ -15,6 +15,7 @@
     "src/components/selector/*.tsx",
     "src/components/selector/*.ts",
     "src/components/shell/*.tsx",
-    "src/components/shell/*.ts"
+    "src/components/shell/*.ts",
+    "src/components/home/*.tsx"
   ]
 }

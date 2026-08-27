@@ -124,6 +124,28 @@ func TestGetHomeDashboardReturnsCurrentProjectAndContextSummary(t *testing.T) {
 	}
 }
 
+func TestLaunchProjectRecordsRecentProjectAfterSuccessfulLaunch(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+	_, appErr := fixture.service().LaunchProject(LaunchProjectRequest{ProjectPath: ".", ContextID: "personal"})
+	if appErr != nil {
+		t.Fatalf("launch project: %v", appErr)
+	}
+
+	recents, err := project.NewRecentRepository(fixture.recentsPath).List()
+	if err != nil {
+		t.Fatalf("list recent projects: %v", err)
+	}
+	if !reflect.DeepEqual(recents, []project.RecentProject{{
+		ProjectPath:    project.Path(fixture.projectDir),
+		ContextID:      devcontext.MustID("personal"),
+		LastLaunchedAt: fixture.now,
+	}}) {
+		t.Fatalf("recent projects = %#v", recents)
+	}
+}
+
 func TestGetLaunchStateDerivesProviderSetupActions(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -1331,6 +1353,7 @@ type applicationFixture struct {
 	contextsDir        string
 	projectDir         string
 	bindingsPath       string
+	recentsPath        string
 	paths              filesystem.PlatformPaths
 	now                time.Time
 	provider           *applicationFakeProvider
@@ -1352,6 +1375,7 @@ func newApplicationFixture(t *testing.T) applicationFixture {
 		contextsDir:  filepath.Join(root, "contexts"),
 		projectDir:   filepath.Join(root, "projects", "current"),
 		bindingsPath: filepath.Join(root, "projects.toml"),
+		recentsPath:  filepath.Join(root, "recents.toml"),
 		now:          time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC),
 		provider:     &applicationFakeProvider{id: "fake"},
 		editor:       &applicationFakeEditor{},
@@ -1385,6 +1409,7 @@ func (f applicationFixture) service() *Service {
 	return NewServiceWithDependencies(Dependencies{
 		Contexts:           devcontext.NewRepository(f.contextsDir),
 		Projects:           project.NewRepository(f.bindingsPath, f.paths),
+		RecentProjects:     project.NewRecentRepository(f.recentsPath),
 		Paths:              f.paths,
 		ProviderRegistry:   registry,
 		ToolRegistry:       toolRegistry,

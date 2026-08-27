@@ -248,6 +248,7 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 	}
 
 	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchSucceeded, plan, nil, s.now()))
+	_ = s.dependencies.RecentProjects.Record(plan.ProjectPath, plan.Context.ID, s.now())
 
 	return LaunchProjectResult{
 		Project:  projectState(plan.ProjectPath),
