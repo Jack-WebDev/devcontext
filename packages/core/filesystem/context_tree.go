@@ -20,14 +20,26 @@ func CreateContextDirectoryTree(paths ContextPaths, ctx devcontext.Context) erro
 // CreateContextDirectoryTreeWithProviderRegistry creates the isolated storage
 // tree for one context using registered provider definitions.
 func CreateContextDirectoryTreeWithProviderRegistry(paths ContextPaths, ctx devcontext.Context, registry provider.Registry) error {
-	return CreateContextDirectoryTreeWithProviderRegistryAndPermissions(paths, ctx, registry, NewDefaultStoragePermissions())
+	return CreateContextDirectoryTreeWithRegistries(paths, ctx, registry, codingtool.BuiltInRegistry())
+}
+
+// CreateContextDirectoryTreeWithRegistries creates the isolated storage tree
+// for one context using the supplied provider and coding-tool registries.
+func CreateContextDirectoryTreeWithRegistries(paths ContextPaths, ctx devcontext.Context, providerRegistry provider.Registry, toolRegistry codingtool.Registry) error {
+	return CreateContextDirectoryTreeWithRegistriesAndPermissions(paths, ctx, providerRegistry, toolRegistry, NewDefaultStoragePermissions())
 }
 
 // CreateContextDirectoryTreeWithProviderRegistryAndPermissions creates the
 // isolated storage tree for one context using registered provider definitions
 // and the supplied storage permission policy.
 func CreateContextDirectoryTreeWithProviderRegistryAndPermissions(paths ContextPaths, ctx devcontext.Context, registry provider.Registry, permissions StoragePermissions) error {
-	return createContextDirectoryTree(paths, ctx, registry, permissions, nil)
+	return CreateContextDirectoryTreeWithRegistriesAndPermissions(paths, ctx, registry, codingtool.BuiltInRegistry(), permissions)
+}
+
+// CreateContextDirectoryTreeWithRegistriesAndPermissions creates the isolated
+// storage tree using the supplied registries and storage permission policy.
+func CreateContextDirectoryTreeWithRegistriesAndPermissions(paths ContextPaths, ctx devcontext.Context, providerRegistry provider.Registry, toolRegistry codingtool.Registry, permissions StoragePermissions) error {
+	return createContextDirectoryTree(paths, ctx, providerRegistry, toolRegistry, permissions, nil)
 }
 
 // CreateContextDirectoryTreeWithProviderCredentials creates the isolated
@@ -41,7 +53,7 @@ func CreateContextDirectoryTreeWithProviderCredentials(platformPaths PlatformPat
 // isolated storage tree for one context, imports supported global provider
 // credential files, and uses the supplied storage permission policy.
 func CreateContextDirectoryTreeWithProviderCredentialsAndPermissions(platformPaths PlatformPaths, paths ContextPaths, ctx devcontext.Context, providerIDs []string, permissions StoragePermissions) error {
-	return CreateContextDirectoryTreeWithProviderRegistryCredentialsAndPermissions(platformPaths, paths, ctx, provider.BuiltInRegistry(), providerIDs, permissions)
+	return CreateContextDirectoryTreeWithRegistriesCredentialsAndPermissions(platformPaths, paths, ctx, provider.BuiltInRegistry(), codingtool.BuiltInRegistry(), providerIDs, permissions)
 }
 
 // CreateContextDirectoryTreeWithProviderRegistryCredentialsAndPermissions
@@ -49,8 +61,14 @@ func CreateContextDirectoryTreeWithProviderCredentialsAndPermissions(platformPat
 // definitions, imports supported global provider credential files, and uses the
 // supplied storage permission policy.
 func CreateContextDirectoryTreeWithProviderRegistryCredentialsAndPermissions(platformPaths PlatformPaths, paths ContextPaths, ctx devcontext.Context, registry provider.Registry, providerIDs []string, permissions StoragePermissions) error {
-	return createContextDirectoryTree(paths, ctx, registry, permissions, func(createdPaths ContextPaths) error {
-		return importProviderCredentials(platformPaths, createdPaths, ctx, registry, providerIDs, permissions)
+	return CreateContextDirectoryTreeWithRegistriesCredentialsAndPermissions(platformPaths, paths, ctx, registry, codingtool.BuiltInRegistry(), providerIDs, permissions)
+}
+
+// CreateContextDirectoryTreeWithRegistriesCredentialsAndPermissions creates
+// the registry-driven storage tree and imports selected provider credentials.
+func CreateContextDirectoryTreeWithRegistriesCredentialsAndPermissions(platformPaths PlatformPaths, paths ContextPaths, ctx devcontext.Context, providerRegistry provider.Registry, toolRegistry codingtool.Registry, providerIDs []string, permissions StoragePermissions) error {
+	return createContextDirectoryTree(paths, ctx, providerRegistry, toolRegistry, permissions, func(createdPaths ContextPaths) error {
+		return importProviderCredentials(platformPaths, createdPaths, ctx, providerRegistry, providerIDs, permissions)
 	})
 }
 
@@ -98,18 +116,21 @@ func importProviderCredentials(platformPaths PlatformPaths, paths ContextPaths, 
 // CreateContextDirectoryTreeWithPermissions creates the isolated storage tree
 // for one context using the supplied storage permission policy.
 func CreateContextDirectoryTreeWithPermissions(paths ContextPaths, ctx devcontext.Context, permissions StoragePermissions) error {
-	return createContextDirectoryTree(paths, ctx, provider.BuiltInRegistry(), permissions, nil)
+	return createContextDirectoryTree(paths, ctx, provider.BuiltInRegistry(), codingtool.BuiltInRegistry(), permissions, nil)
 }
 
-func createContextDirectoryTree(paths ContextPaths, ctx devcontext.Context, registry provider.Registry, permissions StoragePermissions, importProviderCredentials func(ContextPaths) error) error {
+func createContextDirectoryTree(paths ContextPaths, ctx devcontext.Context, providerRegistry provider.Registry, toolRegistry codingtool.Registry, permissions StoragePermissions, importProviderCredentials func(ContextPaths) error) error {
 	if permissions == nil {
 		permissions = NewDefaultStoragePermissions()
 	}
-	if registry.IsZero() {
-		registry = provider.BuiltInRegistry()
+	if providerRegistry.IsZero() {
+		providerRegistry = provider.BuiltInRegistry()
 	}
-	paths = paths.WithProviderStorageDirs(registeredEnabledProviderIDs(ctx, registry))
-	paths = paths.WithToolStorageDirs([]codingtool.ID{ctx.Tool.Type})
+	if toolRegistry.IsZero() {
+		toolRegistry = codingtool.BuiltInRegistry()
+	}
+	paths = paths.WithProviderStorageDirs(registeredEnabledProviderIDs(ctx, providerRegistry))
+	paths = paths.WithToolStorageDirs(registeredSelectedToolIDs(ctx, toolRegistry))
 	if err := validateContextTree(paths, ctx); err != nil {
 		return err
 	}
@@ -202,7 +223,7 @@ func bootstrapDefaultContext(paths PlatformPaths, ctx devcontext.Context, permis
 	if err != nil {
 		return devcontext.Context{}, err
 	}
-	if err := CreateContextDirectoryTreeWithProviderRegistryAndPermissions(contextPaths, ctx, provider.BuiltInRegistry(), permissions); err != nil {
+	if err := CreateContextDirectoryTreeWithRegistriesAndPermissions(contextPaths, ctx, provider.BuiltInRegistry(), codingtool.BuiltInRegistry(), permissions); err != nil {
 		return devcontext.Context{}, err
 	}
 	return ctx, nil
@@ -240,6 +261,15 @@ func registeredEnabledProviderIDs(ctx devcontext.Context, registry provider.Regi
 		}
 	}
 	return ids
+}
+
+func registeredSelectedToolIDs(ctx devcontext.Context, registry codingtool.Registry) []codingtool.ID {
+	for _, registered := range registry.All() {
+		if registered.Integration.ID() == ctx.Tool.Type {
+			return []codingtool.ID{ctx.Tool.Type}
+		}
+	}
+	return nil
 }
 
 func sortedProviderStorageIDs(providerDirs map[provider.ID]string) []provider.ID {

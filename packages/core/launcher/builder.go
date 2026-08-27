@@ -78,11 +78,12 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 		return LaunchPlan{}, err
 	}
 	providerRegistry := b.providerRegistry()
-	contextPaths = contextPaths.WithProviderStorageDirs(registeredEnabledProviderIDs(*resolution.Context, providerRegistry))
-	contextPaths = contextPaths.WithToolStorageDirs([]codingtool.ID{resolution.Context.Tool.Type})
-	if err := filesystem.ValidateContextDirectoryTreeWithProviderRegistry(contextPaths, *resolution.Context, providerRegistry); err != nil {
+	toolRegistry := b.toolRegistry()
+	if err := filesystem.ValidateContextDirectoryTreeWithRegistries(contextPaths, *resolution.Context, providerRegistry, toolRegistry); err != nil {
 		return LaunchPlan{}, err
 	}
+	contextPaths = contextPaths.WithProviderStorageDirs(registeredEnabledProviderIDs(*resolution.Context, providerRegistry))
+	contextPaths = contextPaths.WithToolStorageDirs([]codingtool.ID{resolution.Context.Tool.Type})
 
 	contributions, missingProviderIDs, err := b.providerContributions(*resolution.Context, contextPaths, providerRegistry)
 	if err != nil {
@@ -93,7 +94,7 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 		return LaunchPlan{}, err
 	}
 
-	integration, ok := b.toolRegistry().Get(resolution.Context.Tool.Type)
+	integration, ok := toolRegistry.Get(resolution.Context.Tool.Type)
 	if !ok {
 		return LaunchPlan{}, fmt.Errorf("%w: %s", ErrMissingTool, resolution.Context.Tool.Type)
 	}

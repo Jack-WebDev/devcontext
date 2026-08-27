@@ -92,14 +92,63 @@ func TestCreateContextDirectoryTreeUsesRegisteredEnabledProviders(t *testing.T) 
 	assertPathMissing(t, contextPaths.ProviderStorageDir("unknown"))
 }
 
+func TestContextDirectoryTreeUsesRegisteredSelectedTool(t *testing.T) {
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
+		return t.TempDir(), nil
+	})
+	contextID := devcontext.MustID("client-a")
+	contextPaths, err := filesystem.DeriveContextPaths(platformPaths, contextID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	ctx := contextTreeContext(contextID, "Client A")
+	ctx.Tool.Type = "future-tool"
+	toolRegistry := codingtool.MustNewRegistry([]codingtool.RegisteredTool{
+		{Integration: contextTreeFakeTool{id: "other-tool"}, DisplayName: "Other Tool"},
+		{Integration: contextTreeFakeTool{id: "future-tool"}, DisplayName: "Future Tool"},
+	}, "future-tool")
+
+	if err := filesystem.CreateContextDirectoryTreeWithRegistries(contextPaths, ctx, provider.BuiltInRegistry(), toolRegistry); err != nil {
+		t.Fatalf("create context directory tree: %v", err)
+	}
+
+	assertDirectoryExists(t, contextPaths.ToolStorageDir("future-tool"))
+	assertPathMissing(t, contextPaths.ToolStorageDir("other-tool"))
+	assertPathMissing(t, contextPaths.ToolStorageDir(codingtool.VSCodeID))
+
+	if err := os.RemoveAll(contextPaths.ToolStorageDir("future-tool")); err != nil {
+		t.Fatalf("remove future tool storage: %v", err)
+	}
+	err = filesystem.ValidateContextDirectoryTreeWithRegistries(contextPaths, ctx, provider.BuiltInRegistry(), toolRegistry)
+	if !errors.Is(err, filesystem.ErrContextStorageIncomplete) {
+		t.Fatalf("error = %v, want %v", err, filesystem.ErrContextStorageIncomplete)
+	}
+	var storageErr *filesystem.ContextStorageError
+	if !errors.As(err, &storageErr) {
+		t.Fatalf("error = %T, want *filesystem.ContextStorageError", err)
+	}
+	wantMissing := []filesystem.MissingContextDirectory{
+		{
+			Kind:   filesystem.ContextDirectoryTool,
+			Path:   contextPaths.ToolStorageDir("future-tool"),
+			Reason: "missing",
+		},
+	}
+	if !reflect.DeepEqual(storageErr.Missing, wantMissing) {
+		t.Fatalf("missing directories = %#v, want %#v", storageErr.Missing, wantMissing)
+	}
+}
+
 func TestCreateContextDirectoryTreeRejectsMismatchedContextID(t *testing.T) {
+	rootDir := "/devctx/contexts/company"
+	toolStorageRootDir := filepath.Join(rootDir, "tools")
 	contextPaths := filesystem.ContextPaths{
 		ContextID:              devcontext.MustID("company"),
-		RootDir:                "/devctx/contexts/company",
-		ConfigPath:             "/devctx/contexts/company/context.toml",
-		ProviderStorageRootDir: "/devctx/contexts/company/providers",
-		ToolStorageRootDir:     "/devctx/contexts/company/vscode",
-		ToolStorageDirs:        map[codingtool.ID]string{codingtool.VSCodeID: "/devctx/contexts/company/vscode/user-data"},
+		RootDir:                rootDir,
+		ConfigPath:             filepath.Join(rootDir, "context.toml"),
+		ProviderStorageRootDir: filepath.Join(rootDir, "providers"),
+		ToolStorageRootDir:     toolStorageRootDir,
+		ToolStorageDirs:        map[codingtool.ID]string{codingtool.VSCodeID: filepath.Join(toolStorageRootDir, string(codingtool.VSCodeID))},
 	}
 	ctx := contextTreeContext(devcontext.MustID("personal"), "Personal")
 
@@ -193,7 +242,7 @@ func TestValidateContextDirectoryTreeReportsIncompleteStorage(t *testing.T) {
 	}
 }
 
-func TestValidateContextDirectoryTreeChecksEditorStorage(t *testing.T) {
+func TestValidateContextDirectoryTreeChecksToolStorage(t *testing.T) {
 	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) {
 		return t.TempDir(), nil
 	})
@@ -207,7 +256,7 @@ func TestValidateContextDirectoryTreeChecksEditorStorage(t *testing.T) {
 		t.Fatalf("create context directory tree: %v", err)
 	}
 	if err := os.RemoveAll(contextPaths.ToolStorageDir(codingtool.VSCodeID)); err != nil {
-		t.Fatalf("remove vscode user data dir: %v", err)
+		t.Fatalf("remove selected tool storage: %v", err)
 	}
 
 	err = filesystem.ValidateContextDirectoryTreeWithProviderRegistry(contextPaths, ctx, provider.BuiltInRegistry())
@@ -420,6 +469,20 @@ func contextTreeContext(id devcontext.ID, name string) devcontext.Context {
 type contextTreeFakeProvider struct {
 	id          provider.ID
 	displayName string
+}
+
+type contextTreeFakeTool struct {
+	id codingtool.ID
+}
+
+func (t contextTreeFakeTool) ID() codingtool.ID { return t.id }
+
+func (contextTreeFakeTool) DetectExecutable(codingtool.Config) (codingtool.Executable, error) {
+	return "fake-tool", nil
+}
+
+func (contextTreeFakeTool) BuildLaunchCommand(request codingtool.CommandRequest) (codingtool.Command, error) {
+	return codingtool.Command{Executable: request.Executable}, nil
 }
 
 func (p contextTreeFakeProvider) ID() provider.ID {

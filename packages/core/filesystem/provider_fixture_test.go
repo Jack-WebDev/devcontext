@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
@@ -26,8 +27,8 @@ func TestContextCreationImportsCredentialsForRegisteredFutureProvider(t *testing
 	if err != nil {
 		t.Fatalf("derive context paths: %v", err)
 	}
-	if err := filesystem.CreateContextDirectoryTreeWithProviderRegistryCredentialsAndPermissions(
-		paths, contextPaths, ctx, registry, []string{"future"}, filesystem.NewDefaultStoragePermissions(),
+	if err := filesystem.CreateContextDirectoryTreeWithRegistriesCredentialsAndPermissions(
+		paths, contextPaths, ctx, registry, codingtool.BuiltInRegistry(), []string{"future"}, filesystem.NewDefaultStoragePermissions(),
 	); err != nil {
 		t.Fatalf("create context directory tree: %v", err)
 	}
