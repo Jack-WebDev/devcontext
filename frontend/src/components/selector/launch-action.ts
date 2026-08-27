@@ -13,6 +13,7 @@ interface LaunchSelectorDependencies {
   selectedContextId?: string;
   rememberProject: boolean;
   confirmContextMismatch?: boolean;
+  onPreflightComplete?: (result: PreflightLaunchProjectResult) => void;
   bindProject: (request: BindProjectRequest) => Promise<ApiResult<ProjectBindingState>>;
   preflightLaunchProject: (request: PreflightLaunchProjectRequest) => Promise<ApiResult<PreflightLaunchProjectResult>>;
   launchProject: (request: LaunchProjectRequest) => Promise<ApiResult<LaunchProjectResult>>;
@@ -73,6 +74,8 @@ async function launchSelectedContext(dependencies: LaunchSelectorDependencies): 
   if (!preflight.ok) {
     return preflight;
   }
+
+  dependencies.onPreflightComplete?.(preflight.data);
 
   return dependencies.launchProject({
     ...launchRequest,

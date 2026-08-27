@@ -161,6 +161,20 @@ test("adapter normalizes successful Wails calls", async () => {
           status: "ready",
           checks: [],
         },
+        verificationSteps: [
+          {
+            id: "prepare_environment",
+            label: "Prepare isolated environment",
+            status: "ready",
+            message: "Prepare isolated environment is ready.",
+          },
+          {
+            id: "start_tool",
+            label: "Start VS Code",
+            status: "pending",
+            message: "VS Code will start after launch verification completes.",
+          },
+        ],
       };
     },
     async bindProject(request) {
@@ -338,6 +352,20 @@ test("adapter normalizes successful Wails calls", async () => {
         status: "ready",
         checks: [],
       },
+      verificationSteps: [
+        {
+          id: "prepare_environment",
+          label: "Prepare isolated environment",
+          status: "ready",
+          message: "Prepare isolated environment is ready.",
+        },
+        {
+          id: "start_tool",
+          label: "Start VS Code",
+          status: "pending",
+          message: "VS Code will start after launch verification completes.",
+        },
+      ],
       warnings: [],
     },
   });

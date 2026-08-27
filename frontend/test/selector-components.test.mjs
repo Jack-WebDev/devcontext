@@ -10,24 +10,35 @@ import {
   shouldRenderFirstRunWelcome,
 } from "../.tmp-test/src/components/selector/FirstRunWelcome.js";
 import {GuiErrorNotice} from "../.tmp-test/src/components/selector/GuiErrorNotice.js";
+import {LaunchFailureView} from "../.tmp-test/src/components/selector/LaunchFailureView.js";
+import {
+  LaunchVerificationProgress,
+  verificationStepPresentation,
+} from "../.tmp-test/src/components/selector/LaunchVerificationProgress.js";
 import {ProviderCredentialClassification} from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
 import {ProjectIdentity} from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import {
   boundContextName,
   RememberProjectControl,
 } from "../.tmp-test/src/components/selector/RememberProjectControl.js";
-import {SelectorActions} from "../.tmp-test/src/components/selector/SelectorActions.js";
+import {launchConfidenceFeedback, SelectorActions} from "../.tmp-test/src/components/selector/SelectorActions.js";
 import {
   confidenceStatusPresentation,
   SelectorConfidenceSummary,
 } from "../.tmp-test/src/components/selector/SelectorConfidenceSummary.js";
 import {SelectorLayout} from "../.tmp-test/src/components/selector/SelectorLayout.js";
+import {recommendationReason} from "../.tmp-test/src/components/selector/recommendation.js";
 import {cancelSelector} from "../.tmp-test/src/components/selector/cancel-action.js";
 import {missingDefaultContextIds} from "../.tmp-test/src/components/selector/default-context-actions.js";
 import {
   createLaunchRequestGuard,
   launchSelectedContext,
 } from "../.tmp-test/src/components/selector/launch-action.js";
+import {launchActionLabel, launchPendingLabel} from "../.tmp-test/src/components/selector/launch-copy.js";
+import {
+  defaultLaunchSuccessCloseBehavior,
+  shouldCloseSelectorAfterLaunch,
+} from "../.tmp-test/src/components/selector/launch-success-close-behavior.js";
 import {createOnboardingContextAndRefresh} from "../.tmp-test/src/components/selector/onboarding-action.js";
 import {
   initialRovingContextId,
@@ -41,7 +52,7 @@ import {
 } from "../.tmp-test/src/components/selector/selector-keyboard.js";
 import {createDevContextWindow} from "../.tmp-test/src/lib/devctx-window.js";
 
-test("project identity preserves full project names and paths", () => {
+test("project identity presents the current project name and path in a compact block", () => {
   const projects = [
     {
       name: "api",
@@ -64,6 +75,11 @@ test("project identity preserves full project names and paths", () => {
   for (const project of projects) {
     const html = renderToStaticMarkup(ProjectIdentity({project}));
 
+    assert.match(html, /data-selector-project-identity="true"/);
+    assert.ok(html.includes("Current project"));
+    assert.ok(html.includes("Git branch"));
+    assert.ok(html.includes("Last opened"));
+    assert.match(html, />Unavailable</);
     assert.match(html, /class="[^"]*truncate[^"]*"/);
     assert.match(html, new RegExp(`title="${escapeRegExp(project.name)}"`));
     assert.match(html, new RegExp(`title="${escapeRegExp(project.path)}"`));
@@ -254,16 +270,75 @@ test("context card renders generic context names and ids", () => {
     assert.ok(html.includes(context.id));
     assert.match(html, new RegExp(`title="${escapeRegExp(context.name)}"`));
     assert.match(html, new RegExp(`title="${escapeRegExp(context.id)}"`));
+    assert.ok(html.includes("Enabled providers"));
+    assert.ok(html.includes("No providers enabled."));
   }
 });
 
 test("context card can represent a selected context", () => {
   const context = contextFixture("personal", "Personal");
-  const html = renderToStaticMarkup(ContextCard({context, selected: true}));
+  const html = renderToStaticMarkup(ContextCard({context, selected: true, onSelect: () => {}}));
 
   assert.match(html, /data-selected="true"/);
   assert.match(html, /border-primary/);
+  assert.match(html, /data-context-selection-marker="true"/);
+  assert.match(html, /aria-current="true"/);
   assert.match(html, />Selected</);
+});
+
+test("context card presents a backend-supported recommendation with its reason", () => {
+  const context = contextFixture("company", "Company");
+  const html = renderToStaticMarkup(
+    ContextCard({context, recommendation: "Remembered for this project"}),
+  );
+
+  assert.match(html, />Recommended</);
+  assert.ok(html.includes("Remembered for this project"));
+});
+
+test("recommendation reasons use plain language for known backend sources", () => {
+  assert.equal(recommendationReason("project_binding"), "Remembered for this project");
+  assert.equal(recommendationReason("remembered_context"), "Remembered context");
+  assert.equal(recommendationReason("last_launch"), "Used for the last launch");
+  assert.equal(recommendationReason("user_selection"), undefined);
+});
+
+test("context card renders backend-provided description and accent metadata", () => {
+  const context = {
+    ...contextFixture("company", "Company"),
+    description: "Work environment",
+    metadata: {
+      accent: "slate-blue",
+    },
+  };
+  const html = renderToStaticMarkup(ContextCard({context}));
+
+  assert.match(html, /data-context-accent="slate-blue"/);
+  assert.ok(html.includes("Work environment"));
+  assert.match(html, /bg-blue-700/);
+});
+
+test("context card summarizes provider, tool, and isolation health from confidence checks", () => {
+  const context = {
+    ...contextFixture("company", "Company", [providerFixture("provider", "Provider", true, "ready")]),
+    confidence: {
+      contextId: "company",
+      status: "needs_attention",
+      checks: [
+        {component: "provider", providerId: "provider", severity: "ready", label: "Provider", message: "Provider is ready."},
+        {component: "tool", toolId: "vscode", severity: "needs_attention", label: "VS Code", message: "Review VS Code."},
+        {component: "isolation", severity: "ready", label: "Context storage", message: "Context storage is ready."},
+      ],
+    },
+  };
+  const html = renderToStaticMarkup(ContextCard({context}));
+
+  assert.ok(html.includes("Context health"));
+  assert.ok(html.includes("1 provider"));
+  assert.ok(html.includes("VS Code"));
+  assert.ok(html.includes("Needs attention"));
+  assert.ok(html.includes("Isolation"));
+  assert.ok(html.includes("Protected"));
 });
 
 test("context card renders backend-provided coding tool readiness and guidance", () => {
@@ -291,7 +366,8 @@ test("context card renders as a selectable control when wired", () => {
   assert.match(html, /<button/);
   assert.match(html, /aria-pressed="false"/);
   assert.match(html, /tabindex="-1"/);
-  assert.match(html, />Not selected</);
+  assert.match(html, /absolute inset-0/);
+  assert.ok(html.includes("Select Client A"));
 });
 
 test("context card renders enabled provider status variants with accessible names", () => {
@@ -310,6 +386,27 @@ test("context card renders enabled provider status variants with accessible name
   assert.match(html, /Codex local status: Unavailable/);
   assert.ok(html.includes("Codex isolated provider state was not found"));
   assert.ok(!html.includes("Disabled Provider"));
+});
+
+test("context card renders only backend-provided provider identity information", () => {
+  const context = contextFixture("personal", "Personal", [
+    {
+      ...providerFixture("verified", "Verified Provider", true, "ready"),
+      identity: {
+        status: "verified",
+        fields: [{label: "Email", value: "developer@example.com"}],
+      },
+    },
+    {
+      ...providerFixture("unavailable", "Unavailable Provider", true, "ready"),
+      identity: {status: "unavailable", fields: []},
+    },
+  ]);
+  const html = renderToStaticMarkup(ContextCard({context}));
+
+  assert.ok(html.includes("Account: Email: developer@example.com"));
+  assert.ok(html.includes("Account identity unavailable"));
+  assert.ok(!html.includes("Personal account"));
 });
 
 test("context card renders generic setup guidance for an unconfigured provider", () => {
@@ -493,8 +590,8 @@ test("remember control renders unchecked for unbound selected projects", () => {
   assert.match(html, /focus-visible:ring-2/);
   assert.doesNotMatch(html, /checked=""/);
   assert.doesNotMatch(html, /disabled=""/);
-  assert.ok(html.includes("Remember this project"));
-  assert.ok(html.includes("Use this context automatically for this project next time."));
+  assert.ok(html.includes("Remember Personal for this project"));
+  assert.ok(html.includes("Dev Context will suggest this context next time"));
 });
 
 test("remember control renders checked user intent for unbound selected projects", () => {
@@ -510,6 +607,7 @@ test("remember control renders checked user intent for unbound selected projects
 
   assert.match(html, /type="checkbox"/);
   assert.match(html, /checked=""/);
+  assert.ok(html.includes("Remember Personal for this project"));
 });
 
 test("remember control renders existing binding without a checkbox", () => {
@@ -531,8 +629,9 @@ test("remember control renders existing binding without a checkbox", () => {
   );
 
   assert.doesNotMatch(html, /type="checkbox"/);
-  assert.ok(html.includes("This project is remembered for"));
+  assert.ok(html.includes("Remembered context"));
   assert.ok(html.includes("Company"));
+  assert.ok(html.includes("will be suggested the next time you open this project"));
   assert.equal(boundContextName(state.binding, state.contexts), "Company");
 });
 
@@ -591,6 +690,107 @@ test("selector actions show launch as enabled and pending", () => {
   assert.ok(pending.includes("Launching..."));
 });
 
+test("launch labels name the selected context and pending project", () => {
+  assert.equal(launchActionLabel("Company"), "Launch Company");
+  assert.equal(launchPendingLabel("devctx", "Company"), "Launching devctx as Company...");
+  assert.equal(launchPendingLabel(undefined, "Company"), "Launching Company...");
+});
+
+test("launch verification progress renders a pending shell and backend stages", () => {
+  const pending = renderToStaticMarkup(
+    LaunchVerificationProgress({projectName: "devctx", contextName: "Company"}),
+  );
+  const staged = renderToStaticMarkup(
+    LaunchVerificationProgress({
+      projectName: "devctx",
+      contextName: "Company",
+      steps: [
+        {id: "prepare_environment", label: "Prepare isolated environment", status: "ready", message: "Environment is ready."},
+        {id: "check_providers", label: "Check enabled providers", status: "needs_attention", message: "Review provider setup."},
+        {id: "start_tool", label: "Start coding tool", status: "pending", message: "Waiting to start."},
+      ],
+    }),
+  );
+
+  assert.match(pending, /role="status"/);
+  assert.ok(pending.includes("Launching devctx as Company..."));
+  assert.ok(pending.includes("Preparing launch verification..."));
+  assert.ok(staged.includes("Prepare isolated environment"));
+  assert.ok(staged.includes("Needs attention"));
+  assert.ok(staged.includes("Pending"));
+  assert.deepEqual(
+    ["ready", "needs_attention", "blocked", "pending"].map((status) => verificationStepPresentation(status).label),
+    ["Ready", "Needs attention", "Blocked", "Pending"],
+  );
+});
+
+test("selector actions block unsafe launches and explain the blocking checks", () => {
+  const html = renderToStaticMarkup(
+    SelectorActions({
+      launchDisabled: true,
+      launchPending: false,
+      contextName: "Company",
+      confidence: {
+        contextId: "company",
+        status: "blocked",
+        checks: [{
+          component: "tool",
+          toolId: "tool",
+          severity: "blocked",
+          label: "Selected tool",
+          message: "The selected tool is unavailable.",
+          actionHint: "Install the selected tool.",
+        }],
+      },
+      onLaunch: () => {},
+      onCancel: () => {},
+    }),
+  );
+
+  assert.match(html, /role="alert"/);
+  assert.ok(html.includes("Launch blocked for Company"));
+  assert.ok(html.includes("Selected tool:"));
+  assert.ok(html.includes("Install the selected tool."));
+  assert.ok(html.includes("Launch Company"));
+  assert.match(html, /disabled=""/);
+});
+
+test("selector actions make warnings actionable and confirm ready launch state", () => {
+  const warning = launchConfidenceFeedback({
+    contextId: "company",
+    status: "needs_attention",
+    checks: [{
+      component: "provider",
+      providerId: "provider",
+      severity: "needs_attention",
+      label: "Provider",
+      message: "Provider needs review.",
+      actionHint: "Review provider setup.",
+    }],
+  }, "Company");
+  const ready = launchConfidenceFeedback({contextId: "company", status: "ready", checks: []}, "Company");
+
+  assert.deepEqual(warning, {
+    status: "needs_attention",
+    title: "Review Company before launch",
+    message: "Launch is available, but these items need your attention.",
+    checks: [{
+      component: "provider",
+      providerId: "provider",
+      severity: "needs_attention",
+      label: "Provider",
+      message: "Provider needs review.",
+      actionHint: "Review provider setup.",
+    }],
+  });
+  assert.deepEqual(ready, {
+    status: "ready",
+    title: "Company is ready to launch",
+    message: "Everything required for a safe launch is available.",
+    checks: [],
+  });
+});
+
 test("selector layout keeps project, contexts, confidence, remember, and actions in order", () => {
   const html = renderToStaticMarkup(
     SelectorLayout({
@@ -622,20 +822,31 @@ test("selector layout keeps project, contexts, confidence, remember, and actions
 test("selector confidence summary renders selected context readiness", () => {
   const selected = renderToStaticMarkup(
     SelectorConfidenceSummary({
+      project: {name: "api", path: "/work/api"},
       context: {
         ...contextFixture("personal", "Personal"),
         confidence: {
           contextId: "personal",
           status: "needs_attention",
-          checks: [],
+          checks: [
+            {component: "provider", providerId: "provider", severity: "ready", label: "Provider", message: "Provider is ready."},
+            {component: "tool", toolId: "vscode", severity: "needs_attention", label: "VS Code", message: "Review VS Code."},
+            {component: "isolation", severity: "ready", label: "Context storage", message: "Context storage is ready."},
+          ],
         },
       },
     }),
   );
   const empty = renderToStaticMarkup(SelectorConfidenceSummary({}));
 
-  assert.ok(selected.includes("Confidence summary"));
+  assert.ok(selected.includes("Launch confidence"));
+  assert.ok(selected.includes("Project"));
+  assert.ok(selected.includes("api"));
   assert.ok(selected.includes("Personal"));
+  assert.ok(selected.includes("Provider"));
+  assert.ok(selected.includes("VS Code"));
+  assert.ok(selected.includes("Isolation"));
+  assert.ok(selected.includes("Protected"));
   assert.ok(selected.includes("Needs attention"));
   assert.ok(empty.includes("Select a context to review launch readiness."));
   assert.deepEqual(
@@ -680,7 +891,7 @@ test("selector critical path renders selected context and submits remembered lau
   assert.ok(html.includes("/work/api"));
   assert.ok(html.includes("Personal"));
   assert.match(html, /data-selected="true"/);
-  assert.ok(html.includes("This project is remembered for"));
+  assert.ok(html.includes("Remembered context"));
   assert.ok(html.includes("Launching..."));
 
   const calls = [];
@@ -758,6 +969,44 @@ test("launch action launches the selected context when remember is off", async (
   assert.deepEqual(calls, [
     ["preflightLaunchProject", {projectPath: "/work/api", contextId: "personal"}],
     ["launchProject", {projectPath: "/work/api", contextId: "personal"}],
+  ]);
+});
+
+test("launch action exposes preflight verification steps before starting the coding tool", async () => {
+  const calls = [];
+  const verificationSteps = [{
+    id: "prepare_environment",
+    label: "Prepare isolated environment",
+    status: "ready",
+    message: "Environment is ready.",
+  }];
+
+  const result = await launchSelectedContext({
+    projectPath: "/work/api",
+    selectedContextId: "personal",
+    rememberProject: false,
+    bindProject: () => Promise.resolve(projectBindingResult()),
+    preflightLaunchProject(request) {
+      calls.push(["preflight", request]);
+      return Promise.resolve({
+        ok: true,
+        data: {...preflightLaunchProjectResult().data, verificationSteps},
+      });
+    },
+    onPreflightComplete(preflight) {
+      calls.push(["verification", preflight.verificationSteps]);
+    },
+    launchProject(request) {
+      calls.push(["launch", request]);
+      return Promise.resolve(launchProjectResult());
+    },
+  });
+
+  assert.equal(result?.ok, true);
+  assert.deepEqual(calls, [
+    ["preflight", {projectPath: "/work/api", contextId: "personal"}],
+    ["verification", verificationSteps],
+    ["launch", {projectPath: "/work/api", contextId: "personal"}],
   ]);
 });
 
@@ -1004,9 +1253,31 @@ test("gui error notice renders failure and recovery guidance", () => {
     const html = renderToStaticMarkup(GuiErrorNotice({error: error.error}));
 
     assert.match(html, /role="alert"/);
+    assert.ok(html.includes("What happened"));
+    assert.ok(html.includes("Why it matters"));
+    assert.ok(html.includes("What to do"));
     assert.ok(html.includes(error.error.message));
     assert.ok(html.includes(error.error.recovery));
   }
+});
+
+test("launch success close behavior defaults to keeping the selector open", () => {
+  assert.equal(defaultLaunchSuccessCloseBehavior, "keep_open");
+  assert.equal(shouldCloseSelectorAfterLaunch("keep_open"), false);
+  assert.equal(shouldCloseSelectorAfterLaunch("close_selector"), true);
+});
+
+test("launch failure view keeps recovery actions available without exposing technical details", () => {
+  const error = apiError("launch_error", "Unable to launch editor.", "Check the editor command, project path, and permissions, then retry.").error;
+  const html = renderToStaticMarkup(LaunchFailureView({error, onRetry: () => {}, onCancel: () => {}}));
+
+  assert.match(html, /role="alert"/);
+  assert.ok(html.includes("Dev Context is still open"));
+  assert.ok(html.includes("Retry"));
+  assert.ok(html.includes("Run diagnostics"));
+  assert.ok(html.includes("Open configuration"));
+  assert.ok(html.includes("Cancel"));
+  assert.doesNotMatch(html, /Technical details/);
 });
 
 test("launch progress guard allows only one in-flight launch and restores after rejection", async () => {

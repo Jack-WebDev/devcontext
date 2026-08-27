@@ -31,6 +31,7 @@ type ProjectState struct {
 type ContextState struct {
 	ID             string                `json:"id"`
 	Name           string                `json:"name"`
+	Description    string                `json:"description,omitempty"`
 	Tool           ToolState             `json:"tool"`
 	AvailableTools []ToolOption          `json:"availableTools"`
 	Providers      []ProviderState       `json:"providers"`
@@ -160,10 +161,31 @@ type PreflightLaunchProjectRequest struct {
 // PreflightLaunchProjectResult describes launch readiness before an editor
 // process is started.
 type PreflightLaunchProjectResult struct {
-	Project    ProjectState          `json:"project"`
-	Context    ContextState          `json:"context"`
-	Confidence LaunchConfidenceState `json:"confidence"`
-	Warnings   []ResolutionWarning   `json:"warnings,omitempty"`
+	Project           ProjectState             `json:"project"`
+	Context           ContextState             `json:"context"`
+	Confidence        LaunchConfidenceState    `json:"confidence"`
+	VerificationSteps []LaunchVerificationStep `json:"verificationSteps,omitempty"`
+	Warnings          []ResolutionWarning      `json:"warnings,omitempty"`
+}
+
+// LaunchVerificationStepStatus identifies the current state of one
+// presentation-safe launch verification step.
+type LaunchVerificationStepStatus string
+
+const (
+	LaunchVerificationStepPending        LaunchVerificationStepStatus = "pending"
+	LaunchVerificationStepReady          LaunchVerificationStepStatus = "ready"
+	LaunchVerificationStepNeedsAttention LaunchVerificationStepStatus = "needs_attention"
+	LaunchVerificationStepBlocked        LaunchVerificationStepStatus = "blocked"
+)
+
+// LaunchVerificationStep describes one stage of a safe launch. It does not
+// expose runtime paths, commands, or environment variables.
+type LaunchVerificationStep struct {
+	ID      string                       `json:"id"`
+	Label   string                       `json:"label"`
+	Status  LaunchVerificationStepStatus `json:"status"`
+	Message string                       `json:"message"`
 }
 
 // LaunchConfidenceState summarizes backend-owned launch readiness for the

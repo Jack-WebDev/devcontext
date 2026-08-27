@@ -92,6 +92,21 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	}
 }
 
+func TestGetLaunchStateExposesContextDescription(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	ctx := fixture.context("personal", "Personal")
+	ctx.Metadata["description"] = "Personal projects"
+	fixture.writeContext(t, ctx)
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+	if len(state.Contexts) != 1 || state.Contexts[0].Description != "Personal projects" {
+		t.Fatalf("context descriptions = %#v, want Personal projects", state.Contexts)
+	}
+}
+
 func TestSecondRegisteredToolWorksAcrossStateAndLaunch(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	secondTool := &applicationSecondTool{}
@@ -346,6 +361,14 @@ func TestPreflightLaunchProjectReturnsReadinessWithoutStartingProcess(t *testing
 	}
 	if !reflect.DeepEqual(result.Confidence, result.Context.Confidence) {
 		t.Fatalf("preflight confidence = %#v, want context confidence %#v", result.Confidence, result.Context.Confidence)
+	}
+	if got, want := result.VerificationSteps, []LaunchVerificationStep{
+		{ID: "prepare_environment", Label: "Prepare isolated environment", Status: LaunchVerificationStepReady, Message: "Prepare isolated environment is ready."},
+		{ID: "check_providers", Label: "Check enabled providers", Status: LaunchVerificationStepReady, Message: "Check enabled providers is ready."},
+		{ID: "prepare_tool", Label: "Prepare Fake Tool", Status: LaunchVerificationStepReady, Message: "Prepare Fake Tool is ready."},
+		{ID: "start_tool", Label: "Start Fake Tool", Status: LaunchVerificationStepPending, Message: "Fake Tool will start after launch verification completes."},
+	}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("verification steps = %#v, want %#v", got, want)
 	}
 	if len(fixture.process.requests) != 0 {
 		t.Fatalf("process requests = %#v, want none for preflight", fixture.process.requests)

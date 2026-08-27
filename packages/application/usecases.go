@@ -254,11 +254,64 @@ func (s *Service) preflightLaunchProject(request PreflightLaunchProjectRequest) 
 
 	contextState := s.contextState(*resolution.Context)
 	return PreflightLaunchProjectResult{
-		Project:    projectState(projectPath),
-		Context:    contextState,
-		Confidence: contextState.Confidence,
-		Warnings:   warningStates(resolution.Warnings),
+		Project:           projectState(projectPath),
+		Context:           contextState,
+		Confidence:        contextState.Confidence,
+		VerificationSteps: launchVerificationSteps(contextState),
+		Warnings:          warningStates(resolution.Warnings),
 	}, nil
+}
+
+func launchVerificationSteps(context ContextState) []LaunchVerificationStep {
+	checks := context.Confidence.Checks
+	return []LaunchVerificationStep{
+		verificationStep("prepare_environment", "Prepare isolated environment", checksForComponent(checks, LaunchConfidenceCheckIsolation)),
+		verificationStep("check_providers", "Check enabled providers", checksForComponent(checks, LaunchConfidenceCheckProvider)),
+		verificationStep("prepare_tool", "Prepare "+context.Tool.Name, checksForTool(checks, context.Tool.ID)),
+		{
+			ID:      "start_tool",
+			Label:   "Start " + context.Tool.Name,
+			Status:  LaunchVerificationStepPending,
+			Message: context.Tool.Name + " will start after launch verification completes.",
+		},
+	}
+}
+
+func checksForComponent(checks []LaunchConfidenceCheck, component LaunchConfidenceCheckComponent) []LaunchConfidenceCheck {
+	result := make([]LaunchConfidenceCheck, 0)
+	for _, check := range checks {
+		if check.Component == component {
+			result = append(result, check)
+		}
+	}
+	return result
+}
+
+func checksForTool(checks []LaunchConfidenceCheck, toolID string) []LaunchConfidenceCheck {
+	result := make([]LaunchConfidenceCheck, 0, 1)
+	for _, check := range checks {
+		if check.Component == LaunchConfidenceCheckTool && check.ToolID == toolID {
+			result = append(result, check)
+		}
+	}
+	return result
+}
+
+func verificationStep(id string, label string, checks []LaunchConfidenceCheck) LaunchVerificationStep {
+	status := LaunchVerificationStepReady
+	message := label + " is ready."
+	for _, check := range checks {
+		if check.Severity == LaunchConfidenceBlocked {
+			status = LaunchVerificationStepBlocked
+			message = check.Message
+			break
+		}
+		if check.Severity == LaunchConfidenceNeedsAttention && status == LaunchVerificationStepReady {
+			status = LaunchVerificationStepNeedsAttention
+			message = check.Message
+		}
+	}
+	return LaunchVerificationStep{ID: id, Label: label, Status: status, Message: message}
 }
 
 func (s *Service) bindProject(request BindProjectRequest) (ProjectBindingState, error) {
@@ -332,6 +385,7 @@ func (s *Service) contextState(ctx devcontext.Context) ContextState {
 	return ContextState{
 		ID:             ctx.ID.String(),
 		Name:           ctx.Name,
+		Description:    ctx.Metadata["description"],
 		Tool:           toolState(ctx.Tool.DefaultTool, confidence),
 		AvailableTools: toolOptions(s.dependencies.ToolRegistry),
 		Providers:      providerStatesFromEntries(providerEntries),

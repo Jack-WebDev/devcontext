@@ -4,6 +4,7 @@ import type {
   ApiResult,
   BindProjectRequest,
   CreateContextResult,
+  ContextState,
   DisplayError,
   LaunchProjectRequest,
   LaunchProjectResult,
@@ -19,6 +20,8 @@ import { ContextMismatchDialog } from "./ContextMismatchDialog";
 import { ContextCard } from "./ContextCard";
 import { FirstRunWelcome, shouldRenderFirstRunWelcome } from "./FirstRunWelcome";
 import { GuiErrorNotice } from "./GuiErrorNotice";
+import { LaunchFailureView } from "./LaunchFailureView";
+import { LaunchVerificationProgress } from "./LaunchVerificationProgress";
 import { ProviderCredentialClassification, type ProviderSessionAssignments } from "./ProviderCredentialClassification.js";
 import { ProjectIdentity } from "./ProjectIdentity";
 import { RememberProjectControl } from "./RememberProjectControl";
@@ -28,6 +31,12 @@ import { SelectorLayout } from "./SelectorLayout";
 import { cancelSelector } from "./cancel-action";
 import { missingDefaultContextIds } from "./default-context-actions";
 import { createLaunchRequestGuard, launchSelectedContext } from "./launch-action";
+import {
+  defaultLaunchSuccessCloseBehavior,
+  shouldCloseSelectorAfterLaunch,
+  type LaunchSuccessCloseBehavior,
+} from "./launch-success-close-behavior";
+import { recommendationReason } from "./recommendation";
 import {
   initialRovingContextId,
   initialSelectedContextId,
@@ -43,6 +52,7 @@ interface SelectorViewProps {
   onPreflightLaunchProject: (request: PreflightLaunchProjectRequest) => Promise<ApiResult<PreflightLaunchProjectResult>>;
   onLaunchProject: (request: LaunchProjectRequest) => Promise<ApiResult<LaunchProjectResult>>;
   onCancel: () => Promise<void> | void;
+  launchSuccessCloseBehavior?: LaunchSuccessCloseBehavior;
   onCreatePersonalContext?: (importProviderIds: string[]) => Promise<ApiResult<CreateContextResult>>;
   onCreateCompanyContext?: (importProviderIds: string[]) => Promise<ApiResult<CreateContextResult>>;
 }
@@ -53,6 +63,7 @@ function SelectorView({
   onPreflightLaunchProject,
   onLaunchProject,
   onCancel,
+  launchSuccessCloseBehavior = defaultLaunchSuccessCloseBehavior,
   onCreatePersonalContext,
   onCreateCompanyContext,
 }: SelectorViewProps) {
@@ -63,7 +74,7 @@ function SelectorView({
     initialRovingContextId(launchState),
   );
   const [rememberProject, setRememberProject] = useState(false);
-  const [launchPending, setLaunchPending] = useState(false);
+  const [launchLifecycle, setLaunchLifecycle] = useState<LaunchLifecycleState>({status: "idle"});
   const [launchError, setLaunchError] = useState<DisplayError | undefined>(undefined);
   const [mismatchError, setMismatchError] = useState<DisplayError | undefined>(undefined);
   const [onboardingPendingContextId, setOnboardingPendingContextId] = useState<string | undefined>(undefined);
@@ -73,9 +84,11 @@ function SelectorView({
   const launchGuard = useRef(createLaunchRequestGuard());
   const mismatchDialogOpen = mismatchError?.contextMismatch !== undefined;
   const selectedContext = launchState.contexts.find((context) => context.id === selectedContextId);
+  const launchPending = launchLifecycle.status !== "idle";
+  const launchBlocked = selectedContextConfidenceBlocked(selectedContext);
   const keyboardLaunchAvailable = canLaunchSelectedContextFromKeyboard({
     selectedContextId,
-    launchPending,
+    launchPending: launchPending || launchBlocked,
     mismatchDialogOpen,
   });
 
@@ -83,7 +96,7 @@ function SelectorView({
     setSelectedContextId(initialSelectedContextId(launchState));
     setRovingContextId(initialRovingContextId(launchState));
     setRememberProject(false);
-    setLaunchPending(false);
+    setLaunchLifecycle({status: "idle"});
     setLaunchError(undefined);
     setMismatchError(undefined);
     setOnboardingPendingContextId(undefined);
@@ -149,8 +162,12 @@ function SelectorView({
   }
 
   async function handleLaunch(confirmContextMismatch = false) {
+    if (selectedContextConfidenceBlocked(selectedContext)) {
+      return;
+    }
+
     await launchGuard.current.run(async () => {
-      setLaunchPending(true);
+      setLaunchLifecycle({status: "preflighting"});
       setLaunchError(undefined);
       if (confirmContextMismatch) {
         setMismatchError(undefined);
@@ -162,12 +179,19 @@ function SelectorView({
           selectedContextId,
           rememberProject,
           confirmContextMismatch,
+          onPreflightComplete: (preflight) => {
+            setLaunchLifecycle({status: "launching", steps: preflight.verificationSteps});
+          },
           bindProject: onBindProject,
           preflightLaunchProject: onPreflightLaunchProject,
           launchProject: onLaunchProject,
         });
 
-        if (result && !result.ok) {
+        if (result?.ok) {
+          if (shouldCloseSelectorAfterLaunch(launchSuccessCloseBehavior)) {
+            await cancelSelector({ closeSelector: onCancel });
+          }
+        } else if (result && !result.ok) {
           if (result.error.code === "context_mismatch_requires_confirmation" && result.error.contextMismatch) {
             setMismatchError(result.error);
           } else {
@@ -175,7 +199,7 @@ function SelectorView({
           }
         }
       } finally {
-        setLaunchPending(false);
+        setLaunchLifecycle({status: "idle"});
       }
     });
   }
@@ -239,25 +263,26 @@ function SelectorView({
           projectIdentity={<ProjectIdentity project={launchState.project} />}
           contextCards={
             <>
-              {selectedContextId === undefined ? (
-                <p className="text-sm text-muted-foreground">No context selected</p>
-              ) : null}
-
-              <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="Available contexts">
-                {launchState.contexts.map((context) => (
-                  <ContextCard
-                    key={context.id}
-                    context={context}
-                    selected={selectedContextId === context.id}
-                    disabled={launchPending}
-                    tabIndex={rovingContextId === context.id ? 0 : -1}
-                    buttonRef={setContextButtonRef(context.id)}
-                    onSelect={handleSelectContext}
-                    onNavigate={handleContextNavigation}
-                    onLaunchSelected={keyboardLaunchAvailable ? () => void handleLaunch() : undefined}
-                  />
-                ))}
-              </div>
+              {launchState.contexts.length === 0 ? (
+                <SelectorEmptyContextState />
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="Available contexts">
+                  {launchState.contexts.map((context) => (
+                    <ContextCard
+                      key={context.id}
+                      context={context}
+                      selected={selectedContextId === context.id}
+                      recommendation={recommendationForContext(launchState, context.id)}
+                      disabled={launchPending}
+                      tabIndex={rovingContextId === context.id ? 0 : -1}
+                      buttonRef={setContextButtonRef(context.id)}
+                      onSelect={handleSelectContext}
+                      onNavigate={handleContextNavigation}
+                      onLaunchSelected={keyboardLaunchAvailable ? () => void handleLaunch() : undefined}
+                    />
+                  ))}
+                </div>
+              )}
 
               <MissingDefaultContextActions
                 launchState={launchState}
@@ -279,7 +304,7 @@ function SelectorView({
               />
             </>
           }
-          confidenceSummary={<SelectorConfidenceSummary context={selectedContext} />}
+          confidenceSummary={<SelectorConfidenceSummary context={selectedContext} project={launchState.project} />}
           rememberControl={
             <RememberProjectControl
               binding={launchState.binding}
@@ -293,17 +318,22 @@ function SelectorView({
           launchActions={
             <>
               {launchPending ? (
-                <Card
-                  as="p"
-                  size="sm"
-                  className="mb-3 border border-border bg-muted/30 p-3 text-sm text-muted-foreground"
-                  role="status"
-                >
-                  Launching selected context...
-                </Card>
+                <div className="mb-3">
+                  <LaunchVerificationProgress
+                    projectName={launchState.project.name}
+                    contextName={selectedContext?.name ?? "selected context"}
+                    steps={launchLifecycle.status === "launching" ? launchLifecycle.steps : undefined}
+                  />
+                </div>
               ) : null}
 
-              {launchError ? <GuiErrorNotice error={launchError} /> : null}
+              {launchError ? (
+                <LaunchFailureView
+                  error={launchError}
+                  onRetry={() => void handleLaunch()}
+                  onCancel={() => void cancelSelector({ closeSelector: onCancel })}
+                />
+              ) : null}
 
               {mismatchError?.contextMismatch ? (
                 <ContextMismatchDialog
@@ -316,8 +346,11 @@ function SelectorView({
               ) : null}
 
               <SelectorActions
-                launchDisabled={selectedContextId === undefined}
+                launchDisabled={selectedContextId === undefined || launchBlocked}
                 launchPending={launchPending}
+                projectName={launchState.project.name}
+                contextName={selectedContext?.name}
+                confidence={selectedContext?.confidence}
                 onLaunch={() => void handleLaunch()}
                 onCancel={() => void cancelSelector({ closeSelector: onCancel })}
               />
@@ -326,6 +359,31 @@ function SelectorView({
         />
       )}
     </div>
+  );
+}
+
+type LaunchLifecycleState =
+  | {status: "idle"}
+  | {status: "preflighting"}
+  | {status: "launching"; steps?: PreflightLaunchProjectResult["verificationSteps"]};
+
+function selectedContextConfidenceBlocked(context: ContextState | undefined): boolean {
+  return context?.confidence?.status === "blocked";
+}
+
+function SelectorEmptyContextState() {
+  return (
+    <Card as="section" size="sm" className="border border-border bg-muted/30 p-5" aria-labelledby="empty-context-title">
+      <h3 id="empty-context-title" className="font-medium">Create a development context</h3>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Contexts keep provider accounts and coding-tool storage separate for the projects you open.
+      </p>
+      <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+        <li><span className="font-medium text-foreground">Personal:</span> personal projects and accounts.</li>
+        <li><span className="font-medium text-foreground">Company:</span> work or client projects and accounts.</li>
+        <li><span className="font-medium text-foreground">Custom:</span> create a tailored context from Contexts when custom creation is available.</li>
+      </ul>
+    </Card>
   );
 }
 
@@ -410,6 +468,14 @@ function MissingDefaultContextActions({
       </CardContent>
     </Card>
   );
+}
+
+function recommendationForContext(launchState: LaunchState, contextId: string): string | undefined {
+  if (launchState.selectedContextId !== contextId) {
+    return undefined;
+  }
+
+  return recommendationReason(launchState.resolutionSource);
 }
 
 export { SelectorView };

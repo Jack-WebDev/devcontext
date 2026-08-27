@@ -48,6 +48,7 @@ export interface ProjectState {
 export interface ContextState {
   id: string;
   name: string;
+  description?: string;
   tool: ToolState;
   availableTools: ToolOption[];
   providers: ProviderState[];
@@ -146,7 +147,17 @@ export interface PreflightLaunchProjectResult {
   project: ProjectState;
   context: ContextState;
   confidence: LaunchConfidenceState;
+  verificationSteps?: LaunchVerificationStep[];
   warnings: ResolutionWarning[];
+}
+
+export type LaunchVerificationStepStatus = "pending" | LaunchConfidenceStatus;
+
+export interface LaunchVerificationStep {
+  id: string;
+  label: string;
+  status: LaunchVerificationStepStatus;
+  message: string;
 }
 
 export interface LaunchProjectResult {
@@ -384,12 +395,31 @@ function normalizeLaunchProjectResult(value: unknown): LaunchProjectResult {
 
 function normalizePreflightLaunchProjectResult(value: unknown): PreflightLaunchProjectResult {
   const object = objectValue(value);
+  const verificationSteps = arrayValue(object.verificationSteps).map(normalizeLaunchVerificationStep);
   return {
     project: normalizeProjectState(object.project),
     context: normalizeContextState(object.context),
     confidence: requiredLaunchConfidenceState(object.confidence),
+    ...(verificationSteps.length === 0 ? {} : {verificationSteps}),
     warnings: arrayValue(object.warnings).map(normalizeResolutionWarning),
   };
+}
+
+function normalizeLaunchVerificationStep(value: unknown): LaunchVerificationStep {
+  const object = objectValue(value);
+  return {
+    id: stringValue(object.id),
+    label: stringValue(object.label),
+    status: normalizeLaunchVerificationStepStatus(object.status),
+    message: stringValue(object.message),
+  };
+}
+
+function normalizeLaunchVerificationStepStatus(value: unknown): LaunchVerificationStepStatus {
+  if (value === "pending") {
+    return value;
+  }
+  return normalizeLaunchConfidenceStatus(value);
 }
 
 function requiredLaunchConfidenceState(value: unknown): LaunchConfidenceState {
@@ -417,9 +447,11 @@ function normalizeProjectState(value: unknown): ProjectState {
 
 function normalizeContextState(value: unknown): ContextState {
   const object = objectValue(value);
+	const description = optionalString(object.description);
   return {
     id: stringValue(object.id),
     name: stringValue(object.name),
+    ...(description === undefined ? {} : {description}),
     tool: normalizeToolState(object.tool),
     availableTools: arrayValue(object.availableTools).map(normalizeToolOption),
     providers: arrayValue(object.providers).map(normalizeProviderState),
