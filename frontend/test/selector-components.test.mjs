@@ -16,7 +16,7 @@ import {
   boundContextName,
   RememberProjectControl,
 } from "../.tmp-test/src/components/selector/RememberProjectControl.js";
-import {SelectorActions} from "../.tmp-test/src/components/selector/SelectorActions.js";
+import {launchConfidenceFeedback, SelectorActions} from "../.tmp-test/src/components/selector/SelectorActions.js";
 import {
   confidenceStatusPresentation,
   SelectorConfidenceSummary,
@@ -676,6 +676,73 @@ test("selector actions show launch as enabled and pending", () => {
   assert.ok(enabled.includes("Launch"));
   assert.match(pending, /disabled=""/);
   assert.ok(pending.includes("Launching..."));
+});
+
+test("selector actions block unsafe launches and explain the blocking checks", () => {
+  const html = renderToStaticMarkup(
+    SelectorActions({
+      launchDisabled: true,
+      launchPending: false,
+      contextName: "Company",
+      confidence: {
+        contextId: "company",
+        status: "blocked",
+        checks: [{
+          component: "tool",
+          toolId: "tool",
+          severity: "blocked",
+          label: "Selected tool",
+          message: "The selected tool is unavailable.",
+          actionHint: "Install the selected tool.",
+        }],
+      },
+      onLaunch: () => {},
+      onCancel: () => {},
+    }),
+  );
+
+  assert.match(html, /role="alert"/);
+  assert.ok(html.includes("Launch blocked for Company"));
+  assert.ok(html.includes("Selected tool:"));
+  assert.ok(html.includes("Install the selected tool."));
+  assert.ok(html.includes("Launch Company"));
+  assert.match(html, /disabled=""/);
+});
+
+test("selector actions make warnings actionable and confirm ready launch state", () => {
+  const warning = launchConfidenceFeedback({
+    contextId: "company",
+    status: "needs_attention",
+    checks: [{
+      component: "provider",
+      providerId: "provider",
+      severity: "needs_attention",
+      label: "Provider",
+      message: "Provider needs review.",
+      actionHint: "Review provider setup.",
+    }],
+  }, "Company");
+  const ready = launchConfidenceFeedback({contextId: "company", status: "ready", checks: []}, "Company");
+
+  assert.deepEqual(warning, {
+    status: "needs_attention",
+    title: "Review Company before launch",
+    message: "Launch is available, but these items need your attention.",
+    checks: [{
+      component: "provider",
+      providerId: "provider",
+      severity: "needs_attention",
+      label: "Provider",
+      message: "Provider needs review.",
+      actionHint: "Review provider setup.",
+    }],
+  });
+  assert.deepEqual(ready, {
+    status: "ready",
+    title: "Company is ready to launch",
+    message: "Everything required for a safe launch is available.",
+    checks: [],
+  });
 });
 
 test("selector layout keeps project, contexts, confidence, remember, and actions in order", () => {

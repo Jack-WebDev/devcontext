@@ -4,6 +4,7 @@ import type {
   ApiResult,
   BindProjectRequest,
   CreateContextResult,
+  ContextState,
   DisplayError,
   LaunchProjectRequest,
   LaunchProjectResult,
@@ -74,9 +75,10 @@ function SelectorView({
   const launchGuard = useRef(createLaunchRequestGuard());
   const mismatchDialogOpen = mismatchError?.contextMismatch !== undefined;
   const selectedContext = launchState.contexts.find((context) => context.id === selectedContextId);
+  const launchBlocked = selectedContextConfidenceBlocked(selectedContext);
   const keyboardLaunchAvailable = canLaunchSelectedContextFromKeyboard({
     selectedContextId,
-    launchPending,
+    launchPending: launchPending || launchBlocked,
     mismatchDialogOpen,
   });
 
@@ -150,6 +152,10 @@ function SelectorView({
   }
 
   async function handleLaunch(confirmContextMismatch = false) {
+    if (selectedContextConfidenceBlocked(selectedContext)) {
+      return;
+    }
+
     await launchGuard.current.run(async () => {
       setLaunchPending(true);
       setLaunchError(undefined);
@@ -318,8 +324,10 @@ function SelectorView({
               ) : null}
 
               <SelectorActions
-                launchDisabled={selectedContextId === undefined}
+                launchDisabled={selectedContextId === undefined || launchBlocked}
                 launchPending={launchPending}
+                contextName={selectedContext?.name}
+                confidence={selectedContext?.confidence}
                 onLaunch={() => void handleLaunch()}
                 onCancel={() => void cancelSelector({ closeSelector: onCancel })}
               />
@@ -329,6 +337,10 @@ function SelectorView({
       )}
     </div>
   );
+}
+
+function selectedContextConfidenceBlocked(context: ContextState | undefined): boolean {
+  return context?.confidence?.status === "blocked";
 }
 
 function MissingDefaultContextActions({
