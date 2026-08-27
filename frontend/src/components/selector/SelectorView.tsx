@@ -20,6 +20,7 @@ import { ContextMismatchDialog } from "./ContextMismatchDialog";
 import { ContextCard } from "./ContextCard";
 import { FirstRunWelcome, shouldRenderFirstRunWelcome } from "./FirstRunWelcome";
 import { GuiErrorNotice } from "./GuiErrorNotice";
+import { LaunchVerificationProgress } from "./LaunchVerificationProgress";
 import { ProviderCredentialClassification, type ProviderSessionAssignments } from "./ProviderCredentialClassification.js";
 import { ProjectIdentity } from "./ProjectIdentity";
 import { RememberProjectControl } from "./RememberProjectControl";
@@ -29,7 +30,6 @@ import { SelectorLayout } from "./SelectorLayout";
 import { cancelSelector } from "./cancel-action";
 import { missingDefaultContextIds } from "./default-context-actions";
 import { createLaunchRequestGuard, launchSelectedContext } from "./launch-action";
-import { launchPendingLabel } from "./launch-copy.js";
 import { recommendationReason } from "./recommendation";
 import {
   initialRovingContextId,
@@ -302,14 +302,12 @@ function SelectorView({
           launchActions={
             <>
               {launchPending ? (
-                <Card
-                  as="p"
-                  size="sm"
-                  className="mb-3 border border-border bg-muted/30 p-3 text-sm text-muted-foreground"
-                  role="status"
-                >
-                  {launchPendingLabel(launchState.project.name, selectedContext?.name)}
-                </Card>
+                <div className="mb-3">
+                  <LaunchVerificationProgress
+                    projectName={launchState.project.name}
+                    contextName={selectedContext?.name ?? "selected context"}
+                  />
+                </div>
               ) : null}
 
               {launchError ? <GuiErrorNotice error={launchError} /> : null}

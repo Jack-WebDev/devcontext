@@ -10,6 +10,10 @@ import {
   shouldRenderFirstRunWelcome,
 } from "../.tmp-test/src/components/selector/FirstRunWelcome.js";
 import {GuiErrorNotice} from "../.tmp-test/src/components/selector/GuiErrorNotice.js";
+import {
+  LaunchVerificationProgress,
+  verificationStepPresentation,
+} from "../.tmp-test/src/components/selector/LaunchVerificationProgress.js";
 import {ProviderCredentialClassification} from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
 import {ProjectIdentity} from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import {
@@ -685,6 +689,34 @@ test("launch labels name the selected context and pending project", () => {
   assert.equal(launchActionLabel("Company"), "Launch Company");
   assert.equal(launchPendingLabel("devctx", "Company"), "Launching devctx as Company...");
   assert.equal(launchPendingLabel(undefined, "Company"), "Launching Company...");
+});
+
+test("launch verification progress renders a pending shell and backend stages", () => {
+  const pending = renderToStaticMarkup(
+    LaunchVerificationProgress({projectName: "devctx", contextName: "Company"}),
+  );
+  const staged = renderToStaticMarkup(
+    LaunchVerificationProgress({
+      projectName: "devctx",
+      contextName: "Company",
+      steps: [
+        {id: "prepare_environment", label: "Prepare isolated environment", status: "ready", message: "Environment is ready."},
+        {id: "check_providers", label: "Check enabled providers", status: "needs_attention", message: "Review provider setup."},
+        {id: "start_tool", label: "Start coding tool", status: "pending", message: "Waiting to start."},
+      ],
+    }),
+  );
+
+  assert.match(pending, /role="status"/);
+  assert.ok(pending.includes("Launching devctx as Company..."));
+  assert.ok(pending.includes("Preparing launch verification..."));
+  assert.ok(staged.includes("Prepare isolated environment"));
+  assert.ok(staged.includes("Needs attention"));
+  assert.ok(staged.includes("Pending"));
+  assert.deepEqual(
+    ["ready", "needs_attention", "blocked", "pending"].map((status) => verificationStepPresentation(status).label),
+    ["Ready", "Needs attention", "Blocked", "Pending"],
+  );
 });
 
 test("selector actions block unsafe launches and explain the blocking checks", () => {
