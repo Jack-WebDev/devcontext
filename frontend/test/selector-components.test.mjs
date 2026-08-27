@@ -41,7 +41,7 @@ import {
 } from "../.tmp-test/src/components/selector/selector-keyboard.js";
 import {createDevContextWindow} from "../.tmp-test/src/lib/devctx-window.js";
 
-test("project identity preserves full project names and paths", () => {
+test("project identity presents the current project name and path in a compact block", () => {
   const projects = [
     {
       name: "api",
@@ -64,11 +64,14 @@ test("project identity preserves full project names and paths", () => {
   for (const project of projects) {
     const html = renderToStaticMarkup(ProjectIdentity({project}));
 
+    assert.match(html, /data-selector-project-identity="true"/);
+    assert.ok(html.includes("Current project"));
     assert.match(html, /class="[^"]*truncate[^"]*"/);
     assert.match(html, new RegExp(`title="${escapeRegExp(project.name)}"`));
     assert.match(html, new RegExp(`title="${escapeRegExp(project.path)}"`));
     assert.ok(html.includes(project.name));
     assert.ok(html.includes(project.path));
+    assert.doesNotMatch(html, /Git branch|Last opened/);
   }
 });
 
