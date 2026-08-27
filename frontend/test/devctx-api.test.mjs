@@ -31,6 +31,11 @@ test("adapter normalizes successful Wails calls", async () => {
                 name: "Codex",
                 enabled: true,
                 state: "ready",
+                setupAction: {
+                  state: "verified",
+                  label: "Verified",
+                  message: "Codex account identity is verified for this context.",
+                },
                 identity: {
                   status: "verified",
                   fields: [{label: "Email", value: "user@company.com"}, {label: "Plan", value: "Business"}, {label: "Account", value: "acct_123"}],
@@ -230,6 +235,11 @@ test("adapter normalizes successful Wails calls", async () => {
               enabled: true,
               state: "ready",
               explanation: undefined,
+              setupAction: {
+                state: "verified",
+                label: "Verified",
+                message: "Codex account identity is verified for this context.",
+              },
               identity: {
                 status: "verified",
                 message: undefined,

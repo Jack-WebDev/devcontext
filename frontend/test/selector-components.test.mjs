@@ -1280,6 +1280,19 @@ test("launch failure view keeps recovery actions available without exposing tech
   assert.doesNotMatch(html, /Technical details/);
 });
 
+test("launch failure view hides technical details until requested", () => {
+  const error = {
+    ...apiError("launch_error", "Unable to launch editor.", "Check the editor command, then retry.").error,
+    technicalDetails: "starting tool in /work/api failed: permission denied",
+  };
+  const html = renderToStaticMarkup(LaunchFailureView({error, onRetry: () => {}, onCancel: () => {}}));
+
+  assert.ok(html.includes("Technical details"));
+  assert.ok(html.includes("/work/api"));
+  assert.match(html, /<details/);
+  assert.doesNotMatch(html, /<details[^>]*open/);
+});
+
 test("launch progress guard allows only one in-flight launch and restores after rejection", async () => {
   const guard = createLaunchRequestGuard();
   const deferred = createDeferred();

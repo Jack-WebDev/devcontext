@@ -65,7 +65,36 @@ type ProviderState struct {
 	State       ProviderReadinessState `json:"state"`
 	Explanation string                 `json:"explanation,omitempty"`
 	ActionHint  string                 `json:"actionHint,omitempty"`
+	SetupAction *ProviderSetupAction   `json:"setupAction,omitempty"`
 	Identity    ProviderIdentityState  `json:"identity"`
+}
+
+// ProviderSetupAction describes the next backend-derived setup state for an
+// enabled provider. It contains presentation-safe text only; provider-specific
+// setup mechanics remain owned by the provider integration.
+type ProviderSetupAction struct {
+	State   ProviderSetupState `json:"state"`
+	Label   string             `json:"label"`
+	Message string             `json:"message"`
+}
+
+// ProviderSetupState is the UI-facing provider setup vocabulary.
+type ProviderSetupState string
+
+const (
+	ProviderSetupOpenAndConfigure ProviderSetupState = "open_and_configure"
+	ProviderSetupWaitingForSignIn ProviderSetupState = "waiting_for_sign_in"
+	ProviderSetupVerified         ProviderSetupState = "verified"
+)
+
+// Valid reports whether state is one of the bounded API provider setup states.
+func (s ProviderSetupState) Valid() bool {
+	switch s {
+	case ProviderSetupOpenAndConfigure, ProviderSetupWaitingForSignIn, ProviderSetupVerified:
+		return true
+	default:
+		return false
+	}
 }
 
 // ProviderReadinessState is the UI-facing provider readiness vocabulary.

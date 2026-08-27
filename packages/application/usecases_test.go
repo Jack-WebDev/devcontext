@@ -78,6 +78,11 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 				Name:    "Fake Provider",
 				Enabled: true,
 				State:   ProviderReadinessReady,
+				SetupAction: &ProviderSetupAction{
+					State:   ProviderSetupWaitingForSignIn,
+					Label:   "Waiting for sign-in",
+					Message: "Waiting for Fake Provider sign-in verification.",
+				},
 				Identity: ProviderIdentityState{
 					Status:  ProviderIdentityUnavailable,
 					Message: "Account identity unavailable.",
@@ -89,6 +94,67 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 	}
 	if contextState.Confidence.ContextID != "personal" {
 		t.Fatalf("context confidence = %#v, want personal confidence", contextState.Confidence)
+	}
+}
+
+func TestGetLaunchStateDerivesProviderSetupActions(t *testing.T) {
+	tests := []struct {
+		name         string
+		status       provider.Status
+		hasIdentity  bool
+		wantState    ProviderSetupState
+		wantLabel    string
+		wantNoAction bool
+	}{
+		{
+			name:      "not configured opens setup",
+			status:    provider.NotConfiguredStatus("credentials are missing"),
+			wantState: ProviderSetupOpenAndConfigure,
+			wantLabel: "Open and configure",
+		},
+		{
+			name:      "configured provider awaits sign-in verification",
+			status:    provider.ConfiguredStatus(),
+			wantState: ProviderSetupWaitingForSignIn,
+			wantLabel: "Waiting for sign-in",
+		},
+		{
+			name:        "configured verified provider is verified",
+			status:      provider.ConfiguredStatus(),
+			hasIdentity: true,
+			wantState:   ProviderSetupVerified,
+			wantLabel:   "Verified",
+		},
+		{
+			name:         "unavailable provider has no setup action",
+			status:       provider.UnavailableStatus("status unavailable"),
+			wantNoAction: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newApplicationFixture(t)
+			fixture.provider.statusByContext = map[string]provider.Status{"personal": tt.status}
+			fixture.provider.hasIdentity = tt.hasIdentity
+			fixture.provider.identity = provider.Identity{Fields: []provider.MetadataField{{Label: "Email", Value: "developer@example.com"}}}
+			fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+			state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+			if appErr != nil {
+				t.Fatalf("get launch state: %v", appErr)
+			}
+			action := state.Contexts[0].Providers[0].SetupAction
+			if tt.wantNoAction {
+				if action != nil {
+					t.Fatalf("setup action = %#v, want nil", action)
+				}
+				return
+			}
+			if action == nil || action.State != tt.wantState || action.Label != tt.wantLabel || action.Message == "" {
+				t.Fatalf("setup action = %#v", action)
+			}
+		})
 	}
 }
 

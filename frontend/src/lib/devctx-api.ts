@@ -14,6 +14,7 @@ export interface DisplayError {
   code: ErrorCode;
   message: string;
   recovery: string;
+  technicalDetails?: string;
   contextMismatch?: ContextMismatch;
 }
 
@@ -76,7 +77,16 @@ export interface ProviderState {
   state: ProviderReadinessState;
   explanation?: string;
   actionHint?: string;
+  setupAction?: ProviderSetupAction;
   identity: ProviderIdentityState;
+}
+
+export type ProviderSetupState = "open_and_configure" | "waiting_for_sign_in" | "verified";
+
+export interface ProviderSetupAction {
+  state: ProviderSetupState;
+  label: string;
+  message: string;
 }
 
 export type ProviderReadinessState = "ready" | "not_configured" | "directory_missing" | "unavailable";
@@ -483,6 +493,7 @@ function normalizeToolOption(value: unknown): ToolOption {
 function normalizeProviderState(value: unknown): ProviderState {
   const object = objectValue(value);
 	const actionHint = optionalString(object.actionHint);
+	const setupAction = normalizeProviderSetupAction(object.setupAction);
   return {
     id: stringValue(object.id),
     name: stringValue(object.name),
@@ -490,8 +501,33 @@ function normalizeProviderState(value: unknown): ProviderState {
     state: normalizeProviderReadinessState(object.state),
     explanation: optionalString(object.explanation),
     ...(actionHint === undefined ? {} : {actionHint}),
+	...(setupAction === undefined ? {} : {setupAction}),
     identity: normalizeProviderIdentityState(object.identity),
   };
+}
+
+function normalizeProviderSetupAction(value: unknown): ProviderSetupAction | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const object = objectValue(value);
+  return {
+    state: normalizeProviderSetupState(object.state),
+    label: stringValue(object.label),
+    message: stringValue(object.message),
+  };
+}
+
+function normalizeProviderSetupState(value: unknown): ProviderSetupState {
+  switch (value) {
+    case "open_and_configure":
+    case "waiting_for_sign_in":
+    case "verified":
+      return value;
+    default:
+      throw new Error("Invalid Dev Context response.");
+  }
 }
 
 function normalizeProviderReadinessState(value: unknown): ProviderReadinessState {
@@ -573,10 +609,12 @@ function normalizeResolutionWarning(value: unknown): ResolutionWarning {
 }
 
 function normalizeApplicationError(value: ApplicationErrorLike): DisplayError {
+  const technicalDetails = optionalString(value.technicalDetails);
   return {
     code: knownErrorCode(value.code),
     message: stringValue(value.message),
     recovery: stringValue(value.recovery),
+    ...(technicalDetails === undefined ? {} : {technicalDetails}),
     contextMismatch: normalizeContextMismatch(value.contextMismatch),
   };
 }
@@ -624,6 +662,7 @@ interface ApplicationErrorLike {
   code: unknown;
   message: unknown;
   recovery: unknown;
+  technicalDetails?: unknown;
   contextMismatch?: unknown;
 }
 

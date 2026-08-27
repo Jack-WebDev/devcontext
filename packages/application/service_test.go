@@ -234,6 +234,18 @@ func TestNewErrorReturnsPresentationSafeTypedErrors(t *testing.T) {
 	}
 }
 
+func TestNewErrorProvidesSanitizedTechnicalDetails(t *testing.T) {
+	cause := errors.New("launch failed in /work/api: API_TOKEN=top-secret-token")
+	got := NewError(cause)
+
+	if !strings.Contains(got.TechnicalDetails, "/work/api") {
+		t.Fatalf("technical details = %q, want diagnostic path", got.TechnicalDetails)
+	}
+	if strings.Contains(got.TechnicalDetails, "top-secret-token") {
+		t.Fatalf("technical details expose a credential: %q", got.TechnicalDetails)
+	}
+}
+
 func TestNewErrorReturnsActionableRecoveryDetails(t *testing.T) {
 	tests := []struct {
 		name         string
