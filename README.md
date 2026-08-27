@@ -79,7 +79,7 @@ $ devctx .
            └───────────┬───────────┘
                         │
                         ▼
-                     VS Code
+          Coding tool (VS Code today)
 ```
 
 <div align="center">
@@ -255,7 +255,7 @@ Company
 </tr>
 </table>
 
-Dev Context launches each environment independently. **The context is the root concept** — VS Code, Claude Code, Codex, and future integrations are adapters that operate inside that context.
+Dev Context launches each environment independently. **The context is the root concept** — coding tools such as VS Code, provider integrations such as Claude Code and Codex, and future integrations are adapters that operate inside that context.
 
 <br>
 
@@ -441,7 +441,7 @@ devctx --version
 
 ## ✅ Requirements
 
-The current coding-tool implementation requires the VS Code CLI:
+VS Code is the first built-in coding tool, so the current release requires its CLI:
 
 ```bash
 code --version
@@ -483,20 +483,16 @@ Contexts are stored locally under the Dev Context home directory:
 └── contexts/
     ├── personal/
     │   ├── context.toml
-    │   └── providers/
-    │       ├── claude/
-    │       └── codex/
-    │   ├── context.toml
+    │   ├── tools/
+    │   │   └── vscode/
     │   └── providers/
     │       ├── claude/
     │       └── codex/
     │
     └── company/
         ├── context.toml
-        └── providers/
-            ├── claude/
-            └── codex/
-        ├── context.toml
+        ├── tools/
+        │   └── vscode/
         └── providers/
             ├── claude/
             └── codex/
@@ -559,7 +555,7 @@ Before a project launches, Dev Context should be able to clearly answer:
 Context      Personal
 
 Project      ~/projects/devcontext
-Editor       VS Code
+Coding tool  VS Code
 Claude       Personal ✓
 Codex        Personal ✓
 
@@ -578,7 +574,7 @@ AWS          personal ✓
 ### 🧩 Coding tool adapters
 
 ```text
-VS Code → Cursor → Windsurf → JetBrains → Zed → Neovim
+VS Code (first built-in tool) → Cursor → Windsurf → JetBrains → Zed → Neovim
 ```
 
 ### 🔌 Additional identity providers
