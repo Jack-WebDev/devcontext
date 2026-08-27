@@ -1,10 +1,12 @@
 import type { LaunchConfidenceCheck, LaunchConfidenceState } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Separator } from "../ui/separator.js";
+import { launchActionLabel, launchPendingLabel } from "./launch-copy.js";
 
 interface SelectorActionsProps {
   launchDisabled: boolean;
   launchPending: boolean;
+  projectName?: string;
   contextName?: string;
   confidence?: LaunchConfidenceState;
   onLaunch: () => void;
@@ -14,13 +16,14 @@ interface SelectorActionsProps {
 function SelectorActions({
   launchDisabled,
   launchPending,
+  projectName,
   contextName,
   confidence,
   onLaunch,
   onCancel,
 }: SelectorActionsProps) {
   const feedback = launchConfidenceFeedback(confidence, contextName);
-  const launchLabel = contextName ? `Launch ${contextName}` : "Launch";
+  const launchLabel = launchActionLabel(contextName);
 
   return (
     <div className="space-y-4">
@@ -31,7 +34,7 @@ function SelectorActions({
           Cancel
         </Button>
         <Button type="button" disabled={launchDisabled || launchPending} onClick={onLaunch}>
-          {launchPending ? "Launching..." : launchLabel}
+          {launchPending ? launchPendingLabel(projectName, contextName) : launchLabel}
         </Button>
       </div>
     </div>

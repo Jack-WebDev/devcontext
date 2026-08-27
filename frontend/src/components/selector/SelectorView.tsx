@@ -29,6 +29,7 @@ import { SelectorLayout } from "./SelectorLayout";
 import { cancelSelector } from "./cancel-action";
 import { missingDefaultContextIds } from "./default-context-actions";
 import { createLaunchRequestGuard, launchSelectedContext } from "./launch-action";
+import { launchPendingLabel } from "./launch-copy.js";
 import { recommendationReason } from "./recommendation";
 import {
   initialRovingContextId,
@@ -307,7 +308,7 @@ function SelectorView({
                   className="mb-3 border border-border bg-muted/30 p-3 text-sm text-muted-foreground"
                   role="status"
                 >
-                  Launching selected context...
+                  {launchPendingLabel(launchState.project.name, selectedContext?.name)}
                 </Card>
               ) : null}
 
@@ -326,6 +327,7 @@ function SelectorView({
               <SelectorActions
                 launchDisabled={selectedContextId === undefined || launchBlocked}
                 launchPending={launchPending}
+                projectName={launchState.project.name}
                 contextName={selectedContext?.name}
                 confidence={selectedContext?.confidence}
                 onLaunch={() => void handleLaunch()}

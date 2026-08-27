@@ -29,6 +29,7 @@ import {
   createLaunchRequestGuard,
   launchSelectedContext,
 } from "../.tmp-test/src/components/selector/launch-action.js";
+import {launchActionLabel, launchPendingLabel} from "../.tmp-test/src/components/selector/launch-copy.js";
 import {createOnboardingContextAndRefresh} from "../.tmp-test/src/components/selector/onboarding-action.js";
 import {
   initialRovingContextId,
@@ -580,7 +581,7 @@ test("remember control renders unchecked for unbound selected projects", () => {
   assert.match(html, /focus-visible:ring-2/);
   assert.doesNotMatch(html, /checked=""/);
   assert.doesNotMatch(html, /disabled=""/);
-  assert.ok(html.includes("Remember this project"));
+  assert.ok(html.includes("Remember Personal for this project"));
   assert.ok(html.includes("Use this context automatically for this project next time."));
 });
 
@@ -597,6 +598,7 @@ test("remember control renders checked user intent for unbound selected projects
 
   assert.match(html, /type="checkbox"/);
   assert.match(html, /checked=""/);
+  assert.ok(html.includes("Remember Personal for this project"));
 });
 
 test("remember control renders existing binding without a checkbox", () => {
@@ -676,6 +678,12 @@ test("selector actions show launch as enabled and pending", () => {
   assert.ok(enabled.includes("Launch"));
   assert.match(pending, /disabled=""/);
   assert.ok(pending.includes("Launching..."));
+});
+
+test("launch labels name the selected context and pending project", () => {
+  assert.equal(launchActionLabel("Company"), "Launch Company");
+  assert.equal(launchPendingLabel("devctx", "Company"), "Launching devctx as Company...");
+  assert.equal(launchPendingLabel(undefined, "Company"), "Launching Company...");
 });
 
 test("selector actions block unsafe launches and explain the blocking checks", () => {

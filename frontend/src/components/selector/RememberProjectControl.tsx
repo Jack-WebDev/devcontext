@@ -28,6 +28,8 @@ function RememberProjectControl({
   }
 
   const disabled = disabledByParent || selectedContextId === undefined;
+  const selectedContext = contexts.find((context) => context.id === selectedContextId);
+  const label = selectedContext ? `Remember ${selectedContext.name} for this project` : "Remember this project";
 
   return (
     <Card as="label" size="sm" className="flex-row items-start gap-3 border border-border p-3 text-sm">
@@ -40,7 +42,7 @@ function RememberProjectControl({
         onChange={(event) => onRememberProjectChange?.(event.currentTarget.checked)}
       />
       <span className="space-y-1">
-        <span className="block font-medium">Remember this project</span>
+        <span className="block font-medium">{label}</span>
         <span className="block text-muted-foreground">
           {disabled
             ? disabledByParent
