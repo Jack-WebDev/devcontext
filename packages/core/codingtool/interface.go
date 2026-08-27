@@ -15,12 +15,11 @@ type Command struct {
 	Arguments  Arguments
 }
 
-// ContextPaths contains context-owned storage locations a coding tool may use while
-// building its command.
+// ContextPaths contains the selected tool's storage plus a safe shared context
+// root. Tool implementations must not depend on another tool's storage.
 type ContextPaths struct {
-	RootDir     string
-	DataDir     string
-	UserDataDir string
+	RootDir    string
+	StorageDir string
 }
 
 // CommandRequest contains the resolved inputs needed to build a coding tool

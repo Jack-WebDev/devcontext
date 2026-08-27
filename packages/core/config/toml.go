@@ -40,10 +40,10 @@ func (e *GlobalConfigFileError) Unwrap() error {
 }
 
 type globalConfigTOML struct {
-	Version       *int               `toml:"version"`
+	Version     *int               `toml:"version"`
 	DefaultTool *string            `toml:"default_editor"`
-	UI            uiSettingsTOML     `toml:"ui"`
-	Safety        safetySettingsTOML `toml:"safety"`
+	UI          uiSettingsTOML     `toml:"ui"`
+	Safety      safetySettingsTOML `toml:"safety"`
 }
 
 type uiSettingsTOML struct {
@@ -136,7 +136,7 @@ func globalConfigFromTOML(raw globalConfigTOML) (GlobalConfig, error) {
 	}
 
 	return GlobalConfig{
-		Version:       version,
+		Version:     version,
 		DefaultTool: defaultTool,
 		UI: UISettings{
 			RememberWindowPosition: *raw.UI.RememberWindowPosition,

@@ -9,7 +9,7 @@ import (
 
 func TestGlobalConfigConstructsVersionedApplicationSettings(t *testing.T) {
 	globalConfig := config.GlobalConfig{
-		Version:       config.CurrentSchemaVersion,
+		Version:     config.CurrentSchemaVersion,
 		DefaultTool: codingtool.TypeVSCode,
 		UI: config.UISettings{
 			RememberWindowPosition: true,

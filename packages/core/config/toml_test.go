@@ -196,7 +196,7 @@ func TestDecodeGlobalConfigFileTOMLReportsActionableCorruptConfigError(t *testin
 
 func TestEncodeGlobalConfigTOMLIsDeterministic(t *testing.T) {
 	globalConfig := config.GlobalConfig{
-		Version:       config.CurrentSchemaVersion,
+		Version:     config.CurrentSchemaVersion,
 		DefaultTool: codingtool.TypeVSCode,
 		UI: config.UISettings{
 			RememberWindowPosition: false,
@@ -248,7 +248,7 @@ func TestEncodeGlobalConfigTOMLRoundTripsThroughDecoder(t *testing.T) {
 
 func TestEncodeGlobalConfigTOMLRejectsUnsupportedValues(t *testing.T) {
 	_, err := config.EncodeGlobalConfigTOML(config.GlobalConfig{
-		Version:       config.SchemaVersion(99),
+		Version:     config.SchemaVersion(99),
 		DefaultTool: codingtool.TypeVSCode,
 	})
 	if !errors.Is(err, config.ErrUnsupportedSchemaVersion) {
@@ -256,7 +256,7 @@ func TestEncodeGlobalConfigTOMLRejectsUnsupportedValues(t *testing.T) {
 	}
 
 	_, err = config.EncodeGlobalConfigTOML(config.GlobalConfig{
-		Version:       config.CurrentSchemaVersion,
+		Version:     config.CurrentSchemaVersion,
 		DefaultTool: codingtool.Type("unknown"),
 	})
 	if !errors.Is(err, config.ErrInvalidGlobalConfig) {

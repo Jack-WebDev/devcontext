@@ -36,7 +36,7 @@ func TestWriteGlobalConfigFileAtomicallyReplacesConfig(t *testing.T) {
 	}
 
 	globalConfig := config.GlobalConfig{
-		Version:       config.CurrentSchemaVersion,
+		Version:     config.CurrentSchemaVersion,
 		DefaultTool: codingtool.TypeVSCode,
 		UI: config.UISettings{
 			RememberWindowPosition: false,
@@ -68,7 +68,7 @@ func TestWriteGlobalConfigFileAtomicallyReplacesConfig(t *testing.T) {
 func TestGlobalConfigPersistenceRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
 	original := config.GlobalConfig{
-		Version:       config.CurrentSchemaVersion,
+		Version:     config.CurrentSchemaVersion,
 		DefaultTool: codingtool.TypeVSCode,
 		UI: config.UISettings{
 			RememberWindowPosition: false,
@@ -135,7 +135,7 @@ func TestConcurrentGlobalConfigWritesLeaveParseableConfig(t *testing.T) {
 	values := []config.GlobalConfig{
 		config.DefaultGlobalConfig(),
 		{
-			Version:       config.CurrentSchemaVersion,
+			Version:     config.CurrentSchemaVersion,
 			DefaultTool: codingtool.TypeVSCode,
 			UI: config.UISettings{
 				RememberWindowPosition: false,
@@ -233,7 +233,7 @@ func TestInitializeDevContextHomePreservesExistingGlobalConfig(t *testing.T) {
 	}
 
 	customConfig := config.GlobalConfig{
-		Version:       config.CurrentSchemaVersion,
+		Version:     config.CurrentSchemaVersion,
 		DefaultTool: codingtool.TypeVSCode,
 		UI: config.UISettings{
 			RememberWindowPosition: false,

@@ -10,7 +10,7 @@ const (
 // DefaultGlobalConfig returns the safe configuration for a new installation.
 func DefaultGlobalConfig() GlobalConfig {
 	return GlobalConfig{
-		Version:       CurrentSchemaVersion,
+		Version:     CurrentSchemaVersion,
 		DefaultTool: codingtool.TypeVSCode,
 		UI: UISettings{
 			RememberWindowPosition: true,

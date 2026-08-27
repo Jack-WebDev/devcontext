@@ -44,7 +44,7 @@ func (defaultExecutableProbe) Stat(path string) (os.FileInfo, error) {
 
 // ExecutableNotFoundError describes a failed editor executable lookup.
 type ExecutableNotFoundError struct {
-	ToolID   ID
+	ToolID     ID
 	Candidates []string
 }
 
@@ -63,7 +63,7 @@ func (e *ExecutableNotFoundError) Unwrap() error {
 // path.
 type ExecutableNotExecutableError struct {
 	ToolID ID
-	Path     string
+	Path   string
 }
 
 func (e *ExecutableNotExecutableError) Error() string {
@@ -108,7 +108,7 @@ func (e VSCodeEditor) DetectExecutable(config Config) (Executable, error) {
 	}
 
 	return "", &ExecutableNotFoundError{
-		ToolID:   VSCodeID,
+		ToolID:     VSCodeID,
 		Candidates: candidates,
 	}
 }
@@ -154,7 +154,7 @@ func validateConfiguredExecutable(probe ExecutableProbe, goos string, editorID I
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return "", &ExecutableNotFoundError{
-				ToolID:   editorID,
+				ToolID:     editorID,
 				Candidates: []string{path},
 			}
 		}
@@ -164,7 +164,7 @@ func validateConfiguredExecutable(probe ExecutableProbe, goos string, editorID I
 	if !isUsableExecutable(info, goos) {
 		return "", &ExecutableNotExecutableError{
 			ToolID: editorID,
-			Path:     path,
+			Path:   path,
 		}
 	}
 	return Executable(path), nil

@@ -106,9 +106,8 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 		Executable:  executable,
 		ProjectPath: string(request.ProjectPath),
 		Paths: codingtool.ContextPaths{
-			RootDir:     contextPaths.RootDir,
-			DataDir:     contextPaths.ToolStorageDir(resolution.Context.Tool.Type),
-			UserDataDir: contextPaths.ToolStorageDir(resolution.Context.Tool.Type),
+			RootDir:    contextPaths.RootDir,
+			StorageDir: contextPaths.ToolStorageDir(resolution.Context.Tool.Type),
 		},
 	})
 	if err != nil {

@@ -27,7 +27,7 @@ func (fakeEditor) BuildLaunchCommand(request codingtool.CommandRequest) (codingt
 		Executable: request.Executable,
 		Arguments: codingtool.Arguments{
 			"--state-dir",
-			request.Paths.UserDataDir,
+			request.Paths.StorageDir,
 			request.ProjectPath,
 		},
 	}, nil
@@ -57,9 +57,8 @@ func TestEditorInterfaceAllowsGenericEditorUse(t *testing.T) {
 		Executable:  executable,
 		ProjectPath: "/work/client-a/api",
 		Paths: codingtool.ContextPaths{
-			RootDir:     "/home/alex/.devctx/contexts/client-a",
-			DataDir:     "/home/alex/.devctx/contexts/client-a/fake-editor",
-			UserDataDir: "/home/alex/.devctx/contexts/client-a/fake-editor/user-data",
+			RootDir:    "/home/alex/.devctx/contexts/client-a",
+			StorageDir: "/home/alex/.devctx/contexts/client-a/fake-editor",
 		},
 	})
 	if err != nil {
@@ -70,7 +69,7 @@ func TestEditorInterfaceAllowsGenericEditorUse(t *testing.T) {
 		Executable: "/opt/fake-editor/bin/fake-editor",
 		Arguments: codingtool.Arguments{
 			"--state-dir",
-			"/home/alex/.devctx/contexts/client-a/fake-editor/user-data",
+			"/home/alex/.devctx/contexts/client-a/fake-editor",
 			"/work/client-a/api",
 		},
 	}

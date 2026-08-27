@@ -32,7 +32,7 @@ type ErrorCategory string
 const (
 	ErrorCategoryConfiguration ErrorCategory = "configuration"
 	ErrorCategoryContext       ErrorCategory = "context"
-	ErrorCategoryTool        ErrorCategory = "editor"
+	ErrorCategoryTool          ErrorCategory = "editor"
 	ErrorCategoryPermission    ErrorCategory = "permission"
 	ErrorCategoryProcess       ErrorCategory = "process"
 	ErrorCategoryProject       ErrorCategory = "project"
@@ -48,7 +48,7 @@ type Event struct {
 	Timestamp        time.Time     `json:"timestamp"`
 	ProjectPath      string        `json:"project_path,omitempty"`
 	ContextID        string        `json:"context_id,omitempty"`
-	ToolID         string        `json:"editor_id,omitempty"`
+	ToolID           string        `json:"editor_id,omitempty"`
 	ResolutionSource string        `json:"resolution_source,omitempty"`
 	ErrorCategory    ErrorCategory `json:"error_category,omitempty"`
 	Error            string        `json:"error,omitempty"`
@@ -60,7 +60,7 @@ type EventInput struct {
 	Timestamp        time.Time
 	ProjectPath      string
 	ContextID        string
-	ToolID         string
+	ToolID           string
 	ResolutionSource string
 	Err              error
 	KnownEnvironment []string
@@ -74,7 +74,7 @@ func NewEvent(input EventInput) Event {
 		Timestamp:        input.Timestamp,
 		ProjectPath:      input.ProjectPath,
 		ContextID:        input.ContextID,
-		ToolID:         input.ToolID,
+		ToolID:           input.ToolID,
 		ResolutionSource: input.ResolutionSource,
 	}
 

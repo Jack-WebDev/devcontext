@@ -114,9 +114,8 @@ func TestLaunchPlanBuilderBuildsCompletePlan(t *testing.T) {
 		Executable:  "/usr/local/bin/fake-editor",
 		ProjectPath: projectDir,
 		Paths: codingtool.ContextPaths{
-			RootDir:     contextPaths.RootDir,
-			DataDir:     contextPaths.ToolStorageDir(context.Tool.Type),
-			UserDataDir: contextPaths.ToolStorageDir(context.Tool.Type),
+			RootDir:    contextPaths.RootDir,
+			StorageDir: contextPaths.ToolStorageDir(context.Tool.Type),
 		},
 	}
 	if !reflect.DeepEqual(fakeEditor.commandRequests, []codingtool.CommandRequest{wantEditorRequest}) {
@@ -333,7 +332,7 @@ func (e *builderFakeEditor) BuildLaunchCommand(request codingtool.CommandRequest
 		Executable: request.Executable,
 		Arguments: codingtool.Arguments{
 			"--state-dir",
-			request.Paths.UserDataDir,
+			request.Paths.StorageDir,
 			request.ProjectPath,
 		},
 	}, nil

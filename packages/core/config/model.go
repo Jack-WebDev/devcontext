@@ -7,10 +7,10 @@ type SchemaVersion int
 
 // GlobalConfig stores application-wide Dev Context settings.
 type GlobalConfig struct {
-	Version       SchemaVersion
+	Version     SchemaVersion
 	DefaultTool codingtool.Type
-	UI            UISettings
-	Safety        SafetySettings
+	UI          UISettings
+	Safety      SafetySettings
 }
 
 // UISettings stores application-wide user interface settings.

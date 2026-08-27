@@ -635,7 +635,7 @@ func eventFromLaunchPlan(name devlog.EventName, plan launcher.LaunchPlan, err er
 		Timestamp:        timestamp,
 		ProjectPath:      string(plan.ProjectPath),
 		ContextID:        plan.Context.ID.String(),
-		ToolID:         string(plan.Tool.Type),
+		ToolID:           string(plan.Tool.Type),
 		ResolutionSource: string(plan.ResolutionSource),
 		Err:              err,
 		KnownEnvironment: plan.Environment.Environ(),

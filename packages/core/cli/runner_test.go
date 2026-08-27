@@ -275,9 +275,8 @@ func TestRunnerRootLaunchBuildsPlanAndStartsDetachedProcess(t *testing.T) {
 		Executable:  "/recording/code",
 		ProjectPath: fixture.workingDir,
 		Paths: codingtool.ContextPaths{
-			RootDir:     contextRoot,
-			DataDir:     filepath.Join(contextRoot, "tools", "vscode"),
-			UserDataDir: filepath.Join(contextRoot, "tools", "vscode"),
+			RootDir:    contextRoot,
+			StorageDir: filepath.Join(contextRoot, "tools", "vscode"),
 		},
 	}
 	if !reflect.DeepEqual(launchEditor.requests, []codingtool.CommandRequest{wantEditorRequest}) {

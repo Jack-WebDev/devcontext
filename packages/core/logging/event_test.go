@@ -16,7 +16,7 @@ func TestEventSerializesOnlyApprovedFields(t *testing.T) {
 		Timestamp:        time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC),
 		ProjectPath:      "/work/app",
 		ContextID:        "personal",
-		ToolID:         "vscode",
+		ToolID:           "vscode",
 		ResolutionSource: "explicit",
 		Err:              fmt.Errorf("process failed: API_TOKEN=secret-token"),
 		KnownEnvironment: []string{"API_TOKEN=secret-token"},
