@@ -446,6 +446,23 @@ test("context card offers the backend-supplied provider setup action", () => {
   assert.doesNotMatch(html, /Open and configure<\/button>[^]*disabled=""/);
 });
 
+test("context card renders the backend-supplied provider sign-in waiting state", () => {
+  const context = contextFixture("company", "Company", [{
+    ...providerFixture("future", "Future Provider", true, "ready"),
+    setupAction: {
+      state: "waiting_for_sign_in",
+      label: "Waiting for sign-in",
+      message: "Waiting for Future Provider sign-in verification.",
+    },
+  }]);
+  const html = renderToStaticMarkup(ContextCard({context}));
+
+  assert.match(html, /role="status"/);
+  assert.ok(html.includes("Waiting for sign-in"));
+  assert.ok(html.includes("Waiting for Future Provider sign-in verification."));
+  assert.doesNotMatch(html, /Open and configure/);
+});
+
 test("selection initializes from a valid bound context", () => {
   const state = launchStateFixture({
     binding: {

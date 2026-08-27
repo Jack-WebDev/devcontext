@@ -387,6 +387,16 @@ function ProviderStatusRow({
           </Button>
         </div>
       ) : null}
+      {provider.setupAction?.state === "waiting_for_sign_in" ? (
+        <div
+          className="mt-2 border border-amber-500/40 bg-amber-500/5 p-2 text-xs"
+          role="status"
+          aria-live="polite"
+        >
+          <p className="font-medium text-foreground">{provider.setupAction.label}</p>
+          <p className="mt-1 text-muted-foreground">{provider.setupAction.message}</p>
+        </div>
+      ) : null}
     </li>
   );
 }
