@@ -64,6 +64,20 @@ func TestProviderSpecificSwitchesStayInsideProviderImplementations(t *testing.T)
 	assertNoProviderSpecificSwitches(t, filepath.Join("..", "..", "frontend", "src", "lib"), ".ts")
 }
 
+func TestCodingToolSpecificSwitchesStayInsideCodingToolImplementation(t *testing.T) {
+	goRoots := []string{
+		filepath.Join("..", "application"),
+		filepath.Join("..", "core", "launcher"),
+		filepath.Join("..", "core", "filesystem"),
+		filepath.Join("..", "core", "cli"),
+	}
+	for _, root := range goRoots {
+		assertNoVSCodeSpecificSwitches(t, root, ".go")
+	}
+
+	assertNoVSCodeSpecificSwitches(t, filepath.Join("..", "..", "frontend", "src", "lib"), ".ts")
+}
+
 func assertNoProviderSpecificSwitches(t *testing.T, root string, extension string) {
 	t.Helper()
 
@@ -87,6 +101,36 @@ func assertNoProviderSpecificSwitches(t *testing.T, root string, extension strin
 		} {
 			if strings.Contains(string(contents), forbidden) {
 				t.Errorf("%s contains provider-specific switch case %q", path, forbidden)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk %s: %v", root, err)
+	}
+}
+
+func assertNoVSCodeSpecificSwitches(t *testing.T, root string, extension string) {
+	t.Helper()
+
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, extension) || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, forbidden := range []string{
+			"VSCode",
+			`"vscode"`,
+		} {
+			if strings.Contains(string(contents), forbidden) {
+				t.Errorf("%s contains VS Code-specific tool decision %q", path, forbidden)
 			}
 		}
 		return nil
