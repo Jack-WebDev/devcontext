@@ -540,9 +540,9 @@ Context
 **Not** this — integrations are replaceable, identity is not:
 
 ```text
-VS Code → Context
-Claude  → Context
-Codex   → Context
+Coding tool → Context
+Provider    → Context
+Environment → Context
 ```
 
 > The development identity is the product.
@@ -584,6 +584,8 @@ VS Code → Cursor → Windsurf → JetBrains → Zed → Neovim
 ### 🔌 Additional identity providers
 
 Potential integrations include Git, GitHub, npm, AWS, Azure, and additional AI development tools.
+
+Claude Code and Codex are the built-in providers today. They are provider adapters, not architectural assumptions: a new provider can contribute its own isolated storage, environment, credential handling, identity metadata, and setup guidance through the provider registry.
 
 > The scope remains **development identity separation**. Dev Context is not intended to become a runtime manager, task runner, package manager, or general secrets manager.
 

@@ -155,8 +155,8 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 		{
 			Component: LaunchConfidenceCheckIsolation,
 			Severity:  LaunchConfidenceReady,
-			Label:     "Provider isolation",
-			Message:   "Provider isolation directories are ready.",
+			Label:     "Codex isolation",
+			Message:   "Codex isolation storage is ready.",
 		},
 		{
 			Component:  LaunchConfidenceCheckIsolation,

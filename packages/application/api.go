@@ -51,6 +51,7 @@ type ProviderState struct {
 	Enabled     bool                   `json:"enabled"`
 	State       ProviderReadinessState `json:"state"`
 	Explanation string                 `json:"explanation,omitempty"`
+	ActionHint  string                 `json:"actionHint,omitempty"`
 	Identity    ProviderIdentityState  `json:"identity"`
 }
 

@@ -3,7 +3,6 @@ package launcher
 import (
 	"errors"
 	"os"
-	"sort"
 	"strings"
 
 	"devctx/packages/core/editor"
@@ -86,44 +85,40 @@ func VSCodeConfidenceCheck(executable editor.Executable, err error) ConfidenceCh
 }
 
 // IsolationConfidenceChecks derives readiness checks for the context-owned
-// isolation storage required by launch and editor profile isolation.
-func IsolationConfidenceChecks(paths filesystem.ContextPaths) []ConfidenceCheck {
-	return []ConfidenceCheck{
+// isolation storage required by launch and editor profile isolation. Provider
+// checks are generated from the enabled registered providers passed by the
+// application layer.
+func IsolationConfidenceChecks(paths filesystem.ContextPaths, providers []provider.Provider) []ConfidenceCheck {
+	checks := []ConfidenceCheck{
 		directoryConfidenceCheck(ConfidenceCheck{
 			Component: ConfidenceCheckIsolation,
 			Label:     "Context storage",
 			Severity:  ConfidenceReady,
 			Message:   "Context storage is ready.",
 		}, paths.RootDir, "Context storage is not ready."),
-		multiDirectoryConfidenceCheck(ConfidenceCheck{
+	}
+	for _, integration := range providers {
+		if integration == nil {
+			continue
+		}
+		name := strings.TrimSpace(integration.DisplayName())
+		if name == "" {
+			name = string(integration.ID())
+		}
+		checks = append(checks, directoryConfidenceCheck(ConfidenceCheck{
 			Component: ConfidenceCheckIsolation,
-			Label:     "Provider isolation",
+			Label:     name + " isolation",
 			Severity:  ConfidenceReady,
-			Message:   "Provider isolation directories are ready.",
-		}, providerStorageDirectories(paths), "Provider isolation storage is incomplete."),
-		multiDirectoryConfidenceCheck(ConfidenceCheck{
-			Component: ConfidenceCheckIsolation,
-			Label:     "VS Code profile",
-			Severity:  ConfidenceReady,
-			Message:   "VS Code profile isolation is ready.",
-		}, []string{paths.VSCodeDir, paths.VSCodeUserDataDir}, "VS Code profile isolation is not ready."),
+			Message:   name + " isolation storage is ready.",
+		}, paths.ProviderStorageDir(integration.ID()), name+" isolation storage is not ready."))
 	}
-}
-
-func providerStorageDirectories(paths filesystem.ContextPaths) []string {
-	providerIDs := make([]provider.ID, 0, len(paths.ProviderStorageDirs))
-	for providerID := range paths.ProviderStorageDirs {
-		providerIDs = append(providerIDs, providerID)
-	}
-	sort.Slice(providerIDs, func(i int, j int) bool {
-		return providerIDs[i] < providerIDs[j]
-	})
-
-	dirs := make([]string, 0, len(providerIDs))
-	for _, providerID := range providerIDs {
-		dirs = append(dirs, paths.ProviderStorageDirs[providerID])
-	}
-	return dirs
+	checks = append(checks, multiDirectoryConfidenceCheck(ConfidenceCheck{
+		Component: ConfidenceCheckIsolation,
+		Label:     "VS Code profile",
+		Severity:  ConfidenceReady,
+		Message:   "VS Code profile isolation is ready.",
+	}, []string{paths.VSCodeDir, paths.VSCodeUserDataDir}, "VS Code profile isolation is not ready."))
+	return checks
 }
 
 func confidenceMessage(value string, fallback string) string {

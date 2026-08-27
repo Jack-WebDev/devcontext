@@ -380,7 +380,7 @@ func TestIsolationConfidenceChecksRepresentStorageReadiness(t *testing.T) {
 		}
 	}
 
-	got := launcher.IsolationConfidenceChecks(paths)
+	got := launcher.IsolationConfidenceChecks(paths, []provider.Provider{provider.ClaudeProvider{}, provider.CodexProvider{}})
 	want := []launcher.ConfidenceCheck{
 		{
 			Component: launcher.ConfidenceCheckIsolation,
@@ -391,8 +391,14 @@ func TestIsolationConfidenceChecksRepresentStorageReadiness(t *testing.T) {
 		{
 			Component: launcher.ConfidenceCheckIsolation,
 			Severity:  launcher.ConfidenceReady,
-			Label:     "Provider isolation",
-			Message:   "Provider isolation directories are ready.",
+			Label:     "Claude isolation",
+			Message:   "Claude isolation storage is ready.",
+		},
+		{
+			Component: launcher.ConfidenceCheckIsolation,
+			Severity:  launcher.ConfidenceReady,
+			Label:     "Codex isolation",
+			Message:   "Codex isolation storage is ready.",
 		},
 		{
 			Component: launcher.ConfidenceCheckIsolation,
@@ -425,7 +431,7 @@ func TestIsolationConfidenceChecksReportBlockedStorage(t *testing.T) {
 		t.Fatalf("write vscode user data file: %v", err)
 	}
 
-	got := launcher.IsolationConfidenceChecks(paths)
+	got := launcher.IsolationConfidenceChecks(paths, []provider.Provider{provider.ClaudeProvider{}, provider.CodexProvider{}})
 	want := []launcher.ConfidenceCheck{
 		{
 			Component: launcher.ConfidenceCheckIsolation,
@@ -434,10 +440,16 @@ func TestIsolationConfidenceChecksReportBlockedStorage(t *testing.T) {
 			Message:   "Context storage is ready.",
 		},
 		{
+			Component: launcher.ConfidenceCheckIsolation,
+			Severity:  launcher.ConfidenceReady,
+			Label:     "Claude isolation",
+			Message:   "Claude isolation storage is ready.",
+		},
+		{
 			Component:  launcher.ConfidenceCheckIsolation,
 			Severity:   launcher.ConfidenceBlocked,
-			Label:      "Provider isolation",
-			Message:    "Provider isolation storage is incomplete.",
+			Label:      "Codex isolation",
+			Message:    "Codex isolation storage is not ready.",
 			ActionHint: "Run diagnostics to repair context storage.",
 		},
 		{

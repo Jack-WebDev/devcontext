@@ -58,6 +58,32 @@ func TestDefaultContextSeeds(t *testing.T) {
 	}
 }
 
+func TestDefaultContextSeedsUseRegistryDefaults(t *testing.T) {
+	registry := provider.MustNewRegistry([]provider.Provider{defaultProvider{id: "future", name: "Future Provider"}}, "future")
+	ctx := devcontext.DefaultPersonalContextWithProviderRegistry(time.Now(), registry)
+	if len(ctx.Providers) != 1 {
+		t.Fatalf("provider count = %d, want one", len(ctx.Providers))
+	}
+	assertEnabledProvider(t, ctx.Providers, "future")
+}
+
+type defaultProvider struct {
+	id   provider.ID
+	name string
+}
+
+func (p defaultProvider) ID() provider.ID { return p.id }
+
+func (p defaultProvider) DisplayName() string { return p.name }
+
+func (defaultProvider) BuildEnvironment(provider.RuntimeContext) (provider.EnvironmentContribution, error) {
+	return provider.EnvironmentContribution{}, nil
+}
+
+func (defaultProvider) Status(provider.RuntimeContext) (provider.Status, error) {
+	return provider.ReadyStatus(), nil
+}
+
 func assertEnabledProvider(t *testing.T, providers provider.Configs, providerID provider.ID) {
 	t.Helper()
 

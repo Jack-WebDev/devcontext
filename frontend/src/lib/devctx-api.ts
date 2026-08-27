@@ -64,6 +64,7 @@ export interface ProviderState {
   enabled: boolean;
   state: ProviderReadinessState;
   explanation?: string;
+  actionHint?: string;
   identity: ProviderIdentityState;
 }
 
@@ -319,9 +320,13 @@ function normalizeLaunchConfidenceState(value: unknown): LaunchConfidenceState |
 
 function normalizeLaunchConfidenceCheck(value: unknown): LaunchConfidenceCheck {
   const object = objectValue(value);
+  const component = normalizeLaunchConfidenceCheckComponent(object.component);
   const providerId = optionalString(object.providerId);
+  if (component === "provider" && providerId === undefined) {
+    throw new Error("Invalid Dev Context response.");
+  }
   return {
-    component: normalizeLaunchConfidenceCheckComponent(object.component),
+    component,
     ...(providerId === undefined ? {} : {providerId}),
     severity: normalizeLaunchConfidenceStatus(object.severity),
     label: stringValue(object.label),
@@ -415,12 +420,14 @@ function normalizeEditorState(value: unknown): EditorState {
 
 function normalizeProviderState(value: unknown): ProviderState {
   const object = objectValue(value);
+	const actionHint = optionalString(object.actionHint);
   return {
     id: stringValue(object.id),
     name: stringValue(object.name),
     enabled: booleanValue(object.enabled),
     state: normalizeProviderReadinessState(object.state),
     explanation: optionalString(object.explanation),
+    ...(actionHint === undefined ? {} : {actionHint}),
     identity: normalizeProviderIdentityState(object.identity),
   };
 }

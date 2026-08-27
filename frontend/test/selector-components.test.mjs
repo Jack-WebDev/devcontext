@@ -171,6 +171,26 @@ test("provider credential classification renders only safe metadata fields", () 
   assert.ok(html.includes("e783"));
 });
 
+test("provider credential classification renders a future provider without a provider-specific branch", () => {
+  const html = renderToStaticMarkup(
+    ProviderCredentialClassification({
+      sessions: [{
+        providerId: "future",
+        name: "Future Provider",
+        metadataAvailable: true,
+        fields: [{label: "Workspace", value: "Example"}],
+      }],
+      assignments: {future: "company"},
+      onClassify: () => {},
+    }),
+  );
+
+  assert.ok(html.includes("Future Provider"));
+  assert.ok(html.includes("Workspace:"));
+  assert.ok(html.includes("Example"));
+  assert.ok(html.includes("Current global Future Provider session"));
+});
+
 test("first-run welcome shows pending and error states", () => {
   const state = launchStateFixture({
     contexts: [],
@@ -274,25 +294,25 @@ test("context card renders enabled provider status variants with accessible name
   assert.ok(!html.includes("Disabled Provider"));
 });
 
-test("context card attaches authentication guidance to not configured Claude and Codex providers", () => {
+test("context card renders generic setup guidance for an unconfigured provider", () => {
   const personal = contextFixture("personal", "Personal", [
     providerFixture("codex", "Codex", true, "not_configured", "Codex isolated provider state was not found"),
     providerFixture("claude", "Claude", true, "ready"),
   ]);
   const company = contextFixture("company", "Company", [
     providerFixture("codex", "Codex", true, "ready"),
-    providerFixture("internal", "Internal Tool", true, "not_configured"),
+    {...providerFixture("internal", "Internal Tool", true, "not_configured"), actionHint: "Connect Internal Tool to Company."},
   ]);
   const html = [
     renderToStaticMarkup(ContextCard({context: personal})),
     renderToStaticMarkup(ContextCard({context: company})),
   ].join("");
 
-  assert.ok(html.includes("Codex is enabled for Personal but no isolated provider state was found."));
-  assert.ok(html.includes("Open Personal, then sign in with the Codex VS Code extension."));
+  assert.ok(html.includes("Codex is enabled for Personal but is not configured."));
+  assert.ok(html.includes("Open Personal and complete Codex setup."));
   assert.ok(!html.includes("Claude is enabled for Personal"));
   assert.ok(!html.includes("Codex is enabled for Company"));
-  assert.ok(!html.includes("Internal Tool is enabled for Company"));
+  assert.ok(html.includes("Connect Internal Tool to Company."));
 });
 
 test("selection initializes from a valid bound context", () => {
