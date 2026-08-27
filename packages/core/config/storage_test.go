@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/config"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 )
 
@@ -36,8 +36,8 @@ func TestWriteGlobalConfigFileAtomicallyReplacesConfig(t *testing.T) {
 	}
 
 	globalConfig := config.GlobalConfig{
-		Version:       config.CurrentSchemaVersion,
-		DefaultEditor: editor.TypeVSCode,
+		Version:     config.CurrentSchemaVersion,
+		DefaultTool: codingtool.TypeVSCode,
 		UI: config.UISettings{
 			RememberWindowPosition: false,
 		},
@@ -68,8 +68,8 @@ func TestWriteGlobalConfigFileAtomicallyReplacesConfig(t *testing.T) {
 func TestGlobalConfigPersistenceRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
 	original := config.GlobalConfig{
-		Version:       config.CurrentSchemaVersion,
-		DefaultEditor: editor.TypeVSCode,
+		Version:     config.CurrentSchemaVersion,
+		DefaultTool: codingtool.TypeVSCode,
 		UI: config.UISettings{
 			RememberWindowPosition: false,
 		},
@@ -135,8 +135,8 @@ func TestConcurrentGlobalConfigWritesLeaveParseableConfig(t *testing.T) {
 	values := []config.GlobalConfig{
 		config.DefaultGlobalConfig(),
 		{
-			Version:       config.CurrentSchemaVersion,
-			DefaultEditor: editor.TypeVSCode,
+			Version:     config.CurrentSchemaVersion,
+			DefaultTool: codingtool.TypeVSCode,
 			UI: config.UISettings{
 				RememberWindowPosition: false,
 			},
@@ -233,8 +233,8 @@ func TestInitializeDevContextHomePreservesExistingGlobalConfig(t *testing.T) {
 	}
 
 	customConfig := config.GlobalConfig{
-		Version:       config.CurrentSchemaVersion,
-		DefaultEditor: editor.TypeVSCode,
+		Version:     config.CurrentSchemaVersion,
+		DefaultTool: codingtool.TypeVSCode,
 		UI: config.UISettings{
 			RememberWindowPosition: false,
 		},

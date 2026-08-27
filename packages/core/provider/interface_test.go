@@ -119,7 +119,7 @@ func TestRuntimeContextPathsExposeOnlyProviderStorageDir(t *testing.T) {
 	if _, ok := contextPathsType.FieldByName("StorageDir"); !ok {
 		t.Fatal("provider.ContextPaths is missing StorageDir")
 	}
-	for _, fieldName := range []string{"ClaudeDir", "CodexDir"} {
+	for _, fieldName := range []string{"ClaudeDir", "CodexDir", "VSCodeDir", "VSCodeUserDataDir"} {
 		if _, ok := contextPathsType.FieldByName(fieldName); ok {
 			t.Fatalf("provider.ContextPaths exposes %s, want only provider-owned storage", fieldName)
 		}

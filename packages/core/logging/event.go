@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
@@ -32,7 +32,7 @@ type ErrorCategory string
 const (
 	ErrorCategoryConfiguration ErrorCategory = "configuration"
 	ErrorCategoryContext       ErrorCategory = "context"
-	ErrorCategoryEditor        ErrorCategory = "editor"
+	ErrorCategoryTool          ErrorCategory = "editor"
 	ErrorCategoryPermission    ErrorCategory = "permission"
 	ErrorCategoryProcess       ErrorCategory = "process"
 	ErrorCategoryProject       ErrorCategory = "project"
@@ -48,7 +48,7 @@ type Event struct {
 	Timestamp        time.Time     `json:"timestamp"`
 	ProjectPath      string        `json:"project_path,omitempty"`
 	ContextID        string        `json:"context_id,omitempty"`
-	EditorID         string        `json:"editor_id,omitempty"`
+	ToolID           string        `json:"editor_id,omitempty"`
 	ResolutionSource string        `json:"resolution_source,omitempty"`
 	ErrorCategory    ErrorCategory `json:"error_category,omitempty"`
 	Error            string        `json:"error,omitempty"`
@@ -60,7 +60,7 @@ type EventInput struct {
 	Timestamp        time.Time
 	ProjectPath      string
 	ContextID        string
-	EditorID         string
+	ToolID           string
 	ResolutionSource string
 	Err              error
 	KnownEnvironment []string
@@ -74,7 +74,7 @@ func NewEvent(input EventInput) Event {
 		Timestamp:        input.Timestamp,
 		ProjectPath:      input.ProjectPath,
 		ContextID:        input.ContextID,
-		EditorID:         input.EditorID,
+		ToolID:           input.ToolID,
 		ResolutionSource: input.ResolutionSource,
 	}
 
@@ -107,9 +107,9 @@ func CategoryForError(err error) ErrorCategory {
 		errors.Is(err, project.ErrProjectDirectoryUnreadable), errors.Is(err, project.ErrInvalidProjectPath),
 		errors.Is(err, project.ErrInvalidProjectBindings), errors.Is(err, project.ErrDuplicateProjectBinding):
 		return ErrorCategoryProject
-	case errors.Is(err, editor.ErrExecutableNotFound), errors.Is(err, editor.ErrExecutableNotExecutable),
-		errors.Is(err, editor.ErrMissingExecutable), errors.Is(err, launcher.ErrMissingProcessExecutable):
-		return ErrorCategoryEditor
+	case errors.Is(err, codingtool.ErrExecutableNotFound), errors.Is(err, codingtool.ErrExecutableNotExecutable),
+		errors.Is(err, codingtool.ErrMissingExecutable), errors.Is(err, launcher.ErrMissingProcessExecutable):
+		return ErrorCategoryTool
 	case errors.Is(err, launcher.ErrProcessExecutableNotFound), errors.Is(err, launcher.ErrProcessStartFailed),
 		errors.Is(err, launcher.ErrProcessWorkingDirectoryInvalid):
 		return ErrorCategoryProcess
@@ -123,8 +123,8 @@ func CategoryForError(err error) ErrorCategory {
 // LaunchEventNameForError maps a launch failure to one approved event name.
 func LaunchEventNameForError(err error) EventName {
 	switch {
-	case errors.Is(err, editor.ErrExecutableNotFound), errors.Is(err, editor.ErrExecutableNotExecutable),
-		errors.Is(err, editor.ErrMissingExecutable), errors.Is(err, launcher.ErrMissingProcessExecutable):
+	case errors.Is(err, codingtool.ErrExecutableNotFound), errors.Is(err, codingtool.ErrExecutableNotExecutable),
+		errors.Is(err, codingtool.ErrMissingExecutable), errors.Is(err, launcher.ErrMissingProcessExecutable):
 		return EventLaunchMissingEditor
 	case errors.Is(err, launcher.ErrProcessExecutableNotFound), errors.Is(err, launcher.ErrProcessPermissionDenied),
 		errors.Is(err, launcher.ErrProcessWorkingDirectoryInvalid), errors.Is(err, launcher.ErrProcessStartFailed):

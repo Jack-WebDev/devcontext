@@ -8,7 +8,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"devctx/packages/core/editor"
+	codingtool "devctx/packages/core/codingtool"
 )
 
 var (
@@ -40,10 +40,10 @@ func (e *GlobalConfigFileError) Unwrap() error {
 }
 
 type globalConfigTOML struct {
-	Version       *int               `toml:"version"`
-	DefaultEditor *string            `toml:"default_editor"`
-	UI            uiSettingsTOML     `toml:"ui"`
-	Safety        safetySettingsTOML `toml:"safety"`
+	Version     *int               `toml:"version"`
+	DefaultTool *string            `toml:"default_editor"`
+	UI          uiSettingsTOML     `toml:"ui"`
+	Safety      safetySettingsTOML `toml:"safety"`
 }
 
 type uiSettingsTOML struct {
@@ -91,7 +91,7 @@ func EncodeGlobalConfigTOML(globalConfig GlobalConfig) ([]byte, error) {
 	builder.WriteString(strconv.Itoa(int(globalConfig.Version)))
 	builder.WriteString("\n\n")
 	builder.WriteString("default_editor = ")
-	builder.WriteString(strconv.Quote(string(globalConfig.DefaultEditor)))
+	builder.WriteString(strconv.Quote(string(globalConfig.DefaultTool)))
 	builder.WriteString("\n\n")
 	builder.WriteString("[ui]\n")
 	builder.WriteString("remember_window_position = ")
@@ -117,12 +117,12 @@ func globalConfigFromTOML(raw globalConfigTOML) (GlobalConfig, error) {
 		return GlobalConfig{}, fmt.Errorf("%w: %d", ErrUnsupportedSchemaVersion, version)
 	}
 
-	if raw.DefaultEditor == nil {
+	if raw.DefaultTool == nil {
 		return GlobalConfig{}, fmt.Errorf("%w: missing default_editor", ErrInvalidGlobalConfig)
 	}
-	defaultEditor := editor.Type(*raw.DefaultEditor)
-	if defaultEditor != editor.TypeVSCode {
-		return GlobalConfig{}, fmt.Errorf("%w: unsupported default_editor %q", ErrInvalidGlobalConfig, defaultEditor)
+	defaultTool := codingtool.Type(*raw.DefaultTool)
+	if defaultTool != codingtool.TypeVSCode {
+		return GlobalConfig{}, fmt.Errorf("%w: unsupported default_editor %q", ErrInvalidGlobalConfig, defaultTool)
 	}
 
 	if raw.UI.RememberWindowPosition == nil {
@@ -136,8 +136,8 @@ func globalConfigFromTOML(raw globalConfigTOML) (GlobalConfig, error) {
 	}
 
 	return GlobalConfig{
-		Version:       version,
-		DefaultEditor: defaultEditor,
+		Version:     version,
+		DefaultTool: defaultTool,
 		UI: UISettings{
 			RememberWindowPosition: *raw.UI.RememberWindowPosition,
 		},
@@ -152,8 +152,8 @@ func validateGlobalConfig(globalConfig GlobalConfig) error {
 	if globalConfig.Version != CurrentSchemaVersion {
 		return fmt.Errorf("%w: %d", ErrUnsupportedSchemaVersion, globalConfig.Version)
 	}
-	if globalConfig.DefaultEditor != editor.TypeVSCode {
-		return fmt.Errorf("%w: unsupported default_editor %q", ErrInvalidGlobalConfig, globalConfig.DefaultEditor)
+	if globalConfig.DefaultTool != codingtool.TypeVSCode {
+		return fmt.Errorf("%w: unsupported default_editor %q", ErrInvalidGlobalConfig, globalConfig.DefaultTool)
 	}
 	return nil
 }

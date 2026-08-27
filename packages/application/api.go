@@ -31,15 +31,15 @@ type ProjectState struct {
 type ContextState struct {
 	ID         string                `json:"id"`
 	Name       string                `json:"name"`
-	Editor     EditorState           `json:"editor"`
+	Tool       ToolState             `json:"tool"`
 	Providers  []ProviderState       `json:"providers"`
 	Confidence LaunchConfidenceState `json:"confidence"`
 	Metadata   map[string]string     `json:"metadata,omitempty"`
 }
 
-// EditorState describes the editor selected by a context without exposing
+// ToolState describes the coding tool selected by a context without exposing
 // execution details.
-type EditorState struct {
+type ToolState struct {
 	Type string `json:"type"`
 }
 

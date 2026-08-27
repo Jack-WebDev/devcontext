@@ -1110,7 +1110,7 @@ function contextFixture(id, name, providers = []) {
   return {
     id,
     name,
-    editor: {type: "vscode"},
+    tool: {type: "vscode"},
     providers,
   };
 }

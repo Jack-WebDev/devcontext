@@ -3,14 +3,14 @@ package config_test
 import (
 	"testing"
 
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/config"
-	"devctx/packages/core/editor"
 )
 
 func TestGlobalConfigConstructsVersionedApplicationSettings(t *testing.T) {
 	globalConfig := config.GlobalConfig{
-		Version:       config.CurrentSchemaVersion,
-		DefaultEditor: editor.TypeVSCode,
+		Version:     config.CurrentSchemaVersion,
+		DefaultTool: codingtool.TypeVSCode,
 		UI: config.UISettings{
 			RememberWindowPosition: true,
 		},
@@ -23,8 +23,8 @@ func TestGlobalConfigConstructsVersionedApplicationSettings(t *testing.T) {
 	if globalConfig.Version != config.CurrentSchemaVersion {
 		t.Fatalf("version = %d, want %d", globalConfig.Version, config.CurrentSchemaVersion)
 	}
-	if globalConfig.DefaultEditor != editor.TypeVSCode {
-		t.Fatalf("default editor = %q, want %q", globalConfig.DefaultEditor, editor.TypeVSCode)
+	if globalConfig.DefaultTool != codingtool.TypeVSCode {
+		t.Fatalf("default editor = %q, want %q", globalConfig.DefaultTool, codingtool.TypeVSCode)
 	}
 	if !globalConfig.UI.RememberWindowPosition {
 		t.Fatal("remember window position = false, want true")

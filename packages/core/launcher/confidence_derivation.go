@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"devctx/packages/core/editor"
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/provider"
 )
@@ -55,7 +55,7 @@ func ProviderConfidenceCheck(providerID provider.ID, displayName string, status 
 
 // VSCodeConfidenceCheck derives the VS Code readiness check from executable
 // detection output.
-func VSCodeConfidenceCheck(executable editor.Executable, err error) ConfidenceCheck {
+func VSCodeConfidenceCheck(executable codingtool.Executable, err error) ConfidenceCheck {
 	check := ConfidenceCheck{
 		Component: ConfidenceCheckVSCode,
 		Label:     "VS Code",
@@ -73,9 +73,9 @@ func VSCodeConfidenceCheck(executable editor.Executable, err error) ConfidenceCh
 	switch {
 	case err == nil:
 		check.Message = "Dev Context could not find a VS Code command to launch."
-	case errors.Is(err, editor.ErrExecutableNotFound):
+	case errors.Is(err, codingtool.ErrExecutableNotFound):
 		check.Message = "Dev Context could not find a VS Code command to launch."
-	case errors.Is(err, editor.ErrExecutableNotExecutable):
+	case errors.Is(err, codingtool.ErrExecutableNotExecutable):
 		check.Message = "The configured VS Code command cannot be run."
 	default:
 		check.Message = "VS Code readiness could not be checked."
@@ -117,7 +117,7 @@ func IsolationConfidenceChecks(paths filesystem.ContextPaths, providers []provid
 		Label:     "VS Code profile",
 		Severity:  ConfidenceReady,
 		Message:   "VS Code profile isolation is ready.",
-	}, []string{paths.VSCodeDir, paths.VSCodeUserDataDir}, "VS Code profile isolation is not ready."))
+	}, []string{paths.ToolStorageRootDir, paths.ToolStorageDir(codingtool.VSCodeID)}, "VS Code profile isolation is not ready."))
 	return checks
 }
 

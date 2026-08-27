@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"devctx/packages/core/editor"
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/provider"
 )
 
@@ -59,9 +59,9 @@ func TestWriteContextFileAtomicallyFailureLeavesPreviousContextLoadable(t *testi
 
 func testStoredContext(id string, name string) Context {
 	return Context{
-		ID:     MustID(id),
-		Name:   name,
-		Editor: editor.DefaultConfig(),
+		ID:   MustID(id),
+		Name: name,
+		Tool: codingtool.DefaultConfig(),
 		Providers: provider.Configs{
 			"claude": {Enabled: true},
 			"codex":  {Enabled: true},

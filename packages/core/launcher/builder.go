@@ -2,10 +2,11 @@ package launcher
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/environment"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/project"
@@ -21,9 +22,9 @@ var (
 	// path resolution.
 	ErrMissingPlatformPaths = errors.New("missing platform paths")
 
-	// ErrMissingEditor identifies a launch-plan builder without an editor
+	// ErrMissingTool identifies a launch-plan builder without an editor
 	// implementation.
-	ErrMissingEditor = errors.New("missing editor")
+	ErrMissingTool = errors.New("missing editor")
 
 	// ErrLaunchSelectionRequired identifies a request that cannot produce a full
 	// launch plan until the user selects a context.
@@ -38,10 +39,13 @@ type ContextResolver interface {
 
 // LaunchPlanBuilder builds a complete launch plan without starting a process.
 type LaunchPlanBuilder struct {
-	Resolver          ContextResolver
-	PlatformPaths     filesystem.PlatformPaths
-	ProviderRegistry  provider.Registry
-	Editor            editor.Editor
+	Resolver         ContextResolver
+	PlatformPaths    filesystem.PlatformPaths
+	ProviderRegistry provider.Registry
+	ToolRegistry     codingtool.Registry
+	// Tool is retained temporarily for callers that have not yet moved to the
+	// registry contract. New code must provide ToolRegistry.
+	Tool              codingtool.CodingTool
 	ParentEnvironment []string
 }
 
@@ -54,8 +58,8 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 	if b.PlatformPaths == nil {
 		return LaunchPlan{}, ErrMissingPlatformPaths
 	}
-	if b.Editor == nil {
-		return LaunchPlan{}, ErrMissingEditor
+	if b.ToolRegistry.IsZero() && b.Tool == nil {
+		return LaunchPlan{}, ErrMissingTool
 	}
 	if err := project.ValidateProjectDirectory(request.ProjectPath); err != nil {
 		return LaunchPlan{}, err
@@ -75,6 +79,7 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 	}
 	providerRegistry := b.providerRegistry()
 	contextPaths = contextPaths.WithProviderStorageDirs(registeredEnabledProviderIDs(*resolution.Context, providerRegistry))
+	contextPaths = contextPaths.WithToolStorageDirs([]codingtool.ID{resolution.Context.Tool.Type})
 	if err := filesystem.ValidateContextDirectoryTreeWithProviderRegistry(contextPaths, *resolution.Context, providerRegistry); err != nil {
 		return LaunchPlan{}, err
 	}
@@ -88,18 +93,21 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 		return LaunchPlan{}, err
 	}
 
-	executable, err := b.Editor.DetectExecutable(resolution.Context.Editor)
+	integration, ok := b.toolRegistry().Get(resolution.Context.Tool.Type)
+	if !ok {
+		return LaunchPlan{}, fmt.Errorf("%w: %s", ErrMissingTool, resolution.Context.Tool.Type)
+	}
+	executable, err := integration.DetectExecutable(resolution.Context.Tool)
 	if err != nil {
 		return LaunchPlan{}, err
 	}
-	command, err := b.Editor.BuildLaunchCommand(editor.CommandRequest{
-		Config:      resolution.Context.Editor,
+	command, err := integration.BuildLaunchCommand(codingtool.CommandRequest{
+		Config:      resolution.Context.Tool,
 		Executable:  executable,
 		ProjectPath: string(request.ProjectPath),
-		Paths: editor.ContextPaths{
-			RootDir:     contextPaths.RootDir,
-			DataDir:     contextPaths.VSCodeDir,
-			UserDataDir: contextPaths.VSCodeUserDataDir,
+		Paths: codingtool.ContextPaths{
+			RootDir:    contextPaths.RootDir,
+			StorageDir: contextPaths.ToolStorageDir(resolution.Context.Tool.Type),
 		},
 	})
 	if err != nil {
@@ -109,7 +117,7 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 	return LaunchPlan{
 		ProjectPath:        request.ProjectPath,
 		Context:            *resolution.Context,
-		Editor:             resolution.Context.Editor,
+		Tool:               resolution.Context.Tool,
 		Executable:         Executable(command.Executable),
 		Arguments:          launchArguments(command.Arguments),
 		WorkingDirectory:   WorkingDirectory(request.ProjectPath),
@@ -137,10 +145,8 @@ func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, 
 			ContextID: ctxContext.ID.String(),
 			Config:    config,
 			Paths: provider.ContextPaths{
-				RootDir:           paths.RootDir,
-				StorageDir:        paths.ProviderStorageDir(providerID),
-				VSCodeDir:         paths.VSCodeDir,
-				VSCodeUserDataDir: paths.VSCodeUserDataDir,
+				RootDir:    paths.RootDir,
+				StorageDir: paths.ProviderStorageDir(providerID),
 			},
 		})
 		if err != nil {
@@ -174,6 +180,13 @@ func (b LaunchPlanBuilder) providerRegistry() provider.Registry {
 	return b.ProviderRegistry
 }
 
+func (b LaunchPlanBuilder) toolRegistry() codingtool.Registry {
+	if !b.ToolRegistry.IsZero() {
+		return b.ToolRegistry
+	}
+	return codingtool.MustNewRegistry([]codingtool.RegisteredTool{{Integration: b.Tool, DisplayName: string(b.Tool.ID())}}, b.Tool.ID())
+}
+
 func registeredEnabledProviderIDs(ctx devcontext.Context, registry provider.Registry) []provider.ID {
 	ids := make([]provider.ID, 0, len(ctx.Providers))
 	for _, integration := range registry.All() {
@@ -185,7 +198,7 @@ func registeredEnabledProviderIDs(ctx devcontext.Context, registry provider.Regi
 	return ids
 }
 
-func launchArguments(arguments editor.Arguments) Arguments {
+func launchArguments(arguments codingtool.Arguments) Arguments {
 	values := make(Arguments, len(arguments))
 	for i, value := range arguments {
 		values[i] = string(value)

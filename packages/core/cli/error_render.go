@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"strings"
 
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
@@ -55,7 +55,7 @@ func classifyError(err error) renderedError {
 	var projectPathError *project.PathError
 	var missingContextError *devcontext.MissingContextError
 	var contextStorageError *filesystem.ContextStorageError
-	var executableNotFound *editor.ExecutableNotFoundError
+	var executableNotFound *codingtool.ExecutableNotFoundError
 	var processLaunchError *launcher.ProcessLaunchError
 	switch {
 	case errors.As(err, &globalConfigFileError):
@@ -176,25 +176,25 @@ func classifyError(err error) renderedError {
 			Why:      "The current user's home directory could not be determined.",
 			Recovery: "Check the user environment and try again.",
 		}
-	case errors.As(err, &executableNotFound) && executableNotFound.EditorID == editor.VSCodeID:
+	case errors.As(err, &executableNotFound) && executableNotFound.ToolID == codingtool.VSCodeID:
 		return renderedError{
 			Title:    "VS Code command not found",
 			Why:      missingVSCodeWhy(executableNotFound.Candidates),
 			Recovery: missingVSCodeRecovery(executableNotFound.Candidates),
 		}
-	case errors.Is(err, editor.ErrExecutableNotFound):
+	case errors.Is(err, codingtool.ErrExecutableNotFound):
 		return renderedError{
 			Title:    "Unable to launch editor",
 			Why:      "Dev Context could not find the configured editor executable.",
 			Recovery: "Install the editor command, add it to PATH, or configure a valid editor executable.",
 		}
-	case errors.Is(err, editor.ErrExecutableNotExecutable):
+	case errors.Is(err, codingtool.ErrExecutableNotExecutable):
 		return renderedError{
 			Title:    "Unable to launch editor",
 			Why:      "The configured editor executable is not usable.",
 			Recovery: "Configure an executable editor path or install the editor command on PATH.",
 		}
-	case errors.Is(err, editor.ErrMissingExecutable), errors.Is(err, launcher.ErrMissingProcessExecutable):
+	case errors.Is(err, codingtool.ErrMissingExecutable), errors.Is(err, launcher.ErrMissingProcessExecutable):
 		return renderedError{
 			Title:    "Unable to launch editor",
 			Why:      "No editor executable was resolved for the selected context.",
@@ -204,7 +204,7 @@ func classifyError(err error) renderedError {
 		return renderedError{
 			Title:    "VS Code command not found",
 			Why:      processExecutableWhy(processLaunchError),
-			Recovery: "Install the VS Code command line launcher, add it to PATH, or set editor.executable_override in the context to a valid VS Code CLI path.",
+			Recovery: "Install the VS Code command line launcher, add it to PATH, or set codingtool.executable_override in the context to a valid VS Code CLI path.",
 		}
 	case errors.Is(err, launcher.ErrProcessExecutableNotFound):
 		return renderedError{
@@ -367,7 +367,7 @@ func missingVSCodeRecovery(candidates []string) string {
 	if len(candidates) > 0 {
 		expected = "`" + strings.Join(candidates, "`, `") + "`"
 	}
-	return fmt.Sprintf("Install the VS Code command line launcher so %s is on PATH, or set editor.executable_override in the context to a valid VS Code CLI path.", expected)
+	return fmt.Sprintf("Install the VS Code command line launcher so %s is on PATH, or set codingtool.executable_override in the context to a valid VS Code CLI path.", expected)
 }
 
 func processExecutableWhy(err *launcher.ProcessLaunchError) string {

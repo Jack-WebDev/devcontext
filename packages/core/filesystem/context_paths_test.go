@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/provider"
@@ -25,8 +26,8 @@ func TestDeriveContextPathsFromUnixHome(t *testing.T) {
 		ConfigPath:             "/home/alex/.devctx/contexts/personal/context.toml",
 		ProviderStorageRootDir: "/home/alex/.devctx/contexts/personal/providers",
 		ProviderStorageDirs:    map[provider.ID]string{},
-		VSCodeDir:              "/home/alex/.devctx/contexts/personal/vscode",
-		VSCodeUserDataDir:      "/home/alex/.devctx/contexts/personal/vscode/user-data",
+		ToolStorageRootDir:     "/home/alex/.devctx/contexts/personal/tools",
+		ToolStorageDirs:        map[codingtool.ID]string{},
 	})
 	if got := contextPaths.ProviderStorageDir(provider.CodexID); got != "/home/alex/.devctx/contexts/personal/providers/codex" {
 		t.Fatalf("codex provider storage dir = %q", got)
@@ -49,8 +50,8 @@ func TestDeriveContextPathsFromWindowsHome(t *testing.T) {
 		ConfigPath:             `C:\Users\Alex\.devctx\contexts\client-a\context.toml`,
 		ProviderStorageRootDir: `C:\Users\Alex\.devctx\contexts\client-a\providers`,
 		ProviderStorageDirs:    map[provider.ID]string{},
-		VSCodeDir:              `C:\Users\Alex\.devctx\contexts\client-a\vscode`,
-		VSCodeUserDataDir:      `C:\Users\Alex\.devctx\contexts\client-a\vscode\user-data`,
+		ToolStorageRootDir:     `C:\Users\Alex\.devctx\contexts\client-a\tools`,
+		ToolStorageDirs:        map[codingtool.ID]string{},
 	})
 	if got := contextPaths.ProviderStorageDir(provider.ClaudeID); got != `C:\Users\Alex\.devctx\contexts\client-a\providers\claude` {
 		t.Fatalf("claude provider storage dir = %q", got)

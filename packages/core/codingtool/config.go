@@ -1,4 +1,4 @@
-package editor
+package codingtool
 
 // ID identifies an editor implementation.
 type ID string
@@ -29,5 +29,11 @@ type Config struct {
 
 // DefaultConfig returns the default editor intent for new contexts.
 func DefaultConfig() Config {
-	return Config{Type: TypeVSCode}
+	return DefaultConfigForRegistry(BuiltInRegistry())
+}
+
+// DefaultConfigForRegistry returns the default editor intent selected by the
+// supplied registry.
+func DefaultConfigForRegistry(registry Registry) Config {
+	return Config{Type: registry.DefaultID()}
 }

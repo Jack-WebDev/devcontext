@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/environment"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
@@ -43,12 +43,15 @@ func (r Result) Write(stdout io.Writer, stderr io.Writer) error {
 
 // Runner executes implemented CLI commands against core repositories.
 type Runner struct {
-	Contexts           devcontext.Repository
-	Projects           project.Repository
-	WorkingDirectory   string
-	Paths              filesystem.PlatformPaths
-	ProviderRegistry   provider.Registry
-	Editor             editor.Editor
+	Contexts         devcontext.Repository
+	Projects         project.Repository
+	WorkingDirectory string
+	Paths            filesystem.PlatformPaths
+	ProviderRegistry provider.Registry
+	ToolRegistry     codingtool.Registry
+	// Tool is retained temporarily for callers that have not yet moved to the
+	// registry contract. New code must provide ToolRegistry.
+	Tool               codingtool.CodingTool
 	ProcessLauncher    launcher.ProcessLauncher
 	ParentEnvironment  []string
 	DetachMode         launcher.DetachMode
@@ -101,7 +104,7 @@ func (r Runner) runRootLaunch(command RootLaunchCommand) Result {
 		Resolver:          launcher.NewResolver(r.Contexts, r.Projects),
 		PlatformPaths:     paths,
 		ProviderRegistry:  r.providerRegistry(),
-		Editor:            r.editor(),
+		ToolRegistry:      r.toolRegistry(),
 		ParentEnvironment: r.parentEnvironment(),
 	}
 	plan, err := builder.Build(request)
@@ -151,7 +154,7 @@ func (r Runner) runContext(command ContextCommand) Result {
 		if err != nil {
 			return r.errorResult(err)
 		}
-		ctx, err := devcontext.DefaultContextForIDWithProviderRegistry(contextID, r.now(), r.providerRegistry())
+		ctx, err := devcontext.DefaultContextForIDWithRegistries(contextID, r.now(), r.providerRegistry(), r.toolRegistry())
 		if err != nil {
 			return r.errorResult(err)
 		}
@@ -234,11 +237,14 @@ func (r Runner) providerRegistry() provider.Registry {
 	return provider.BuiltInRegistry()
 }
 
-func (r Runner) editor() editor.Editor {
-	if r.Editor != nil {
-		return r.Editor
+func (r Runner) toolRegistry() codingtool.Registry {
+	if !r.ToolRegistry.IsZero() {
+		return r.ToolRegistry
 	}
-	return editor.VSCodeEditor{}
+	if r.Tool != nil {
+		return codingtool.MustNewRegistry([]codingtool.RegisteredTool{{Integration: r.Tool, DisplayName: string(r.Tool.ID())}}, r.Tool.ID())
+	}
+	return codingtool.BuiltInRegistry()
 }
 
 func (r Runner) processLauncher() launcher.ProcessLauncher {
@@ -388,7 +394,7 @@ func renderDebugLaunchPlan(plan launcher.LaunchPlan) string {
 	var builder strings.Builder
 	builder.WriteString("Debug:\n")
 	fmt.Fprintf(&builder, "resolution_source: %s\n", plan.ResolutionSource)
-	fmt.Fprintf(&builder, "editor_id: %s\n", plan.Editor.Type)
+	fmt.Fprintf(&builder, "editor_id: %s\n", plan.Tool.Type)
 	fmt.Fprintf(&builder, "editor_executable: %s\n", plan.Executable)
 	builder.WriteString("context_directories:\n")
 	fmt.Fprintf(&builder, "  root: %s\n", plan.ContextPaths.RootDir)
@@ -445,7 +451,7 @@ func eventFromPlan(name devlog.EventName, plan launcher.LaunchPlan, err error, t
 		Timestamp:        timestamp,
 		ProjectPath:      string(plan.ProjectPath),
 		ContextID:        plan.Context.ID.String(),
-		EditorID:         string(plan.Editor.Type),
+		ToolID:           string(plan.Tool.Type),
 		ResolutionSource: string(plan.ResolutionSource),
 		Err:              err,
 		KnownEnvironment: plan.Environment.Environ(),

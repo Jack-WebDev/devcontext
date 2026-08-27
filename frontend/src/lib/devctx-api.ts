@@ -48,13 +48,13 @@ export interface ProjectState {
 export interface ContextState {
   id: string;
   name: string;
-  editor: EditorState;
+  tool: ToolState;
   providers: ProviderState[];
   confidence?: LaunchConfidenceState;
   metadata?: Record<string, string>;
 }
 
-export interface EditorState {
+export interface ToolState {
   type: string;
 }
 
@@ -404,14 +404,14 @@ function normalizeContextState(value: unknown): ContextState {
   return {
     id: stringValue(object.id),
     name: stringValue(object.name),
-    editor: normalizeEditorState(object.editor),
+    tool: normalizeToolState(object.tool),
     providers: arrayValue(object.providers).map(normalizeProviderState),
     confidence: normalizeLaunchConfidenceState(object.confidence),
     metadata: optionalStringRecord(object.metadata),
   };
 }
 
-function normalizeEditorState(value: unknown): EditorState {
+function normalizeToolState(value: unknown): ToolState {
   const object = objectValue(value);
   return {
     type: stringValue(object.type),

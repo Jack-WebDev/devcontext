@@ -1,6 +1,7 @@
 package filesystem
 
 import (
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/provider"
 )
@@ -9,8 +10,7 @@ const (
 	contextsDirectoryName        = "contexts"
 	contextConfigFileName        = "context.toml"
 	providerStorageDirectoryName = "providers"
-	vscodeDirectoryName          = "vscode"
-	vscodeUserDataDirName        = "user-data"
+	toolStorageDirectoryName     = "tools"
 )
 
 // ContextPaths contains every context-owned storage path derived from the Dev
@@ -21,8 +21,8 @@ type ContextPaths struct {
 	ConfigPath             string
 	ProviderStorageRootDir string
 	ProviderStorageDirs    map[provider.ID]string
-	VSCodeDir              string
-	VSCodeUserDataDir      string
+	ToolStorageRootDir     string
+	ToolStorageDirs        map[codingtool.ID]string
 }
 
 // DeriveContextPaths derives all context-owned paths without reading the
@@ -35,7 +35,7 @@ func DeriveContextPaths(paths PlatformPaths, contextID devcontext.ID) (ContextPa
 
 	contextsDir := joinPlatformPath(homeDir, contextsDirectoryName)
 	rootDir := joinPlatformPath(contextsDir, contextID.String())
-	vscodeDir := joinPlatformPath(rootDir, vscodeDirectoryName)
+	toolStorageRootDir := joinPlatformPath(rootDir, toolStorageDirectoryName)
 
 	return ContextPaths{
 		ContextID:              contextID,
@@ -43,9 +43,32 @@ func DeriveContextPaths(paths PlatformPaths, contextID devcontext.ID) (ContextPa
 		ConfigPath:             joinPlatformPath(rootDir, contextConfigFileName),
 		ProviderStorageRootDir: joinPlatformPath(rootDir, providerStorageDirectoryName),
 		ProviderStorageDirs:    map[provider.ID]string{},
-		VSCodeDir:              vscodeDir,
-		VSCodeUserDataDir:      joinPlatformPath(vscodeDir, vscodeUserDataDirName),
+		ToolStorageRootDir:     toolStorageRootDir,
+		ToolStorageDirs:        map[codingtool.ID]string{},
 	}, nil
+}
+
+// ToolStorageDir returns context-owned storage for toolID.
+func (p ContextPaths) ToolStorageDir(toolID codingtool.ID) string {
+	if p.ToolStorageDirs != nil {
+		if dir := p.ToolStorageDirs[toolID]; dir != "" {
+			return dir
+		}
+	}
+	return joinPlatformPath(p.ToolStorageRootDir, string(toolID))
+}
+
+// WithToolStorageDirs returns paths with tool storage directories materialized
+// for the supplied tool IDs.
+func (p ContextPaths) WithToolStorageDirs(toolIDs []codingtool.ID) ContextPaths {
+	next := p
+	next.ToolStorageDirs = make(map[codingtool.ID]string, len(toolIDs))
+	for _, toolID := range toolIDs {
+		if toolID != "" {
+			next.ToolStorageDirs[toolID] = p.ToolStorageDir(toolID)
+		}
+	}
+	return next
 }
 
 // ProviderStorageDir returns the context-owned storage directory for providerID.

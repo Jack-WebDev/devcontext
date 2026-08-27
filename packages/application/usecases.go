@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
@@ -140,7 +141,7 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 		return CreateContextResult{}, err
 	}
 
-	ctx, err := devcontext.DefaultContextForIDWithProviderRegistry(contextID, s.now(), s.dependencies.ProviderRegistry)
+	ctx, err := devcontext.DefaultContextForIDWithRegistries(contextID, s.now(), s.dependencies.ProviderRegistry, s.dependencies.ToolRegistry)
 	if err != nil {
 		return CreateContextResult{}, err
 	}
@@ -329,7 +330,7 @@ func (s *Service) contextState(ctx devcontext.Context) ContextState {
 	return ContextState{
 		ID:         ctx.ID.String(),
 		Name:       ctx.Name,
-		Editor:     EditorState{Type: string(ctx.Editor.Type)},
+		Tool:       ToolState{Type: string(ctx.Tool.Type)},
 		Providers:  providerStatesFromEntries(providerEntries),
 		Confidence: s.launchConfidenceStateForContext(ctx, providerEntries),
 		Metadata:   cloneMetadata(ctx.Metadata),
@@ -393,10 +394,8 @@ func (s *Service) providerStateEntries(ctx devcontext.Context) []providerStateEn
 					ContextID: ctx.ID.String(),
 					Config:    config,
 					Paths: provider.ContextPaths{
-						RootDir:           contextPaths.RootDir,
-						StorageDir:        contextPaths.ProviderStorageDir(integration.ID()),
-						VSCodeDir:         contextPaths.VSCodeDir,
-						VSCodeUserDataDir: contextPaths.VSCodeUserDataDir,
+						RootDir:    contextPaths.RootDir,
+						StorageDir: contextPaths.ProviderStorageDir(integration.ID()),
 					},
 				})
 				if err != nil {
@@ -511,10 +510,8 @@ func providerRuntimeContext(ctx devcontext.Context, config provider.Config, path
 		ContextID: ctx.ID.String(),
 		Config:    config,
 		Paths: provider.ContextPaths{
-			RootDir:           paths.RootDir,
-			StorageDir:        paths.ProviderStorageDir(providerID),
-			VSCodeDir:         paths.VSCodeDir,
-			VSCodeUserDataDir: paths.VSCodeUserDataDir,
+			RootDir:    paths.RootDir,
+			StorageDir: paths.ProviderStorageDir(providerID),
 		},
 	}
 }
@@ -556,7 +553,14 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 		}
 	}
 
-	executable, editorErr := s.dependencies.Editor.DetectExecutable(ctx.Editor)
+	integration, registered := s.dependencies.ToolRegistry.Get(ctx.Tool.Type)
+	var executable codingtool.Executable
+	var editorErr error
+	if !registered {
+		editorErr = fmt.Errorf("selected editor %q is not registered", ctx.Tool.Type)
+	} else {
+		executable, editorErr = integration.DetectExecutable(ctx.Tool)
+	}
 	checks = append(checks, launcher.VSCodeConfidenceCheck(executable, editorErr))
 
 	contextPaths, pathsErr := filesystem.DeriveContextPaths(s.dependencies.Paths, ctx.ID)
@@ -631,7 +635,7 @@ func eventFromLaunchPlan(name devlog.EventName, plan launcher.LaunchPlan, err er
 		Timestamp:        timestamp,
 		ProjectPath:      string(plan.ProjectPath),
 		ContextID:        plan.Context.ID.String(),
-		EditorID:         string(plan.Editor.Type),
+		ToolID:           string(plan.Tool.Type),
 		ResolutionSource: string(plan.ResolutionSource),
 		Err:              err,
 		KnownEnvironment: plan.Environment.Environ(),

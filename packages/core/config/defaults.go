@@ -1,6 +1,6 @@
 package config
 
-import "devctx/packages/core/editor"
+import codingtool "devctx/packages/core/codingtool"
 
 const (
 	// CurrentSchemaVersion is the supported global configuration schema.
@@ -10,8 +10,8 @@ const (
 // DefaultGlobalConfig returns the safe configuration for a new installation.
 func DefaultGlobalConfig() GlobalConfig {
 	return GlobalConfig{
-		Version:       CurrentSchemaVersion,
-		DefaultEditor: editor.TypeVSCode,
+		Version:     CurrentSchemaVersion,
+		DefaultTool: codingtool.TypeVSCode,
 		UI: UISettings{
 			RememberWindowPosition: true,
 		},

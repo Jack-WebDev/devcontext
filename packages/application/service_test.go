@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
@@ -157,7 +157,7 @@ func TestNewServiceWithDependenciesUsesFakesWithoutWails(t *testing.T) {
 		Projects:          projects,
 		Paths:             paths,
 		ProviderRegistry:  provider.MustNewRegistry([]provider.Provider{fakeProvider}),
-		Editor:            fakeEditor,
+		ToolRegistry:      codingtool.MustNewRegistry([]codingtool.RegisteredTool{{Integration: fakeEditor, DisplayName: "Fake Tool"}}, fakeEditor.ID()),
 		ProcessLauncher:   fakeLauncher,
 		ParentEnvironment: []string{"PATH=/fixture/bin"},
 		WorkingDirectory:  filepath.Join(root, "project"),
@@ -168,8 +168,9 @@ func TestNewServiceWithDependenciesUsesFakesWithoutWails(t *testing.T) {
 	})
 
 	builder := service.launchPlanBuilder()
-	if builder.Editor != fakeEditor {
-		t.Fatalf("builder editor = %#v, want fake editor", builder.Editor)
+	registeredEditor, ok := builder.ToolRegistry.Get(fakeEditor.ID())
+	if !ok || registeredEditor != fakeEditor {
+		t.Fatalf("builder tool = %#v, found = %t, want fake editor", registeredEditor, ok)
 	}
 	if !reflect.DeepEqual(builder.ProviderRegistry.All(), []provider.Provider{fakeProvider}) {
 		t.Fatalf("builder providers = %#v, want fake provider", builder.ProviderRegistry.All())
@@ -203,7 +204,7 @@ func TestNewErrorReturnsPresentationSafeTypedErrors(t *testing.T) {
 		},
 		{
 			name: "launch",
-			err:  editor.ErrExecutableNotFound,
+			err:  codingtool.ErrExecutableNotFound,
 			want: ErrorCodeLaunch,
 		},
 		{
@@ -266,13 +267,13 @@ func TestNewErrorReturnsActionableRecoveryDetails(t *testing.T) {
 		},
 		{
 			name: "missing vscode command",
-			err: &editor.ExecutableNotFoundError{
-				EditorID:   editor.VSCodeID,
+			err: &codingtool.ExecutableNotFoundError{
+				ToolID:     codingtool.VSCodeID,
 				Candidates: []string{"code"},
 			},
 			wantCode:     ErrorCodeLaunch,
 			wantMessage:  "VS Code command not found.",
-			wantRecovery: []string{"VS Code command line launcher", "code", "editor.executable_override"},
+			wantRecovery: []string{"VS Code command line launcher", "code", "codingtool.executable_override"},
 		},
 		{
 			name: "storage permission",
@@ -372,16 +373,16 @@ func (p applicationFakeProvider) DetectGlobalCredentialSession(provider.GlobalCr
 }
 
 type applicationFakeEditor struct {
-	executable editor.Executable
+	executable codingtool.Executable
 	err        error
-	requests   []editor.CommandRequest
+	requests   []codingtool.CommandRequest
 }
 
-func (e *applicationFakeEditor) ID() editor.ID {
+func (e *applicationFakeEditor) ID() codingtool.ID {
 	return "fake-editor"
 }
 
-func (e *applicationFakeEditor) DetectExecutable(editor.Config) (editor.Executable, error) {
+func (e *applicationFakeEditor) DetectExecutable(codingtool.Config) (codingtool.Executable, error) {
 	if e.err != nil {
 		return "", e.err
 	}
@@ -391,11 +392,11 @@ func (e *applicationFakeEditor) DetectExecutable(editor.Config) (editor.Executab
 	return "/fixture/editor", nil
 }
 
-func (e *applicationFakeEditor) BuildLaunchCommand(request editor.CommandRequest) (editor.Command, error) {
+func (e *applicationFakeEditor) BuildLaunchCommand(request codingtool.CommandRequest) (codingtool.Command, error) {
 	e.requests = append(e.requests, request)
-	return editor.Command{
+	return codingtool.Command{
 		Executable: request.Executable,
-		Arguments:  editor.Arguments{request.ProjectPath},
+		Arguments:  codingtool.Arguments{request.ProjectPath},
 	}, nil
 }
 

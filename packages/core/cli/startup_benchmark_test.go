@@ -47,7 +47,7 @@ func BenchmarkDirectLaunchPreparation(b *testing.B) {
 			WorkingDirectory:  workingDir,
 			Paths:             paths,
 			ProviderRegistry:  provider.BuiltInRegistry(),
-			Editor:            &recordingCLIEditor{},
+			Tool:              &recordingCLIEditor{},
 			ProcessLauncher:   &recordingProcessLauncher{},
 			ParentEnvironment: []string{"PATH=/usr/local/bin"},
 			Now: func() time.Time {

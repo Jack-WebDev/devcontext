@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/provider"
 )
@@ -33,8 +33,8 @@ func TestCreateContextDirectoryTreeCreatesCompleteRestrictedTree(t *testing.T) {
 
 	for _, dir := range []string{
 		contextPaths.RootDir,
-		contextPaths.VSCodeDir,
-		contextPaths.VSCodeUserDataDir,
+		contextPaths.ToolStorageRootDir,
+		contextPaths.ToolStorageDir(codingtool.VSCodeID),
 		contextPaths.ProviderStorageDir(provider.ClaudeID),
 		contextPaths.ProviderStorageDir(provider.CodexID),
 	} {
@@ -56,8 +56,8 @@ func TestCreateContextDirectoryTreeCreatesCompleteRestrictedTree(t *testing.T) {
 	assertRestrictedMode(t, contextPaths.ConfigPath, filesystem.RestrictedFileMode)
 	assertDirectoryEmpty(t, contextPaths.ProviderStorageDir(provider.ClaudeID))
 	assertDirectoryEmpty(t, contextPaths.ProviderStorageDir(provider.CodexID))
-	assertDirectoryExists(t, contextPaths.VSCodeDir)
-	assertDirectoryEmpty(t, contextPaths.VSCodeUserDataDir)
+	assertDirectoryExists(t, contextPaths.ToolStorageRootDir)
+	assertDirectoryEmpty(t, contextPaths.ToolStorageDir(codingtool.VSCodeID))
 }
 
 func TestCreateContextDirectoryTreeUsesRegisteredEnabledProviders(t *testing.T) {
@@ -85,8 +85,8 @@ func TestCreateContextDirectoryTreeUsesRegisteredEnabledProviders(t *testing.T) 
 	}
 
 	assertDirectoryExists(t, contextPaths.RootDir)
-	assertDirectoryExists(t, contextPaths.VSCodeDir)
-	assertDirectoryExists(t, contextPaths.VSCodeUserDataDir)
+	assertDirectoryExists(t, contextPaths.ToolStorageRootDir)
+	assertDirectoryExists(t, contextPaths.ToolStorageDir(codingtool.VSCodeID))
 	assertDirectoryExists(t, contextPaths.ProviderStorageDir("registered"))
 	assertPathMissing(t, contextPaths.ProviderStorageDir("disabled"))
 	assertPathMissing(t, contextPaths.ProviderStorageDir("unknown"))
@@ -98,8 +98,8 @@ func TestCreateContextDirectoryTreeRejectsMismatchedContextID(t *testing.T) {
 		RootDir:                "/devctx/contexts/company",
 		ConfigPath:             "/devctx/contexts/company/context.toml",
 		ProviderStorageRootDir: "/devctx/contexts/company/providers",
-		VSCodeDir:              "/devctx/contexts/company/vscode",
-		VSCodeUserDataDir:      "/devctx/contexts/company/vscode/user-data",
+		ToolStorageRootDir:     "/devctx/contexts/company/vscode",
+		ToolStorageDirs:        map[codingtool.ID]string{codingtool.VSCodeID: "/devctx/contexts/company/vscode/user-data"},
 	}
 	ctx := contextTreeContext(devcontext.MustID("personal"), "Personal")
 
@@ -206,7 +206,7 @@ func TestValidateContextDirectoryTreeChecksEditorStorage(t *testing.T) {
 	if err := filesystem.CreateContextDirectoryTree(contextPaths, ctx); err != nil {
 		t.Fatalf("create context directory tree: %v", err)
 	}
-	if err := os.RemoveAll(contextPaths.VSCodeUserDataDir); err != nil {
+	if err := os.RemoveAll(contextPaths.ToolStorageDir(codingtool.VSCodeID)); err != nil {
 		t.Fatalf("remove vscode user data dir: %v", err)
 	}
 
@@ -220,8 +220,8 @@ func TestValidateContextDirectoryTreeChecksEditorStorage(t *testing.T) {
 	}
 	wantMissing := []filesystem.MissingContextDirectory{
 		{
-			Kind:   filesystem.ContextDirectoryEditor,
-			Path:   contextPaths.VSCodeUserDataDir,
+			Kind:   filesystem.ContextDirectoryTool,
+			Path:   contextPaths.ToolStorageDir(codingtool.VSCodeID),
 			Reason: "missing",
 		},
 	}
@@ -403,9 +403,9 @@ func snapshotTree(t *testing.T, root string) map[string]string {
 
 func contextTreeContext(id devcontext.ID, name string) devcontext.Context {
 	return devcontext.Context{
-		ID:     id,
-		Name:   name,
-		Editor: editor.DefaultConfig(),
+		ID:   id,
+		Name: name,
+		Tool: codingtool.DefaultConfig(),
 		Providers: provider.Configs{
 			"claude": {Enabled: true},
 			"codex":  {Enabled: true},

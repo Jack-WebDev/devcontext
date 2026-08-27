@@ -10,7 +10,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"devctx/packages/core/editor"
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/provider"
 )
 
@@ -27,7 +27,7 @@ type contextTOML struct {
 	ID        *string                 `toml:"id"`
 	Name      *string                 `toml:"name"`
 	CreatedAt *time.Time              `toml:"created_at"`
-	Editor    editorTOML              `toml:"editor"`
+	Tool      editorTOML              `toml:"editor"`
 	Providers map[string]providerTOML `toml:"providers"`
 	Metadata  map[string]string       `toml:"metadata"`
 }
@@ -76,9 +76,9 @@ func EncodeContextTOML(ctx Context) ([]byte, error) {
 	writeTimeValue(&builder, "created_at", ctx.CreatedAt)
 
 	builder.WriteString("\n[editor]\n")
-	writeStringValue(&builder, "type", string(ctx.Editor.Type))
-	if ctx.Editor.ExecutableOverride != "" {
-		writeStringValue(&builder, "executable_override", ctx.Editor.ExecutableOverride)
+	writeStringValue(&builder, "type", string(ctx.Tool.Type))
+	if ctx.Tool.ExecutableOverride != "" {
+		writeStringValue(&builder, "executable_override", ctx.Tool.ExecutableOverride)
 	}
 
 	for _, providerID := range sortedProviderIDs(ctx.Providers) {
@@ -137,7 +137,7 @@ func contextFromTOML(raw contextTOML, expectedID ID) (Context, error) {
 		return Context{}, fmt.Errorf("%w: created_at cannot be zero", ErrInvalidContextConfig)
 	}
 
-	editorConfig, err := editorConfigFromTOML(raw.Editor)
+	editorConfig, err := editorConfigFromTOML(raw.Tool)
 	if err != nil {
 		return Context{}, err
 	}
@@ -153,23 +153,23 @@ func contextFromTOML(raw contextTOML, expectedID ID) (Context, error) {
 	return Context{
 		ID:        id,
 		Name:      *raw.Name,
-		Editor:    editorConfig,
+		Tool:      editorConfig,
 		Providers: providerConfigs,
 		Metadata:  metadata,
 		CreatedAt: raw.CreatedAt.UTC(),
 	}, nil
 }
 
-func editorConfigFromTOML(raw editorTOML) (editor.Config, error) {
+func editorConfigFromTOML(raw editorTOML) (codingtool.Config, error) {
 	if raw.Type == nil {
-		return editor.Config{}, fmt.Errorf("%w: missing editor.type", ErrInvalidContextConfig)
+		return codingtool.Config{}, fmt.Errorf("%w: missing codingtool.type", ErrInvalidContextConfig)
 	}
 	if *raw.Type == "" {
-		return editor.Config{}, fmt.Errorf("%w: editor.type cannot be empty", ErrInvalidContextConfig)
+		return codingtool.Config{}, fmt.Errorf("%w: codingtool.type cannot be empty", ErrInvalidContextConfig)
 	}
 
-	editorConfig := editor.Config{
-		Type: editor.Type(*raw.Type),
+	editorConfig := codingtool.Config{
+		Type: codingtool.Type(*raw.Type),
 	}
 	if raw.ExecutableOverride != nil {
 		editorConfig.ExecutableOverride = *raw.ExecutableOverride
@@ -244,8 +244,8 @@ func validateContextForTOML(ctx Context) error {
 	if ctx.CreatedAt.IsZero() {
 		return fmt.Errorf("%w: created_at cannot be zero", ErrInvalidContextConfig)
 	}
-	if ctx.Editor.Type == "" {
-		return fmt.Errorf("%w: editor.type cannot be empty", ErrInvalidContextConfig)
+	if ctx.Tool.Type == "" {
+		return fmt.Errorf("%w: codingtool.type cannot be empty", ErrInvalidContextConfig)
 	}
 
 	for providerID, providerConfig := range ctx.Providers {

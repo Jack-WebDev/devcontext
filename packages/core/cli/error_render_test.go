@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"devctx/packages/core/cli"
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
@@ -137,8 +137,8 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 		},
 		{
 			name: "editor executable missing",
-			err: &editor.ExecutableNotFoundError{
-				EditorID:   editor.VSCodeID,
+			err: &codingtool.ExecutableNotFoundError{
+				ToolID:     codingtool.VSCodeID,
 				Candidates: []string{"code"},
 			},
 			want: "" +
@@ -147,7 +147,7 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 				"Dev Context expected the VS Code CLI command on PATH and checked: `code`.\n" +
 				"\n" +
 				"Next step:\n" +
-				"Install the VS Code command line launcher so `code` is on PATH, or set editor.executable_override in the context to a valid VS Code CLI path.\n",
+				"Install the VS Code command line launcher so `code` is on PATH, or set codingtool.executable_override in the context to a valid VS Code CLI path.\n",
 		},
 		{
 			name: "process executable missing",
@@ -162,7 +162,7 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 				"Dev Context could not find the configured VS Code command \"/missing/code\".\n" +
 				"\n" +
 				"Next step:\n" +
-				"Install the VS Code command line launcher, add it to PATH, or set editor.executable_override in the context to a valid VS Code CLI path.\n",
+				"Install the VS Code command line launcher, add it to PATH, or set codingtool.executable_override in the context to a valid VS Code CLI path.\n",
 		},
 		{
 			name: "process permission denied",

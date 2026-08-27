@@ -25,10 +25,8 @@ type RuntimeContext struct {
 
 // ContextPaths contains the context-owned storage locations a provider may use.
 type ContextPaths struct {
-	RootDir           string
-	StorageDir        string
-	VSCodeDir         string
-	VSCodeUserDataDir string
+	RootDir    string
+	StorageDir string
 }
 
 // EnvironmentContribution stores environment variables owned by one provider.

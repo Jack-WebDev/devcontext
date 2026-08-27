@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	devlog "devctx/packages/core/logging"
@@ -18,11 +18,14 @@ import (
 
 // Dependencies contains the core collaborators used by application use cases.
 type Dependencies struct {
-	Contexts           devcontext.Repository
-	Projects           project.Repository
-	Paths              filesystem.PlatformPaths
-	ProviderRegistry   provider.Registry
-	Editor             editor.Editor
+	Contexts         devcontext.Repository
+	Projects         project.Repository
+	Paths            filesystem.PlatformPaths
+	ProviderRegistry provider.Registry
+	ToolRegistry     codingtool.Registry
+	// Tool is retained temporarily for callers that have not yet moved to the
+	// registry contract. New code must provide ToolRegistry.
+	Tool               codingtool.CodingTool
 	ProcessLauncher    launcher.ProcessLauncher
 	StoragePermissions filesystem.StoragePermissions
 	ParentEnvironment  []string
@@ -77,7 +80,7 @@ func NewDefaultService(options DefaultOptions) (*Service, error) {
 		Projects:           project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
 		Paths:              paths,
 		ProviderRegistry:   provider.BuiltInRegistry(),
-		Editor:             editor.VSCodeEditor{},
+		ToolRegistry:       codingtool.BuiltInRegistry(),
 		ProcessLauncher:    launcher.NativeProcessLauncher{},
 		StoragePermissions: filesystem.NewDefaultStoragePermissions(),
 		ParentEnvironment:  options.ParentEnvironment,
@@ -102,7 +105,7 @@ func (s *Service) launchPlanBuilder() launcher.LaunchPlanBuilder {
 		Resolver:          launcher.NewResolver(s.dependencies.Contexts, s.dependencies.Projects),
 		PlatformPaths:     s.dependencies.Paths,
 		ProviderRegistry:  s.dependencies.ProviderRegistry,
-		Editor:            s.dependencies.Editor,
+		ToolRegistry:      s.dependencies.ToolRegistry,
 		ParentEnvironment: s.dependencies.ParentEnvironment,
 	}
 }
@@ -126,8 +129,12 @@ func normalizeDependencies(dependencies Dependencies) Dependencies {
 	if dependencies.ProviderRegistry.IsZero() {
 		dependencies.ProviderRegistry = provider.BuiltInRegistry()
 	}
-	if dependencies.Editor == nil {
-		dependencies.Editor = editor.VSCodeEditor{}
+	if dependencies.ToolRegistry.IsZero() {
+		if dependencies.Tool != nil {
+			dependencies.ToolRegistry = codingtool.MustNewRegistry([]codingtool.RegisteredTool{{Integration: dependencies.Tool, DisplayName: string(dependencies.Tool.ID())}}, dependencies.Tool.ID())
+		} else {
+			dependencies.ToolRegistry = codingtool.BuiltInRegistry()
+		}
 	}
 	if dependencies.ProcessLauncher == nil {
 		dependencies.ProcessLauncher = launcher.NativeProcessLauncher{}

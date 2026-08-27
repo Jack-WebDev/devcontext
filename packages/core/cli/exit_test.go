@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"devctx/packages/core/cli"
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/config"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
 )
@@ -76,7 +76,7 @@ func TestExitCodeForErrorMapsStableCLIOutcomes(t *testing.T) {
 		},
 		{
 			name: "editor detection failure",
-			err:  fmt.Errorf("detect editor: %w", editor.ErrExecutableNotFound),
+			err:  fmt.Errorf("detect editor: %w", codingtool.ErrExecutableNotFound),
 			want: cli.ExitLaunchFailure,
 		},
 		{

@@ -1,12 +1,12 @@
-package editor
+package codingtool
 
-// Executable identifies the editor command to start.
+// Executable identifies the coding-tool command to start.
 type Executable string
 
-// Arguments stores structured editor command arguments.
+// Arguments stores structured coding-tool command arguments.
 type Arguments []string
 
-// Command is the editor-owned command specification used by launch planning.
+// Command is the coding-tool-owned command specification used by launch planning.
 //
 // It intentionally excludes environment, working directory, and process
 // detachment. Those are process-launcher concerns.
@@ -15,15 +15,14 @@ type Command struct {
 	Arguments  Arguments
 }
 
-// ContextPaths contains context-owned storage locations an editor may use while
-// building its command.
+// ContextPaths contains the selected tool's storage plus a safe shared context
+// root. Tool implementations must not depend on another tool's storage.
 type ContextPaths struct {
-	RootDir     string
-	DataDir     string
-	UserDataDir string
+	RootDir    string
+	StorageDir string
 }
 
-// CommandRequest contains the resolved inputs needed to build an editor
+// CommandRequest contains the resolved inputs needed to build a coding tool
 // command without starting a process.
 type CommandRequest struct {
 	Config      Config
@@ -32,11 +31,11 @@ type CommandRequest struct {
 	Paths       ContextPaths
 }
 
-// Editor is the contract implemented by editor integrations.
+// CodingTool is the contract implemented by coding-tool integrations.
 //
 // Implementations detect their executable and build a structured command. They
 // must not start processes.
-type Editor interface {
+type CodingTool interface {
 	ID() ID
 	DetectExecutable(Config) (Executable, error)
 	BuildLaunchCommand(CommandRequest) (Command, error)

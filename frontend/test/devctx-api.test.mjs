@@ -14,7 +14,7 @@ test("adapter normalizes successful Wails calls", async () => {
           {
             id: "personal",
             name: "Personal",
-            editor: {type: "vscode"},
+            tool: {type: "vscode"},
             providers: [
               {
                 id: "codex",
@@ -118,7 +118,7 @@ test("adapter normalizes successful Wails calls", async () => {
         context: {
           id: "personal",
           name: "Personal",
-          editor: {type: "vscode"},
+          tool: {type: "vscode"},
           providers: [],
           confidence: {
             contextId: "personal",
@@ -135,7 +135,7 @@ test("adapter normalizes successful Wails calls", async () => {
         context: {
           id: "personal",
           name: "Personal",
-          editor: {type: "vscode"},
+          tool: {type: "vscode"},
           providers: [],
           confidence: {
             contextId: "personal",
@@ -173,7 +173,7 @@ test("adapter normalizes successful Wails calls", async () => {
         context: {
           id: "personal",
           name: "Personal",
-          editor: {type: "vscode"},
+          tool: {type: "vscode"},
           providers: [],
           confidence: {
             contextId: "personal",
@@ -193,7 +193,7 @@ test("adapter normalizes successful Wails calls", async () => {
         {
           id: "personal",
           name: "Personal",
-          editor: {type: "vscode"},
+          tool: {type: "vscode"},
           providers: [
             {
               id: "codex",
@@ -307,7 +307,7 @@ test("adapter normalizes successful Wails calls", async () => {
       context: {
         id: "personal",
         name: "Personal",
-        editor: {type: "vscode"},
+        tool: {type: "vscode"},
         providers: [],
         confidence: {
           contextId: "personal",
@@ -331,7 +331,7 @@ test("adapter normalizes successful Wails calls", async () => {
       context: {
         id: "personal",
         name: "Personal",
-        editor: {type: "vscode"},
+        tool: {type: "vscode"},
         providers: [],
         confidence: {
           contextId: "personal",
@@ -371,7 +371,7 @@ test("adapter normalizes successful Wails calls", async () => {
       context: {
         id: "personal",
         name: "Personal",
-        editor: {type: "vscode"},
+        tool: {type: "vscode"},
         providers: [],
         confidence: {
           contextId: "personal",

@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/provider"
 )
 
@@ -43,8 +43,8 @@ func TestDefaultContextSeeds(t *testing.T) {
 			if tt.context.Name != tt.wantName {
 				t.Fatalf("name = %q, want %q", tt.context.Name, tt.wantName)
 			}
-			if tt.context.Editor != editor.DefaultConfig() {
-				t.Fatalf("editor = %#v, want %#v", tt.context.Editor, editor.DefaultConfig())
+			if tt.context.Tool != codingtool.DefaultConfig() {
+				t.Fatalf("editor = %#v, want %#v", tt.context.Tool, codingtool.DefaultConfig())
 			}
 			assertEnabledProvider(t, tt.context.Providers, "claude")
 			assertEnabledProvider(t, tt.context.Providers, "codex")

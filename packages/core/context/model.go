@@ -3,7 +3,7 @@ package context
 import (
 	"time"
 
-	"devctx/packages/core/editor"
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/provider"
 )
 
@@ -17,7 +17,7 @@ type Context struct {
 	// Name is the user-facing display name.
 	Name string
 
-	Editor    editor.Config
+	Tool      codingtool.Config
 	Providers provider.Configs
 	Metadata  Metadata
 	CreatedAt time.Time

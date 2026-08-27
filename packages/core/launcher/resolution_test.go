@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/launcher"
 )
 
@@ -110,7 +110,7 @@ func testContext(id string, name string) devcontext.Context {
 	return devcontext.Context{
 		ID:        devcontext.MustID(id),
 		Name:      name,
-		Editor:    editor.DefaultConfig(),
+		Tool:      codingtool.DefaultConfig(),
 		CreatedAt: time.Date(2026, 8, 13, 12, 0, 0, 0, time.UTC),
 	}
 }

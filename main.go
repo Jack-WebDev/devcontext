@@ -8,9 +8,9 @@ import (
 
 	"devctx/packages/application"
 	"devctx/packages/core/cli"
+	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	devlog "devctx/packages/core/logging"
@@ -112,7 +112,7 @@ func runCLI(args []string) cli.ExitCode {
 		WorkingDirectory:  workingDirectory,
 		Paths:             paths,
 		ProviderRegistry:  provider.BuiltInRegistry(),
-		Editor:            editor.VSCodeEditor{},
+		ToolRegistry:      codingtool.BuiltInRegistry(),
 		ProcessLauncher:   launcher.NativeProcessLauncher{},
 		ParentEnvironment: os.Environ(),
 		DetachMode:        launcher.DetachModeDetached,

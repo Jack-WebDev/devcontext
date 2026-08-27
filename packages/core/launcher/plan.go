@@ -1,8 +1,8 @@
 package launcher
 
 import (
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/project"
 	"devctx/packages/core/provider"
@@ -20,11 +20,11 @@ type Environment map[string]string
 // WorkingDirectory identifies the directory used to start the editor process.
 type WorkingDirectory string
 
-// LaunchPlan represents the deterministic operation needed to launch an editor.
+// LaunchPlan represents the deterministic operation needed to launch an codingtool.
 type LaunchPlan struct {
 	ProjectPath        project.Path
 	Context            devcontext.Context
-	Editor             editor.Config
+	Tool               codingtool.Config
 	Executable         Executable
 	Arguments          Arguments
 	WorkingDirectory   WorkingDirectory

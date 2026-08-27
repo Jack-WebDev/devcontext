@@ -7,6 +7,7 @@ import (
 	"strings"
 	"syscall"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/provider"
 )
@@ -20,7 +21,7 @@ type ContextDirectoryKind string
 
 const (
 	ContextDirectoryRoot     ContextDirectoryKind = "context"
-	ContextDirectoryEditor   ContextDirectoryKind = "editor"
+	ContextDirectoryTool     ContextDirectoryKind = "tool"
 	ContextDirectoryProvider ContextDirectoryKind = "provider"
 )
 
@@ -82,7 +83,7 @@ func ValidateContextDirectoryTreeWithProviderRegistry(paths ContextPaths, ctx de
 	if registry.IsZero() {
 		registry = provider.BuiltInRegistry()
 	}
-	return validateContextDirectoryTree(paths.WithProviderStorageDirs(registeredEnabledProviderIDs(ctx, registry)), registry)
+	return validateContextDirectoryTree(paths.WithProviderStorageDirs(registeredEnabledProviderIDs(ctx, registry)).WithToolStorageDirs([]codingtool.ID{ctx.Tool.Type}), registry)
 }
 
 func validateContextDirectoryTree(paths ContextPaths, registry provider.Registry) error {
@@ -135,8 +136,10 @@ type expectedContextDirectory struct {
 func expectedContextDirectories(paths ContextPaths, registry provider.Registry) []expectedContextDirectory {
 	expected := []expectedContextDirectory{
 		{Kind: ContextDirectoryRoot, Path: paths.RootDir},
-		{Kind: ContextDirectoryEditor, Path: paths.VSCodeDir},
-		{Kind: ContextDirectoryEditor, Path: paths.VSCodeUserDataDir},
+		{Kind: ContextDirectoryTool, Path: paths.ToolStorageRootDir},
+	}
+	for _, toolID := range sortedToolStorageIDs(paths.ToolStorageDirs) {
+		expected = append(expected, expectedContextDirectory{Kind: ContextDirectoryTool, Path: paths.ToolStorageDirs[toolID]})
 	}
 	for _, providerID := range sortedProviderStorageIDs(paths.ProviderStorageDirs) {
 		expected = append(expected, expectedContextDirectory{

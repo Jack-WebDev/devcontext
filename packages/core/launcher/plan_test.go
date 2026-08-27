@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
-	"devctx/packages/core/editor"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
 	"devctx/packages/core/provider"
@@ -14,9 +14,9 @@ import (
 
 func TestLaunchPlanRepresentsCompleteEditorLaunchOperation(t *testing.T) {
 	context := devcontext.Context{
-		ID:     devcontext.MustID("client-a"),
-		Name:   "Client A",
-		Editor: editor.DefaultConfig(),
+		ID:   devcontext.MustID("client-a"),
+		Name: "Client A",
+		Tool: codingtool.DefaultConfig(),
 		Providers: provider.Configs{
 			"claude": {Enabled: true},
 			"codex":  {Enabled: true},
@@ -27,7 +27,7 @@ func TestLaunchPlanRepresentsCompleteEditorLaunchOperation(t *testing.T) {
 	plan := launcher.LaunchPlan{
 		ProjectPath:      project.Path("/work/client-a/api"),
 		Context:          context,
-		Editor:           context.Editor,
+		Tool:             context.Tool,
 		Executable:       launcher.Executable("/usr/local/bin/code"),
 		Arguments:        launcher.Arguments{"/work/client-a/api"},
 		WorkingDirectory: launcher.WorkingDirectory("/work/client-a/api"),
@@ -48,7 +48,7 @@ func TestLaunchPlanRepresentsCompleteEditorLaunchOperation(t *testing.T) {
 	want := launcher.LaunchPlan{
 		ProjectPath:      project.Path("/work/client-a/api"),
 		Context:          context,
-		Editor:           editor.DefaultConfig(),
+		Tool:             codingtool.DefaultConfig(),
 		Executable:       launcher.Executable("/usr/local/bin/code"),
 		Arguments:        launcher.Arguments{"/work/client-a/api"},
 		WorkingDirectory: launcher.WorkingDirectory("/work/client-a/api"),
