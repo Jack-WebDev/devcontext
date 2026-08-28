@@ -12,11 +12,9 @@ export function ExportContextMetadata(arg1:application.ExportContextMetadataRequ
 
 export function GetContextDetails(arg1:application.GetContextDetailsRequest):Promise<any>;
 
-export function GetContexts():Promise<any>;
-
 export function GetContextTemplates():Promise<any>;
 
-export function ImportContextMetadata(arg1:application.ImportContextMetadataRequest):Promise<any>;
+export function GetContexts():Promise<any>;
 
 export function GetDiagnostics(arg1:application.GetDiagnosticsRequest):Promise<any>;
 
@@ -36,12 +34,18 @@ export function GetRunningEnvironments():Promise<any>;
 
 export function GetSettings():Promise<any>;
 
+export function GetTrayState():Promise<any>;
+
+export function GetTrustCenter():Promise<any>;
+
+export function ImportContextMetadata(arg1:application.ImportContextMetadataRequest):Promise<any>;
+
 export function LaunchProject(arg1:application.LaunchProjectRequest):Promise<any>;
 
 export function PreflightLaunchProject(arg1:application.PreflightLaunchProjectRequest):Promise<any>;
 
 export function RunRepairAction(arg1:application.RunRepairActionRequest):Promise<any>;
 
-export function UpdateSettings(arg1:any):Promise<any>;
-
 export function UnbindProject(arg1:application.UnbindProjectRequest):Promise<any>;
+
+export function UpdateSettings(arg1:application.UpdateSettingsRequest):Promise<any>;

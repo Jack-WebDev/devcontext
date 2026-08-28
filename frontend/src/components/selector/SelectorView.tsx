@@ -18,6 +18,8 @@ import type {
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import { RunningEnvironmentConflictDialog } from "../running/RunningEnvironmentConflictDialog";
+import { AccountIdentityMismatchDialog } from "./AccountIdentityMismatchDialog";
+import { hasAccountIdentityMismatch } from "./account-identity-mismatch";
 import { ContextMismatchDialog } from "./ContextMismatchDialog";
 import { ContextCard } from "./ContextCard";
 import { FirstRunWelcome, shouldRenderFirstRunWelcome } from "./FirstRunWelcome";
@@ -61,6 +63,8 @@ interface SelectorViewProps {
   onRunDiagnostics?: () => void;
   onCodingToolLaunched?: (result: LaunchProjectResult) => void;
   showLaunchVerification?: boolean;
+  showOnboardingReplay?: boolean;
+  onDismissOnboardingReplay?: () => void;
 }
 
 function SelectorView({
@@ -75,6 +79,8 @@ function SelectorView({
   onRunDiagnostics,
   onCodingToolLaunched,
   showLaunchVerification = true,
+  showOnboardingReplay = false,
+  onDismissOnboardingReplay,
 }: SelectorViewProps) {
   const [selectedContextId, setSelectedContextId] = useState<string | undefined>(() =>
     initialSelectedContextId(launchState),
@@ -86,13 +92,14 @@ function SelectorView({
   const [launchLifecycle, setLaunchLifecycle] = useState<LaunchLifecycleState>({status: "idle"});
   const [launchError, setLaunchError] = useState<DisplayError | undefined>(undefined);
   const [mismatchError, setMismatchError] = useState<DisplayError | undefined>(undefined);
+  const [identityMismatchContextID, setIdentityMismatchContextID] = useState<string | undefined>(undefined);
   const [runningEnvironmentConflict, setRunningEnvironmentConflict] = useState<RunningEnvironmentConflict | undefined>(undefined);
   const [onboardingPendingContextId, setOnboardingPendingContextId] = useState<string | undefined>(undefined);
   const [onboardingError, setOnboardingError] = useState<DisplayError | undefined>(undefined);
   const [providerSessionAssignments, setProviderSessionAssignments] = useState<ProviderSessionAssignments>({});
   const contextButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const launchGuard = useRef(createLaunchRequestGuard());
-  const mismatchDialogOpen = mismatchError?.contextMismatch !== undefined;
+  const mismatchDialogOpen = mismatchError?.contextMismatch !== undefined || identityMismatchContextID !== undefined;
   const selectedContext = launchState.contexts.find((context) => context.id === selectedContextId);
   const launchPending = launchLifecycle.status !== "idle";
   const launchBlocked = selectedContextConfidenceBlocked(selectedContext);
@@ -109,6 +116,7 @@ function SelectorView({
     setLaunchLifecycle({status: "idle"});
     setLaunchError(undefined);
     setMismatchError(undefined);
+    setIdentityMismatchContextID(undefined);
     setOnboardingPendingContextId(undefined);
     setOnboardingError(undefined);
     setProviderSessionAssignments({});
@@ -129,6 +137,7 @@ function SelectorView({
     const nextContextId = nextSelectedContextId(launchState.contexts, contextId);
     setSelectedContextId(nextContextId);
     setRovingContextId(nextContextId);
+    setIdentityMismatchContextID(undefined);
   }
 
   function handleContextNavigation(contextId: string, direction: ContextNavigationDirection) {
@@ -176,15 +185,25 @@ function SelectorView({
 
     if (action === "close-dialog") {
       setMismatchError(undefined);
+      setIdentityMismatchContextID(undefined);
       return;
     }
 
     void cancelSelector({ closeSelector: onCancel });
   }
 
-  async function handleLaunch(confirmContextMismatch = false, contextId = selectedContextId, allowExistingEnvironmentLaunch = false) {
+  async function handleLaunch({
+    confirmContextMismatch = false,
+    contextId = selectedContextId,
+    allowExistingEnvironmentLaunch = false,
+    confirmIdentityMismatch = false,
+  }: LaunchAttemptOptions = {}) {
     const contextToLaunch = launchState.contexts.find((context) => context.id === contextId);
     if (selectedContextConfidenceBlocked(contextToLaunch)) {
+      return;
+    }
+    if (!confirmIdentityMismatch && hasAccountIdentityMismatch(contextToLaunch)) {
+      setIdentityMismatchContextID(contextId);
       return;
     }
 
@@ -193,6 +212,9 @@ function SelectorView({
       setLaunchError(undefined);
       if (confirmContextMismatch) {
         setMismatchError(undefined);
+      }
+      if (confirmIdentityMismatch) {
+        setIdentityMismatchContextID(undefined);
       }
 
       try {
@@ -264,7 +286,7 @@ function SelectorView({
 
   return (
     <div className="space-y-8" onKeyDown={handleSelectorKeyDown}>
-      {shouldRenderFirstRunWelcome(launchState) ? (
+      {shouldRenderFirstRunWelcome(launchState) || showOnboardingReplay ? (
         <>
           <ProjectIdentity project={launchState.project} />
           <FirstRunWelcome
@@ -284,6 +306,8 @@ function SelectorView({
                 ? () => void handleCreateContext("company", onCreateCompanyContext)
                 : undefined
             }
+            replay={showOnboardingReplay && !launchState.firstRun}
+            onContinue={showOnboardingReplay && !launchState.firstRun ? onDismissOnboardingReplay : undefined}
           />
         </>
       ) : (
@@ -309,7 +333,7 @@ function SelectorView({
                       onLaunchSelected={keyboardLaunchAvailable ? () => void handleLaunch() : undefined}
                       onProviderSetup={(contextId) => {
                         handleSelectContext(contextId);
-                        void handleLaunch(false, contextId);
+                        void handleLaunch({contextId});
                       }}
                     />
                   ))}
@@ -374,7 +398,29 @@ function SelectorView({
                   contexts={launchState.contexts}
                   launchPending={launchPending}
                   onCancel={() => setMismatchError(undefined)}
-                  onOpenAnyway={() => void handleLaunch(true)}
+                  onOpenAnyway={() => {
+                    const mismatch = mismatchError.contextMismatch;
+                    if (mismatch !== undefined) {
+                      void handleLaunch({
+                        contextId: mismatch.requestedContextId,
+                        confirmContextMismatch: true,
+                        confirmIdentityMismatch: true,
+                      });
+                    }
+                  }}
+                />
+              ) : null}
+
+              {identityMismatchContextID !== undefined ? (
+                <AccountIdentityMismatchDialog
+                  contextName={launchState.contexts.find((context) => context.id === identityMismatchContextID)?.name ?? "selected context"}
+                  launchPending={launchPending}
+                  onCancel={() => setIdentityMismatchContextID(undefined)}
+                  onReviewConfiguration={() => {
+                    setIdentityMismatchContextID(undefined);
+                    onRunDiagnostics?.();
+                  }}
+                  onLaunchAnyway={() => void handleLaunch({contextId: identityMismatchContextID, confirmIdentityMismatch: true})}
                 />
               ) : null}
 
@@ -383,7 +429,7 @@ function SelectorView({
                   conflict={runningEnvironmentConflict}
                   launchPending={launchPending}
                   onCancel={() => setRunningEnvironmentConflict(undefined)}
-                  onLaunchAnother={() => void handleLaunch(false, selectedContextId, true)}
+                  onLaunchAnother={() => void handleLaunch({allowExistingEnvironmentLaunch: true})}
                 />
               ) : null}
 
@@ -408,6 +454,13 @@ type LaunchLifecycleState =
   | {status: "idle"}
   | {status: "preflighting"}
   | {status: "launching"; steps?: PreflightLaunchProjectResult["verificationSteps"]};
+
+interface LaunchAttemptOptions {
+  confirmContextMismatch?: boolean;
+  contextId?: string;
+  allowExistingEnvironmentLaunch?: boolean;
+  confirmIdentityMismatch?: boolean;
+}
 
 function selectedContextConfidenceBlocked(context: ContextState | undefined): boolean {
   return context?.confidence?.status === "blocked";

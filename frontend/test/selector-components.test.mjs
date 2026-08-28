@@ -89,7 +89,10 @@ import {
 } from "../.tmp-test/src/components/selector/selector-keyboard.js";
 import {createDevContextWindow} from "../.tmp-test/src/lib/devctx-window.js";
 import {notificationPresentation} from "../.tmp-test/src/components/notifications/notification-policy.js";
+import {AccountIdentityMismatchDialog} from "../.tmp-test/src/components/selector/AccountIdentityMismatchDialog.js";
+import {hasAccountIdentityMismatch} from "../.tmp-test/src/components/selector/account-identity-mismatch.js";
 import {parseContextMetadataExport} from "../.tmp-test/src/components/contexts/context-transfer.js";
+import {TrustCenterView} from "../.tmp-test/src/components/trust/TrustCenterView.js";
 
 test("context metadata import requires a JSON export document", () => {
   const exported = {version: 1, context: {name: "Personal"}};
@@ -97,6 +100,21 @@ test("context metadata import requires a JSON export document", () => {
   assert.throws(() => parseContextMetadataExport("not JSON"));
   assert.throws(() => parseContextMetadataExport("[]"));
   assert.throws(() => parseContextMetadataExport(JSON.stringify({version: "1", context: {}})));
+});
+
+test("account identity mismatch review is limited to backend identity evidence", () => {
+  assert.equal(hasAccountIdentityMismatch({confidence: {checks: [{component: "identity", severity: "needs_attention"}]}}), true);
+  assert.equal(hasAccountIdentityMismatch({confidence: {checks: [{component: "provider", severity: "needs_attention"}]}}), false);
+  const html = renderToStaticMarkup(createElement(AccountIdentityMismatchDialog, {
+    contextName: "Company",
+    launchPending: false,
+    onCancel() {},
+    onReviewConfiguration() {},
+    onLaunchAnyway() {},
+  }));
+  assert.ok(html.includes("Review configuration"));
+  assert.ok(html.includes("Launch anyway"));
+  assert.ok(html.includes("Cancel"));
 });
 
 test("notification policy permits only meaningful provider, tool, and update events", () => {
@@ -432,6 +450,19 @@ test("first-run predicate separates new and returning users", () => {
   assert.equal(shouldRenderFirstRunWelcome(launchStateFixture()), false);
 });
 
+test("onboarding replay does not offer duplicate context creation", () => {
+  const replayHTML = renderToStaticMarkup(createElement(FirstRunWelcome, {
+    launchState: launchStateFixture({firstRun: false}),
+    replay: true,
+    onContinue() {},
+  }));
+
+  assert.ok(replayHTML.includes("Development context setup"));
+  assert.ok(replayHTML.includes("Continue to context selector"));
+  assert.ok(!replayHTML.includes("Create Personal"));
+  assert.ok(!replayHTML.includes("Create Company"));
+});
+
 test("default context setup finds only missing default contexts", () => {
   assert.deepEqual(missingDefaultContextIds([contextFixture("personal", "Personal")]), ["company"]);
   assert.deepEqual(missingDefaultContextIds([contextFixture("company", "Company")]), ["personal"]);
@@ -547,9 +578,25 @@ test("app shell exposes stable navigation, current project state, and a responsi
   assert.ok(html.includes("Current project"));
   assert.ok(html.includes("api"));
   assert.ok(html.includes("/work/api"));
-  assert.deepEqual(appRoutes.map((route) => route.label), ["Home", "Contexts", "Projects", "Running", "History", "Settings"]);
+  assert.deepEqual(appRoutes.map((route) => route.label), ["Home", "Contexts", "Projects", "Running", "History", "Settings", "Trust Center"]);
   assert.equal(appRouteFromHash("#projects"), "projects");
   assert.equal(appRouteFromHash("#unknown"), "home");
+});
+
+test("Trust Center presents actual isolation, mappings, integration boundaries, and credential-sync state", () => {
+  const html = renderToStaticMarkup(createElement(TrustCenterView, {
+    state: {
+      contexts: [{id: "personal", name: "Personal", providers: [{id: "codex", name: "Codex", isolation: {status: "ready", message: "Codex isolation storage is ready."}}], tool: {id: "vscode", name: "VS Code", isolation: {status: "ready", message: "VS Code isolation storage is ready."}}}],
+      projectMappings: [{project: {name: "api", path: "/work/api"}, contextId: "personal", contextName: "Personal"}],
+      credentialSync: {enabled: false, message: "Dev Context does not sync credentials."},
+      integrationBoundaries: [{toolId: "vscode", toolName: "VS Code", statusDataAvailable: true, message: "Safe status data stays in tool storage."}],
+    },
+  }));
+  assert.ok(html.includes("Trust Center"));
+  assert.ok(html.includes("Credential sync"));
+  assert.ok(html.includes("Codex isolation storage is ready."));
+  assert.ok(html.includes("Suggested context: Personal"));
+  assert.ok(html.includes("Safe status data available"));
 });
 
 test("Home shows project, selected context, and context-named quick launch", () => {

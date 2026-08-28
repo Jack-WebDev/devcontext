@@ -1,4 +1,4 @@
-type AppRoute = "home" | "contexts" | "projects" | "running" | "history" | "settings" | "diagnostics";
+type AppRoute = "home" | "contexts" | "projects" | "running" | "history" | "settings" | "trust" | "diagnostics";
 
 interface AppRouteDefinition {
   id: AppRoute;
@@ -12,6 +12,7 @@ const appRoutes: AppRouteDefinition[] = [
   {id: "running", label: "Running"},
   {id: "history", label: "History"},
   {id: "settings", label: "Settings"},
+  {id: "trust", label: "Trust Center"},
 ];
 
 const appRouteDefinitions: AppRouteDefinition[] = [

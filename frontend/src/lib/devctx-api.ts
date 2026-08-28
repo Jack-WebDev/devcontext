@@ -84,6 +84,20 @@ export interface ContextDetailsState {
   enabledProviders: ProviderState[];
 }
 
+export interface TrustCenterState {
+  contexts: TrustContextProtection[];
+  projectMappings: TrustProjectMapping[];
+  credentialSync: TrustCredentialSyncProtection;
+  integrationBoundaries: TrustIntegrationBoundary[];
+}
+export interface TrustContextProtection { id: string; name: string; providers: TrustProviderProtection[]; tool: TrustCodingToolProtection; }
+export interface TrustProviderProtection { id: string; name: string; isolation: TrustIsolationProtection; }
+export interface TrustCodingToolProtection { id: string; name: string; isolation: TrustIsolationProtection; }
+export interface TrustIsolationProtection { status: LaunchConfidenceStatus; message: string; }
+export interface TrustProjectMapping { project: ProjectState; contextId: string; contextName: string; }
+export interface TrustCredentialSyncProtection { enabled: boolean; message: string; }
+export interface TrustIntegrationBoundary { toolId: string; toolName: string; statusDataAvailable: boolean; message: string; }
+
 export interface HomeRunningSummary {
   count: number;
   contextCounts: HomeRunningContextCount[];
@@ -173,7 +187,7 @@ export interface ProviderMetadataField {
 
 export type LaunchConfidenceStatus = "ready" | "needs_attention" | "blocked";
 
-export type LaunchConfidenceCheckComponent = "provider" | "tool" | "isolation";
+export type LaunchConfidenceCheckComponent = "provider" | "tool" | "isolation" | "identity";
 
 export interface LaunchConfidenceState {
   contextId: string;
@@ -342,6 +356,7 @@ export interface DevContextApi {
   getRecentProjects(): Promise<ApiResult<RecentProjectsState>>;
   getContexts(): Promise<ApiResult<ContextListState>>;
   getContextDetails(request: GetContextDetailsRequest): Promise<ApiResult<ContextDetailsState>>;
+  getTrustCenter(): Promise<ApiResult<TrustCenterState>>;
   preflightLaunchProject(request: PreflightLaunchProjectRequest): Promise<ApiResult<PreflightLaunchProjectResult>>;
   launchProject(request: LaunchProjectRequest): Promise<ApiResult<LaunchProjectResult>>;
   bindProject(request: BindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
@@ -367,6 +382,7 @@ export interface WailsBindings {
   getRecentProjects(): Promise<unknown>;
   getContexts(): Promise<unknown>;
   getContextDetails(request: GetContextDetailsRequest): Promise<unknown>;
+  getTrustCenter(): Promise<unknown>;
   preflightLaunchProject(request: PreflightLaunchProjectRequest): Promise<unknown>;
   launchProject(request: LaunchProjectRequest): Promise<unknown>;
   bindProject(request: BindProjectRequest): Promise<unknown>;
@@ -402,6 +418,9 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
     },
     getContextDetails(request) {
       return callBinding(() => bindings.getContextDetails(request), normalizeContextDetailsState);
+    },
+    getTrustCenter() {
+      return callBinding(() => bindings.getTrustCenter(), normalizeTrustCenterState);
     },
     preflightLaunchProject(request) {
       return callBinding(
@@ -467,6 +486,10 @@ const generatedBindings: WailsBindings = {
   async getContextDetails(request) {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
     return bindings.GetContextDetails(request);
+  },
+  async getTrustCenter() {
+    const bindings = await import("../../wailsjs/go/wailsapp/App");
+    return bindings.GetTrustCenter();
   },
   async preflightLaunchProject(request) {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
@@ -633,6 +656,23 @@ function normalizeContextDetailsState(value: unknown): ContextDetailsState {
   };
 }
 
+function normalizeTrustCenterState(value: unknown): TrustCenterState {
+  const object = objectValue(value);
+  return {
+    contexts: arrayValue(object.contexts).map(normalizeTrustContextProtection),
+    projectMappings: arrayValue(object.projectMappings).map(normalizeTrustProjectMapping),
+    credentialSync: normalizeTrustCredentialSyncProtection(object.credentialSync),
+    integrationBoundaries: arrayValue(object.integrationBoundaries).map(normalizeTrustIntegrationBoundary),
+  };
+}
+function normalizeTrustContextProtection(value: unknown): TrustContextProtection { const object = objectValue(value); return {id: stringValue(object.id), name: stringValue(object.name), providers: arrayValue(object.providers).map(normalizeTrustProviderProtection), tool: normalizeTrustCodingToolProtection(object.tool)}; }
+function normalizeTrustProviderProtection(value: unknown): TrustProviderProtection { const object = objectValue(value); return {id: stringValue(object.id), name: stringValue(object.name), isolation: normalizeTrustIsolationProtection(object.isolation)}; }
+function normalizeTrustCodingToolProtection(value: unknown): TrustCodingToolProtection { const object = objectValue(value); return {id: stringValue(object.id), name: stringValue(object.name), isolation: normalizeTrustIsolationProtection(object.isolation)}; }
+function normalizeTrustIsolationProtection(value: unknown): TrustIsolationProtection { const object = objectValue(value); return {status: normalizeLaunchConfidenceStatus(object.status), message: stringValue(object.message)}; }
+function normalizeTrustProjectMapping(value: unknown): TrustProjectMapping { const object = objectValue(value); return {project: normalizeProjectState(object.project), contextId: stringValue(object.contextId), contextName: stringValue(object.contextName)}; }
+function normalizeTrustCredentialSyncProtection(value: unknown): TrustCredentialSyncProtection { const object = objectValue(value); return {enabled: booleanValue(object.enabled), message: stringValue(object.message)}; }
+function normalizeTrustIntegrationBoundary(value: unknown): TrustIntegrationBoundary { const object = objectValue(value); return {toolId: stringValue(object.toolId), toolName: stringValue(object.toolName), statusDataAvailable: booleanValue(object.statusDataAvailable), message: stringValue(object.message)}; }
+
 function normalizeHomeRunningSummary(value: unknown): HomeRunningSummary {
   const object = objectValue(value);
   return {count: numberValue(object.count), contextCounts: arrayValue(object.contextCounts).map(normalizeHomeRunningContextCount), isolationProtected: booleanValue(object.isolationProtected)};
@@ -694,6 +734,7 @@ function normalizeLaunchConfidenceCheckComponent(value: unknown): LaunchConfiden
     case "provider":
 	case "tool":
     case "isolation":
+	case "identity":
       return value;
     default:
       throw new Error("Invalid Dev Context response.");

@@ -12,6 +12,7 @@ type service interface {
 	GetRecentProjects() (application.RecentProjectsState, *application.Error)
 	GetContexts() (application.ContextListState, *application.Error)
 	GetContextDetails(application.GetContextDetailsRequest) (application.ContextDetailsState, *application.Error)
+	GetTrustCenter() (application.TrustCenterState, *application.Error)
 	PreflightLaunchProject(application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error)
 	LaunchProject(application.LaunchProjectRequest) (application.LaunchProjectResult, *application.Error)
 	BindProject(application.BindProjectRequest) (application.ProjectBindingState, *application.Error)
@@ -141,6 +142,16 @@ func (a *App) GetContextDetails(request application.GetContextDetailsRequest) an
 		return err
 	}
 	return details
+}
+
+// GetTrustCenter returns factual local protection and integration-boundary
+// data for the Trust Center.
+func (a *App) GetTrustCenter() any {
+	state, err := a.service.GetTrustCenter()
+	if err != nil {
+		return err
+	}
+	return state
 }
 
 // App is the Wails-bound application surface.

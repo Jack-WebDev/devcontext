@@ -14,6 +14,140 @@ export namespace application {
 	        this.contextId = source["contextId"];
 	    }
 	}
+	export class ContextTransferTool {
+	    id: string;
+	    options?: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContextTransferTool(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.options = source["options"];
+	    }
+	}
+	export class ContextTransferLaunchTarget {
+	    defaultTool: string;
+	    tools: ContextTransferTool[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ContextTransferLaunchTarget(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.defaultTool = source["defaultTool"];
+	        this.tools = this.convertValues(source["tools"], ContextTransferTool);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ContextTransferProvider {
+	    id: string;
+	    enabled: boolean;
+	    options?: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContextTransferProvider(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.enabled = source["enabled"];
+	        this.options = source["options"];
+	    }
+	}
+	export class ContextTransferMetadata {
+	    name: string;
+	    metadata?: Record<string, string>;
+	    providers: ContextTransferProvider[];
+	    launchTarget: ContextTransferLaunchTarget;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContextTransferMetadata(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.metadata = source["metadata"];
+	        this.providers = this.convertValues(source["providers"], ContextTransferProvider);
+	        this.launchTarget = this.convertValues(source["launchTarget"], ContextTransferLaunchTarget);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ContextMetadataExport {
+	    version: number;
+	    context: ContextTransferMetadata;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContextMetadataExport(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.context = this.convertValues(source["context"], ContextTransferMetadata);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
+	
 	export class CreateContextRequest {
 	    contextId: string;
 	    templateId?: string;
@@ -46,11 +180,11 @@ export namespace application {
 	    sourceContextId: string;
 	    contextId: string;
 	    name?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DuplicateContextRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sourceContextId = source["sourceContextId"];
@@ -60,64 +194,15 @@ export namespace application {
 	}
 	export class ExportContextMetadataRequest {
 	    contextId: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ExportContextMetadataRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.contextId = source["contextId"];
 	    }
-	}
-	export class ContextTransferProvider {
-	    id: string;
-	    enabled: boolean;
-	    options?: {[key: string]: string};
-
-	    static createFrom(source: any = {}) { return new ContextTransferProvider(source); }
-	    constructor(source: any = {}) { if ('string' === typeof source) source = JSON.parse(source); this.id = source["id"]; this.enabled = source["enabled"]; this.options = source["options"]; }
-	}
-	export class ContextTransferTool {
-	    id: string;
-	    options?: {[key: string]: string};
-
-	    static createFrom(source: any = {}) { return new ContextTransferTool(source); }
-	    constructor(source: any = {}) { if ('string' === typeof source) source = JSON.parse(source); this.id = source["id"]; this.options = source["options"]; }
-	}
-	export class ContextTransferLaunchTarget {
-	    defaultTool: string;
-	    tools: ContextTransferTool[];
-
-	    static createFrom(source: any = {}) { return new ContextTransferLaunchTarget(source); }
-	    constructor(source: any = {}) { if ('string' === typeof source) source = JSON.parse(source); this.defaultTool = source["defaultTool"]; this.tools = this.convertValues(source["tools"], ContextTransferTool); }
-	    convertValues(a: any, classs: any, asMap: boolean = false): any { if (!a) return a; if (a.slice) return (a as any[]).map(elem => this.convertValues(elem, classs)); else if ("object" === typeof a) { if (asMap) { for (const key of Object.keys(a)) { a[key] = new classs(a[key]); } return a; } return new classs(a); } return a; }
-	}
-	export class ContextTransferMetadata {
-	    name: string;
-	    metadata?: {[key: string]: string};
-	    providers: ContextTransferProvider[];
-	    launchTarget: ContextTransferLaunchTarget;
-
-	    static createFrom(source: any = {}) { return new ContextTransferMetadata(source); }
-	    constructor(source: any = {}) { if ('string' === typeof source) source = JSON.parse(source); this.name = source["name"]; this.metadata = source["metadata"]; this.providers = this.convertValues(source["providers"], ContextTransferProvider); this.launchTarget = this.convertValues(source["launchTarget"], ContextTransferLaunchTarget); }
-	    convertValues(a: any, classs: any, asMap: boolean = false): any { if (!a) return a; if (a.slice) return (a as any[]).map(elem => this.convertValues(elem, classs)); else if ("object" === typeof a) { if (asMap) { for (const key of Object.keys(a)) { a[key] = new classs(a[key]); } return a; } return new classs(a); } return a; }
-	}
-	export class ContextMetadataExport {
-	    version: number;
-	    context: ContextTransferMetadata;
-
-	    static createFrom(source: any = {}) { return new ContextMetadataExport(source); }
-	    constructor(source: any = {}) { if ('string' === typeof source) source = JSON.parse(source); this.version = source["version"]; this.context = this.convertValues(source["context"], ContextTransferMetadata); }
-	    convertValues(a: any, classs: any, asMap: boolean = false): any { if (!a) return a; if (a.slice) return (a as any[]).map(elem => this.convertValues(elem, classs)); else if ("object" === typeof a) { if (asMap) { for (const key of Object.keys(a)) { a[key] = new classs(a[key]); } return a; } return new classs(a); } return a; }
-	}
-	export class ImportContextMetadataRequest {
-	    contextId: string;
-	    export: ContextMetadataExport;
-
-	    static createFrom(source: any = {}) { return new ImportContextMetadataRequest(source); }
-	    constructor(source: any = {}) { if ('string' === typeof source) source = JSON.parse(source); this.contextId = source["contextId"]; this.export = this.convertValues(source["export"], ContextMetadataExport); }
-	    convertValues(a: any, classs: any, asMap: boolean = false): any { if (!a) return a; if (a.slice) return (a as any[]).map(elem => this.convertValues(elem, classs)); else if ("object" === typeof a) { if (asMap) { for (const key of Object.keys(a)) { a[key] = new classs(a[key]); } return a; } return new classs(a); } return a; }
 	}
 	export class GetContextDetailsRequest {
 	    contextId: string;
@@ -179,6 +264,38 @@ export namespace application {
 	        this.contextId = source["contextId"];
 	    }
 	}
+	export class ImportContextMetadataRequest {
+	    contextId: string;
+	    export: ContextMetadataExport;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportContextMetadataRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contextId = source["contextId"];
+	        this.export = this.convertValues(source["export"], ContextMetadataExport);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class LaunchProjectRequest {
 	    projectPath?: string;
 	    contextId: string;
@@ -239,5 +356,24 @@ export namespace application {
 	        this.projectPath = source["projectPath"];
 	    }
 	}
+	export class UpdateSettingsRequest {
+	    closeAfterLaunch: boolean;
+	    launchVerification: boolean;
+	    rememberProjects: boolean;
+	    trayEnabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateSettingsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.closeAfterLaunch = source["closeAfterLaunch"];
+	        this.launchVerification = source["launchVerification"];
+	        this.rememberProjects = source["rememberProjects"];
+	        this.trayEnabled = source["trayEnabled"];
+	    }
+	}
 
 }
+
