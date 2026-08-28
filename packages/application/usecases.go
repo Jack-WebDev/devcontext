@@ -9,6 +9,7 @@ import (
 	"time"
 
 	codingtool "devctx/packages/core/codingtool"
+	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
@@ -25,6 +26,80 @@ func (s *Service) GetLaunchState(request GetLaunchStateRequest) (LaunchState, *E
 		return LaunchState{}, NewError(err)
 	}
 	return state, nil
+}
+
+func (s *Service) GetSettings() (SettingsState, *Error) {
+	settings, err := s.getSettings()
+	if err != nil {
+		return SettingsState{}, NewError(err)
+	}
+	return settings, nil
+}
+
+func (s *Service) UpdateSettings(request UpdateSettingsRequest) (SettingsState, *Error) {
+	settings, err := s.updateSettings(request)
+	if err != nil {
+		return SettingsState{}, NewError(err)
+	}
+	return settings, nil
+}
+
+func (s *Service) GetTrayState() (TrayState, *Error) {
+	state, err := s.getTrayState()
+	if err != nil {
+		return TrayState{}, NewError(err)
+	}
+	return state, nil
+}
+
+func (s *Service) getTrayState() (TrayState, error) {
+	settings, err := s.getSettings()
+	if err != nil {
+		return TrayState{}, err
+	}
+	running, err := s.getRunningEnvironments()
+	if err != nil {
+		return TrayState{}, err
+	}
+	recents, err := s.getRecentProjects()
+	if err != nil {
+		return TrayState{}, err
+	}
+	state := TrayState{Enabled: settings.TrayEnabled, Indicator: "normal", Environments: make([]TrayEnvironmentItem, 0, len(running.Environments)), RecentProjects: make([]TrayRecentProjectItem, 0, len(recents))}
+	for _, environment := range running.Environments {
+		state.Environments = append(state.Environments, TrayEnvironmentItem{ID: environment.ID, ProjectName: environment.Project.Name, ContextName: environment.Context.Name, ToolName: environment.Tool.Name})
+	}
+	for _, recent := range recents {
+		state.RecentProjects = append(state.RecentProjects, TrayRecentProjectItem{ProjectName: recent.Project.Name, ContextName: recent.ContextName})
+	}
+	return state, nil
+}
+
+func (s *Service) getSettings() (SettingsState, error) {
+	globalConfig, err := config.ReadGlobalConfigFile(s.dependencies.ConfigPath)
+	if err != nil {
+		return SettingsState{}, err
+	}
+	return settingsState(globalConfig), nil
+}
+
+func (s *Service) updateSettings(request UpdateSettingsRequest) (SettingsState, error) {
+	globalConfig, err := config.ReadGlobalConfigFile(s.dependencies.ConfigPath)
+	if err != nil {
+		return SettingsState{}, err
+	}
+	globalConfig.UI.CloseAfterLaunch = request.CloseAfterLaunch
+	globalConfig.UI.LaunchVerification = request.LaunchVerification
+	globalConfig.UI.RememberProjects = request.RememberProjects
+	globalConfig.UI.TrayEnabled = request.TrayEnabled
+	if err := config.WriteGlobalConfigFileWithPermissions(s.dependencies.ConfigPath, globalConfig, s.dependencies.StoragePermissions); err != nil {
+		return SettingsState{}, err
+	}
+	return settingsState(globalConfig), nil
+}
+
+func settingsState(globalConfig config.GlobalConfig) SettingsState {
+	return SettingsState{CloseAfterLaunch: globalConfig.UI.CloseAfterLaunch, LaunchVerification: globalConfig.UI.LaunchVerification, RememberProjects: globalConfig.UI.RememberProjects, TrayEnabled: globalConfig.UI.TrayEnabled}
 }
 
 // GetHomeDashboard returns the backend-owned summary for the Home screen.

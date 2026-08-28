@@ -16,6 +16,10 @@ type GlobalConfig struct {
 // UISettings stores application-wide user interface settings.
 type UISettings struct {
 	RememberWindowPosition bool
+	CloseAfterLaunch       bool
+	LaunchVerification     bool
+	RememberProjects       bool
+	TrayEnabled            bool
 }
 
 // SafetySettings stores application-wide safety behavior settings.

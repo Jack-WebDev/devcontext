@@ -48,6 +48,10 @@ type globalConfigTOML struct {
 
 type uiSettingsTOML struct {
 	RememberWindowPosition *bool `toml:"remember_window_position"`
+	CloseAfterLaunch       *bool `toml:"close_after_launch"`
+	LaunchVerification     *bool `toml:"launch_verification"`
+	RememberProjects       *bool `toml:"remember_projects"`
+	TrayEnabled            *bool `toml:"tray_enabled"`
 }
 
 type safetySettingsTOML struct {
@@ -96,6 +100,14 @@ func EncodeGlobalConfigTOML(globalConfig GlobalConfig) ([]byte, error) {
 	builder.WriteString("[ui]\n")
 	builder.WriteString("remember_window_position = ")
 	builder.WriteString(strconv.FormatBool(globalConfig.UI.RememberWindowPosition))
+	builder.WriteString("\nclose_after_launch = ")
+	builder.WriteString(strconv.FormatBool(globalConfig.UI.CloseAfterLaunch))
+	builder.WriteString("\nlaunch_verification = ")
+	builder.WriteString(strconv.FormatBool(globalConfig.UI.LaunchVerification))
+	builder.WriteString("\nremember_projects = ")
+	builder.WriteString(strconv.FormatBool(globalConfig.UI.RememberProjects))
+	builder.WriteString("\ntray_enabled = ")
+	builder.WriteString(strconv.FormatBool(globalConfig.UI.TrayEnabled))
 	builder.WriteString("\n\n")
 	builder.WriteString("[safety]\n")
 	builder.WriteString("warn_on_context_mismatch = ")
@@ -140,12 +152,23 @@ func globalConfigFromTOML(raw globalConfigTOML) (GlobalConfig, error) {
 		DefaultTool: defaultTool,
 		UI: UISettings{
 			RememberWindowPosition: *raw.UI.RememberWindowPosition,
+			CloseAfterLaunch:       optionalBool(raw.UI.CloseAfterLaunch, false),
+			LaunchVerification:     optionalBool(raw.UI.LaunchVerification, true),
+			RememberProjects:       optionalBool(raw.UI.RememberProjects, true),
+			TrayEnabled:            optionalBool(raw.UI.TrayEnabled, false),
 		},
 		Safety: SafetySettings{
 			WarnOnContextMismatch:  *raw.Safety.WarnOnContextMismatch,
 			ConfirmUnboundProjects: *raw.Safety.ConfirmUnboundProjects,
 		},
 	}, nil
+}
+
+func optionalBool(value *bool, fallback bool) bool {
+	if value == nil {
+		return fallback
+	}
+	return *value
 }
 
 func validateGlobalConfig(globalConfig GlobalConfig) error {

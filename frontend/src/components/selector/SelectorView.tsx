@@ -59,6 +59,7 @@ interface SelectorViewProps {
   onCreatePersonalContext?: (importProviderIds: string[]) => Promise<ApiResult<CreateContextResult>>;
   onCreateCompanyContext?: (importProviderIds: string[]) => Promise<ApiResult<CreateContextResult>>;
   onRunDiagnostics?: () => void;
+  showLaunchVerification?: boolean;
 }
 
 function SelectorView({
@@ -71,6 +72,7 @@ function SelectorView({
   onCreatePersonalContext,
   onCreateCompanyContext,
   onRunDiagnostics,
+  showLaunchVerification = true,
 }: SelectorViewProps) {
   const [selectedContextId, setSelectedContextId] = useState<string | undefined>(() =>
     initialSelectedContextId(launchState),
@@ -342,7 +344,7 @@ function SelectorView({
           }
           launchActions={
             <>
-              {launchPending ? (
+              {launchPending && showLaunchVerification ? (
                 <div className="mb-3">
                   <LaunchVerificationProgress
                     projectName={launchState.project.name}

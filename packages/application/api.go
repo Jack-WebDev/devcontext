@@ -7,6 +7,36 @@ type GetLaunchStateRequest struct {
 	ProjectPath string `json:"projectPath,omitempty"`
 }
 
+// SettingsState contains user-configurable application behavior.
+type SettingsState struct {
+	CloseAfterLaunch   bool `json:"closeAfterLaunch"`
+	LaunchVerification bool `json:"launchVerification"`
+	RememberProjects   bool `json:"rememberProjects"`
+	TrayEnabled        bool `json:"trayEnabled"`
+}
+
+// TrayState describes presentation-safe system-tray content. The desktop host
+// owns rendering and platform availability; this contract has no OS details.
+type TrayState struct {
+	Enabled        bool                    `json:"enabled"`
+	Indicator      string                  `json:"indicator"`
+	Environments   []TrayEnvironmentItem   `json:"environments"`
+	RecentProjects []TrayRecentProjectItem `json:"recentProjects"`
+}
+type TrayEnvironmentItem struct {
+	ID          string `json:"id"`
+	ProjectName string `json:"projectName"`
+	ContextName string `json:"contextName"`
+	ToolName    string `json:"toolName"`
+}
+type TrayRecentProjectItem struct {
+	ProjectName string `json:"projectName"`
+	ContextName string `json:"contextName"`
+}
+
+// UpdateSettingsRequest replaces the supported application preferences.
+type UpdateSettingsRequest SettingsState
+
 // GetHomeDashboardRequest identifies the project represented by the Home
 // dashboard.
 type GetHomeDashboardRequest struct {

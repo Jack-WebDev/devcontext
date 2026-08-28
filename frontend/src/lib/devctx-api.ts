@@ -27,6 +27,8 @@ export interface ContextMismatch {
 export interface GetLaunchStateRequest {
   projectPath?: string;
 }
+export interface SettingsState { closeAfterLaunch: boolean; launchVerification: boolean; rememberProjects: boolean; trayEnabled: boolean; }
+export type UpdateSettingsRequest = SettingsState;
 
 export interface GetHomeDashboardRequest {
   projectPath?: string;
@@ -338,6 +340,8 @@ export interface DevContextApi {
   runRepairAction(request: RunRepairActionRequest): Promise<ApiResult<RunRepairActionResult>>;
   getHistory(): Promise<ApiResult<HistoryState>>;
   getRunningEnvironments(): Promise<ApiResult<RunningEnvironmentsState>>;
+  getSettings(): Promise<ApiResult<SettingsState>>;
+  updateSettings(request: UpdateSettingsRequest): Promise<ApiResult<SettingsState>>;
 }
 
 export interface WailsBindings {
@@ -357,6 +361,8 @@ export interface WailsBindings {
   runRepairAction(request: RunRepairActionRequest): Promise<unknown>;
   getHistory(): Promise<unknown>;
   getRunningEnvironments(): Promise<unknown>;
+  getSettings(): Promise<unknown>;
+  updateSettings(request: UpdateSettingsRequest): Promise<unknown>;
 }
 
 export function createDevContextApi(bindings: WailsBindings = generatedBindings): DevContextApi {
@@ -411,6 +417,8 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
     runRepairAction(request) { return callBinding(() => bindings.runRepairAction({...request, confirmDestructive: request.confirmDestructive ?? false}), normalizeRunRepairActionResult); },
     getHistory() { return callBinding(() => bindings.getHistory(), normalizeHistoryState); },
     getRunningEnvironments() { return callBinding(() => bindings.getRunningEnvironments(), normalizeRunningEnvironmentsState); },
+    getSettings() { return callBinding(() => bindings.getSettings(), normalizeSettingsState); },
+    updateSettings(request) { return callBinding(() => bindings.updateSettings(request), normalizeSettingsState); },
   };
 }
 
@@ -467,7 +475,11 @@ const generatedBindings: WailsBindings = {
   async runRepairAction(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.RunRepairAction({...request, confirmDestructive: request.confirmDestructive ?? false}); },
   async getHistory() { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetHistory(); },
   async getRunningEnvironments() { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetRunningEnvironments(); },
+  async getSettings() { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetSettings(); },
+  async updateSettings(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.UpdateSettings(request); },
 };
+
+function normalizeSettingsState(value: unknown): SettingsState { const object = objectValue(value); return {closeAfterLaunch: booleanValue(object.closeAfterLaunch), launchVerification: booleanValue(object.launchVerification), rememberProjects: booleanValue(object.rememberProjects), trayEnabled: booleanValue(object.trayEnabled)}; }
 
 export const devContextApi = createDevContextApi();
 
