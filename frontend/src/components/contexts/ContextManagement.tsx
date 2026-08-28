@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import type {
   ApiResult,
-  ContextDetailsState,
   ContextListItem,
   CreateContextResult,
   CreateContextRequest,
+  ContextTemplateState,
   DisplayError,
 } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
@@ -15,6 +15,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "../ui/sheet.js";
+import { ContextField } from "./ContextField";
+
+export { ContextDetailsDrawer } from "./ContextDetailsDrawer";
 
 type CustomContextRequest = CreateContextRequest & {
   name: string;
@@ -25,84 +28,18 @@ type CustomContextRequest = CreateContextRequest & {
   enabledProviderIds: string[];
 };
 
-export function ContextDetailsDrawer({
-  contextId,
-  onClose,
-  load,
-}: {
-  contextId: string;
-  onClose: () => void;
-  load: (id: string) => Promise<ApiResult<ContextDetailsState>>;
-}) {
-  const [result, setResult] = useState<
-    ApiResult<ContextDetailsState> | undefined
-  >();
-  useEffect(() => {
-    void load(contextId).then(setResult);
-  }, [contextId, load]);
-  return (
-    <Sheet open onOpenChange={(open) => !open && onClose()}>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>Context details</SheetTitle>
-          <SheetDescription>
-            Backend-owned context information.
-          </SheetDescription>
-        </SheetHeader>
-        <div className="space-y-3 px-8 pb-8">
-          {!result ? (
-            <p>Loading context details...</p>
-          ) : !result.ok ? (
-            <p className="text-destructive">{result.error.message}</p>
-          ) : (
-            <>
-              <Detail label="Name" value={result.data.context.name} />
-              <Detail label="Location" value={result.data.location} />
-              <Detail
-                label="Created"
-                value={new Date(result.data.createdAt).toLocaleString()}
-              />
-              <Detail
-                label="Projects"
-                value={String(result.data.projectCount)}
-              />
-              <Detail
-                label="Coding tool"
-                value={result.data.context.tool.name}
-              />
-              <Detail
-                label="Providers"
-                value={
-                  result.data.enabledProviders.map((p) => p.name).join(", ") ||
-                  "None"
-                }
-              />
-            </>
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs uppercase text-muted-foreground">{label}</p>
-      <p className="mt-1 break-all">{value}</p>
-    </div>
-  );
-}
-
 export function CreateContextDialog({
   contexts,
   onClose,
   create,
+  loadTemplates,
 }: {
   contexts: ContextListItem[];
   onClose: () => void;
   create: (
     request: CreateContextRequest,
   ) => Promise<ApiResult<CreateContextResult>>;
+  loadTemplates: () => Promise<ApiResult<{ templates: ContextTemplateState[] }>>;
 }) {
   const [name, setName] = useState("");
   const [contextId, setContextID] = useState("");
@@ -111,17 +48,30 @@ export function CreateContextDialog({
   const [accent, setAccent] = useState("custom");
   const [toolId, setToolID] = useState(contexts[0]?.context.tool.id ?? "");
   const [providers, setProviders] = useState<string[]>([]);
+  const [templates, setTemplates] = useState<ContextTemplateState[]>([]);
+  const [templateID, setTemplateID] = useState("custom");
   const [error, setError] = useState<DisplayError>();
   const [pending, setPending] = useState(false);
   const options = contexts[0]?.context.availableTools ?? [];
   const providerOptions = contexts
     .flatMap((c) => c.context.providers)
     .filter((p, i, all) => all.findIndex((x) => x.id === p.id) === i);
+  useEffect(() => { void loadTemplates().then((result) => { if (result.ok) setTemplates(result.data.templates); }); }, [loadTemplates]);
+  function selectTemplate(id: string) {
+    setTemplateID(id);
+    const template = templates.find((item) => item.id === id);
+    if (!template) return;
+    setName(template.name);
+    setDescription(template.description);
+    setIcon(template.icon ?? "");
+    setAccent(template.accent);
+  }
   async function submit() {
     setPending(true);
     setError(undefined);
     const request: CustomContextRequest = {
       contextId,
+      templateId: templateID,
       name,
       description,
       icon,
@@ -147,14 +97,20 @@ export function CreateContextDialog({
           </SheetDescription>
         </SheetHeader>
         <div className="space-y-4 px-8 pb-8">
-          <Field label="Name" value={name} onChange={setName} />
-          <Field label="ID" value={contextId} onChange={setContextID} />
-          <Field
+          <label className="block text-sm">
+            Start from a template
+            <select className="mt-1 w-full border p-2" value={templateID} onChange={(e) => selectTemplate(e.target.value)}>
+              {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+            </select>
+          </label>
+          <ContextField label="Name" value={name} onChange={setName} />
+          <ContextField label="ID" value={contextId} onChange={setContextID} />
+          <ContextField
             label="Description"
             value={description}
             onChange={setDescription}
           />
-          <Field label="Icon" value={icon} onChange={setIcon} />
+          <ContextField label="Icon" value={icon} onChange={setIcon} />
           <label className="block text-sm">
             Accent
             <select
@@ -211,25 +167,5 @@ export function CreateContextDialog({
         </div>
       </SheetContent>
     </Sheet>
-  );
-}
-function Field({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="block text-sm">
-      {label}
-      <input
-        className="mt-1 w-full border p-2"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
   );
 }
