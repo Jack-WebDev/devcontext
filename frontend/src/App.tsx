@@ -8,6 +8,7 @@ import { RecentProjectConfirmationDialog } from "./components/home/RecentProject
 import { ProjectsView } from "./components/projects/ProjectsView";
 import { ProjectContextChangeDialog } from "./components/projects/ProjectContextChangeDialog";
 import { DiagnosticsView } from "./components/diagnostics/DiagnosticsView";
+import { HistoryView } from "./components/history/HistoryView";
 import { ContextsView } from "./components/contexts/ContextsView";
 import { ContextDetailsDrawer, CreateContextDialog } from "./components/contexts/ContextManagement";
 import { AppShell } from "./components/shell/AppShell";
@@ -19,6 +20,7 @@ import {
   type ContextListItem,
   type DisplayError,
   type HomeDashboardState,
+  type HistoryState,
   type LaunchState,
   type ProjectListItem,
   type ProjectsState,
@@ -51,6 +53,11 @@ type ProjectsLoad =
   | { status: "loaded"; data: ProjectsState }
   | { status: "error"; error: DisplayError };
 
+type HistoryLoad =
+  | { status: "loading" }
+  | { status: "loaded"; data: HistoryState }
+  | { status: "error"; error: DisplayError };
+
 function App() {
   const [launchState, setLaunchState] = useState<LaunchStateLoad>({
     status: "loading",
@@ -59,6 +66,7 @@ function App() {
   const [recentProjects, setRecentProjects] = useState<RecentProjectsLoad>({status: "loading"});
   const [contexts, setContexts] = useState<ContextsLoad>({status: "loading"});
   const [projects, setProjects] = useState<ProjectsLoad>({status: "loading"});
+  const [history, setHistory] = useState<HistoryLoad>({status: "loading"});
   const [contextDetailsID, setContextDetailsID] = useState<string>();
   const [creatingContext, setCreatingContext] = useState(false);
   const [homeLaunchPending, setHomeLaunchPending] = useState(false);
@@ -129,6 +137,12 @@ function App() {
     return () => window.removeEventListener("hashchange", syncRouteFromHash);
   }, []);
 
+  useEffect(() => {
+    if (activeRoute === "history") {
+      void refreshHistory();
+    }
+  }, [activeRoute]);
+
   function handleNavigate(route: AppRoute) {
     if (route !== activeRoute) {
       window.location.hash = route;
@@ -176,6 +190,11 @@ function App() {
   async function refreshProjects() {
     const result = await devContextApi.getProjects();
     setProjects(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error});
+  }
+
+  async function refreshHistory() {
+    const result = await devContextApi.getHistory();
+    setHistory(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error});
   }
 
   async function handleHomeQuickLaunch() {
@@ -360,11 +379,23 @@ function App() {
         </>
       ) : activeRoute === "diagnostics" ? (
         <DiagnosticsView contexts={contexts.status === "loaded" ? contexts.data : []} load={(contextId) => devContextApi.getDiagnostics({contextId})} loadRepairActions={(contextId) => devContextApi.getRepairActions({contextId})} runRepairAction={(contextId, actionId, confirmDestructive) => devContextApi.runRepairAction({contextId, actionId, confirmDestructive})} />
+      ) : activeRoute === "history" ? (
+        renderHistory(history)
       ) : (
         <PlaceholderScreen route={activeRoute} />
       )}
     </AppShell>
   );
+}
+
+function renderHistory(history: HistoryLoad) {
+  if (history.status === "loading") {
+    return <p className="text-sm text-muted-foreground">Loading history...</p>;
+  }
+  if (history.status === "error") {
+    return <GuiErrorNotice error={history.error} />;
+  }
+  return <HistoryView entries={history.data.entries} />;
 }
 
 function renderContexts(contexts: ContextsLoad, onSelect: (id: string) => void, onNew: () => void) {

@@ -392,6 +392,29 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 	); err != nil {
 		return CreateContextResult{}, err
 	}
+	s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{
+		Name:      devlog.EventContextCreated,
+		Timestamp: s.now(),
+		ContextID: ctx.ID.String(),
+		ToolID:    string(ctx.Tool.DefaultTool),
+	}))
+	recordedProviders := make(map[provider.ID]bool, len(request.ImportProviderIDs))
+	for _, rawProviderID := range request.ImportProviderIDs {
+		providerID := provider.ID(rawProviderID)
+		if recordedProviders[providerID] {
+			continue
+		}
+		if _, enabled := ctx.Providers[providerID]; !enabled {
+			continue
+		}
+		recordedProviders[providerID] = true
+		s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{
+			Name:      devlog.EventProviderConnected,
+			Timestamp: s.now(),
+			ContextID: ctx.ID.String(),
+			ToolID:    string(ctx.Tool.DefaultTool),
+		}))
+	}
 
 	return CreateContextResult{Context: s.contextState(ctx)}, nil
 }
@@ -634,6 +657,12 @@ func (s *Service) bindProject(request BindProjectRequest) (ProjectBindingState, 
 	if err != nil {
 		return ProjectBindingState{}, err
 	}
+	s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{
+		Name:        devlog.EventProjectBindingChanged,
+		Timestamp:   s.now(),
+		ProjectPath: string(binding.ProjectPath),
+		ContextID:   binding.ContextID.String(),
+	}))
 
 	return ProjectBindingState{
 		ProjectPath: string(binding.ProjectPath),
@@ -651,6 +680,14 @@ func (s *Service) unbindProject(request UnbindProjectRequest) (ProjectBindingSta
 	result, err := s.dependencies.Projects.Unbind(string(projectPath), projectPath)
 	if err != nil {
 		return ProjectBindingState{}, err
+	}
+	if result.Removed {
+		s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{
+			Name:        devlog.EventProjectBindingChanged,
+			Timestamp:   s.now(),
+			ProjectPath: string(result.ProjectPath),
+			ContextID:   result.Binding.ContextID.String(),
+		}))
 	}
 
 	return ProjectBindingState{
@@ -1074,6 +1111,10 @@ func cloneLaunchEnvironment(environment launcher.Environment) launcher.Environme
 }
 
 func (s *Service) recordLaunchEvent(event devlog.Event) {
+	_ = s.logger().Record(event)
+}
+
+func (s *Service) recordHistoryEvent(event devlog.Event) {
 	_ = s.logger().Record(event)
 }
 
