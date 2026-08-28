@@ -37,6 +37,15 @@ import {ProviderCredentialClassification} from "../.tmp-test/src/components/sele
 import {ProjectIdentity} from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import {AppShell} from "../.tmp-test/src/components/shell/AppShell.js";
 import {
+  contextPositionFromShortcut,
+  isCommandPaletteShortcut,
+  keyboardShortcuts,
+} from "../.tmp-test/src/components/command-palette/shortcut.js";
+import {
+  launchContextActions,
+  navigationActions,
+} from "../.tmp-test/src/components/command-palette/actions.js";
+import {
   appRouteFromHash,
   appRoutes,
 } from "../.tmp-test/src/components/shell/routes.js";
@@ -79,6 +88,42 @@ import {
   escapeKeyboardAction,
 } from "../.tmp-test/src/components/selector/selector-keyboard.js";
 import {createDevContextWindow} from "../.tmp-test/src/lib/devctx-window.js";
+
+test("command palette shortcut accepts Ctrl or Command K without modifiers", () => {
+  assert.equal(isCommandPaletteShortcut({key: "k", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false}), true);
+  assert.equal(isCommandPaletteShortcut({key: "K", ctrlKey: false, metaKey: true, altKey: false, shiftKey: false}), true);
+  assert.equal(isCommandPaletteShortcut({key: "k", ctrlKey: true, metaKey: false, altKey: false, shiftKey: true}), false);
+  assert.equal(isCommandPaletteShortcut({key: "p", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false}), false);
+});
+
+test("shortcut registry maps number keys to visible context positions", () => {
+  assert.equal(keyboardShortcuts.command_palette.label, "Ctrl/Cmd+K");
+  assert.equal(keyboardShortcuts.select_context.label, "1-9");
+  assert.equal(contextPositionFromShortcut({key: "1", ctrlKey: false, metaKey: false, altKey: false, shiftKey: false}), 0);
+  assert.equal(contextPositionFromShortcut({key: "9", ctrlKey: false, metaKey: false, altKey: false, shiftKey: false}), 8);
+  assert.equal(contextPositionFromShortcut({key: "1", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false}), undefined);
+});
+
+test("command palette actions use context names and configured routes", () => {
+  const launched = [];
+  const navigated = [];
+  const launchActions = launchContextActions([
+    {id: "personal", name: "Personal", confidence: {status: "ready"}, tool: {name: "VS Code"}},
+    {id: "company", name: "Company", confidence: {status: "blocked"}, tool: {name: "Cursor"}},
+  ], (contextId) => launched.push(contextId));
+  const routeActions = navigationActions([
+    {id: "home", label: "Home"},
+    {id: "diagnostics", label: "Diagnostics"},
+  ], (route) => navigated.push(route));
+
+  assert.equal(launchActions[0].label, "Launch Personal");
+  assert.equal(launchActions[1].disabled, true);
+  launchActions[0].onSelect();
+  assert.deepEqual(launched, ["personal"]);
+  assert.equal(routeActions[1].label, "Open Diagnostics");
+  routeActions[1].onSelect();
+  assert.deepEqual(navigated, ["diagnostics"]);
+});
 
 test("history groups entries by date and presents project, context, event, and time", () => {
   const entries = [
