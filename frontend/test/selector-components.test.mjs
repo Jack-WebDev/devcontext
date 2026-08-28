@@ -7,6 +7,7 @@ import {ContextMismatchDialog} from "../.tmp-test/src/components/selector/Contex
 import {ContextCard} from "../.tmp-test/src/components/selector/ContextCard.js";
 import {HomeView, homeConfidenceSummary} from "../.tmp-test/src/components/home/HomeView.js";
 import {RecentProjectConfirmationDialog} from "../.tmp-test/src/components/home/RecentProjectConfirmationDialog.js";
+import {ContextsView, providerSummary} from "../.tmp-test/src/components/contexts/ContextsView.js";
 import {
   ContextAccentIndicator,
   contextAccentFromMetadata,
@@ -448,6 +449,40 @@ test("Home lists recent projects for review and requires confirmation before lau
   assert.ok(dialogHtml.includes("Dev Context will check this project and context before opening it."));
   assert.ok(dialogHtml.includes("Launch Company"));
   assert.match(dialogHtml, /role="dialog"/);
+});
+
+test("Contexts screen lists backend-owned identity summaries and reserves creation", () => {
+  const context = {
+    context: {
+      id: "company",
+      name: "Company",
+      description: "Work identity",
+      tool: {id: "tool", name: "Future Tool", status: "ready", message: "Ready"},
+      availableTools: [],
+      providers: [],
+      confidence: {contextId: "company", status: "needs_attention", checks: []},
+    },
+    enabledProviders: [{
+      id: "provider",
+      name: "Provider",
+      enabled: true,
+      state: "ready",
+      identity: {status: "none", fields: []},
+    }],
+    projectCount: 2,
+    lastUsedAt: "2026-08-28T10:30:00Z",
+  };
+  const html = renderToStaticMarkup(ContextsView({contexts: [context]}));
+
+  assert.ok(html.includes("Contexts"));
+  assert.ok(html.includes("New context"));
+  assert.match(html, /disabled=""/);
+  assert.ok(html.includes("Company"));
+  assert.ok(html.includes("Work identity"));
+  assert.ok(html.includes("Future Tool"));
+  assert.ok(html.includes("2 projects"));
+  assert.ok(html.includes("Provider"));
+  assert.equal(providerSummary({...context, enabledProviders: []}), "No providers enabled");
 });
 
 test("context card summarizes provider, tool, and isolation health from confidence checks", () => {

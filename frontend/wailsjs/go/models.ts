@@ -40,6 +40,18 @@ export namespace application {
 	        this.projectPath = source["projectPath"];
 	    }
 	}
+	export class GetContextDetailsRequest {
+	    contextId: string;
+
+	    static createFrom(source: any = {}) {
+	        return new GetContextDetailsRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contextId = source["contextId"];
+	    }
+	}
 	export class GetLaunchStateRequest {
 	    projectPath?: string;
 	
@@ -98,4 +110,3 @@ export namespace application {
 	}
 
 }
-

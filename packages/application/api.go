@@ -64,6 +64,23 @@ type ContextListItem struct {
 	LastUsedAt       *time.Time      `json:"lastUsedAt,omitempty"`
 }
 
+// GetContextDetailsRequest identifies one configured context.
+type GetContextDetailsRequest struct {
+	ContextID string `json:"contextId"`
+}
+
+// ContextDetailsState contains the backend-owned data for one context's
+// detail view. It extends the list summary with its storage location and
+// creation time.
+type ContextDetailsState struct {
+	Context          ContextState    `json:"context"`
+	Location         string          `json:"location"`
+	CreatedAt        time.Time       `json:"createdAt"`
+	ProjectCount     int             `json:"projectCount"`
+	LastUsedAt       *time.Time      `json:"lastUsedAt,omitempty"`
+	EnabledProviders []ProviderState `json:"enabledProviders"`
+}
+
 // HomeRunningSummary reserves aggregate running-environment data for later
 // running-environment tracking phases.
 type HomeRunningSummary struct {

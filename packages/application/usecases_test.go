@@ -217,6 +217,43 @@ func TestGetContextsReturnsUsageAndReadinessSummaries(t *testing.T) {
 	}
 }
 
+func TestGetContextDetailsReturnsConfiguredContextMetadata(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "one")),
+		ContextID:   devcontext.MustID("personal"),
+		CreatedAt:   fixture.now,
+	})
+	lastUsed := fixture.now.Add(-time.Minute)
+	if err := project.WriteRecentProjectsFile(fixture.recentsPath, []project.RecentProject{{
+		ProjectPath:    project.Path(filepath.Join(fixture.root, "projects", "one")),
+		ContextID:      devcontext.MustID("personal"),
+		LastLaunchedAt: lastUsed,
+	}}); err != nil {
+		t.Fatalf("write recents: %v", err)
+	}
+
+	details, appErr := fixture.service().GetContextDetails(GetContextDetailsRequest{ContextID: "personal"})
+	if appErr != nil {
+		t.Fatalf("get context details: %v", appErr)
+	}
+	paths, err := filesystem.DeriveContextPaths(fixture.paths, devcontext.MustID("personal"))
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	if details.Context.ID != "personal" || details.Context.Tool.ID != "fake-editor" ||
+		details.Location != paths.RootDir || !details.CreatedAt.Equal(fixture.now) || details.ProjectCount != 1 {
+		t.Fatalf("context details = %#v", details)
+	}
+	if details.LastUsedAt == nil || !details.LastUsedAt.Equal(lastUsed) {
+		t.Fatalf("last used = %#v, want %s", details.LastUsedAt, lastUsed)
+	}
+	if len(details.EnabledProviders) != 1 || details.EnabledProviders[0].ID != "fake" {
+		t.Fatalf("enabled providers = %#v", details.EnabledProviders)
+	}
+}
+
 func TestGetLaunchStateDerivesProviderSetupActions(t *testing.T) {
 	tests := []struct {
 		name         string

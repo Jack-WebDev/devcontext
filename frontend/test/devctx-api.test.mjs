@@ -127,6 +127,47 @@ test("adapter normalizes context list summaries", async () => {
   });
 });
 
+test("adapter normalizes context details", async () => {
+  const api = createDevContextApi({
+    async getContextDetails(request) {
+      assert.deepEqual(request, {contextId: "personal"});
+      return {
+        context: {
+          id: "personal",
+          name: "Personal",
+          tool: toolFixture(),
+          availableTools: [toolOptionFixture()],
+          providers: [],
+          confidence: {contextId: "personal", status: "ready", checks: []},
+        },
+        location: "/contexts/personal",
+        createdAt: "2026-08-01T10:30:00Z",
+        projectCount: 2,
+        enabledProviders: [],
+      };
+    },
+  });
+
+  assert.deepEqual(await api.getContextDetails({contextId: "personal"}), {
+    ok: true,
+    data: {
+      context: {
+        id: "personal",
+        name: "Personal",
+        tool: toolFixture(),
+        availableTools: [toolOptionFixture()],
+        providers: [],
+        confidence: {contextId: "personal", status: "ready", checks: []},
+        metadata: undefined,
+      },
+      location: "/contexts/personal",
+      createdAt: "2026-08-01T10:30:00Z",
+      projectCount: 2,
+      enabledProviders: [],
+    },
+  });
+});
+
 test("adapter normalizes successful Wails calls", async () => {
   const calls = [];
   const api = createDevContextApi({

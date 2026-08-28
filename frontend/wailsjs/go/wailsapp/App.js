@@ -18,6 +18,10 @@ export function GetContexts() {
   return window['go']['wailsapp']['App']['GetContexts']();
 }
 
+export function GetContextDetails(arg1) {
+  return window['go']['wailsapp']['App']['GetContextDetails'](arg1);
+}
+
 export function GetRecentProjects() {
   return window['go']['wailsapp']['App']['GetRecentProjects']();
 }

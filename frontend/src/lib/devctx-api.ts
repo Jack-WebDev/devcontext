@@ -69,6 +69,19 @@ export interface ContextListItem {
   lastUsedAt?: string;
 }
 
+export interface GetContextDetailsRequest {
+  contextId: string;
+}
+
+export interface ContextDetailsState {
+  context: ContextState;
+  location: string;
+  createdAt: string;
+  projectCount: number;
+  lastUsedAt?: string;
+  enabledProviders: ProviderState[];
+}
+
 export interface HomeRunningSummary {
   count: number;
 }
@@ -255,6 +268,7 @@ export interface DevContextApi {
   getHomeDashboard(request?: GetHomeDashboardRequest): Promise<ApiResult<HomeDashboardState>>;
   getRecentProjects(): Promise<ApiResult<RecentProjectsState>>;
   getContexts(): Promise<ApiResult<ContextListState>>;
+  getContextDetails(request: GetContextDetailsRequest): Promise<ApiResult<ContextDetailsState>>;
   preflightLaunchProject(request: PreflightLaunchProjectRequest): Promise<ApiResult<PreflightLaunchProjectResult>>;
   launchProject(request: LaunchProjectRequest): Promise<ApiResult<LaunchProjectResult>>;
   bindProject(request: BindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
@@ -267,6 +281,7 @@ export interface WailsBindings {
   getHomeDashboard(request: GetHomeDashboardRequest): Promise<unknown>;
   getRecentProjects(): Promise<unknown>;
   getContexts(): Promise<unknown>;
+  getContextDetails(request: GetContextDetailsRequest): Promise<unknown>;
   preflightLaunchProject(request: PreflightLaunchProjectRequest): Promise<unknown>;
   launchProject(request: LaunchProjectRequest): Promise<unknown>;
   bindProject(request: BindProjectRequest): Promise<unknown>;
@@ -287,6 +302,9 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
     },
     getContexts() {
       return callBinding(() => bindings.getContexts(), normalizeContextListState);
+    },
+    getContextDetails(request) {
+      return callBinding(() => bindings.getContextDetails(request), normalizeContextDetailsState);
     },
     preflightLaunchProject(request) {
       return callBinding(
@@ -336,6 +354,10 @@ const generatedBindings: WailsBindings = {
   async getContexts() {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
     return bindings.GetContexts();
+  },
+  async getContextDetails(request) {
+    const bindings = await import("../../wailsjs/go/wailsapp/App");
+    return bindings.GetContextDetails(request);
   },
   async preflightLaunchProject(request) {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
@@ -465,6 +487,19 @@ function normalizeContextListItem(value: unknown): ContextListItem {
     context: normalizeContextState(object.context),
     enabledProviders: arrayValue(object.enabledProviders).map(normalizeProviderState),
     projectCount: numberValue(object.projectCount),
+    ...(lastUsedAt === undefined ? {} : {lastUsedAt}),
+  };
+}
+
+function normalizeContextDetailsState(value: unknown): ContextDetailsState {
+  const object = objectValue(value);
+  const lastUsedAt = optionalTimestamp(object.lastUsedAt);
+  return {
+    context: normalizeContextState(object.context),
+    location: stringValue(object.location),
+    createdAt: timestampValue(object.createdAt),
+    projectCount: numberValue(object.projectCount),
+    enabledProviders: arrayValue(object.enabledProviders).map(normalizeProviderState),
     ...(lastUsedAt === undefined ? {} : {lastUsedAt}),
   };
 }

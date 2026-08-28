@@ -23,6 +23,9 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 		contexts: application.ContextListState{Contexts: []application.ContextListItem{{
 			Context: application.ContextState{ID: "personal", Name: "Personal"}, ProjectCount: 1,
 		}}},
+		contextDetails: application.ContextDetailsState{
+			Context: application.ContextState{ID: "personal", Name: "Personal"}, Location: "/contexts/personal",
+		},
 		launchResult: application.LaunchProjectResult{
 			Project: application.ProjectState{Name: "api", Path: "/work/api"},
 			Context: application.ContextState{ID: "personal", Name: "Personal"},
@@ -78,6 +81,15 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	contexts := app.GetContexts()
 	if !reflect.DeepEqual(contexts, service.contexts) {
 		t.Fatalf("contexts = %#v, want %#v", contexts, service.contexts)
+	}
+
+	detailsRequest := application.GetContextDetailsRequest{ContextID: "personal"}
+	details := app.GetContextDetails(detailsRequest)
+	if !reflect.DeepEqual(details, service.contextDetails) {
+		t.Fatalf("context details = %#v, want %#v", details, service.contextDetails)
+	}
+	if service.contextDetailsRequest != detailsRequest {
+		t.Fatalf("context details request = %#v, want %#v", service.contextDetailsRequest, detailsRequest)
 	}
 
 	preflightRequest := application.PreflightLaunchProjectRequest{ProjectPath: "/work/api", ContextID: "personal"}
@@ -151,6 +163,10 @@ type fakeService struct {
 	contexts    application.ContextListState
 	contextsErr *application.Error
 
+	contextDetailsRequest application.GetContextDetailsRequest
+	contextDetails        application.ContextDetailsState
+	contextDetailsErr     *application.Error
+
 	preflightRequest application.PreflightLaunchProjectRequest
 	preflightResult  application.PreflightLaunchProjectResult
 	preflightErr     *application.Error
@@ -188,6 +204,11 @@ func (s *fakeService) GetRecentProjects() (application.RecentProjectsState, *app
 
 func (s *fakeService) GetContexts() (application.ContextListState, *application.Error) {
 	return s.contexts, s.contextsErr
+}
+
+func (s *fakeService) GetContextDetails(request application.GetContextDetailsRequest) (application.ContextDetailsState, *application.Error) {
+	s.contextDetailsRequest = request
+	return s.contextDetails, s.contextDetailsErr
 }
 
 func (s *fakeService) PreflightLaunchProject(request application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error) {

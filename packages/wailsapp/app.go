@@ -11,6 +11,7 @@ type service interface {
 	GetHomeDashboard(application.GetHomeDashboardRequest) (application.HomeDashboardState, *application.Error)
 	GetRecentProjects() (application.RecentProjectsState, *application.Error)
 	GetContexts() (application.ContextListState, *application.Error)
+	GetContextDetails(application.GetContextDetailsRequest) (application.ContextDetailsState, *application.Error)
 	PreflightLaunchProject(application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error)
 	LaunchProject(application.LaunchProjectRequest) (application.LaunchProjectResult, *application.Error)
 	BindProject(application.BindProjectRequest) (application.ProjectBindingState, *application.Error)
@@ -43,6 +44,15 @@ func (a *App) GetContexts() any {
 		return err
 	}
 	return contexts
+}
+
+// GetContextDetails returns one configured context's presentation-safe details.
+func (a *App) GetContextDetails(request application.GetContextDetailsRequest) any {
+	details, err := a.service.GetContextDetails(request)
+	if err != nil {
+		return err
+	}
+	return details
 }
 
 // App is the Wails-bound application surface.
