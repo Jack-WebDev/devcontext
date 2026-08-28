@@ -337,10 +337,6 @@ function App() {
     >
       {activeRoute === "home" ? (
         <section aria-labelledby="home-heading" className="space-y-8">
-          <div>
-            <p className="text-sm text-muted-foreground">{appRouteDefinition(activeRoute).label}</p>
-            <h2 id="home-heading" className="text-2xl font-semibold">Home</h2>
-          </div>
           <HomeDashboardContent dashboard={homeDashboard} recentProjects={recentProjects} launchPending={homeLaunchPending} launchError={homeLaunchError} onQuickLaunch={handleHomeQuickLaunch} onReviewLaunchOptions={handleReviewLaunchOptions} onRecentProjectSelect={handleRecentProjectSelect} />
           {recentProjectToLaunch ? (
             <RecentProjectConfirmationDialog
