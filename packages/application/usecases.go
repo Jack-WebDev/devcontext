@@ -45,6 +45,16 @@ func (s *Service) GetRecentProjects() (RecentProjectsState, *Error) {
 	return RecentProjectsState{Projects: projects}, nil
 }
 
+// GetContexts returns all configured development identities with their
+// backend-derived readiness, project usage, and recent launch summaries.
+func (s *Service) GetContexts() (ContextListState, *Error) {
+	contexts, err := s.getContexts()
+	if err != nil {
+		return ContextListState{}, NewError(err)
+	}
+	return ContextListState{Contexts: contexts}, nil
+}
+
 // LaunchProject builds a launch plan for a selected context and starts the
 // editor process.
 func (s *Service) LaunchProject(request LaunchProjectRequest) (LaunchProjectResult, *Error) {
@@ -193,6 +203,47 @@ func (s *Service) getRecentProjects() ([]RecentProjectState, error) {
 		return projects[i].LastLaunchedAt.After(projects[j].LastLaunchedAt)
 	})
 	return projects, nil
+}
+
+func (s *Service) getContexts() ([]ContextListItem, error) {
+	contexts, err := s.dependencies.Contexts.List()
+	if err != nil {
+		return nil, err
+	}
+	bindings, err := s.dependencies.Projects.List()
+	if err != nil {
+		return nil, err
+	}
+	recents, err := s.dependencies.RecentProjects.List()
+	if err != nil {
+		return nil, err
+	}
+
+	projectCounts := make(map[devcontext.ID]int, len(contexts))
+	for _, binding := range bindings {
+		projectCounts[binding.ContextID]++
+	}
+	lastUsedAt := make(map[devcontext.ID]time.Time, len(contexts))
+	for _, recent := range recents {
+		if previous, found := lastUsedAt[recent.ContextID]; !found || recent.LastLaunchedAt.After(previous) {
+			lastUsedAt[recent.ContextID] = recent.LastLaunchedAt.UTC()
+		}
+	}
+
+	items := make([]ContextListItem, 0, len(contexts))
+	for _, configuredContext := range contexts {
+		state := s.contextState(configuredContext)
+		item := ContextListItem{
+			Context:          state,
+			EnabledProviders: enabledProviderStates(state.Providers),
+			ProjectCount:     projectCounts[configuredContext.ID],
+		}
+		if lastUsed, found := lastUsedAt[configuredContext.ID]; found {
+			item.LastUsedAt = &lastUsed
+		}
+		items = append(items, item)
+	}
+	return items, nil
 }
 
 func (s *Service) firstRunLaunchState(projectPath project.Path) LaunchState {
@@ -470,6 +521,16 @@ func (s *Service) contextState(ctx devcontext.Context) ContextState {
 		Confidence:     confidence,
 		Metadata:       cloneMetadata(ctx.Metadata),
 	}
+}
+
+func enabledProviderStates(providers []ProviderState) []ProviderState {
+	enabled := make([]ProviderState, 0, len(providers))
+	for _, provider := range providers {
+		if provider.Enabled {
+			enabled = append(enabled, provider)
+		}
+	}
+	return enabled
 }
 
 func (s *Service) providerCredentialSessionStates() ([]ProviderCredentialSessionState, error) {

@@ -14,6 +14,10 @@ export function GetHomeDashboard(arg1) {
   return window['go']['wailsapp']['App']['GetHomeDashboard'](arg1);
 }
 
+export function GetContexts() {
+  return window['go']['wailsapp']['App']['GetContexts']();
+}
+
 export function GetRecentProjects() {
   return window['go']['wailsapp']['App']['GetRecentProjects']();
 }

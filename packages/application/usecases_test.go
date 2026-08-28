@@ -174,6 +174,49 @@ func TestGetRecentProjectsReturnsNewestFirstWithContextMetadata(t *testing.T) {
 	}
 }
 
+func TestGetContextsReturnsUsageAndReadinessSummaries(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	fixture.writeContext(t, fixture.context("company", "Company"))
+	fixture.writeBindings(t,
+		project.Binding{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "one")), ContextID: devcontext.MustID("personal"), CreatedAt: fixture.now},
+		project.Binding{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "two")), ContextID: devcontext.MustID("personal"), CreatedAt: fixture.now},
+		project.Binding{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "three")), ContextID: devcontext.MustID("removed"), CreatedAt: fixture.now},
+	)
+	older := fixture.now.Add(-time.Hour)
+	newer := fixture.now.Add(-time.Minute)
+	if err := project.WriteRecentProjectsFile(fixture.recentsPath, []project.RecentProject{
+		{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "one")), ContextID: devcontext.MustID("personal"), LastLaunchedAt: older},
+		{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "two")), ContextID: devcontext.MustID("personal"), LastLaunchedAt: newer},
+		{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "three")), ContextID: devcontext.MustID("removed"), LastLaunchedAt: fixture.now},
+	}); err != nil {
+		t.Fatalf("write recents: %v", err)
+	}
+
+	result, appErr := fixture.service().GetContexts()
+	if appErr != nil {
+		t.Fatalf("get contexts: %v", appErr)
+	}
+	if len(result.Contexts) != 2 {
+		t.Fatalf("context count = %d, want 2", len(result.Contexts))
+	}
+	personal := result.Contexts[1]
+	if personal.Context.ID != "personal" || personal.Context.Tool.ID != "fake-editor" ||
+		personal.Context.Confidence.ContextID != "personal" || personal.ProjectCount != 2 {
+		t.Fatalf("personal context summary = %#v", personal)
+	}
+	if len(personal.EnabledProviders) != 1 || !personal.EnabledProviders[0].Enabled || personal.EnabledProviders[0].ID != "fake" {
+		t.Fatalf("enabled providers = %#v, want fake provider", personal.EnabledProviders)
+	}
+	if personal.LastUsedAt == nil || !personal.LastUsedAt.Equal(newer) {
+		t.Fatalf("personal last used = %#v, want %s", personal.LastUsedAt, newer)
+	}
+	company := result.Contexts[0]
+	if company.Context.ID != "company" || company.ProjectCount != 0 || company.LastUsedAt != nil {
+		t.Fatalf("company context summary = %#v", company)
+	}
+}
+
 func TestGetLaunchStateDerivesProviderSetupActions(t *testing.T) {
 	tests := []struct {
 		name         string

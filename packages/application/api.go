@@ -48,6 +48,22 @@ type RecentProjectState struct {
 	LastLaunchedAt time.Time    `json:"lastLaunchedAt"`
 }
 
+// ContextListState contains every configured context and the aggregate data
+// needed to present an identity list.
+type ContextListState struct {
+	Contexts []ContextListItem `json:"contexts"`
+}
+
+// ContextListItem combines a context's backend-owned readiness state with its
+// project-binding count and most recent successful launch. EnabledProviders is
+// intentionally pre-filtered so clients do not need to infer the summary.
+type ContextListItem struct {
+	Context          ContextState    `json:"context"`
+	EnabledProviders []ProviderState `json:"enabledProviders"`
+	ProjectCount     int             `json:"projectCount"`
+	LastUsedAt       *time.Time      `json:"lastUsedAt,omitempty"`
+}
+
 // HomeRunningSummary reserves aggregate running-environment data for later
 // running-environment tracking phases.
 type HomeRunningSummary struct {

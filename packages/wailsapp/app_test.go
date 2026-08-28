@@ -20,6 +20,9 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 		recentProjects: application.RecentProjectsState{Projects: []application.RecentProjectState{{
 			Project: application.ProjectState{Name: "api", Path: "/work/api"}, ContextID: "personal",
 		}}},
+		contexts: application.ContextListState{Contexts: []application.ContextListItem{{
+			Context: application.ContextState{ID: "personal", Name: "Personal"}, ProjectCount: 1,
+		}}},
 		launchResult: application.LaunchProjectResult{
 			Project: application.ProjectState{Name: "api", Path: "/work/api"},
 			Context: application.ContextState{ID: "personal", Name: "Personal"},
@@ -70,6 +73,11 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	recentProjects := app.GetRecentProjects()
 	if !reflect.DeepEqual(recentProjects, service.recentProjects) {
 		t.Fatalf("recent projects = %#v, want %#v", recentProjects, service.recentProjects)
+	}
+
+	contexts := app.GetContexts()
+	if !reflect.DeepEqual(contexts, service.contexts) {
+		t.Fatalf("contexts = %#v, want %#v", contexts, service.contexts)
 	}
 
 	preflightRequest := application.PreflightLaunchProjectRequest{ProjectPath: "/work/api", ContextID: "personal"}
@@ -140,6 +148,9 @@ type fakeService struct {
 	recentProjects    application.RecentProjectsState
 	recentProjectsErr *application.Error
 
+	contexts    application.ContextListState
+	contextsErr *application.Error
+
 	preflightRequest application.PreflightLaunchProjectRequest
 	preflightResult  application.PreflightLaunchProjectResult
 	preflightErr     *application.Error
@@ -173,6 +184,10 @@ func (s *fakeService) GetHomeDashboard(request application.GetHomeDashboardReque
 
 func (s *fakeService) GetRecentProjects() (application.RecentProjectsState, *application.Error) {
 	return s.recentProjects, s.recentProjectsErr
+}
+
+func (s *fakeService) GetContexts() (application.ContextListState, *application.Error) {
+	return s.contexts, s.contextsErr
 }
 
 func (s *fakeService) PreflightLaunchProject(request application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error) {
