@@ -6,6 +6,8 @@ import type {
   CreateContextResult,
   CreateContextRequest,
   ContextTemplateState,
+  DuplicateContextRequest,
+  DuplicateContextResult,
   DisplayError,
 } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
@@ -30,17 +32,50 @@ export function ContextDetailsDrawer({
   contextId,
   onClose,
   load,
+  duplicate,
 }: {
   contextId: string;
   onClose: () => void;
   load: (id: string) => Promise<ApiResult<ContextDetailsState>>;
+  duplicate: (
+    request: DuplicateContextRequest,
+  ) => Promise<ApiResult<DuplicateContextResult>>;
 }) {
   const [result, setResult] = useState<
     ApiResult<ContextDetailsState> | undefined
   >();
+  const [duplicateID, setDuplicateID] = useState("");
+  const [duplicateName, setDuplicateName] = useState("");
+  const [duplicateError, setDuplicateError] = useState<DisplayError>();
+  const [duplicatePending, setDuplicatePending] = useState(false);
   useEffect(() => {
     void load(contextId).then(setResult);
   }, [contextId, load]);
+  useEffect(() => {
+    if (!result?.ok) {
+      return;
+    }
+    setDuplicateID(`${result.data.context.id}-copy`);
+    setDuplicateName(`${result.data.context.name} copy`);
+  }, [result]);
+  async function submitDuplicate() {
+    if (!result?.ok) {
+      return;
+    }
+    setDuplicatePending(true);
+    setDuplicateError(undefined);
+    const duplicated = await duplicate({
+      sourceContextId: result.data.context.id,
+      contextId: duplicateID,
+      name: duplicateName,
+    });
+    setDuplicatePending(false);
+    if (!duplicated.ok) {
+      setDuplicateError(duplicated.error);
+      return;
+    }
+    onClose();
+  }
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent>
@@ -78,6 +113,20 @@ export function ContextDetailsDrawer({
                   "None"
                 }
               />
+              <section className="space-y-3 border-t border-border pt-4" aria-labelledby="duplicate-context-heading">
+                <div>
+                  <h3 id="duplicate-context-heading" className="font-medium">Duplicate context</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Copies context metadata, provider settings, and coding-tool settings into a new isolated context. Credentials are not copied.
+                  </p>
+                </div>
+                <Field label="New name" value={duplicateName} onChange={setDuplicateName} />
+                <Field label="New ID" value={duplicateID} onChange={setDuplicateID} />
+                {duplicateError ? <p className="text-destructive">{duplicateError.message}</p> : null}
+                <Button type="button" disabled={duplicatePending || !duplicateID || !duplicateName} onClick={() => void submitDuplicate()}>
+                  {duplicatePending ? "Duplicating..." : "Duplicate context"}
+                </Button>
+              </section>
             </>
           )}
         </div>
