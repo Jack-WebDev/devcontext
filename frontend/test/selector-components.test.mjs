@@ -36,6 +36,7 @@ import {
 import {ProviderCredentialClassification} from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
 import {ProjectIdentity} from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import {AppShell} from "../.tmp-test/src/components/shell/AppShell.js";
+import {isCommandPaletteShortcut} from "../.tmp-test/src/components/command-palette/shortcut.js";
 import {
   appRouteFromHash,
   appRoutes,
@@ -79,6 +80,13 @@ import {
   escapeKeyboardAction,
 } from "../.tmp-test/src/components/selector/selector-keyboard.js";
 import {createDevContextWindow} from "../.tmp-test/src/lib/devctx-window.js";
+
+test("command palette shortcut accepts Ctrl or Command K without modifiers", () => {
+  assert.equal(isCommandPaletteShortcut({key: "k", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false}), true);
+  assert.equal(isCommandPaletteShortcut({key: "K", ctrlKey: false, metaKey: true, altKey: false, shiftKey: false}), true);
+  assert.equal(isCommandPaletteShortcut({key: "k", ctrlKey: true, metaKey: false, altKey: false, shiftKey: true}), false);
+  assert.equal(isCommandPaletteShortcut({key: "p", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false}), false);
+});
 
 test("history groups entries by date and presents project, context, event, and time", () => {
   const entries = [

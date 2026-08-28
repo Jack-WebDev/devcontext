@@ -14,6 +14,8 @@ import { RunningEnvironmentConflictDialog } from "./components/running/RunningEn
 import { ContextsView } from "./components/contexts/ContextsView";
 import { ContextDetailsDrawer, CreateContextDialog } from "./components/contexts/ContextManagement";
 import { AppShell } from "./components/shell/AppShell";
+import { CommandPalette } from "./components/command-palette/CommandPalette";
+import { isCommandPaletteShortcut } from "./components/command-palette/shortcut";
 import { appRouteDefinition, appRouteFromHash, type AppRoute } from "./components/shell/routes";
 import {
   devContextApi,
@@ -96,6 +98,7 @@ function App() {
   const [projectContextChangePending, setProjectContextChangePending] = useState(false);
   const [projectContextChangeError, setProjectContextChangeError] = useState<DisplayError>();
   const [activeRoute, setActiveRoute] = useState<AppRoute>(() => appRouteFromHash(window.location.hash));
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -150,6 +153,20 @@ function App() {
 
     window.addEventListener("hashchange", syncRouteFromHash);
     return () => window.removeEventListener("hashchange", syncRouteFromHash);
+  }, []);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (!isCommandPaletteShortcut(event)) {
+        return;
+      }
+
+      event.preventDefault();
+      setCommandPaletteOpen((open) => !open);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   useEffect(() => {
@@ -446,6 +463,7 @@ function App() {
       ) : (
         <PlaceholderScreen route={activeRoute} />
       )}
+      <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
       {pendingRunningEnvironmentLaunch ? <RunningEnvironmentConflictDialog conflict={pendingRunningEnvironmentLaunch.conflict} launchPending={runningEnvironmentLaunchPending} error={runningEnvironmentLaunchError} onCancel={() => !runningEnvironmentLaunchPending && setPendingRunningEnvironmentLaunch(undefined)} onLaunchAnother={() => void handleLaunchAnotherWindow()} /> : null}
     </AppShell>
   );
