@@ -30,9 +30,31 @@ function HomeView({
         error={launchError}
         onQuickLaunch={onQuickLaunch}
       />
+      <HomeRunningSummarySection running={dashboard.running} />
       <HomeRecentProjectsSection projects={dashboard.recentProjects} onSelect={onRecentProjectSelect} />
     </div>
   );
+}
+
+function HomeRunningSummarySection({running}: {running: HomeDashboardState["running"]}) {
+  return (
+    <Card as="section" hierarchy="secondary" className="py-0" aria-labelledby="home-running-heading">
+      <CardContent className="space-y-4 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div><h2 id="home-running-heading" className="font-semibold">Running environments</h2><p className="mt-1 text-sm text-muted-foreground">Active coding-tool environments keep their launch context isolated.</p></div>
+          <span className="text-2xl font-semibold" aria-label={`${running.count} active environments`}>{running.count}</span>
+        </div>
+        <dl className="grid gap-3 border-t border-border pt-4 text-sm sm:grid-cols-2">
+          {running.contextCounts.length === 0 ? <HomeRunningDetail label="Contexts" value="No active environments" /> : running.contextCounts.map((count) => <HomeRunningDetail key={count.contextId} label={count.contextName} value={`${count.count} active`} />)}
+          <HomeRunningDetail label="Isolation" value={running.isolationProtected ? "Protected" : "No active environments"} />
+        </dl>
+      </CardContent>
+    </Card>
+  );
+}
+
+function HomeRunningDetail({label, value}: {label: string; value: string}) {
+  return <div><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 font-medium">{value}</dd></div>;
 }
 
 function HomeRecentProjectsSection({

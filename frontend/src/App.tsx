@@ -10,6 +10,7 @@ import { ProjectContextChangeDialog } from "./components/projects/ProjectContext
 import { DiagnosticsView } from "./components/diagnostics/DiagnosticsView";
 import { HistoryView } from "./components/history/HistoryView";
 import { RunningView } from "./components/running/RunningView";
+import { RunningEnvironmentConflictDialog } from "./components/running/RunningEnvironmentConflictDialog";
 import { ContextsView } from "./components/contexts/ContextsView";
 import { ContextDetailsDrawer, CreateContextDialog } from "./components/contexts/ContextManagement";
 import { AppShell } from "./components/shell/AppShell";
@@ -27,6 +28,7 @@ import {
   type ProjectsState,
   type RecentProjectState,
   type RunningEnvironmentsState,
+  type RunningEnvironmentConflict,
 } from "./lib/devctx-api";
 import { devContextWindow } from "./lib/devctx-window";
 
@@ -65,6 +67,8 @@ type RunningLoad =
   | { status: "loaded"; data: RunningEnvironmentsState }
   | { status: "error"; error: DisplayError };
 
+interface PendingRunningEnvironmentLaunch { conflict: RunningEnvironmentConflict; request: {projectPath: string; contextId: string}; }
+
 function App() {
   const [launchState, setLaunchState] = useState<LaunchStateLoad>({
     status: "loading",
@@ -75,6 +79,9 @@ function App() {
   const [projects, setProjects] = useState<ProjectsLoad>({status: "loading"});
   const [history, setHistory] = useState<HistoryLoad>({status: "loading"});
   const [running, setRunning] = useState<RunningLoad>({status: "loading"});
+  const [pendingRunningEnvironmentLaunch, setPendingRunningEnvironmentLaunch] = useState<PendingRunningEnvironmentLaunch>();
+  const [runningEnvironmentLaunchPending, setRunningEnvironmentLaunchPending] = useState(false);
+  const [runningEnvironmentLaunchError, setRunningEnvironmentLaunchError] = useState<DisplayError>();
   const [contextDetailsID, setContextDetailsID] = useState<string>();
   const [creatingContext, setCreatingContext] = useState(false);
   const [homeLaunchPending, setHomeLaunchPending] = useState(false);
@@ -228,6 +235,9 @@ function App() {
         setHomeLaunchError(preflight.error);
         return;
       }
+      if (deferRunningEnvironmentConflict(preflight.data, request)) {
+        return;
+      }
       const launch = await devContextApi.launchProject(request);
       if (!launch.ok) {
         setHomeLaunchError(launch.error);
@@ -267,6 +277,9 @@ function App() {
         setRecentProjectLaunchError(preflight.error);
         return;
       }
+      if (deferRunningEnvironmentConflict(preflight.data, request)) {
+        return;
+      }
       const launch = await devContextApi.launchProject(request);
       if (!launch.ok) {
         setRecentProjectLaunchError(launch.error);
@@ -297,6 +310,9 @@ function App() {
       const preflight = await devContextApi.preflightLaunchProject(request);
       if (!preflight.ok) {
         setProjectLaunchError(preflight.error);
+        return;
+      }
+      if (deferRunningEnvironmentConflict(preflight.data, request)) {
         return;
       }
       const launch = await devContextApi.launchProject(request);
@@ -337,6 +353,34 @@ function App() {
 
   function handleProjectOpenFolder(project: ProjectListItem) {
     window.open(new URL(project.project.path, "file://").href, "_blank", "noopener,noreferrer");
+  }
+
+  function deferRunningEnvironmentConflict(preflight: {runningEnvironmentConflict?: RunningEnvironmentConflict}, request: {projectPath: string; contextId: string}) {
+    if (preflight.runningEnvironmentConflict === undefined) {
+      return false;
+    }
+    setRunningEnvironmentLaunchError(undefined);
+    setPendingRunningEnvironmentLaunch({conflict: preflight.runningEnvironmentConflict, request});
+    return true;
+  }
+
+  async function handleLaunchAnotherWindow() {
+    if (pendingRunningEnvironmentLaunch === undefined || runningEnvironmentLaunchPending) {
+      return;
+    }
+    setRunningEnvironmentLaunchPending(true);
+    setRunningEnvironmentLaunchError(undefined);
+    try {
+      const result = await devContextApi.launchProject(pendingRunningEnvironmentLaunch.request);
+      if (!result.ok) {
+        setRunningEnvironmentLaunchError(result.error);
+        return;
+      }
+      setPendingRunningEnvironmentLaunch(undefined);
+      await Promise.all([refreshHomeDashboard(), refreshRecentProjects(), refreshProjects(), refreshRunningEnvironments()]);
+    } finally {
+      setRunningEnvironmentLaunchPending(false);
+    }
   }
 
   return (
@@ -402,6 +446,7 @@ function App() {
       ) : (
         <PlaceholderScreen route={activeRoute} />
       )}
+      {pendingRunningEnvironmentLaunch ? <RunningEnvironmentConflictDialog conflict={pendingRunningEnvironmentLaunch.conflict} launchPending={runningEnvironmentLaunchPending} error={runningEnvironmentLaunchError} onCancel={() => !runningEnvironmentLaunchPending && setPendingRunningEnvironmentLaunch(undefined)} onLaunchAnother={() => void handleLaunchAnotherWindow()} /> : null}
     </AppShell>
   );
 }

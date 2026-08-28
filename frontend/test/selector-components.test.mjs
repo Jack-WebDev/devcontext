@@ -469,7 +469,7 @@ test("Home shows project, selected context, and context-named quick launch", () 
         confidence: {contextId: "company", status: "ready", checks: []},
       },
       recentProjects: [],
-      running: {count: 0},
+      running: {count: 0, contextCounts: [], isolationProtected: false},
       activity: {count: 0},
     },
     launchPending: false,
@@ -499,7 +499,7 @@ test("Home lists recent projects for review and requires confirmation before lau
     dashboard: {
       project: {name: "current", path: "/work/current"},
       recentProjects: [recentProject],
-      running: {count: 0},
+      running: {count: 0, contextCounts: [], isolationProtected: false},
       activity: {count: 0},
     },
     launchPending: false,

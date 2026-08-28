@@ -227,6 +227,11 @@ func (s *Service) getHomeDashboard(request GetHomeDashboardRequest) (HomeDashboa
 		Running:        HomeRunningSummary{},
 		Activity:       HomeActivitySummary{},
 	}
+	running, err := s.homeRunningSummary()
+	if err != nil {
+		return HomeDashboardState{}, err
+	}
+	dashboard.Running = running
 	for _, context := range launchState.Contexts {
 		if context.ID != launchState.SelectedContextID {
 			continue
@@ -609,12 +614,17 @@ func (s *Service) preflightLaunchProject(request PreflightLaunchProjectRequest) 
 	}
 
 	contextState := s.contextState(*resolution.Context)
+	runningConflict, err := s.runningEnvironmentConflict(projectPath, contextID)
+	if err != nil {
+		return PreflightLaunchProjectResult{}, err
+	}
 	return PreflightLaunchProjectResult{
-		Project:           projectState(projectPath),
-		Context:           contextState,
-		Confidence:        contextState.Confidence,
-		VerificationSteps: launchVerificationSteps(contextState),
-		Warnings:          warningStates(resolution.Warnings),
+		Project:                    projectState(projectPath),
+		Context:                    contextState,
+		Confidence:                 contextState.Confidence,
+		VerificationSteps:          launchVerificationSteps(contextState),
+		Warnings:                   warningStates(resolution.Warnings),
+		RunningEnvironmentConflict: runningConflict,
 	}, nil
 }
 

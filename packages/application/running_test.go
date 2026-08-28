@@ -66,6 +66,40 @@ func TestGetRunningEnvironmentsRefreshesProcessStateAndRecordsStoppedEvent(t *te
 	}
 }
 
+func TestRunningSummaryAndPreflightConflictsUseActiveEnvironmentIdentity(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	fixture.writeContext(t, fixture.context("company", "Company"))
+	fixture.writeContext(t, fixture.context("freelance", "Freelance"))
+	repository := coreRunning.NewRepository(fixture.runningPath)
+	for _, environment := range []coreRunning.Environment{
+		testRunningEnvironment(fixture, "personal", 0),
+		testRunningEnvironment(fixture, "company", 0),
+	} {
+		environment.Process.PID = nil
+		if _, err := repository.Record(environment); err != nil {
+			t.Fatalf("record environment: %v", err)
+		}
+	}
+
+	dashboard, appErr := fixture.service().GetHomeDashboard(GetHomeDashboardRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get home dashboard: %v", appErr)
+	}
+	if dashboard.Running.Count != 2 || !dashboard.Running.IsolationProtected || len(dashboard.Running.ContextCounts) != 2 {
+		t.Fatalf("running summary = %#v", dashboard.Running)
+	}
+
+	same, appErr := fixture.service().PreflightLaunchProject(PreflightLaunchProjectRequest{ProjectPath: ".", ContextID: "personal"})
+	if appErr != nil || same.RunningEnvironmentConflict == nil || same.RunningEnvironmentConflict.Kind != "same_context" {
+		t.Fatalf("same-context conflict = %#v, %v", same.RunningEnvironmentConflict, appErr)
+	}
+	different, appErr := fixture.service().PreflightLaunchProject(PreflightLaunchProjectRequest{ProjectPath: ".", ContextID: "freelance"})
+	if appErr != nil || different.RunningEnvironmentConflict == nil || different.RunningEnvironmentConflict.Kind != "different_context" {
+		t.Fatalf("different-context conflict = %#v, %v", different.RunningEnvironmentConflict, appErr)
+	}
+}
+
 func testRunningEnvironment(fixture applicationFixture, contextID string, pid int) coreRunning.Environment {
 	return coreRunning.Environment{
 		Project:   coreRunning.ProjectIdentity{Path: project.Path(fixture.projectDir), Name: "current"},

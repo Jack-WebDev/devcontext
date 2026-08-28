@@ -1,28 +1,83 @@
 package application
 
 import (
+	"sort"
 	"time"
 
+	devcontext "devctx/packages/core/context"
 	devlog "devctx/packages/core/logging"
+	"devctx/packages/core/project"
 	coreRunning "devctx/packages/core/running"
 )
 
 func (s *Service) getRunningEnvironments() (RunningEnvironmentsState, error) {
-	result, err := s.dependencies.RunningEnvironments.RefreshProcessStates(s.dependencies.ProcessInspector)
+	environments, err := s.refreshRunningEnvironments()
 	if err != nil {
 		return RunningEnvironmentsState{}, err
+	}
+	states := make([]RunningEnvironmentState, len(environments))
+	for index, environment := range environments {
+		states[index] = runningEnvironmentState(environment)
+	}
+	return RunningEnvironmentsState{Environments: states}, nil
+}
+
+func (s *Service) refreshRunningEnvironments() ([]coreRunning.Environment, error) {
+	result, err := s.dependencies.RunningEnvironments.RefreshProcessStates(s.dependencies.ProcessInspector)
+	if err != nil {
+		return nil, err
 	}
 	for _, environment := range result.Stopped {
 		s.recordHistoryEvent(environmentStoppedEvent(environment, s.now()))
 	}
-
-	states := make([]RunningEnvironmentState, 0, len(result.Environments))
+	active := make([]coreRunning.Environment, 0, len(result.Environments))
 	for _, environment := range result.Environments {
 		if environment.Process.State == coreRunning.ProcessStateRunning {
-			states = append(states, runningEnvironmentState(environment))
+			active = append(active, environment)
 		}
 	}
-	return RunningEnvironmentsState{Environments: states}, nil
+	return active, nil
+}
+
+func (s *Service) homeRunningSummary() (HomeRunningSummary, error) {
+	environments, err := s.refreshRunningEnvironments()
+	if err != nil {
+		return HomeRunningSummary{}, err
+	}
+	counts := map[string]HomeRunningContextCount{}
+	for _, environment := range environments {
+		count := counts[environment.Context.ID.String()]
+		count.ContextID = environment.Context.ID.String()
+		count.ContextName = environment.Context.Name
+		count.Count++
+		counts[count.ContextID] = count
+	}
+	contextCounts := make([]HomeRunningContextCount, 0, len(counts))
+	for _, count := range counts {
+		contextCounts = append(contextCounts, count)
+	}
+	sort.Slice(contextCounts, func(i, j int) bool { return contextCounts[i].ContextName < contextCounts[j].ContextName })
+	return HomeRunningSummary{Count: len(environments), ContextCounts: contextCounts, IsolationProtected: len(environments) > 0}, nil
+}
+
+func (s *Service) runningEnvironmentConflict(projectPath project.Path, contextID devcontext.ID) (*RunningEnvironmentConflict, error) {
+	environments, err := s.refreshRunningEnvironments()
+	if err != nil {
+		return nil, err
+	}
+	var differentContext *RunningEnvironmentConflict
+	for _, environment := range environments {
+		if environment.Project.Path != projectPath {
+			continue
+		}
+		if environment.Context.ID == contextID {
+			return &RunningEnvironmentConflict{Kind: "same_context", Environment: runningEnvironmentState(environment)}, nil
+		}
+		if differentContext == nil {
+			differentContext = &RunningEnvironmentConflict{Kind: "different_context", Environment: runningEnvironmentState(environment)}
+		}
+	}
+	return differentContext, nil
 }
 
 func environmentStoppedEvent(environment coreRunning.Environment, timestamp time.Time) devlog.Event {

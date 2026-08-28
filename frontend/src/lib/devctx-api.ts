@@ -84,7 +84,10 @@ export interface ContextDetailsState {
 
 export interface HomeRunningSummary {
   count: number;
+  contextCounts: HomeRunningContextCount[];
+  isolationProtected: boolean;
 }
+export interface HomeRunningContextCount { contextId: string; contextName: string; count: number; }
 
 export interface HomeActivitySummary {
   count: number;
@@ -221,7 +224,9 @@ export interface PreflightLaunchProjectResult {
   confidence: LaunchConfidenceState;
   verificationSteps?: LaunchVerificationStep[];
   warnings: ResolutionWarning[];
+  runningEnvironmentConflict?: RunningEnvironmentConflict;
 }
+export interface RunningEnvironmentConflict { kind: "same_context" | "different_context"; environment: RunningEnvironmentState; }
 
 export type LaunchVerificationStepStatus = "pending" | LaunchConfidenceStatus;
 
@@ -582,8 +587,10 @@ function normalizeContextDetailsState(value: unknown): ContextDetailsState {
 }
 
 function normalizeHomeRunningSummary(value: unknown): HomeRunningSummary {
-  return {count: numberValue(objectValue(value).count)};
+  const object = objectValue(value);
+  return {count: numberValue(object.count), contextCounts: arrayValue(object.contextCounts).map(normalizeHomeRunningContextCount), isolationProtected: booleanValue(object.isolationProtected)};
 }
+function normalizeHomeRunningContextCount(value: unknown): HomeRunningContextCount { const object = objectValue(value); return {contextId: stringValue(object.contextId), contextName: stringValue(object.contextName), count: numberValue(object.count)}; }
 
 function normalizeHomeActivitySummary(value: unknown): HomeActivitySummary {
   return {count: numberValue(objectValue(value).count)};
@@ -658,14 +665,18 @@ function normalizeLaunchProjectResult(value: unknown): LaunchProjectResult {
 function normalizePreflightLaunchProjectResult(value: unknown): PreflightLaunchProjectResult {
   const object = objectValue(value);
   const verificationSteps = arrayValue(object.verificationSteps).map(normalizeLaunchVerificationStep);
+  const runningEnvironmentConflict = optionalRunningEnvironmentConflict(object.runningEnvironmentConflict);
   return {
     project: normalizeProjectState(object.project),
     context: normalizeContextState(object.context),
     confidence: requiredLaunchConfidenceState(object.confidence),
     ...(verificationSteps.length === 0 ? {} : {verificationSteps}),
     warnings: arrayValue(object.warnings).map(normalizeResolutionWarning),
+    ...(runningEnvironmentConflict === undefined ? {} : {runningEnvironmentConflict}),
   };
 }
+
+function optionalRunningEnvironmentConflict(value: unknown): RunningEnvironmentConflict | undefined { if (value === undefined || value === null) { return undefined; } const object = objectValue(value); const kind = object.kind === "same_context" || object.kind === "different_context" ? object.kind : undefined; if (kind === undefined) { throw new Error("Invalid Dev Context response."); } return {kind, environment: normalizeRunningEnvironmentState(object.environment)}; }
 
 function normalizeLaunchVerificationStep(value: unknown): LaunchVerificationStep {
   const object = objectValue(value);

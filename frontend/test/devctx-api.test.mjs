@@ -25,7 +25,7 @@ test("adapter normalizes the Home dashboard contract", async () => {
           confidence: {contextId: "personal", status: "ready", checks: []},
         },
         recentProjects: [],
-        running: {count: 0},
+        running: {count: 0, contextCounts: [], isolationProtected: false},
         activity: {count: 0},
       };
     },
@@ -42,7 +42,7 @@ test("adapter normalizes the Home dashboard contract", async () => {
         confidence: {contextId: "personal", status: "ready", checks: []},
       },
       recentProjects: [],
-      running: {count: 0},
+      running: {count: 0, contextCounts: [], isolationProtected: false},
       activity: {count: 0},
     },
   });
