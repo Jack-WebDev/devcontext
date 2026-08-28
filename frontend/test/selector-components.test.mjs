@@ -89,6 +89,8 @@ import {
 } from "../.tmp-test/src/components/selector/selector-keyboard.js";
 import {createDevContextWindow} from "../.tmp-test/src/lib/devctx-window.js";
 import {notificationPresentation} from "../.tmp-test/src/components/notifications/notification-policy.js";
+import {AccountIdentityMismatchDialog} from "../.tmp-test/src/components/selector/AccountIdentityMismatchDialog.js";
+import {hasAccountIdentityMismatch} from "../.tmp-test/src/components/selector/account-identity-mismatch.js";
 import {parseContextMetadataExport} from "../.tmp-test/src/components/contexts/context-transfer.js";
 
 test("context metadata import requires a JSON export document", () => {
@@ -97,6 +99,21 @@ test("context metadata import requires a JSON export document", () => {
   assert.throws(() => parseContextMetadataExport("not JSON"));
   assert.throws(() => parseContextMetadataExport("[]"));
   assert.throws(() => parseContextMetadataExport(JSON.stringify({version: "1", context: {}})));
+});
+
+test("account identity mismatch review is limited to backend identity evidence", () => {
+  assert.equal(hasAccountIdentityMismatch({confidence: {checks: [{component: "identity", severity: "needs_attention"}]}}), true);
+  assert.equal(hasAccountIdentityMismatch({confidence: {checks: [{component: "provider", severity: "needs_attention"}]}}), false);
+  const html = renderToStaticMarkup(createElement(AccountIdentityMismatchDialog, {
+    contextName: "Company",
+    launchPending: false,
+    onCancel() {},
+    onReviewConfiguration() {},
+    onLaunchAnyway() {},
+  }));
+  assert.ok(html.includes("Review configuration"));
+  assert.ok(html.includes("Launch anyway"));
+  assert.ok(html.includes("Cancel"));
 });
 
 test("notification policy permits only meaningful provider, tool, and update events", () => {
