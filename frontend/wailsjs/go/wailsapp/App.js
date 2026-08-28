@@ -30,6 +30,10 @@ export function RunRepairAction(arg1) {
   return window['go']['wailsapp']['App']['RunRepairAction'](arg1);
 }
 
+export function GetHistory() {
+  return window['go']['wailsapp']['App']['GetHistory']();
+}
+
 export function GetHomeDashboard(arg1) {
   return window['go']['wailsapp']['App']['GetHomeDashboard'](arg1);
 }

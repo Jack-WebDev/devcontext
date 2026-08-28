@@ -444,6 +444,21 @@ type RunRepairActionResult struct {
 	Diagnostics DiagnosticsState `json:"diagnostics"`
 }
 
+// HistoryState contains local launch events for later history presentation.
+type HistoryState struct {
+	Entries []HistoryEntry `json:"entries"`
+}
+
+// HistoryEntry is a presentation-safe local activity record.
+type HistoryEntry struct {
+	Event       string    `json:"event"`
+	Timestamp   time.Time `json:"timestamp"`
+	ProjectPath string    `json:"projectPath,omitempty"`
+	ContextID   string    `json:"contextId,omitempty"`
+	ToolID      string    `json:"toolId,omitempty"`
+	Message     string    `json:"message"`
+}
+
 // ProviderCredentialSessionState describes a detected global provider session
 // using only non-secret metadata that helps the user classify the session.
 type ProviderCredentialSessionState struct {

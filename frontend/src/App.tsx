@@ -359,7 +359,7 @@ function App() {
           ) : null}
         </>
       ) : activeRoute === "diagnostics" ? (
-        <DiagnosticsView contexts={contexts.status === "loaded" ? contexts.data : []} load={(contextId) => devContextApi.getDiagnostics({contextId})} />
+        <DiagnosticsView contexts={contexts.status === "loaded" ? contexts.data : []} load={(contextId) => devContextApi.getDiagnostics({contextId})} loadRepairActions={(contextId) => devContextApi.getRepairActions({contextId})} runRepairAction={(contextId, actionId, confirmDestructive) => devContextApi.runRepairAction({contextId, actionId, confirmDestructive})} />
       ) : (
         <PlaceholderScreen route={activeRoute} />
       )}

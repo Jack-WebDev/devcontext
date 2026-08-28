@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 
-import type { ApiResult, ContextListItem, DiagnosticsState, DisplayError } from "../../lib/devctx-api";
+import type { ApiResult, ContextListItem, DiagnosticsState, DisplayError, RepairAction, RepairActionsState, RunRepairActionResult } from "../../lib/devctx-api";
 import { StatusIndicator } from "../status/StatusIndicator.js";
+import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 
 interface DiagnosticsViewProps {
   contexts: ContextListItem[];
   load: (contextId: string) => Promise<ApiResult<DiagnosticsState>>;
+  loadRepairActions: (contextId: string) => Promise<ApiResult<RepairActionsState>>;
+  runRepairAction: (contextId: string, actionId: string, confirmDestructive: boolean) => Promise<ApiResult<RunRepairActionResult>>;
 }
 
 type DiagnosticsLoad =
@@ -14,9 +17,13 @@ type DiagnosticsLoad =
   | {status: "loaded"; data: DiagnosticsState}
   | {status: "error"; error: DisplayError};
 
-function DiagnosticsView({contexts, load}: DiagnosticsViewProps) {
+function DiagnosticsView({contexts, load, loadRepairActions, runRepairAction}: DiagnosticsViewProps) {
   const [contextID, setContextID] = useState(contexts[0]?.context.id ?? "");
   const [diagnostics, setDiagnostics] = useState<DiagnosticsLoad>({status: "loading"});
+  const [repairActions, setRepairActions] = useState<RepairAction[]>([]);
+  const [repairAction, setRepairAction] = useState<RepairAction>();
+  const [repairPending, setRepairPending] = useState(false);
+  const [repairError, setRepairError] = useState<DisplayError>();
 
   useEffect(() => {
     if (!contexts.some((item) => item.context.id === contextID)) {
@@ -42,6 +49,37 @@ function DiagnosticsView({contexts, load}: DiagnosticsViewProps) {
     };
   }, [contextID, load]);
 
+  useEffect(() => {
+    if (contextID === "") {
+      setRepairActions([]);
+      return;
+    }
+    loadRepairActions(contextID).then((result) => setRepairActions(result.ok ? result.data.actions : []));
+  }, [contextID, loadRepairActions]);
+
+  async function run(action: RepairAction, confirmDestructive = false) {
+    if (repairPending) {
+      return;
+    }
+    setRepairPending(true);
+    setRepairError(undefined);
+    try {
+      const result = await runRepairAction(contextID, action.id, confirmDestructive);
+      if (!result.ok) {
+        setRepairError(result.error);
+        return;
+      }
+      setDiagnostics({status: "loaded", data: result.data.diagnostics});
+      setRepairAction(undefined);
+      const actions = await loadRepairActions(contextID);
+      if (actions.ok) {
+        setRepairActions(actions.data.actions);
+      }
+    } finally {
+      setRepairPending(false);
+    }
+  }
+
   return (
     <section aria-labelledby="diagnostics-heading" className="space-y-6">
       <div>
@@ -64,7 +102,34 @@ function DiagnosticsView({contexts, load}: DiagnosticsViewProps) {
       </label>
 
       {renderDiagnostics(diagnostics, contexts.length)}
+      {repairActions.length > 0 ? <RepairActions actions={repairActions} pending={repairPending} onSelect={(action) => action.destructive ? setRepairAction(action) : void run(action)} /> : null}
+      {repairAction ? <RepairConfirmation action={repairAction} pending={repairPending} error={repairError} onCancel={() => !repairPending && setRepairAction(undefined)} onConfirm={() => void run(repairAction, true)} /> : null}
     </section>
+  );
+}
+
+function RepairActions({actions, pending, onSelect}: {actions: RepairAction[]; pending: boolean; onSelect: (action: RepairAction) => void}) {
+  return (
+    <Card as="section" hierarchy="tertiary" className="py-0" aria-labelledby="repair-actions-heading">
+      <CardContent className="space-y-4 p-5">
+        <div><h3 id="repair-actions-heading" className="text-lg font-semibold">Repair</h3><p className="mt-1 text-sm text-muted-foreground">Repair actions affect only this context’s isolated storage.</p></div>
+        <div className="flex flex-wrap gap-3">{actions.map((action) => <Button key={action.id} type="button" variant={action.destructive ? "destructive" : "outline"} size="sm" disabled={pending} onClick={() => onSelect(action)}>{action.label}</Button>)}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RepairConfirmation({action, pending, error, onCancel, onConfirm}: {action: RepairAction; pending: boolean; error?: DisplayError; onCancel: () => void; onConfirm: () => void}) {
+  return (
+    <Card as="section" aria-labelledby="repair-confirmation-heading" aria-modal="true" className="border border-destructive/30 py-0" role="dialog">
+      <CardContent className="space-y-4 p-5">
+        <div><h3 id="repair-confirmation-heading" className="text-lg font-semibold">Confirm {action.label}</h3><p className="mt-1 text-sm text-muted-foreground">{action.description}</p></div>
+        <p className="text-sm text-destructive">This permanently removes the following context-owned items.</p>
+        {action.targets.length === 0 ? <p className="text-sm text-muted-foreground">No files are currently present.</p> : <ul className="max-h-48 space-y-1 overflow-y-auto border border-border p-3 font-mono text-xs">{action.targets.map((target) => <li key={target.path}>{target.path}</li>)}</ul>}
+        {error ? <p className="text-sm text-destructive" role="alert">{error.message}</p> : null}
+        <div className="flex justify-end gap-3"><Button type="button" variant="outline" disabled={pending} onClick={onCancel}>Cancel</Button><Button type="button" variant="destructive" disabled={pending} onClick={onConfirm}>{pending ? "Resetting..." : "Reset storage"}</Button></div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -137,4 +202,4 @@ function EmptyDiagnostics({message}: {message: string}) {
   return <Card as="section" hierarchy="secondary" className="py-0"><CardContent className="p-5 text-sm text-muted-foreground">{message}</CardContent></Card>;
 }
 
-export { DiagnosticsView, DiagnosticCheckRow, renderDiagnostics };
+export { DiagnosticsView, DiagnosticCheckRow, RepairConfirmation, renderDiagnostics };

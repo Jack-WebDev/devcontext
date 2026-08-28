@@ -21,6 +21,7 @@ type service interface {
 	GetDiagnostics(application.GetDiagnosticsRequest) (application.DiagnosticsState, *application.Error)
 	GetRepairActions(application.GetRepairActionsRequest) (application.RepairActionsState, *application.Error)
 	RunRepairAction(application.RunRepairActionRequest) (application.RunRepairActionResult, *application.Error)
+	GetHistory() (application.HistoryState, *application.Error)
 }
 
 func (a *App) GetProjects() any {
@@ -56,6 +57,15 @@ func (a *App) RunRepairAction(request application.RunRepairActionRequest) any {
 		return err
 	}
 	return result
+}
+
+// GetHistory returns local user-facing activity records.
+func (a *App) GetHistory() any {
+	history, err := a.service.GetHistory()
+	if err != nil {
+		return err
+	}
+	return history
 }
 
 // GetHomeDashboard returns the Home screen state for the requested project.

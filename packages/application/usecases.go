@@ -149,6 +149,15 @@ func (s *Service) RunRepairAction(request RunRepairActionRequest) (RunRepairActi
 	return result, nil
 }
 
+// GetHistory returns local user-facing activity records.
+func (s *Service) GetHistory() (HistoryState, *Error) {
+	history, err := s.getHistory()
+	if err != nil {
+		return HistoryState{}, NewError(err)
+	}
+	return history, nil
+}
+
 func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, error) {
 	projectPath, err := s.validatedProjectPath(request.ProjectPath)
 	if err != nil {

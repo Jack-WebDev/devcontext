@@ -50,6 +50,7 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 		diagnostics:   application.DiagnosticsState{Groups: []application.DiagnosticGroup{}},
 		repairActions: application.RepairActionsState{Actions: []application.RepairAction{}},
 		repairResult:  application.RunRepairActionResult{ActionID: "recheck-provider-files"},
+		history:       application.HistoryState{Entries: []application.HistoryEntry{}},
 	}
 	app := New(service)
 	app.Startup(context.Background())
@@ -166,6 +167,11 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	if service.runRepairRequest != runRepairRequest {
 		t.Fatalf("run repair request = %#v, want %#v", service.runRepairRequest, runRepairRequest)
 	}
+
+	history := app.GetHistory()
+	if !reflect.DeepEqual(history, service.history) {
+		t.Fatalf("history = %#v, want %#v", history, service.history)
+	}
 }
 
 func TestAppReturnsApplicationErrorsAsSingleValues(t *testing.T) {
@@ -231,6 +237,9 @@ type fakeService struct {
 	runRepairRequest application.RunRepairActionRequest
 	repairResult     application.RunRepairActionResult
 	repairErr        *application.Error
+
+	history    application.HistoryState
+	historyErr *application.Error
 }
 
 func (s *fakeService) GetLaunchState(request application.GetLaunchStateRequest) (application.LaunchState, *application.Error) {
@@ -273,6 +282,10 @@ func (s *fakeService) GetRepairActions(request application.GetRepairActionsReque
 func (s *fakeService) RunRepairAction(request application.RunRepairActionRequest) (application.RunRepairActionResult, *application.Error) {
 	s.runRepairRequest = request
 	return s.repairResult, s.repairErr
+}
+
+func (s *fakeService) GetHistory() (application.HistoryState, *application.Error) {
+	return s.history, s.historyErr
 }
 
 func (s *fakeService) PreflightLaunchProject(request application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error) {
