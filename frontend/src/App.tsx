@@ -20,6 +20,8 @@ import {
   type ApiResult,
   type CreateContextResult,
   type DisplayError,
+  type ImportContextMetadataRequest,
+  type ImportContextMetadataResult,
   type ProjectListItem,
   type RecentProjectState,
   type RunningEnvironmentConflict,
@@ -143,6 +145,14 @@ function App() {
     }
 
     return { ok: false, error: result.error };
+  }
+
+  async function handleImportContextMetadata(request: ImportContextMetadataRequest): Promise<ApiResult<ImportContextMetadataResult>> {
+    const result = await devContextApi.importContextMetadata(request);
+    if (result.ok) {
+      await refreshContexts();
+    }
+    return result;
   }
 
   async function handleSettingsChange(next: SettingsState) { if (settingsPending) return; setSettingsPending(true); const result = await devContextApi.updateSettings(next); setSettings(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error}); setSettingsPending(false); }
@@ -346,7 +356,7 @@ function App() {
           </section>
         </section>
       ) : activeRoute === "contexts" ? (
-        <><ContextsContent contexts={contexts} onSelect={setContextDetailsID} onNew={() => setCreatingContext(true)} />{contextDetailsID ? <ContextDetailsDrawer contextId={contextDetailsID} onClose={() => setContextDetailsID(undefined)} load={(contextId) => devContextApi.getContextDetails({contextId})} duplicate={async (request) => { const result = await devContextApi.duplicateContext(request); if (result.ok) { await refreshContexts(); } return result; }}/> : null}{creatingContext && contexts.status === "loaded" ? <CreateContextDialog contexts={contexts.data} onClose={() => setCreatingContext(false)} create={async (request) => { const result = await devContextApi.createContext(request); if (result.ok) { await refreshContexts(); setCreatingContext(false); } return result; }} loadTemplates={() => devContextApi.getContextTemplates()}/> : null}</>
+        <><ContextsContent contexts={contexts} onSelect={setContextDetailsID} onNew={() => setCreatingContext(true)} />{contextDetailsID ? <ContextDetailsDrawer contextId={contextDetailsID} onClose={() => setContextDetailsID(undefined)} load={(contextId) => devContextApi.getContextDetails({contextId})} duplicate={async (request) => { const result = await devContextApi.duplicateContext(request); if (result.ok) { await refreshContexts(); } return result; }} exportMetadata={devContextApi.exportContextMetadata} importMetadata={handleImportContextMetadata}/> : null}{creatingContext && contexts.status === "loaded" ? <CreateContextDialog contexts={contexts.data} onClose={() => setCreatingContext(false)} create={async (request) => { const result = await devContextApi.createContext(request); if (result.ok) { await refreshContexts(); setCreatingContext(false); } return result; }} loadTemplates={() => devContextApi.getContextTemplates()}/> : null}</>
       ) : activeRoute === "projects" ? (
         <>
           <ProjectsContent projects={projects} launchingProjectPath={projectLaunchPath} errorProjectPath={projectErrorPath} launchError={projectLaunchError} onLaunch={handleProjectLaunch} onChangeContext={contexts.status === "loaded" ? handleProjectChangeContext : undefined} onOpenFolder={handleProjectOpenFolder} />

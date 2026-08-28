@@ -89,6 +89,15 @@ import {
 } from "../.tmp-test/src/components/selector/selector-keyboard.js";
 import {createDevContextWindow} from "../.tmp-test/src/lib/devctx-window.js";
 import {notificationPresentation} from "../.tmp-test/src/components/notifications/notification-policy.js";
+import {parseContextMetadataExport} from "../.tmp-test/src/components/contexts/context-transfer.js";
+
+test("context metadata import requires a JSON export document", () => {
+  const exported = {version: 1, context: {name: "Personal"}};
+  assert.deepEqual(parseContextMetadataExport(JSON.stringify(exported)), exported);
+  assert.throws(() => parseContextMetadataExport("not JSON"));
+  assert.throws(() => parseContextMetadataExport("[]"));
+  assert.throws(() => parseContextMetadataExport(JSON.stringify({version: "1", context: {}})));
+});
 
 test("notification policy permits only meaningful provider, tool, and update events", () => {
   assert.deepEqual(
