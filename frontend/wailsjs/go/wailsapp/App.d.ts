@@ -16,6 +16,8 @@ export function GetContexts():Promise<any>;
 
 export function GetContextTemplates():Promise<any>;
 
+export function GetTrustCenter():Promise<any>;
+
 export function ImportContextMetadata(arg1:application.ImportContextMetadataRequest):Promise<any>;
 
 export function GetDiagnostics(arg1:application.GetDiagnosticsRequest):Promise<any>;

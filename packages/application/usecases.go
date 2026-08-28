@@ -141,6 +141,16 @@ func (s *Service) GetContextDetails(request GetContextDetailsRequest) (ContextDe
 	return details, nil
 }
 
+// GetTrustCenter returns factual local protection, project mapping, and
+// coding-tool integration-boundary data for the Trust Center.
+func (s *Service) GetTrustCenter() (TrustCenterState, *Error) {
+	state, err := s.getTrustCenter()
+	if err != nil {
+		return TrustCenterState{}, NewError(err)
+	}
+	return state, nil
+}
+
 // LaunchProject builds a launch plan for a selected context and starts the
 // editor process.
 func (s *Service) LaunchProject(request LaunchProjectRequest) (LaunchProjectResult, *Error) {

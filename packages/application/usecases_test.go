@@ -255,6 +255,32 @@ func TestGetContextDetailsReturnsConfiguredContextMetadata(t *testing.T) {
 	}
 }
 
+func TestGetTrustCenterReportsActualLocalBoundaries(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	ctx := fixture.context("personal", "Personal")
+	ctx.Providers = provider.Configs{fixture.provider.ID(): {Enabled: true}}
+	fixture.writeContext(t, ctx)
+	fixture.writeBindings(t, project.Binding{ProjectPath: project.Path(fixture.projectDir), ContextID: ctx.ID, CreatedAt: fixture.now})
+
+	state, appErr := fixture.service().GetTrustCenter()
+	if appErr != nil {
+		t.Fatalf("get trust center: %v", appErr)
+	}
+	if state.CredentialSync.Enabled || len(state.Contexts) != 1 || len(state.ProjectMappings) != 1 || len(state.IntegrationBoundaries) != 1 {
+		t.Fatalf("trust center = %#v", state)
+	}
+	protection := state.Contexts[0]
+	if protection.Name != "Personal" || protection.Tool.Isolation.Status != LaunchConfidenceReady || len(protection.Providers) != 1 || protection.Providers[0].Isolation.Status != LaunchConfidenceReady {
+		t.Fatalf("context protection = %#v", protection)
+	}
+	if state.ProjectMappings[0].ContextName != "Personal" || state.ProjectMappings[0].Project.Path != fixture.projectDir {
+		t.Fatalf("project mapping = %#v", state.ProjectMappings[0])
+	}
+	if state.IntegrationBoundaries[0].StatusDataAvailable {
+		t.Fatalf("integration boundary = %#v, want no fake-tool status-data export", state.IntegrationBoundaries[0])
+	}
+}
+
 func TestGetLaunchStateDerivesProviderSetupActions(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -442,10 +468,11 @@ func TestGetLaunchStateReturnsConfidenceForSelectedContext(t *testing.T) {
 			Message:   "Context storage is ready.",
 		},
 		{
-			Component: LaunchConfidenceCheckIsolation,
-			Severity:  LaunchConfidenceReady,
-			Label:     "Codex isolation",
-			Message:   "Codex isolation storage is ready.",
+			Component:  LaunchConfidenceCheckIsolation,
+			ProviderID: "codex",
+			Severity:   LaunchConfidenceReady,
+			Label:      "Codex isolation",
+			Message:    "Codex isolation storage is ready.",
 		},
 		{
 			Component:  LaunchConfidenceCheckIsolation,

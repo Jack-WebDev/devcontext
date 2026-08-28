@@ -111,6 +111,71 @@ type ContextDetailsState struct {
 	EnabledProviders []ProviderState `json:"enabledProviders"`
 }
 
+// TrustCenterState contains factual local protection and integration-boundary
+// information for the Trust Center. It intentionally contains no credentials,
+// commands, environment values, or context storage paths.
+type TrustCenterState struct {
+	Contexts              []TrustContextProtection      `json:"contexts"`
+	ProjectMappings       []TrustProjectMapping         `json:"projectMappings"`
+	CredentialSync        TrustCredentialSyncProtection `json:"credentialSync"`
+	IntegrationBoundaries []TrustIntegrationBoundary    `json:"integrationBoundaries"`
+}
+
+// TrustContextProtection reports the actual isolation readiness for one
+// configured development identity.
+type TrustContextProtection struct {
+	ID        string                    `json:"id"`
+	Name      string                    `json:"name"`
+	Providers []TrustProviderProtection `json:"providers"`
+	Tool      TrustCodingToolProtection `json:"tool"`
+}
+
+// TrustProviderProtection reports one enabled provider's isolated storage
+// readiness without disclosing its storage location.
+type TrustProviderProtection struct {
+	ID        string                   `json:"id"`
+	Name      string                   `json:"name"`
+	Isolation TrustIsolationProtection `json:"isolation"`
+}
+
+// TrustCodingToolProtection reports the selected coding tool's isolated
+// storage readiness without exposing commands or host paths.
+type TrustCodingToolProtection struct {
+	ID        string                   `json:"id"`
+	Name      string                   `json:"name"`
+	Isolation TrustIsolationProtection `json:"isolation"`
+}
+
+// TrustIsolationProtection contains backend-derived isolation readiness.
+type TrustIsolationProtection struct {
+	Status  LaunchConfidenceStatus `json:"status"`
+	Message string                 `json:"message"`
+}
+
+// TrustProjectMapping describes an explicit remembered project-to-context
+// relationship.
+type TrustProjectMapping struct {
+	Project     ProjectState `json:"project"`
+	ContextID   string       `json:"contextId"`
+	ContextName string       `json:"contextName"`
+}
+
+// TrustCredentialSyncProtection reports Dev Context's actual credential-sync
+// boundary. Credentials remain in local provider-owned context storage.
+type TrustCredentialSyncProtection struct {
+	Enabled bool   `json:"enabled"`
+	Message string `json:"message"`
+}
+
+// TrustIntegrationBoundary describes the data Dev Context can provide to one
+// selected coding-tool integration. It never grants credentials or commands.
+type TrustIntegrationBoundary struct {
+	ToolID              string `json:"toolId"`
+	ToolName            string `json:"toolName"`
+	StatusDataAvailable bool   `json:"statusDataAvailable"`
+	Message             string `json:"message"`
+}
+
 // HomeRunningSummary reserves aggregate running-environment data for later
 // running-environment tracking phases.
 type HomeRunningSummary struct {

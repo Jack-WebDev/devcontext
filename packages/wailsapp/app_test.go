@@ -26,6 +26,7 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 		contextDetails: application.ContextDetailsState{
 			Context: application.ContextState{ID: "personal", Name: "Personal"}, Location: "/contexts/personal",
 		},
+		trustCenter: application.TrustCenterState{CredentialSync: application.TrustCredentialSyncProtection{Enabled: false}},
 		launchResult: application.LaunchProjectResult{
 			Project: application.ProjectState{Name: "api", Path: "/work/api"},
 			Context: application.ContextState{ID: "personal", Name: "Personal"},
@@ -103,6 +104,9 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	}
 	if service.contextDetailsRequest != detailsRequest {
 		t.Fatalf("context details request = %#v, want %#v", service.contextDetailsRequest, detailsRequest)
+	}
+	if trustCenter := app.GetTrustCenter(); !reflect.DeepEqual(trustCenter, service.trustCenter) {
+		t.Fatalf("trust center = %#v, want %#v", trustCenter, service.trustCenter)
 	}
 
 	preflightRequest := application.PreflightLaunchProjectRequest{ProjectPath: "/work/api", ContextID: "personal"}
@@ -241,6 +245,9 @@ type fakeService struct {
 	contextDetails        application.ContextDetailsState
 	contextDetailsErr     *application.Error
 
+	trustCenter    application.TrustCenterState
+	trustCenterErr *application.Error
+
 	projects    application.ProjectsState
 	projectsErr *application.Error
 
@@ -327,6 +334,10 @@ func (s *fakeService) GetContexts() (application.ContextListState, *application.
 func (s *fakeService) GetContextDetails(request application.GetContextDetailsRequest) (application.ContextDetailsState, *application.Error) {
 	s.contextDetailsRequest = request
 	return s.contextDetails, s.contextDetailsErr
+}
+
+func (s *fakeService) GetTrustCenter() (application.TrustCenterState, *application.Error) {
+	return s.trustCenter, s.trustCenterErr
 }
 
 func (s *fakeService) GetProjects() (application.ProjectsState, *application.Error) {

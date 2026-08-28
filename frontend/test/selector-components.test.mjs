@@ -92,6 +92,7 @@ import {notificationPresentation} from "../.tmp-test/src/components/notification
 import {AccountIdentityMismatchDialog} from "../.tmp-test/src/components/selector/AccountIdentityMismatchDialog.js";
 import {hasAccountIdentityMismatch} from "../.tmp-test/src/components/selector/account-identity-mismatch.js";
 import {parseContextMetadataExport} from "../.tmp-test/src/components/contexts/context-transfer.js";
+import {TrustCenterView} from "../.tmp-test/src/components/trust/TrustCenterView.js";
 
 test("context metadata import requires a JSON export document", () => {
   const exported = {version: 1, context: {name: "Personal"}};
@@ -564,9 +565,25 @@ test("app shell exposes stable navigation, current project state, and a responsi
   assert.ok(html.includes("Current project"));
   assert.ok(html.includes("api"));
   assert.ok(html.includes("/work/api"));
-  assert.deepEqual(appRoutes.map((route) => route.label), ["Home", "Contexts", "Projects", "Running", "History", "Settings"]);
+  assert.deepEqual(appRoutes.map((route) => route.label), ["Home", "Contexts", "Projects", "Running", "History", "Settings", "Trust Center"]);
   assert.equal(appRouteFromHash("#projects"), "projects");
   assert.equal(appRouteFromHash("#unknown"), "home");
+});
+
+test("Trust Center presents actual isolation, mappings, integration boundaries, and credential-sync state", () => {
+  const html = renderToStaticMarkup(createElement(TrustCenterView, {
+    state: {
+      contexts: [{id: "personal", name: "Personal", providers: [{id: "codex", name: "Codex", isolation: {status: "ready", message: "Codex isolation storage is ready."}}], tool: {id: "vscode", name: "VS Code", isolation: {status: "ready", message: "VS Code isolation storage is ready."}}}],
+      projectMappings: [{project: {name: "api", path: "/work/api"}, contextId: "personal", contextName: "Personal"}],
+      credentialSync: {enabled: false, message: "Dev Context does not sync credentials."},
+      integrationBoundaries: [{toolId: "vscode", toolName: "VS Code", statusDataAvailable: true, message: "Safe status data stays in tool storage."}],
+    },
+  }));
+  assert.ok(html.includes("Trust Center"));
+  assert.ok(html.includes("Credential sync"));
+  assert.ok(html.includes("Codex isolation storage is ready."));
+  assert.ok(html.includes("Suggested context: Personal"));
+  assert.ok(html.includes("Safe status data available"));
 });
 
 test("Home shows project, selected context, and context-named quick launch", () => {

@@ -76,6 +76,25 @@ test("adapter normalizes safe context metadata export and import", async () => {
   });
 });
 
+test("adapter normalizes Trust Center protection boundaries", async () => {
+  const api = createDevContextApi({
+    async getTrustCenter() {
+      return {
+        contexts: [{id: "personal", name: "Personal", providers: [], tool: {id: "second-tool", name: "Second Tool", isolation: {status: "ready", message: "Ready"}}}],
+        projectMappings: [{project: {name: "api", path: "/work/api"}, contextId: "personal", contextName: "Personal"}],
+        credentialSync: {enabled: false, message: "Credentials stay local."},
+        integrationBoundaries: [{toolId: "second-tool", toolName: "Second Tool", statusDataAvailable: false, message: "No integration data."}],
+      };
+    },
+  });
+  const result = await api.getTrustCenter();
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.data.contexts[0].tool.isolation.status, "ready");
+  assert.equal(result.data.projectMappings[0].contextName, "Personal");
+  assert.equal(result.data.credentialSync.enabled, false);
+});
+
 test("adapter accepts backend-owned account identity confidence checks", async () => {
   const api = createDevContextApi({
     async getLaunchState() {

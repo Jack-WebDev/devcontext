@@ -20,10 +20,18 @@ import type {
   RecentProjectState,
   RunningEnvironmentsState,
   SettingsState,
+  TrustCenterState,
 } from "../../lib/devctx-api";
 import { appRouteDefinition, type AppRoute } from "../shell/routes";
 import { notifyCodingToolLaunched } from "../notifications/notifications";
 import type { LoadState } from "./load-state";
+import { TrustCenterView } from "../trust/TrustCenterView";
+
+export function TrustCenterContent({ trustCenter }: { trustCenter: LoadState<TrustCenterState> }) {
+  if (trustCenter.status === "loading") return <LoadingMessage>Loading Trust Center...</LoadingMessage>;
+  if (trustCenter.status === "error") return <GuiErrorNotice error={trustCenter.error} />;
+  return <TrustCenterView state={trustCenter.data} />;
+}
 
 export function HistoryContent({ history }: { history: LoadState<HistoryState> }) {
   if (history.status === "loading") return <LoadingMessage>Loading history...</LoadingMessage>;

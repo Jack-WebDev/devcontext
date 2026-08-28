@@ -30,6 +30,10 @@ export function GetContextTemplates() {
   return window['go']['wailsapp']['App']['GetContextTemplates']();
 }
 
+export function GetTrustCenter() {
+  return window['go']['wailsapp']['App']['GetTrustCenter']();
+}
+
 export function ImportContextMetadata(arg1) {
   return window['go']['wailsapp']['App']['ImportContextMetadata'](arg1);
 }

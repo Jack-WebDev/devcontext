@@ -28,14 +28,14 @@ import {
   type SettingsState,
 } from "./lib/devctx-api";
 import { useAppData } from "./components/app/useAppData";
-import { ContextsContent, HistoryContent, HomeDashboardContent, PlaceholderScreen, ProjectsContent, RunningContent, SelectorContent } from "./components/app/AppContent";
+import { ContextsContent, HistoryContent, HomeDashboardContent, PlaceholderScreen, ProjectsContent, RunningContent, SelectorContent, TrustCenterContent } from "./components/app/AppContent";
 
 interface PendingRunningEnvironmentLaunch { conflict: RunningEnvironmentConflict; request: {projectPath: string; contextId: string}; }
 
 function App() {
   const [activeRoute, setActiveRoute] = useState<AppRoute>(() => appRouteFromHash(window.location.hash));
   const {
-    launchState, setLaunchState, homeDashboard, recentProjects, contexts, projects, history, running, settings,
+    launchState, setLaunchState, homeDashboard, recentProjects, contexts, projects, history, running, settings, trustCenter,
     refreshHomeDashboard, refreshRecentProjects, refreshContexts, refreshProjects, refreshRunningEnvironments, setSettings,
   } = useAppData(activeRoute);
   const [settingsPending, setSettingsPending] = useState(false);
@@ -379,6 +379,8 @@ function App() {
         <RunningContent running={running} />
       ) : activeRoute === "settings" ? (
         settings.status === "loaded" ? <SettingsView settings={settings.data} pending={settingsPending} onChange={(next) => void handleSettingsChange(next)} /> : settings.status === "error" ? <GuiErrorNotice error={settings.error} /> : <p className="text-sm text-muted-foreground">Loading settings...</p>
+      ) : activeRoute === "trust" ? (
+        <TrustCenterContent trustCenter={trustCenter} />
       ) : (
         <PlaceholderScreen route={activeRoute} />
       )}

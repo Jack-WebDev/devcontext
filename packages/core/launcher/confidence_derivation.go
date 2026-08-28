@@ -110,10 +110,11 @@ func IsolationConfidenceChecks(paths filesystem.ContextPaths, providers []provid
 			name = string(integration.ID())
 		}
 		checks = append(checks, directoryConfidenceCheck(ConfidenceCheck{
-			Component: ConfidenceCheckIsolation,
-			Label:     name + " isolation",
-			Severity:  ConfidenceReady,
-			Message:   name + " isolation storage is ready.",
+			Component:  ConfidenceCheckIsolation,
+			ProviderID: string(integration.ID()),
+			Label:      name + " isolation",
+			Severity:   ConfidenceReady,
+			Message:    name + " isolation storage is ready.",
 		}, paths.ProviderStorageDir(integration.ID()), name+" isolation storage is not ready."))
 	}
 	name := strings.TrimSpace(toolName)
@@ -156,6 +157,7 @@ func directoryConfidenceCheck(ready ConfidenceCheck, path string, blockedMessage
 func blockedIsolationCheck(ready ConfidenceCheck, message string) ConfidenceCheck {
 	return ConfidenceCheck{
 		Component:  ConfidenceCheckIsolation,
+		ProviderID: ready.ProviderID,
 		ToolID:     ready.ToolID,
 		Severity:   ConfidenceBlocked,
 		Label:      ready.Label,
