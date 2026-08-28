@@ -1212,6 +1212,66 @@ func TestCreateContextReportsStorageWriteFailure(t *testing.T) {
 	}
 }
 
+func TestGetContextTemplatesReturnsBuiltInSafeDefaults(t *testing.T) {
+	templates := newApplicationFixture(t).service().GetContextTemplates().Templates
+	if got, want := len(templates), 6; got != want {
+		t.Fatalf("template count = %d, want %d", got, want)
+	}
+	if templates[0].ID != "personal" || templates[5].ID != "custom" {
+		t.Fatalf("templates = %#v", templates)
+	}
+}
+
+func TestCreateContextAppliesTemplateDefaults(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	_, appErr := fixture.service().CreateContext(CreateContextRequest{ContextID: "freelance", TemplateID: "freelance"})
+	if appErr != nil {
+		t.Fatalf("create context: %v", appErr)
+	}
+	stored, err := devcontext.NewRepository(fixture.contextsDir).Get(devcontext.MustID("freelance"))
+	if err != nil {
+		t.Fatalf("get stored context: %v", err)
+	}
+	if stored.Name != "Freelance" || stored.Metadata["accent"] != "amber" {
+		t.Fatalf("stored context = %#v, want template defaults", stored)
+	}
+}
+
+func TestDuplicateContextCopiesSafeConfigurationWithoutCredentials(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	source := fixture.context("personal", "Personal")
+	source.Tool.Tools[source.Tool.DefaultTool] = codingtool.Config{ExecutableOverride: "/custom/tool", Options: map[string]string{"profile": "personal"}}
+	source.Providers["fake"] = provider.Config{Enabled: true, Options: map[string]string{"region": "south"}}
+	fixture.writeContext(t, source)
+	sourcePaths, err := filesystem.DeriveContextPaths(fixture.paths, source.ID)
+	if err != nil {
+		t.Fatalf("derive source paths: %v", err)
+	}
+	writeFile(t, filepath.Join(sourcePaths.ProviderStorageDir("fake"), "credential.json"), []byte(`{"token":"secret"}`))
+
+	result, appErr := fixture.service().DuplicateContext(DuplicateContextRequest{SourceContextID: "personal", ContextID: "personal-copy"})
+	if appErr != nil {
+		t.Fatalf("duplicate context: %v", appErr)
+	}
+	if result.Context.Name != "Personal copy" {
+		t.Fatalf("name = %q, want Personal copy", result.Context.Name)
+	}
+	target, err := devcontext.NewRepository(fixture.contextsDir).Get(devcontext.MustID("personal-copy"))
+	if err != nil {
+		t.Fatalf("get duplicate: %v", err)
+	}
+	if !reflect.DeepEqual(target.Tool, source.Tool) || !reflect.DeepEqual(target.Providers, source.Providers) || !reflect.DeepEqual(target.Metadata, source.Metadata) {
+		t.Fatalf("duplicate safe configuration = %#v, want source %#v", target, source)
+	}
+	targetPaths, err := filesystem.DeriveContextPaths(fixture.paths, target.ID)
+	if err != nil {
+		t.Fatalf("derive target paths: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(targetPaths.ProviderStorageDir("fake"), "credential.json")); !os.IsNotExist(err) {
+		t.Fatalf("duplicate credential file error = %v, want not exist", err)
+	}
+}
+
 func TestLaunchProjectBuildsPlanAndStartsProcess(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.writeContext(t, fixture.context("personal", "Personal"))

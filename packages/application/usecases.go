@@ -188,6 +188,30 @@ func (s *Service) CreateContext(request CreateContextRequest) (CreateContextResu
 	return result, nil
 }
 
+// GetContextTemplates returns safe defaults for the create-context flow.
+func (s *Service) GetContextTemplates() ContextTemplatesState {
+	templates := devcontext.Templates()
+	states := make([]ContextTemplateState, len(templates))
+	for index, template := range templates {
+		states[index] = ContextTemplateState{
+			ID: template.ID, Name: template.Name, Description: template.Description,
+			Icon: template.Icon, Accent: template.Accent,
+		}
+	}
+	return ContextTemplatesState{Templates: states}
+}
+
+// DuplicateContext creates a new isolated context with the source context's
+// metadata, provider enablement, and coding-tool settings. Provider
+// credentials are intentionally excluded.
+func (s *Service) DuplicateContext(request DuplicateContextRequest) (DuplicateContextResult, *Error) {
+	result, err := s.duplicateContext(request)
+	if err != nil {
+		return DuplicateContextResult{}, NewError(err)
+	}
+	return result, nil
+}
+
 // GetProjects returns known project summaries without requiring log scraping.
 func (s *Service) GetProjects() (ProjectsState, *Error) {
 	projects, err := s.getProjects()
@@ -511,6 +535,24 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 }
 
 func (s *Service) contextFromCreateRequest(contextID devcontext.ID, request CreateContextRequest) (devcontext.Context, error) {
+	if request.TemplateID != "" {
+		template, ok := devcontext.TemplateByID(request.TemplateID)
+		if !ok {
+			return devcontext.Context{}, fmt.Errorf("unknown context template %q", request.TemplateID)
+		}
+		if strings.TrimSpace(request.Name) == "" {
+			request.Name = template.Name
+		}
+		if strings.TrimSpace(request.Description) == "" {
+			request.Description = template.Description
+		}
+		if strings.TrimSpace(request.Icon) == "" {
+			request.Icon = template.Icon
+		}
+		if strings.TrimSpace(request.Accent) == "" {
+			request.Accent = template.Accent
+		}
+	}
 	if strings.TrimSpace(request.Name) == "" {
 		return devcontext.DefaultContextForIDWithRegistries(contextID, s.now(), s.dependencies.ProviderRegistry, s.dependencies.ToolRegistry)
 	}
@@ -536,6 +578,65 @@ func (s *Service) contextFromCreateRequest(contextID devcontext.ID, request Crea
 		}
 	}
 	return devcontext.Context{ID: contextID, Name: strings.TrimSpace(request.Name), Tool: codingtool.LaunchTarget{DefaultTool: toolID, Tools: map[codingtool.ID]codingtool.Config{toolID: {}}}, Providers: providers, Metadata: metadata, CreatedAt: s.now().UTC()}, nil
+}
+
+func (s *Service) duplicateContext(request DuplicateContextRequest) (DuplicateContextResult, error) {
+	sourceID, err := devcontext.NewID(request.SourceContextID)
+	if err != nil {
+		return DuplicateContextResult{}, err
+	}
+	targetID, err := devcontext.NewID(request.ContextID)
+	if err != nil {
+		return DuplicateContextResult{}, err
+	}
+	source, err := s.dependencies.Contexts.Get(sourceID)
+	if err != nil {
+		return DuplicateContextResult{}, err
+	}
+	name := strings.TrimSpace(request.Name)
+	if name == "" {
+		name = source.Name + " copy"
+	}
+	copy := devcontext.Context{
+		ID: targetID, Name: name, Tool: cloneLaunchTarget(source.Tool),
+		Providers: cloneProviderConfigs(source.Providers), Metadata: cloneMetadata(source.Metadata), CreatedAt: s.now().UTC(),
+	}
+	paths, err := filesystem.DeriveContextPaths(s.dependencies.Paths, targetID)
+	if err != nil {
+		return DuplicateContextResult{}, err
+	}
+	if err := filesystem.CreateContextDirectoryTreeWithRegistriesCredentialsAndPermissions(
+		s.dependencies.Paths, paths, copy, s.dependencies.ProviderRegistry, s.dependencies.ToolRegistry,
+		nil, s.dependencies.StoragePermissions,
+	); err != nil {
+		return DuplicateContextResult{}, err
+	}
+	s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{Name: devlog.EventContextCreated, Timestamp: s.now(), ContextID: copy.ID.String(), ToolID: string(copy.Tool.DefaultTool)}))
+	return DuplicateContextResult{Context: s.contextState(copy)}, nil
+}
+
+func cloneLaunchTarget(source codingtool.LaunchTarget) codingtool.LaunchTarget {
+	tools := make(map[codingtool.ID]codingtool.Config, len(source.Tools))
+	for id, config := range source.Tools {
+		options := make(map[string]string, len(config.Options))
+		for key, value := range config.Options {
+			options[key] = value
+		}
+		tools[id] = codingtool.Config{ExecutableOverride: config.ExecutableOverride, Options: options}
+	}
+	return codingtool.LaunchTarget{DefaultTool: source.DefaultTool, Tools: tools}
+}
+
+func cloneProviderConfigs(source provider.Configs) provider.Configs {
+	configs := make(provider.Configs, len(source))
+	for id, config := range source {
+		options := make(map[string]string, len(config.Options))
+		for key, value := range config.Options {
+			options[key] = value
+		}
+		configs[id] = provider.Config{Enabled: config.Enabled, Options: options}
+	}
+	return configs
 }
 
 func (s *Service) getProjects() ([]ProjectListItem, error) {

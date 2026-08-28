@@ -16,6 +16,7 @@ export namespace application {
 	}
 	export class CreateContextRequest {
 	    contextId: string;
+	    templateId?: string;
 	    name?: string;
 	    description?: string;
 	    icon?: string;
@@ -31,6 +32,7 @@ export namespace application {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.contextId = source["contextId"];
+	        this.templateId = source["templateId"];
 	        this.name = source["name"];
 	        this.description = source["description"];
 	        this.icon = source["icon"];
@@ -38,6 +40,22 @@ export namespace application {
 	        this.enabledProviderIds = source["enabledProviderIds"];
 	        this.toolId = source["toolId"];
 	        this.importProviderIds = source["importProviderIds"];
+	    }
+	}
+	export class DuplicateContextRequest {
+	    sourceContextId: string;
+	    contextId: string;
+	    name?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new DuplicateContextRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sourceContextId = source["sourceContextId"];
+	        this.contextId = source["contextId"];
+	        this.name = source["name"];
 	    }
 	}
 	export class GetContextDetailsRequest {
@@ -162,4 +180,3 @@ export namespace application {
 	}
 
 }
-

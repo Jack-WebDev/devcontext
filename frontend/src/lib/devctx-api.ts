@@ -256,6 +256,7 @@ export interface UnbindProjectRequest {
 
 export interface CreateContextRequest {
   contextId: string;
+  templateId?: string;
   name?: string;
   description?: string;
   icon?: string;
@@ -268,6 +269,10 @@ export interface CreateContextRequest {
 export interface CreateContextResult {
   context: ContextState;
 }
+export interface ContextTemplateState { id: string; name: string; description: string; icon?: string; accent: string; }
+export interface ContextTemplatesState { templates: ContextTemplateState[]; }
+export interface DuplicateContextRequest { sourceContextId: string; contextId: string; name?: string; }
+export interface DuplicateContextResult { context: ContextState; }
 export interface ProjectsState { projects: ProjectListItem[]; }
 export interface ProjectListItem { project: ProjectState; contextId?: string; contextName?: string; lastLaunchedAt?: string; running: boolean; }
 
@@ -334,6 +339,8 @@ export interface DevContextApi {
   bindProject(request: BindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
   unbindProject(request?: UnbindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
   createContext(request: CreateContextRequest): Promise<ApiResult<CreateContextResult>>;
+  getContextTemplates(): Promise<ApiResult<ContextTemplatesState>>;
+  duplicateContext(request: DuplicateContextRequest): Promise<ApiResult<DuplicateContextResult>>;
   getProjects(): Promise<ApiResult<ProjectsState>>;
   getDiagnostics(request?: GetDiagnosticsRequest): Promise<ApiResult<DiagnosticsState>>;
   getRepairActions(request: GetRepairActionsRequest): Promise<ApiResult<RepairActionsState>>;
@@ -355,6 +362,8 @@ export interface WailsBindings {
   bindProject(request: BindProjectRequest): Promise<unknown>;
   unbindProject(request: UnbindProjectRequest): Promise<unknown>;
   createContext(request: CreateContextRequest): Promise<unknown>;
+  getContextTemplates(): Promise<unknown>;
+  duplicateContext(request: DuplicateContextRequest): Promise<unknown>;
   getProjects(): Promise<unknown>;
   getDiagnostics(request: GetDiagnosticsRequest): Promise<unknown>;
   getRepairActions(request: GetRepairActionsRequest): Promise<unknown>;
@@ -411,6 +420,8 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
     createContext(request) {
       return callBinding(() => bindings.createContext(request), normalizeCreateContextResult);
     },
+    getContextTemplates() { return callBinding(() => bindings.getContextTemplates(), normalizeContextTemplatesState); },
+    duplicateContext(request) { return callBinding(() => bindings.duplicateContext(request), normalizeDuplicateContextResult); },
     getProjects() { return callBinding(() => bindings.getProjects(), normalizeProjectsState); },
     getDiagnostics(request = {}) { return callBinding(() => bindings.getDiagnostics(request), normalizeDiagnosticsState); },
     getRepairActions(request) { return callBinding(() => bindings.getRepairActions(request), normalizeRepairActionsState); },
@@ -469,6 +480,8 @@ const generatedBindings: WailsBindings = {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
     return bindings.CreateContext(request);
   },
+  async getContextTemplates() { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetContextTemplates(); },
+  async duplicateContext(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.DuplicateContext(request); },
   async getProjects() { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetProjects(); },
   async getDiagnostics(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetDiagnostics(request); },
   async getRepairActions(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetRepairActions(request); },
@@ -721,6 +734,9 @@ function normalizeCreateContextResult(value: unknown): CreateContextResult {
     context: normalizeContextState(object.context),
   };
 }
+function normalizeContextTemplatesState(value: unknown): ContextTemplatesState { const object = objectValue(value); return {templates: arrayValue(object.templates).map(normalizeContextTemplateState)}; }
+function normalizeContextTemplateState(value: unknown): ContextTemplateState { const object = objectValue(value); return {id: stringValue(object.id), name: stringValue(object.name), description: stringValue(object.description), icon: optionalString(object.icon), accent: stringValue(object.accent)}; }
+function normalizeDuplicateContextResult(value: unknown): DuplicateContextResult { const object = objectValue(value); return {context: normalizeContextState(object.context)}; }
 function normalizeProjectsState(value: unknown): ProjectsState { return {projects: arrayValue(objectValue(value).projects).map(normalizeProjectListItem)}; }
 function normalizeProjectListItem(value: unknown): ProjectListItem { const object = objectValue(value); const contextId = optionalString(object.contextId); const contextName = optionalString(object.contextName); const lastLaunchedAt = optionalTimestamp(object.lastLaunchedAt); return {project: normalizeProjectState(object.project), ...(contextId === undefined ? {} : {contextId}), ...(contextName === undefined ? {} : {contextName}), ...(lastLaunchedAt === undefined ? {} : {lastLaunchedAt}), running: booleanValue(object.running)}; }
 function normalizeDiagnosticsState(value: unknown): DiagnosticsState { return {groups: arrayValue(objectValue(value).groups).map(normalizeDiagnosticGroup)}; }

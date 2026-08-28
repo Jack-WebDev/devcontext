@@ -493,7 +493,7 @@ function App() {
           </section>
         </section>
       ) : activeRoute === "contexts" ? (
-        <>{renderContexts(contexts, setContextDetailsID, () => setCreatingContext(true))}{contextDetailsID ? <ContextDetailsDrawer contextId={contextDetailsID} onClose={() => setContextDetailsID(undefined)} load={(contextId) => devContextApi.getContextDetails({contextId})}/> : null}{creatingContext && contexts.status === "loaded" ? <CreateContextDialog contexts={contexts.data} onClose={() => setCreatingContext(false)} create={async (request) => { const result = await devContextApi.createContext(request); if (result.ok) { await refreshContexts(); setCreatingContext(false); } return result; }}/> : null}</>
+        <>{renderContexts(contexts, setContextDetailsID, () => setCreatingContext(true))}{contextDetailsID ? <ContextDetailsDrawer contextId={contextDetailsID} onClose={() => setContextDetailsID(undefined)} load={(contextId) => devContextApi.getContextDetails({contextId})}/> : null}{creatingContext && contexts.status === "loaded" ? <CreateContextDialog contexts={contexts.data} onClose={() => setCreatingContext(false)} create={async (request) => { const result = await devContextApi.createContext(request); if (result.ok) { await refreshContexts(); setCreatingContext(false); } return result; }} loadTemplates={() => devContextApi.getContextTemplates()}/> : null}</>
       ) : activeRoute === "projects" ? (
         <>
           {renderProjects(projects, projectLaunchPath, projectErrorPath, projectLaunchError, handleProjectLaunch, contexts.status === "loaded" ? handleProjectChangeContext : undefined, handleProjectOpenFolder)}

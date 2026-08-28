@@ -17,6 +17,8 @@ type service interface {
 	BindProject(application.BindProjectRequest) (application.ProjectBindingState, *application.Error)
 	UnbindProject(application.UnbindProjectRequest) (application.ProjectBindingState, *application.Error)
 	CreateContext(application.CreateContextRequest) (application.CreateContextResult, *application.Error)
+	GetContextTemplates() application.ContextTemplatesState
+	DuplicateContext(application.DuplicateContextRequest) (application.DuplicateContextResult, *application.Error)
 	GetProjects() (application.ProjectsState, *application.Error)
 	GetDiagnostics(application.GetDiagnosticsRequest) (application.DiagnosticsState, *application.Error)
 	GetRepairActions(application.GetRepairActionsRequest) (application.RepairActionsState, *application.Error)
@@ -203,6 +205,18 @@ func (a *App) UnbindProject(request application.UnbindProjectRequest) any {
 // CreateContext creates a default context during first-run onboarding.
 func (a *App) CreateContext(request application.CreateContextRequest) any {
 	result, err := a.service.CreateContext(request)
+	if err != nil {
+		return err
+	}
+	return result
+}
+
+// GetContextTemplates returns safe create-context defaults.
+func (a *App) GetContextTemplates() any { return a.service.GetContextTemplates() }
+
+// DuplicateContext copies safe context configuration into a new isolation boundary.
+func (a *App) DuplicateContext(request application.DuplicateContextRequest) any {
+	result, err := a.service.DuplicateContext(request)
 	if err != nil {
 		return err
 	}

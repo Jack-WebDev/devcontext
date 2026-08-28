@@ -47,6 +47,10 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 		createContextResult: application.CreateContextResult{
 			Context: application.ContextState{ID: "personal", Name: "Personal"},
 		},
+		contextTemplates: application.ContextTemplatesState{Templates: []application.ContextTemplateState{{ID: "personal", Name: "Personal"}}},
+		duplicateContextResult: application.DuplicateContextResult{
+			Context: application.ContextState{ID: "personal-copy", Name: "Personal copy"},
+		},
 		diagnostics:         application.DiagnosticsState{Groups: []application.DiagnosticGroup{}},
 		repairActions:       application.RepairActionsState{Actions: []application.RepairAction{}},
 		repairResult:        application.RunRepairActionResult{ActionID: "recheck-provider-files"},
@@ -141,6 +145,16 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	if !reflect.DeepEqual(service.createContextRequest, createContextRequest) {
 		t.Fatalf("create context request = %#v, want %#v", service.createContextRequest, createContextRequest)
 	}
+	if templates := app.GetContextTemplates(); !reflect.DeepEqual(templates, service.contextTemplates) {
+		t.Fatalf("context templates = %#v, want %#v", templates, service.contextTemplates)
+	}
+	duplicateRequest := application.DuplicateContextRequest{SourceContextID: "personal", ContextID: "personal-copy"}
+	if duplicate := app.DuplicateContext(duplicateRequest); !reflect.DeepEqual(duplicate, service.duplicateContextResult) {
+		t.Fatalf("duplicate context = %#v, want %#v", duplicate, service.duplicateContextResult)
+	}
+	if service.duplicateContextRequest != duplicateRequest {
+		t.Fatalf("duplicate context request = %#v, want %#v", service.duplicateContextRequest, duplicateRequest)
+	}
 
 	diagnosticsRequest := application.GetDiagnosticsRequest{ContextID: "personal"}
 	diagnostics := app.GetDiagnostics(diagnosticsRequest)
@@ -231,6 +245,11 @@ type fakeService struct {
 	createContextRequest application.CreateContextRequest
 	createContextResult  application.CreateContextResult
 	createContextErr     *application.Error
+
+	contextTemplates        application.ContextTemplatesState
+	duplicateContextRequest application.DuplicateContextRequest
+	duplicateContextResult  application.DuplicateContextResult
+	duplicateContextErr     *application.Error
 
 	diagnosticsRequest application.GetDiagnosticsRequest
 	diagnostics        application.DiagnosticsState
@@ -335,4 +354,13 @@ func (s *fakeService) UnbindProject(request application.UnbindProjectRequest) (a
 func (s *fakeService) CreateContext(request application.CreateContextRequest) (application.CreateContextResult, *application.Error) {
 	s.createContextRequest = request
 	return s.createContextResult, s.createContextErr
+}
+
+func (s *fakeService) GetContextTemplates() application.ContextTemplatesState {
+	return s.contextTemplates
+}
+
+func (s *fakeService) DuplicateContext(request application.DuplicateContextRequest) (application.DuplicateContextResult, *application.Error) {
+	s.duplicateContextRequest = request
+	return s.duplicateContextResult, s.duplicateContextErr
 }

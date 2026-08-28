@@ -10,12 +10,20 @@ export function CreateContext(arg1) {
   return window['go']['wailsapp']['App']['CreateContext'](arg1);
 }
 
+export function DuplicateContext(arg1) {
+  return window['go']['wailsapp']['App']['DuplicateContext'](arg1);
+}
+
 export function GetContextDetails(arg1) {
   return window['go']['wailsapp']['App']['GetContextDetails'](arg1);
 }
 
 export function GetContexts() {
   return window['go']['wailsapp']['App']['GetContexts']();
+}
+
+export function GetContextTemplates() {
+  return window['go']['wailsapp']['App']['GetContextTemplates']();
 }
 
 export function GetDiagnostics(arg1) {

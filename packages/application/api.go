@@ -371,6 +371,7 @@ type ProjectBindingState struct {
 // CreateContextRequest asks the service to create one default context.
 type CreateContextRequest struct {
 	ContextID          string   `json:"contextId"`
+	TemplateID         string   `json:"templateId,omitempty"`
 	Name               string   `json:"name,omitempty"`
 	Description        string   `json:"description,omitempty"`
 	Icon               string   `json:"icon,omitempty"`
@@ -382,6 +383,35 @@ type CreateContextRequest struct {
 
 // CreateContextResult describes a newly created context.
 type CreateContextResult struct {
+	Context ContextState `json:"context"`
+}
+
+// ContextTemplateState is a safe set of defaults for creating a context.
+// Templates do not include credentials, provider settings, or tool settings.
+type ContextTemplateState struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Icon        string `json:"icon,omitempty"`
+	Accent      string `json:"accent"`
+}
+
+// ContextTemplatesState contains the built-in templates available to the
+// create-context flow.
+type ContextTemplatesState struct {
+	Templates []ContextTemplateState `json:"templates"`
+}
+
+// DuplicateContextRequest copies a context's safe configuration into a new
+// isolated context. Credentials are never copied.
+type DuplicateContextRequest struct {
+	SourceContextID string `json:"sourceContextId"`
+	ContextID       string `json:"contextId"`
+	Name            string `json:"name,omitempty"`
+}
+
+// DuplicateContextResult describes the newly duplicated context.
+type DuplicateContextResult struct {
 	Context ContextState `json:"context"`
 }
 

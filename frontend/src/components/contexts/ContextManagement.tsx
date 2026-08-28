@@ -5,6 +5,7 @@ import type {
   ContextListItem,
   CreateContextResult,
   CreateContextRequest,
+  ContextTemplateState,
   DisplayError,
 } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
@@ -97,12 +98,14 @@ export function CreateContextDialog({
   contexts,
   onClose,
   create,
+  loadTemplates,
 }: {
   contexts: ContextListItem[];
   onClose: () => void;
   create: (
     request: CreateContextRequest,
   ) => Promise<ApiResult<CreateContextResult>>;
+  loadTemplates: () => Promise<ApiResult<{ templates: ContextTemplateState[] }>>;
 }) {
   const [name, setName] = useState("");
   const [contextId, setContextID] = useState("");
@@ -111,17 +114,30 @@ export function CreateContextDialog({
   const [accent, setAccent] = useState("custom");
   const [toolId, setToolID] = useState(contexts[0]?.context.tool.id ?? "");
   const [providers, setProviders] = useState<string[]>([]);
+  const [templates, setTemplates] = useState<ContextTemplateState[]>([]);
+  const [templateID, setTemplateID] = useState("custom");
   const [error, setError] = useState<DisplayError>();
   const [pending, setPending] = useState(false);
   const options = contexts[0]?.context.availableTools ?? [];
   const providerOptions = contexts
     .flatMap((c) => c.context.providers)
     .filter((p, i, all) => all.findIndex((x) => x.id === p.id) === i);
+  useEffect(() => { void loadTemplates().then((result) => { if (result.ok) setTemplates(result.data.templates); }); }, [loadTemplates]);
+  function selectTemplate(id: string) {
+    setTemplateID(id);
+    const template = templates.find((item) => item.id === id);
+    if (!template) return;
+    setName(template.name);
+    setDescription(template.description);
+    setIcon(template.icon ?? "");
+    setAccent(template.accent);
+  }
   async function submit() {
     setPending(true);
     setError(undefined);
     const request: CustomContextRequest = {
       contextId,
+      templateId: templateID,
       name,
       description,
       icon,
@@ -147,6 +163,12 @@ export function CreateContextDialog({
           </SheetDescription>
         </SheetHeader>
         <div className="space-y-4 px-8 pb-8">
+          <label className="block text-sm">
+            Start from a template
+            <select className="mt-1 w-full border p-2" value={templateID} onChange={(e) => selectTemplate(e.target.value)}>
+              {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+            </select>
+          </label>
           <Field label="Name" value={name} onChange={setName} />
           <Field label="ID" value={contextId} onChange={setContextID} />
           <Field
