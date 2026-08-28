@@ -47,6 +47,7 @@ import {
   type ContextNavigationDirection,
 } from "./selection-state";
 import { canLaunchSelectedContextFromKeyboard, escapeKeyboardAction } from "./selector-keyboard";
+import { contextPositionFromShortcut, keyboardShortcuts } from "../command-palette/shortcut";
 
 interface SelectorViewProps {
   launchState: LaunchState;
@@ -142,6 +143,17 @@ function SelectorView({
   }
 
   function handleSelectorKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const contextPosition = contextPositionFromShortcut(event);
+    if (contextPosition !== undefined && !launchPending && !mismatchDialogOpen) {
+      const context = launchState.contexts[contextPosition];
+      if (context !== undefined) {
+        event.preventDefault();
+        handleSelectContext(context.id);
+        contextButtonRefs.current.get(context.id)?.focus();
+      }
+      return;
+    }
+
     if (event.key !== "Escape") {
       return;
     }
@@ -275,7 +287,7 @@ function SelectorView({
               {launchState.contexts.length === 0 ? (
                 <SelectorEmptyContextState />
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="Available contexts">
+                <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label={`Available contexts. Press ${keyboardShortcuts.select_context.label} to select a visible context.`}>
                   {launchState.contexts.map((context) => (
                     <ContextCard
                       key={context.id}

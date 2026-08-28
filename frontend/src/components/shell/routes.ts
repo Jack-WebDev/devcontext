@@ -28,5 +28,5 @@ function appRouteDefinition(route: AppRoute): AppRouteDefinition {
   return appRouteDefinitions.find((definition) => definition.id === route) ?? appRoutes[0];
 }
 
-export { appRouteDefinition, appRouteFromHash, appRoutes };
+export { appRouteDefinition, appRouteDefinitions, appRouteFromHash, appRoutes };
 export type { AppRoute, AppRouteDefinition };
