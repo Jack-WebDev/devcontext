@@ -167,6 +167,9 @@ type fakeService struct {
 	contextDetails        application.ContextDetailsState
 	contextDetailsErr     *application.Error
 
+	projects    application.ProjectsState
+	projectsErr *application.Error
+
 	preflightRequest application.PreflightLaunchProjectRequest
 	preflightResult  application.PreflightLaunchProjectResult
 	preflightErr     *application.Error
@@ -209,6 +212,10 @@ func (s *fakeService) GetContexts() (application.ContextListState, *application.
 func (s *fakeService) GetContextDetails(request application.GetContextDetailsRequest) (application.ContextDetailsState, *application.Error) {
 	s.contextDetailsRequest = request
 	return s.contextDetails, s.contextDetailsErr
+}
+
+func (s *fakeService) GetProjects() (application.ProjectsState, *application.Error) {
+	return s.projects, s.projectsErr
 }
 
 func (s *fakeService) PreflightLaunchProject(request application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error) {

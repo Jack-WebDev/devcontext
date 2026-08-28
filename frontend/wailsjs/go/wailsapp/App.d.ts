@@ -13,6 +13,7 @@ export function GetContexts():Promise<any>;
 export function GetContextDetails(arg1:application.GetContextDetailsRequest):Promise<any>;
 
 export function GetRecentProjects():Promise<any>;
+export function GetProjects():Promise<any>;
 
 export function GetLaunchState(arg1:application.GetLaunchStateRequest):Promise<any>;
 

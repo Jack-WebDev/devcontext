@@ -6,6 +6,7 @@ import { createOnboardingContextAndRefresh } from "./components/selector/onboard
 import { HomeView } from "./components/home/HomeView";
 import { RecentProjectConfirmationDialog } from "./components/home/RecentProjectConfirmationDialog";
 import { ContextsView } from "./components/contexts/ContextsView";
+import { ContextDetailsDrawer, CreateContextDialog } from "./components/contexts/ContextManagement";
 import { AppShell } from "./components/shell/AppShell";
 import { appRouteDefinition, appRouteFromHash, type AppRoute } from "./components/shell/routes";
 import {
@@ -47,6 +48,8 @@ function App() {
   const [homeDashboard, setHomeDashboard] = useState<HomeDashboardLoad>({status: "loading"});
   const [recentProjects, setRecentProjects] = useState<RecentProjectsLoad>({status: "loading"});
   const [contexts, setContexts] = useState<ContextsLoad>({status: "loading"});
+  const [contextDetailsID, setContextDetailsID] = useState<string>();
+  const [creatingContext, setCreatingContext] = useState(false);
   const [homeLaunchPending, setHomeLaunchPending] = useState(false);
   const [homeLaunchError, setHomeLaunchError] = useState<DisplayError | undefined>(undefined);
   const [recentProjectToLaunch, setRecentProjectToLaunch] = useState<RecentProjectState | undefined>(undefined);
@@ -256,7 +259,7 @@ function App() {
           </section>
         </section>
       ) : activeRoute === "contexts" ? (
-        renderContexts(contexts)
+        <>{renderContexts(contexts, setContextDetailsID, () => setCreatingContext(true))}{contextDetailsID ? <ContextDetailsDrawer contextId={contextDetailsID} onClose={() => setContextDetailsID(undefined)} load={(contextId) => devContextApi.getContextDetails({contextId})}/> : null}{creatingContext && contexts.status === "loaded" ? <CreateContextDialog contexts={contexts.data} onClose={() => setCreatingContext(false)} create={async (request) => { const result = await devContextApi.createContext(request); if (result.ok) { await refreshContexts(); setCreatingContext(false); } return result; }}/> : null}</>
       ) : (
         <PlaceholderScreen route={activeRoute} />
       )}
@@ -264,14 +267,14 @@ function App() {
   );
 }
 
-function renderContexts(contexts: ContextsLoad) {
+function renderContexts(contexts: ContextsLoad, onSelect: (id: string) => void, onNew: () => void) {
   if (contexts.status === "loading") {
     return <p className="text-sm text-muted-foreground">Loading contexts...</p>;
   }
   if (contexts.status === "error") {
     return <GuiErrorNotice error={contexts.error} />;
   }
-  return <ContextsView contexts={contexts.data} />;
+  return <ContextsView contexts={contexts.data} onSelect={onSelect} onNew={onNew} />;
 }
 
 function renderHomeDashboard(

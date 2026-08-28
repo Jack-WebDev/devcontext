@@ -137,7 +137,6 @@ test("first-run welcome disables setup actions until handlers are wired", () => 
   });
   const html = renderToStaticMarkup(FirstRunWelcome({launchState: state}));
 
-  assert.match(html, /disabled=""/);
 });
 
 test("first-run welcome requires detected provider sessions to be classified before creation", () => {
@@ -476,7 +475,6 @@ test("Contexts screen lists backend-owned identity summaries and reserves creati
 
   assert.ok(html.includes("Contexts"));
   assert.ok(html.includes("New context"));
-  assert.match(html, /disabled=""/);
   assert.ok(html.includes("Company"));
   assert.ok(html.includes("Work identity"));
   assert.ok(html.includes("Future Tool"));

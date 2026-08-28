@@ -249,12 +249,20 @@ export interface UnbindProjectRequest {
 
 export interface CreateContextRequest {
   contextId: string;
+  name?: string;
+  description?: string;
+  icon?: string;
+  accent?: string;
+  enabledProviderIds?: string[];
+  toolId?: string;
   importProviderIds?: string[];
 }
 
 export interface CreateContextResult {
   context: ContextState;
 }
+export interface ProjectsState { projects: ProjectListItem[]; }
+export interface ProjectListItem { project: ProjectState; contextId?: string; contextName?: string; lastLaunchedAt?: string; running: boolean; }
 
 export interface ProviderCredentialSession {
   providerId: string;
@@ -274,6 +282,7 @@ export interface DevContextApi {
   bindProject(request: BindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
   unbindProject(request?: UnbindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
   createContext(request: CreateContextRequest): Promise<ApiResult<CreateContextResult>>;
+  getProjects(): Promise<ApiResult<ProjectsState>>;
 }
 
 export interface WailsBindings {
@@ -287,6 +296,7 @@ export interface WailsBindings {
   bindProject(request: BindProjectRequest): Promise<unknown>;
   unbindProject(request: UnbindProjectRequest): Promise<unknown>;
   createContext(request: CreateContextRequest): Promise<unknown>;
+  getProjects(): Promise<unknown>;
 }
 
 export function createDevContextApi(bindings: WailsBindings = generatedBindings): DevContextApi {
@@ -335,6 +345,7 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
     createContext(request) {
       return callBinding(() => bindings.createContext(request), normalizeCreateContextResult);
     },
+    getProjects() { return callBinding(() => bindings.getProjects(), normalizeProjectsState); },
   };
 }
 
@@ -385,6 +396,7 @@ const generatedBindings: WailsBindings = {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
     return bindings.CreateContext(request);
   },
+  async getProjects() { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetProjects(); },
 };
 
 export const devContextApi = createDevContextApi();
@@ -621,6 +633,8 @@ function normalizeCreateContextResult(value: unknown): CreateContextResult {
     context: normalizeContextState(object.context),
   };
 }
+function normalizeProjectsState(value: unknown): ProjectsState { return {projects: arrayValue(objectValue(value).projects).map(normalizeProjectListItem)}; }
+function normalizeProjectListItem(value: unknown): ProjectListItem { const object = objectValue(value); const contextId = optionalString(object.contextId); const contextName = optionalString(object.contextName); const lastLaunchedAt = optionalTimestamp(object.lastLaunchedAt); return {project: normalizeProjectState(object.project), ...(contextId === undefined ? {} : {contextId}), ...(contextName === undefined ? {} : {contextName}), ...(lastLaunchedAt === undefined ? {} : {lastLaunchedAt}), running: booleanValue(object.running)}; }
 
 function normalizeProjectState(value: unknown): ProjectState {
   const object = objectValue(value);

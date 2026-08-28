@@ -25,6 +25,7 @@ export function GetContextDetails(arg1) {
 export function GetRecentProjects() {
   return window['go']['wailsapp']['App']['GetRecentProjects']();
 }
+export function GetProjects() { return window['go']['wailsapp']['App']['GetProjects'](); }
 
 export function GetLaunchState(arg1) {
   return window['go']['wailsapp']['App']['GetLaunchState'](arg1);

@@ -325,13 +325,32 @@ type ProjectBindingState struct {
 
 // CreateContextRequest asks the service to create one default context.
 type CreateContextRequest struct {
-	ContextID         string   `json:"contextId"`
-	ImportProviderIDs []string `json:"importProviderIds,omitempty"`
+	ContextID          string   `json:"contextId"`
+	Name               string   `json:"name,omitempty"`
+	Description        string   `json:"description,omitempty"`
+	Icon               string   `json:"icon,omitempty"`
+	Accent             string   `json:"accent,omitempty"`
+	EnabledProviderIDs []string `json:"enabledProviderIds,omitempty"`
+	ToolID             string   `json:"toolId,omitempty"`
+	ImportProviderIDs  []string `json:"importProviderIds,omitempty"`
 }
 
 // CreateContextResult describes a newly created context.
 type CreateContextResult struct {
 	Context ContextState `json:"context"`
+}
+
+// ProjectsState contains all known projects from remembered bindings and
+// successful launch history.
+type ProjectsState struct {
+	Projects []ProjectListItem `json:"projects"`
+}
+type ProjectListItem struct {
+	Project        ProjectState `json:"project"`
+	ContextID      string       `json:"contextId,omitempty"`
+	ContextName    string       `json:"contextName,omitempty"`
+	LastLaunchedAt *time.Time   `json:"lastLaunchedAt,omitempty"`
+	Running        bool         `json:"running"`
 }
 
 // ProviderCredentialSessionState describes a detected global provider session

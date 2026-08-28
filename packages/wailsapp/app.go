@@ -17,6 +17,15 @@ type service interface {
 	BindProject(application.BindProjectRequest) (application.ProjectBindingState, *application.Error)
 	UnbindProject(application.UnbindProjectRequest) (application.ProjectBindingState, *application.Error)
 	CreateContext(application.CreateContextRequest) (application.CreateContextResult, *application.Error)
+	GetProjects() (application.ProjectsState, *application.Error)
+}
+
+func (a *App) GetProjects() any {
+	projects, err := a.service.GetProjects()
+	if err != nil {
+		return err
+	}
+	return projects
 }
 
 // GetHomeDashboard returns the Home screen state for the requested project.

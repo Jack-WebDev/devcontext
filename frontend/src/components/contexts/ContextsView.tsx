@@ -5,9 +5,11 @@ import { Card, CardContent } from "../ui/card.js";
 
 interface ContextsViewProps {
   contexts: ContextListItem[];
+  onSelect?: (id: string) => void;
+  onNew?: () => void;
 }
 
-function ContextsView({contexts}: ContextsViewProps) {
+function ContextsView({contexts, onSelect, onNew}: ContextsViewProps) {
   return (
     <section aria-labelledby="contexts-heading" className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -15,7 +17,7 @@ function ContextsView({contexts}: ContextsViewProps) {
           <p className="text-sm text-muted-foreground">Development identities</p>
           <h2 id="contexts-heading" className="text-2xl font-semibold">Contexts</h2>
         </div>
-        <Button type="button" disabled title="Context creation will be available in a later update.">
+        <Button type="button" onClick={onNew}>
           New context
         </Button>
       </div>
@@ -28,14 +30,14 @@ function ContextsView({contexts}: ContextsViewProps) {
         </Card>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2" aria-label="Configured contexts">
-          {contexts.map((item) => <ContextListCard key={item.context.id} item={item} />)}
+          {contexts.map((item) => <ContextListCard key={item.context.id} item={item} onSelect={onSelect} />)}
         </div>
       )}
     </section>
   );
 }
 
-function ContextListCard({item}: {item: ContextListItem}) {
+function ContextListCard({item, onSelect}: {item: ContextListItem; onSelect?: (id: string) => void}) {
   const {context} = item;
   return (
     <Card as="article" hierarchy="secondary" className="py-0" aria-labelledby={`context-${context.id}-heading`}>
@@ -56,6 +58,7 @@ function ContextListCard({item}: {item: ContextListItem}) {
           <ContextListDetail label="Providers" value={providerSummary(item)} />
           <ContextListDetail label="Last used" value={formatContextTime(item.lastUsedAt)} />
         </dl>
+        {onSelect ? <Button type="button" variant="outline" size="sm" onClick={() => onSelect(context.id)}>View details</Button> : null}
       </CardContent>
     </Card>
   );
