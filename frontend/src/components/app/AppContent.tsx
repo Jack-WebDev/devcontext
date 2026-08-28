@@ -84,15 +84,17 @@ export function HomeDashboardContent({ dashboard, recentProjects, launchPending,
   return <HomeView dashboard={{ ...dashboard.data, recentProjects: projects }} launchPending={launchPending} launchError={launchError} onQuickLaunch={onQuickLaunch} onReviewLaunchOptions={onReviewLaunchOptions} onRecentProjectSelect={onRecentProjectSelect} />;
 }
 
-export function SelectorContent({ launchState, onCreateContext, onRunDiagnostics, settings }: {
+export function SelectorContent({ launchState, onCreateContext, onRunDiagnostics, settings, showOnboardingReplay, onDismissOnboardingReplay }: {
   launchState: LoadState<LaunchState>;
   onCreateContext: (contextId: string, importProviderIds?: string[]) => Promise<ApiResult<CreateContextResult>>;
   onRunDiagnostics: () => void;
   settings?: SettingsState;
+  showOnboardingReplay?: boolean;
+  onDismissOnboardingReplay?: () => void;
 }) {
   if (launchState.status === "loading") return <LoadingMessage>Loading selector...</LoadingMessage>;
   if (launchState.status === "error") return <GuiErrorNotice error={launchState.error} />;
-  return <SelectorView launchState={launchState.data} onBindProject={devContextApi.bindProject} onPreflightLaunchProject={devContextApi.preflightLaunchProject} onLaunchProject={devContextApi.launchProject} onCancel={devContextWindow.closeSelector} onCreatePersonalContext={(providerIds) => onCreateContext("personal", providerIds)} onCreateCompanyContext={(providerIds) => onCreateContext("company", providerIds)} onRunDiagnostics={onRunDiagnostics} onCodingToolLaunched={notifyLaunch} launchSuccessCloseBehavior={settings?.closeAfterLaunch ? "close_selector" : "keep_open"} showLaunchVerification={settings?.launchVerification ?? true} />;
+  return <SelectorView launchState={launchState.data} onBindProject={devContextApi.bindProject} onPreflightLaunchProject={devContextApi.preflightLaunchProject} onLaunchProject={devContextApi.launchProject} onCancel={devContextWindow.closeSelector} onCreatePersonalContext={(providerIds) => onCreateContext("personal", providerIds)} onCreateCompanyContext={(providerIds) => onCreateContext("company", providerIds)} onRunDiagnostics={onRunDiagnostics} onCodingToolLaunched={notifyLaunch} launchSuccessCloseBehavior={settings?.closeAfterLaunch ? "close_selector" : "keep_open"} showLaunchVerification={settings?.launchVerification ?? true} showOnboardingReplay={showOnboardingReplay} onDismissOnboardingReplay={onDismissOnboardingReplay} />;
 }
 
 export function PlaceholderScreen({ route }: { route: AppRoute }) {

@@ -450,6 +450,19 @@ test("first-run predicate separates new and returning users", () => {
   assert.equal(shouldRenderFirstRunWelcome(launchStateFixture()), false);
 });
 
+test("onboarding replay does not offer duplicate context creation", () => {
+  const replayHTML = renderToStaticMarkup(createElement(FirstRunWelcome, {
+    launchState: launchStateFixture({firstRun: false}),
+    replay: true,
+    onContinue() {},
+  }));
+
+  assert.ok(replayHTML.includes("Development context setup"));
+  assert.ok(replayHTML.includes("Continue to context selector"));
+  assert.ok(!replayHTML.includes("Create Personal"));
+  assert.ok(!replayHTML.includes("Create Company"));
+});
+
 test("default context setup finds only missing default contexts", () => {
   assert.deepEqual(missingDefaultContextIds([contextFixture("personal", "Personal")]), ["company"]);
   assert.deepEqual(missingDefaultContextIds([contextFixture("company", "Company")]), ["personal"]);

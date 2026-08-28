@@ -63,6 +63,8 @@ interface SelectorViewProps {
   onRunDiagnostics?: () => void;
   onCodingToolLaunched?: (result: LaunchProjectResult) => void;
   showLaunchVerification?: boolean;
+  showOnboardingReplay?: boolean;
+  onDismissOnboardingReplay?: () => void;
 }
 
 function SelectorView({
@@ -77,6 +79,8 @@ function SelectorView({
   onRunDiagnostics,
   onCodingToolLaunched,
   showLaunchVerification = true,
+  showOnboardingReplay = false,
+  onDismissOnboardingReplay,
 }: SelectorViewProps) {
   const [selectedContextId, setSelectedContextId] = useState<string | undefined>(() =>
     initialSelectedContextId(launchState),
@@ -282,7 +286,7 @@ function SelectorView({
 
   return (
     <div className="space-y-8" onKeyDown={handleSelectorKeyDown}>
-      {shouldRenderFirstRunWelcome(launchState) ? (
+      {shouldRenderFirstRunWelcome(launchState) || showOnboardingReplay ? (
         <>
           <ProjectIdentity project={launchState.project} />
           <FirstRunWelcome
@@ -302,6 +306,8 @@ function SelectorView({
                 ? () => void handleCreateContext("company", onCreateCompanyContext)
                 : undefined
             }
+            replay={showOnboardingReplay && !launchState.firstRun}
+            onContinue={showOnboardingReplay && !launchState.firstRun ? onDismissOnboardingReplay : undefined}
           />
         </>
       ) : (

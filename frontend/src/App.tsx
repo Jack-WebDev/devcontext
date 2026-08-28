@@ -39,6 +39,7 @@ function App() {
     refreshHomeDashboard, refreshRecentProjects, refreshContexts, refreshProjects, refreshRunningEnvironments, setSettings,
   } = useAppData(activeRoute);
   const [settingsPending, setSettingsPending] = useState(false);
+  const [onboardingReplayVisible, setOnboardingReplayVisible] = useState(false);
   const [pendingRunningEnvironmentLaunch, setPendingRunningEnvironmentLaunch] = useState<PendingRunningEnvironmentLaunch>();
   const [runningEnvironmentLaunchPending, setRunningEnvironmentLaunchPending] = useState(false);
   const [runningEnvironmentLaunchError, setRunningEnvironmentLaunchError] = useState<DisplayError>();
@@ -85,6 +86,9 @@ function App() {
 
 
   function handleNavigate(route: AppRoute) {
+    if (route !== "home") {
+      setOnboardingReplayVisible(false);
+    }
     if (route !== activeRoute) {
       window.location.hash = route;
     }
@@ -352,7 +356,7 @@ function App() {
               <p className="text-sm text-muted-foreground">Launch options</p>
               <h2 id="context-selector-heading" className="text-xl font-semibold">Context selector</h2>
             </div>
-          <SelectorContent launchState={launchState} onCreateContext={handleCreateContext} onRunDiagnostics={() => handleNavigate("diagnostics")} settings={settings.status === "loaded" ? settings.data : undefined} />
+          <SelectorContent launchState={launchState} onCreateContext={handleCreateContext} onRunDiagnostics={() => handleNavigate("diagnostics")} settings={settings.status === "loaded" ? settings.data : undefined} showOnboardingReplay={onboardingReplayVisible} onDismissOnboardingReplay={() => setOnboardingReplayVisible(false)} />
           </section>
         </section>
       ) : activeRoute === "contexts" ? (
@@ -378,7 +382,7 @@ function App() {
       ) : activeRoute === "running" ? (
         <RunningContent running={running} />
       ) : activeRoute === "settings" ? (
-        settings.status === "loaded" ? <SettingsView settings={settings.data} pending={settingsPending} onChange={(next) => void handleSettingsChange(next)} /> : settings.status === "error" ? <GuiErrorNotice error={settings.error} /> : <p className="text-sm text-muted-foreground">Loading settings...</p>
+        settings.status === "loaded" ? <SettingsView settings={settings.data} pending={settingsPending} onChange={(next) => void handleSettingsChange(next)} onReplayOnboarding={() => { setOnboardingReplayVisible(true); handleNavigate("home"); }} /> : settings.status === "error" ? <GuiErrorNotice error={settings.error} /> : <p className="text-sm text-muted-foreground">Loading settings...</p>
       ) : activeRoute === "trust" ? (
         <TrustCenterContent trustCenter={trustCenter} />
       ) : (

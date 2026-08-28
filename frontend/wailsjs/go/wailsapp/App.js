@@ -22,20 +22,12 @@ export function GetContextDetails(arg1) {
   return window['go']['wailsapp']['App']['GetContextDetails'](arg1);
 }
 
-export function GetContexts() {
-  return window['go']['wailsapp']['App']['GetContexts']();
-}
-
 export function GetContextTemplates() {
   return window['go']['wailsapp']['App']['GetContextTemplates']();
 }
 
-export function GetTrustCenter() {
-  return window['go']['wailsapp']['App']['GetTrustCenter']();
-}
-
-export function ImportContextMetadata(arg1) {
-  return window['go']['wailsapp']['App']['ImportContextMetadata'](arg1);
+export function GetContexts() {
+  return window['go']['wailsapp']['App']['GetContexts']();
 }
 
 export function GetDiagnostics(arg1) {
@@ -74,6 +66,18 @@ export function GetSettings() {
   return window['go']['wailsapp']['App']['GetSettings']();
 }
 
+export function GetTrayState() {
+  return window['go']['wailsapp']['App']['GetTrayState']();
+}
+
+export function GetTrustCenter() {
+  return window['go']['wailsapp']['App']['GetTrustCenter']();
+}
+
+export function ImportContextMetadata(arg1) {
+  return window['go']['wailsapp']['App']['ImportContextMetadata'](arg1);
+}
+
 export function LaunchProject(arg1) {
   return window['go']['wailsapp']['App']['LaunchProject'](arg1);
 }
@@ -86,10 +90,10 @@ export function RunRepairAction(arg1) {
   return window['go']['wailsapp']['App']['RunRepairAction'](arg1);
 }
 
-export function UpdateSettings(arg1) {
-  return window['go']['wailsapp']['App']['UpdateSettings'](arg1);
-}
-
 export function UnbindProject(arg1) {
   return window['go']['wailsapp']['App']['UnbindProject'](arg1);
+}
+
+export function UpdateSettings(arg1) {
+  return window['go']['wailsapp']['App']['UpdateSettings'](arg1);
 }

@@ -13,6 +13,8 @@ interface FirstRunWelcomeProps {
   onClassifyProviderSession?: (providerId: string, contextId: "personal" | "company") => void;
   pendingContextId?: string;
   error?: DisplayError;
+  replay?: boolean;
+  onContinue?: () => void;
 }
 
 function FirstRunWelcome({
@@ -24,6 +26,8 @@ function FirstRunWelcome({
   onClassifyProviderSession,
   pendingContextId,
   error,
+  replay = false,
+  onContinue,
 }: FirstRunWelcomeProps) {
   const pending = pendingContextId !== undefined;
   const canClassify = providerCredentialSessions.length === 0 || onClassifyProviderSession !== undefined;
@@ -36,11 +40,12 @@ function FirstRunWelcome({
     <section aria-labelledby="first-run-title" className="space-y-6">
       <div className="space-y-2">
         <h3 id="first-run-title" className="text-xl font-semibold">
-          Create your first development context
+          {replay ? "Development context setup" : "Create your first development context"}
         </h3>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Dev Context creates local identities for this machine so each project can open with the right provider
-          folders and authentication setup.
+          {replay
+            ? "Review how Dev Context keeps development identities separate on this machine."
+            : "Dev Context creates local identities for this machine so each project can open with the right provider folders and authentication setup."}
         </p>
       </div>
 
@@ -59,46 +64,45 @@ function FirstRunWelcome({
         />
       </div>
 
-      <ProviderCredentialClassification
-        sessions={providerCredentialSessions}
-        assignments={providerSessionAssignments}
-        disabled={pending}
-        onClassify={handleClassifyProviderSession}
-      />
+      {!replay ? (
+        <>
+          <ProviderCredentialClassification
+            sessions={providerCredentialSessions}
+            assignments={providerSessionAssignments}
+            disabled={pending}
+            onClassify={handleClassifyProviderSession}
+          />
 
-      <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="Create a default context">
-        <OnboardingAction
-          title="Personal"
-          description="Use this for personal repositories, experiments, and tools tied to your own accounts."
-          buttonLabel={pendingContextId === "personal" ? "Creating..." : "Create Personal"}
-          disabled={pending || !canClassify || !classificationComplete || onCreatePersonal === undefined}
-          onClick={onCreatePersonal}
-        />
-        <OnboardingAction
-          title="Company"
-          description="Use this for work repositories and tools tied to employer or client accounts."
-          buttonLabel={pendingContextId === "company" ? "Creating..." : "Create Company"}
-          disabled={pending || !canClassify || !classificationComplete || onCreateCompany === undefined}
-          onClick={onCreateCompany}
-        />
-      </div>
+          <div className="grid gap-4 sm:grid-cols-2" role="group" aria-label="Create a default context">
+            <OnboardingAction
+              title="Personal"
+              description="Use this for personal repositories, experiments, and tools tied to your own accounts."
+              buttonLabel={pendingContextId === "personal" ? "Creating..." : "Create Personal"}
+              disabled={pending || !canClassify || !classificationComplete || onCreatePersonal === undefined}
+              onClick={onCreatePersonal}
+            />
+            <OnboardingAction
+              title="Company"
+              description="Use this for work repositories and tools tied to employer or client accounts."
+              buttonLabel={pendingContextId === "company" ? "Creating..." : "Create Company"}
+              disabled={pending || !canClassify || !classificationComplete || onCreateCompany === undefined}
+              onClick={onCreateCompany}
+            />
+          </div>
 
-      {pendingContextId ? (
-        <Card
-          as="p"
-          size="sm"
-          className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground"
-          role="status"
-        >
-          Creating {pendingContextId === "personal" ? "Personal" : "Company"} context...
-        </Card>
+          {pendingContextId ? (
+            <Card as="p" size="sm" className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground" role="status">
+              Creating {pendingContextId === "personal" ? "Personal" : "Company"} context...
+            </Card>
+          ) : null}
+          {error ? <FirstRunErrorNotice error={error} /> : null}
+        </>
       ) : null}
-
-      {error ? <FirstRunErrorNotice error={error} /> : null}
 
       <Card as="p" size="sm" className="border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
         Current project: <span className="font-medium text-foreground">{launchState.project.path}</span>
       </Card>
+      {replay && onContinue ? <Button type="button" onClick={onContinue}>Continue to context selector</Button> : null}
     </section>
   );
 }
