@@ -98,6 +98,20 @@ type CredentialImporter interface {
 	ImportCredentials(CredentialImportContext) error
 }
 
+// CredentialDiagnosticFile identifies one provider-owned credential file that
+// can be inspected without reading its contents. Providers opt into this
+// capability so application diagnostics never infer provider file layouts.
+type CredentialDiagnosticFile struct {
+	Label string
+	Path  string
+}
+
+// CredentialDiagnosticsProvider is implemented by providers that can safely
+// identify credential files in their isolated storage for diagnostics.
+type CredentialDiagnosticsProvider interface {
+	CredentialDiagnosticFiles(RuntimeContext) []CredentialDiagnosticFile
+}
+
 // ContextIdentityDetector is implemented by providers that can identify the
 // account represented by their context-owned credential state.
 type ContextIdentityDetector interface {
