@@ -29,6 +29,7 @@ var _ CredentialMetadataExtractor = CodexProvider{}
 var _ CredentialImporter = CodexProvider{}
 var _ ContextIdentityDetector = CodexProvider{}
 var _ SetupGuidanceProvider = CodexProvider{}
+var _ CredentialDiagnosticsProvider = CodexProvider{}
 
 // ID returns the persisted provider identifier.
 func (CodexProvider) ID() ID {
@@ -89,6 +90,12 @@ func (CodexProvider) DetectContextIdentity(ctx RuntimeContext) (Identity, bool, 
 		return Identity{}, false, err
 	}
 	return Identity{Fields: fields}, true, nil
+}
+
+// CredentialDiagnosticFiles identifies the Codex credential file without
+// exposing its contents.
+func (CodexProvider) CredentialDiagnosticFiles(ctx RuntimeContext) []CredentialDiagnosticFile {
+	return []CredentialDiagnosticFile{{Label: "Credentials", Path: filepath.Join(ctx.Paths.StorageDir, "auth.json")}}
 }
 
 // SetupGuidance describes the next safe setup action for Codex.

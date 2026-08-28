@@ -18,6 +18,10 @@ type service interface {
 	UnbindProject(application.UnbindProjectRequest) (application.ProjectBindingState, *application.Error)
 	CreateContext(application.CreateContextRequest) (application.CreateContextResult, *application.Error)
 	GetProjects() (application.ProjectsState, *application.Error)
+	GetDiagnostics(application.GetDiagnosticsRequest) (application.DiagnosticsState, *application.Error)
+	GetRepairActions(application.GetRepairActionsRequest) (application.RepairActionsState, *application.Error)
+	RunRepairAction(application.RunRepairActionRequest) (application.RunRepairActionResult, *application.Error)
+	GetHistory() (application.HistoryState, *application.Error)
 }
 
 func (a *App) GetProjects() any {
@@ -26,6 +30,42 @@ func (a *App) GetProjects() any {
 		return err
 	}
 	return projects
+}
+
+// GetDiagnostics returns structured, presentation-safe diagnostics.
+func (a *App) GetDiagnostics(request application.GetDiagnosticsRequest) any {
+	diagnostics, err := a.service.GetDiagnostics(request)
+	if err != nil {
+		return err
+	}
+	return diagnostics
+}
+
+// GetRepairActions returns repair options and destructive-impact previews.
+func (a *App) GetRepairActions(request application.GetRepairActionsRequest) any {
+	actions, err := a.service.GetRepairActions(request)
+	if err != nil {
+		return err
+	}
+	return actions
+}
+
+// RunRepairAction executes one repair action after backend confirmation checks.
+func (a *App) RunRepairAction(request application.RunRepairActionRequest) any {
+	result, err := a.service.RunRepairAction(request)
+	if err != nil {
+		return err
+	}
+	return result
+}
+
+// GetHistory returns local user-facing activity records.
+func (a *App) GetHistory() any {
+	history, err := a.service.GetHistory()
+	if err != nil {
+		return err
+	}
+	return history
 }
 
 // GetHomeDashboard returns the Home screen state for the requested project.

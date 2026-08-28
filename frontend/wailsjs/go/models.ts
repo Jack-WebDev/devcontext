@@ -40,6 +40,58 @@ export namespace application {
 	        this.importProviderIds = source["importProviderIds"];
 	    }
 	}
+	export class GetContextDetailsRequest {
+	    contextId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetContextDetailsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contextId = source["contextId"];
+	    }
+	}
+	export class GetDiagnosticsRequest {
+	    contextId?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetDiagnosticsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contextId = source["contextId"];
+	    }
+	}
+	export class GetRepairActionsRequest {
+	    contextId: string;
+
+	    static createFrom(source: any = {}) {
+	        return new GetRepairActionsRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contextId = source["contextId"];
+	    }
+	}
+	export class RunRepairActionRequest {
+	    contextId: string;
+	    actionId: string;
+	    confirmDestructive: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new RunRepairActionRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contextId = source["contextId"];
+	        this.actionId = source["actionId"];
+	        this.confirmDestructive = source["confirmDestructive"];
+	    }
+	}
 	export class GetHomeDashboardRequest {
 	    projectPath?: string;
 	
@@ -50,18 +102,6 @@ export namespace application {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.projectPath = source["projectPath"];
-	    }
-	}
-	export class GetContextDetailsRequest {
-	    contextId: string;
-
-	    static createFrom(source: any = {}) {
-	        return new GetContextDetailsRequest(source);
-	    }
-
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.contextId = source["contextId"];
 	    }
 	}
 	export class GetLaunchStateRequest {

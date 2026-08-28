@@ -17,6 +17,8 @@
     "src/components/shell/*.tsx",
     "src/components/shell/*.ts",
     "src/components/home/*.tsx",
-    "src/components/contexts/*.tsx"
+    "src/components/contexts/*.tsx",
+    "src/components/projects/*.tsx",
+    "src/components/diagnostics/*.tsx"
   ]
 }

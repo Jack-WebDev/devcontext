@@ -10,25 +10,44 @@ export function CreateContext(arg1) {
   return window['go']['wailsapp']['App']['CreateContext'](arg1);
 }
 
-export function GetHomeDashboard(arg1) {
-  return window['go']['wailsapp']['App']['GetHomeDashboard'](arg1);
+export function GetContextDetails(arg1) {
+  return window['go']['wailsapp']['App']['GetContextDetails'](arg1);
 }
 
 export function GetContexts() {
   return window['go']['wailsapp']['App']['GetContexts']();
 }
 
-export function GetContextDetails(arg1) {
-  return window['go']['wailsapp']['App']['GetContextDetails'](arg1);
+export function GetDiagnostics(arg1) {
+  return window['go']['wailsapp']['App']['GetDiagnostics'](arg1);
+}
+
+export function GetRepairActions(arg1) {
+  return window['go']['wailsapp']['App']['GetRepairActions'](arg1);
+}
+
+export function RunRepairAction(arg1) {
+  return window['go']['wailsapp']['App']['RunRepairAction'](arg1);
+}
+
+export function GetHistory() {
+  return window['go']['wailsapp']['App']['GetHistory']();
+}
+
+export function GetHomeDashboard(arg1) {
+  return window['go']['wailsapp']['App']['GetHomeDashboard'](arg1);
+}
+
+export function GetLaunchState(arg1) {
+  return window['go']['wailsapp']['App']['GetLaunchState'](arg1);
+}
+
+export function GetProjects() {
+  return window['go']['wailsapp']['App']['GetProjects']();
 }
 
 export function GetRecentProjects() {
   return window['go']['wailsapp']['App']['GetRecentProjects']();
-}
-export function GetProjects() { return window['go']['wailsapp']['App']['GetProjects'](); }
-
-export function GetLaunchState(arg1) {
-  return window['go']['wailsapp']['App']['GetLaunchState'](arg1);
 }
 
 export function LaunchProject(arg1) {

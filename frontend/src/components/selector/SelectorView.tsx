@@ -55,6 +55,7 @@ interface SelectorViewProps {
   launchSuccessCloseBehavior?: LaunchSuccessCloseBehavior;
   onCreatePersonalContext?: (importProviderIds: string[]) => Promise<ApiResult<CreateContextResult>>;
   onCreateCompanyContext?: (importProviderIds: string[]) => Promise<ApiResult<CreateContextResult>>;
+  onRunDiagnostics?: () => void;
 }
 
 function SelectorView({
@@ -66,6 +67,7 @@ function SelectorView({
   launchSuccessCloseBehavior = defaultLaunchSuccessCloseBehavior,
   onCreatePersonalContext,
   onCreateCompanyContext,
+  onRunDiagnostics,
 }: SelectorViewProps) {
   const [selectedContextId, setSelectedContextId] = useState<string | undefined>(() =>
     initialSelectedContextId(launchState),
@@ -336,6 +338,7 @@ function SelectorView({
                 <LaunchFailureView
                   error={launchError}
                   onRetry={() => void handleLaunch()}
+                  onRunDiagnostics={onRunDiagnostics}
                   onCancel={() => void cancelSelector({ closeSelector: onCancel })}
                 />
               ) : null}

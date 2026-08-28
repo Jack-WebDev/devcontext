@@ -6,16 +6,25 @@ export function BindProject(arg1:application.BindProjectRequest):Promise<any>;
 
 export function CreateContext(arg1:application.CreateContextRequest):Promise<any>;
 
-export function GetHomeDashboard(arg1:application.GetHomeDashboardRequest):Promise<any>;
+export function GetContextDetails(arg1:application.GetContextDetailsRequest):Promise<any>;
 
 export function GetContexts():Promise<any>;
 
-export function GetContextDetails(arg1:application.GetContextDetailsRequest):Promise<any>;
+export function GetDiagnostics(arg1:application.GetDiagnosticsRequest):Promise<any>;
 
-export function GetRecentProjects():Promise<any>;
-export function GetProjects():Promise<any>;
+export function GetRepairActions(arg1:application.GetRepairActionsRequest):Promise<any>;
+
+export function RunRepairAction(arg1:application.RunRepairActionRequest):Promise<any>;
+
+export function GetHistory():Promise<any>;
+
+export function GetHomeDashboard(arg1:application.GetHomeDashboardRequest):Promise<any>;
 
 export function GetLaunchState(arg1:application.GetLaunchStateRequest):Promise<any>;
+
+export function GetProjects():Promise<any>;
+
+export function GetRecentProjects():Promise<any>;
 
 export function LaunchProject(arg1:application.LaunchProjectRequest):Promise<any>;
 

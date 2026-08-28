@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import {createElement} from "react";
 import {renderToStaticMarkup} from "react-dom/server";
 
 import {ContextMismatchDialog} from "../.tmp-test/src/components/selector/ContextMismatchDialog.js";
 import {ContextCard} from "../.tmp-test/src/components/selector/ContextCard.js";
 import {HomeView, homeConfidenceSummary} from "../.tmp-test/src/components/home/HomeView.js";
 import {RecentProjectConfirmationDialog} from "../.tmp-test/src/components/home/RecentProjectConfirmationDialog.js";
+import {ProjectsView, formatProjectTime} from "../.tmp-test/src/components/projects/ProjectsView.js";
+import {ProjectContextChangeDialog, safetyImplication} from "../.tmp-test/src/components/projects/ProjectContextChangeDialog.js";
+import {renderDiagnostics} from "../.tmp-test/src/components/diagnostics/DiagnosticsView.js";
 import {ContextsView, providerSummary} from "../.tmp-test/src/components/contexts/ContextsView.js";
 import {
   ContextAccentIndicator,
@@ -448,6 +452,93 @@ test("Home lists recent projects for review and requires confirmation before lau
   assert.ok(dialogHtml.includes("Dev Context will check this project and context before opening it."));
   assert.ok(dialogHtml.includes("Launch Company"));
   assert.match(dialogHtml, /role="dialog"/);
+});
+
+test("Projects lists known projects with safe launch and management entry points", () => {
+  const html = renderToStaticMarkup(ProjectsView({
+    projects: [{
+      project: {name: "api", path: "/work/api"},
+      contextId: "company",
+      contextName: "Company",
+      lastLaunchedAt: "2026-08-28T10:30:00Z",
+      running: true,
+    }],
+    onLaunch: () => {},
+    onChangeContext: () => {},
+    onOpenFolder: () => {},
+  }));
+
+  assert.ok(html.includes("Known projects"));
+  assert.ok(html.includes("/work/api"));
+  assert.ok(html.includes("Remembered context"));
+  assert.ok(html.includes("Company"));
+  assert.ok(html.includes("Running"));
+  assert.ok(html.includes("Launch Company"));
+  assert.ok(html.includes("Change context"));
+  assert.ok(html.includes("Open folder"));
+  assert.ok(html.includes("Forget project"));
+  assert.match(html, /Forget project<\/button>/);
+  assert.match(html, /disabled=""/);
+  assert.equal(formatProjectTime(undefined), "Never launched");
+});
+
+test("Project context changes are explicit and show backend safety implications", () => {
+  const html = renderToStaticMarkup(createElement(ProjectContextChangeDialog, {
+    project: {
+      project: {name: "api", path: "/work/api"},
+      contextId: "personal",
+      contextName: "Personal",
+      running: false,
+    },
+    contexts: [{
+      id: "personal",
+      name: "Personal",
+      tool: {id: "tool", name: "Future Tool", status: "ready", message: "Ready"},
+      availableTools: [],
+      providers: [],
+      confidence: {contextId: "personal", status: "needs_attention", checks: []},
+    }],
+    pending: false,
+    onCancel: () => {},
+    onConfirm: () => {},
+  }));
+
+  assert.match(html, /role="dialog"/);
+  assert.ok(html.includes("Change project context"));
+  assert.ok(html.includes("Current context"));
+  assert.ok(html.includes("Safety implications"));
+  assert.ok(html.includes("can launch, but its setup needs attention"));
+  assert.ok(html.includes("Use Personal"));
+  assert.equal(safetyImplication("blocked", "Company"), "Company is blocked and cannot launch until its required setup is resolved.");
+});
+
+test("Diagnostics groups backend checks and keeps paths in a disclosure", () => {
+  const html = renderToStaticMarkup(renderDiagnostics({
+    status: "loaded",
+    data: {
+      groups: [{
+        id: "context-filesystem",
+        label: "Context filesystem",
+        checks: [{
+          id: "context-directory",
+          severity: "ready",
+          label: "Context directory",
+          message: "Context directory is available.",
+          details: [
+            {label: "Mode", value: "-rwx------", isPath: false},
+            {label: "Location", value: "/contexts/personal", isPath: true},
+          ],
+        }],
+      }],
+    },
+  }, 1));
+
+  assert.ok(html.includes("Context filesystem"));
+  assert.ok(html.includes("Context directory is available."));
+  assert.ok(html.includes("Mode"));
+  assert.ok(html.includes("Show paths"));
+  assert.match(html, /<details/);
+  assert.doesNotMatch(html, /<details open/);
 });
 
 test("Contexts screen lists backend-owned identity summaries and reserves creation", () => {

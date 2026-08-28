@@ -353,6 +353,112 @@ type ProjectListItem struct {
 	Running        bool         `json:"running"`
 }
 
+// GetDiagnosticsRequest identifies the context that diagnostics should inspect.
+// An empty ContextID reserves application-wide diagnostics for a later phase.
+type GetDiagnosticsRequest struct {
+	ContextID string `json:"contextId,omitempty"`
+}
+
+// DiagnosticsState contains structured, presentation-safe diagnostics. Checks
+// are added by their owning integration phases; this contract deliberately does
+// not expose raw environment variables, credentials, or filesystem paths.
+type DiagnosticsState struct {
+	Groups []DiagnosticGroup `json:"groups"`
+}
+
+// DiagnosticGroup collects related checks for one diagnostics surface.
+type DiagnosticGroup struct {
+	ID     string            `json:"id"`
+	Label  string            `json:"label"`
+	Checks []DiagnosticCheck `json:"checks"`
+}
+
+// DiagnosticCheck describes one backend-derived diagnostic result.
+type DiagnosticCheck struct {
+	ID       string             `json:"id"`
+	Severity DiagnosticSeverity `json:"severity"`
+	Label    string             `json:"label"`
+	Message  string             `json:"message"`
+	Details  []DiagnosticDetail `json:"details,omitempty"`
+}
+
+// DiagnosticSeverity uses the shared UI status vocabulary for diagnostic
+// presentation without requiring frontend severity inference.
+type DiagnosticSeverity string
+
+const (
+	DiagnosticSeverityReady          DiagnosticSeverity = "ready"
+	DiagnosticSeverityNeedsAttention DiagnosticSeverity = "needs_attention"
+	DiagnosticSeverityBlocked        DiagnosticSeverity = "blocked"
+)
+
+// DiagnosticDetail is a safe backend-provided detail. When IsPath is true,
+// the frontend must keep Value behind its path disclosure control.
+type DiagnosticDetail struct {
+	Label  string `json:"label"`
+	Value  string `json:"value"`
+	IsPath bool   `json:"isPath,omitempty"`
+}
+
+// GetRepairActionsRequest identifies the context whose repair options should
+// be evaluated.
+type GetRepairActionsRequest struct {
+	ContextID string `json:"contextId"`
+}
+
+// RepairActionsState contains the repair actions available for one context.
+type RepairActionsState struct {
+	Actions []RepairAction `json:"actions"`
+}
+
+// RepairAction is a backend-owned repair operation. Targets preview the exact
+// integration-owned paths affected by the operation.
+type RepairAction struct {
+	ID                   string         `json:"id"`
+	Label                string         `json:"label"`
+	Description          string         `json:"description"`
+	Destructive          bool           `json:"destructive"`
+	RequiresConfirmation bool           `json:"requiresConfirmation"`
+	Targets              []RepairTarget `json:"targets"`
+}
+
+// RepairTarget describes one path affected by a repair action. Paths are
+// presentation-safe only when revealed through the frontend's path disclosure.
+type RepairTarget struct {
+	Label string `json:"label"`
+	Path  string `json:"path"`
+	Kind  string `json:"kind"`
+}
+
+// RunRepairActionRequest asks the service to execute one advertised action.
+// ConfirmDestructive must be true for any destructive action.
+type RunRepairActionRequest struct {
+	ContextID          string `json:"contextId"`
+	ActionID           string `json:"actionId"`
+	ConfirmDestructive bool   `json:"confirmDestructive"`
+}
+
+// RunRepairActionResult returns refreshed diagnostics after one action.
+type RunRepairActionResult struct {
+	ActionID    string           `json:"actionId"`
+	Diagnostics DiagnosticsState `json:"diagnostics"`
+}
+
+// HistoryState contains local launch events for later history presentation.
+type HistoryState struct {
+	Entries []HistoryEntry `json:"entries"`
+}
+
+// HistoryEntry is a presentation-safe local activity record.
+type HistoryEntry struct {
+	Event       string    `json:"event"`
+	Timestamp   time.Time `json:"timestamp"`
+	ProjectPath string    `json:"projectPath,omitempty"`
+	ContextID   string    `json:"contextId,omitempty"`
+	ToolID      string    `json:"toolId,omitempty"`
+	Message     string    `json:"message"`
+}
+
 // ProviderCredentialSessionState describes a detected global provider session
 // using only non-secret metadata that helps the user classify the session.
 type ProviderCredentialSessionState struct {

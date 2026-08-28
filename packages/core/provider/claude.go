@@ -29,6 +29,7 @@ var _ CredentialMetadataExtractor = ClaudeProvider{}
 var _ CredentialImporter = ClaudeProvider{}
 var _ ContextIdentityDetector = ClaudeProvider{}
 var _ SetupGuidanceProvider = ClaudeProvider{}
+var _ CredentialDiagnosticsProvider = ClaudeProvider{}
 
 // ID returns the persisted provider identifier.
 func (ClaudeProvider) ID() ID {
@@ -107,6 +108,12 @@ func (ClaudeProvider) DetectContextIdentity(ctx RuntimeContext) (Identity, bool,
 		return Identity{}, false, err
 	}
 	return Identity{Fields: fields}, true, nil
+}
+
+// CredentialDiagnosticFiles identifies the Claude credential file without
+// exposing its contents.
+func (ClaudeProvider) CredentialDiagnosticFiles(ctx RuntimeContext) []CredentialDiagnosticFile {
+	return []CredentialDiagnosticFile{{Label: "Credentials", Path: filepath.Join(ctx.Paths.StorageDir, ".credentials.json")}}
 }
 
 // SetupGuidance describes the next safe setup action for Claude.
