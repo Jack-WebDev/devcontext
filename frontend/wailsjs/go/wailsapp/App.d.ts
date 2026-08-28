@@ -12,13 +12,7 @@ export function GetContexts():Promise<any>;
 
 export function GetDiagnostics(arg1:application.GetDiagnosticsRequest):Promise<any>;
 
-export function GetRepairActions(arg1:application.GetRepairActionsRequest):Promise<any>;
-
-export function RunRepairAction(arg1:application.RunRepairActionRequest):Promise<any>;
-
 export function GetHistory():Promise<any>;
-
-export function GetRunningEnvironments():Promise<any>;
 
 export function GetHomeDashboard(arg1:application.GetHomeDashboardRequest):Promise<any>;
 
@@ -28,8 +22,14 @@ export function GetProjects():Promise<any>;
 
 export function GetRecentProjects():Promise<any>;
 
+export function GetRepairActions(arg1:application.GetRepairActionsRequest):Promise<any>;
+
+export function GetRunningEnvironments():Promise<any>;
+
 export function LaunchProject(arg1:application.LaunchProjectRequest):Promise<any>;
 
 export function PreflightLaunchProject(arg1:application.PreflightLaunchProjectRequest):Promise<any>;
+
+export function RunRepairAction(arg1:application.RunRepairActionRequest):Promise<any>;
 
 export function UnbindProject(arg1:application.UnbindProjectRequest):Promise<any>;
