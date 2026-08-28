@@ -10,6 +10,7 @@ import {HomeView, homeConfidenceSummary} from "../.tmp-test/src/components/home/
 import {RecentProjectConfirmationDialog} from "../.tmp-test/src/components/home/RecentProjectConfirmationDialog.js";
 import {ProjectsView, formatProjectTime} from "../.tmp-test/src/components/projects/ProjectsView.js";
 import {ProjectContextChangeDialog, safetyImplication} from "../.tmp-test/src/components/projects/ProjectContextChangeDialog.js";
+import {renderDiagnostics} from "../.tmp-test/src/components/diagnostics/DiagnosticsView.js";
 import {ContextsView, providerSummary} from "../.tmp-test/src/components/contexts/ContextsView.js";
 import {
   ContextAccentIndicator,
@@ -509,6 +510,35 @@ test("Project context changes are explicit and show backend safety implications"
   assert.ok(html.includes("can launch, but its setup needs attention"));
   assert.ok(html.includes("Use Personal"));
   assert.equal(safetyImplication("blocked", "Company"), "Company is blocked and cannot launch until its required setup is resolved.");
+});
+
+test("Diagnostics groups backend checks and keeps paths in a disclosure", () => {
+  const html = renderToStaticMarkup(renderDiagnostics({
+    status: "loaded",
+    data: {
+      groups: [{
+        id: "context-filesystem",
+        label: "Context filesystem",
+        checks: [{
+          id: "context-directory",
+          severity: "ready",
+          label: "Context directory",
+          message: "Context directory is available.",
+          details: [
+            {label: "Mode", value: "-rwx------", isPath: false},
+            {label: "Location", value: "/contexts/personal", isPath: true},
+          ],
+        }],
+      }],
+    },
+  }, 1));
+
+  assert.ok(html.includes("Context filesystem"));
+  assert.ok(html.includes("Context directory is available."));
+  assert.ok(html.includes("Mode"));
+  assert.ok(html.includes("Show paths"));
+  assert.match(html, /<details/);
+  assert.doesNotMatch(html, /<details open/);
 });
 
 test("Contexts screen lists backend-owned identity summaries and reserves creation", () => {

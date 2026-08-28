@@ -22,6 +22,14 @@ export function GetDiagnostics(arg1) {
   return window['go']['wailsapp']['App']['GetDiagnostics'](arg1);
 }
 
+export function GetRepairActions(arg1) {
+  return window['go']['wailsapp']['App']['GetRepairActions'](arg1);
+}
+
+export function RunRepairAction(arg1) {
+  return window['go']['wailsapp']['App']['RunRepairAction'](arg1);
+}
+
 export function GetHomeDashboard(arg1) {
   return window['go']['wailsapp']['App']['GetHomeDashboard'](arg1);
 }

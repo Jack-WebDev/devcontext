@@ -276,6 +276,20 @@ export interface DiagnosticCheck {
 }
 export interface DiagnosticDetail { label: string; value: string; isPath: boolean; }
 
+export interface GetRepairActionsRequest { contextId: string; }
+export interface RepairActionsState { actions: RepairAction[]; }
+export interface RepairAction {
+  id: string;
+  label: string;
+  description: string;
+  destructive: boolean;
+  requiresConfirmation: boolean;
+  targets: RepairTarget[];
+}
+export interface RepairTarget { label: string; path: string; kind: string; }
+export interface RunRepairActionRequest { contextId: string; actionId: string; confirmDestructive?: boolean; }
+export interface RunRepairActionResult { actionId: string; diagnostics: DiagnosticsState; }
+
 export interface ProviderCredentialSession {
   providerId: string;
   name: string;
@@ -296,6 +310,8 @@ export interface DevContextApi {
   createContext(request: CreateContextRequest): Promise<ApiResult<CreateContextResult>>;
   getProjects(): Promise<ApiResult<ProjectsState>>;
   getDiagnostics(request?: GetDiagnosticsRequest): Promise<ApiResult<DiagnosticsState>>;
+  getRepairActions(request: GetRepairActionsRequest): Promise<ApiResult<RepairActionsState>>;
+  runRepairAction(request: RunRepairActionRequest): Promise<ApiResult<RunRepairActionResult>>;
 }
 
 export interface WailsBindings {
@@ -311,6 +327,8 @@ export interface WailsBindings {
   createContext(request: CreateContextRequest): Promise<unknown>;
   getProjects(): Promise<unknown>;
   getDiagnostics(request: GetDiagnosticsRequest): Promise<unknown>;
+  getRepairActions(request: GetRepairActionsRequest): Promise<unknown>;
+  runRepairAction(request: RunRepairActionRequest): Promise<unknown>;
 }
 
 export function createDevContextApi(bindings: WailsBindings = generatedBindings): DevContextApi {
@@ -361,6 +379,8 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
     },
     getProjects() { return callBinding(() => bindings.getProjects(), normalizeProjectsState); },
     getDiagnostics(request = {}) { return callBinding(() => bindings.getDiagnostics(request), normalizeDiagnosticsState); },
+    getRepairActions(request) { return callBinding(() => bindings.getRepairActions(request), normalizeRepairActionsState); },
+    runRepairAction(request) { return callBinding(() => bindings.runRepairAction({...request, confirmDestructive: request.confirmDestructive ?? false}), normalizeRunRepairActionResult); },
   };
 }
 
@@ -413,6 +433,8 @@ const generatedBindings: WailsBindings = {
   },
   async getProjects() { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetProjects(); },
   async getDiagnostics(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetDiagnostics(request); },
+  async getRepairActions(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetRepairActions(request); },
+  async runRepairAction(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.RunRepairAction({...request, confirmDestructive: request.confirmDestructive ?? false}); },
 };
 
 export const devContextApi = createDevContextApi();
@@ -655,6 +677,10 @@ function normalizeDiagnosticsState(value: unknown): DiagnosticsState { return {g
 function normalizeDiagnosticGroup(value: unknown): DiagnosticGroup { const object = objectValue(value); return {id: stringValue(object.id), label: stringValue(object.label), checks: arrayValue(object.checks).map(normalizeDiagnosticCheck)}; }
 function normalizeDiagnosticCheck(value: unknown): DiagnosticCheck { const object = objectValue(value); return {id: stringValue(object.id), severity: normalizeLaunchConfidenceStatus(object.severity), label: stringValue(object.label), message: stringValue(object.message), details: arrayValue(object.details).map(normalizeDiagnosticDetail)}; }
 function normalizeDiagnosticDetail(value: unknown): DiagnosticDetail { const object = objectValue(value); return {label: stringValue(object.label), value: stringValue(object.value), isPath: booleanValue(object.isPath)}; }
+function normalizeRepairActionsState(value: unknown): RepairActionsState { return {actions: arrayValue(objectValue(value).actions).map(normalizeRepairAction)}; }
+function normalizeRepairAction(value: unknown): RepairAction { const object = objectValue(value); return {id: stringValue(object.id), label: stringValue(object.label), description: stringValue(object.description), destructive: booleanValue(object.destructive), requiresConfirmation: booleanValue(object.requiresConfirmation), targets: arrayValue(object.targets).map(normalizeRepairTarget)}; }
+function normalizeRepairTarget(value: unknown): RepairTarget { const object = objectValue(value); return {label: stringValue(object.label), path: stringValue(object.path), kind: stringValue(object.kind)}; }
+function normalizeRunRepairActionResult(value: unknown): RunRepairActionResult { const object = objectValue(value); return {actionId: stringValue(object.actionId), diagnostics: normalizeDiagnosticsState(object.diagnostics)}; }
 
 function normalizeProjectState(value: unknown): ProjectState {
   const object = objectValue(value);

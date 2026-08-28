@@ -19,6 +19,8 @@ type service interface {
 	CreateContext(application.CreateContextRequest) (application.CreateContextResult, *application.Error)
 	GetProjects() (application.ProjectsState, *application.Error)
 	GetDiagnostics(application.GetDiagnosticsRequest) (application.DiagnosticsState, *application.Error)
+	GetRepairActions(application.GetRepairActionsRequest) (application.RepairActionsState, *application.Error)
+	RunRepairAction(application.RunRepairActionRequest) (application.RunRepairActionResult, *application.Error)
 }
 
 func (a *App) GetProjects() any {
@@ -36,6 +38,24 @@ func (a *App) GetDiagnostics(request application.GetDiagnosticsRequest) any {
 		return err
 	}
 	return diagnostics
+}
+
+// GetRepairActions returns repair options and destructive-impact previews.
+func (a *App) GetRepairActions(request application.GetRepairActionsRequest) any {
+	actions, err := a.service.GetRepairActions(request)
+	if err != nil {
+		return err
+	}
+	return actions
+}
+
+// RunRepairAction executes one repair action after backend confirmation checks.
+func (a *App) RunRepairAction(request application.RunRepairActionRequest) any {
+	result, err := a.service.RunRepairAction(request)
+	if err != nil {
+		return err
+	}
+	return result
 }
 
 // GetHomeDashboard returns the Home screen state for the requested project.

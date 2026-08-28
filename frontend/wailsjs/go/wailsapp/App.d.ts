@@ -12,6 +12,10 @@ export function GetContexts():Promise<any>;
 
 export function GetDiagnostics(arg1:application.GetDiagnosticsRequest):Promise<any>;
 
+export function GetRepairActions(arg1:application.GetRepairActionsRequest):Promise<any>;
+
+export function RunRepairAction(arg1:application.RunRepairActionRequest):Promise<any>;
+
 export function GetHomeDashboard(arg1:application.GetHomeDashboardRequest):Promise<any>;
 
 export function GetLaunchState(arg1:application.GetLaunchStateRequest):Promise<any>;

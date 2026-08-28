@@ -969,3 +969,39 @@ test("adapter normalizes structured diagnostics and preserves path disclosure me
     },
   });
 });
+
+test("adapter normalizes repair actions and defaults destructive confirmation to false", async () => {
+  const requests = [];
+  const api = createDevContextApi({
+    async getRepairActions(request) {
+      assert.deepEqual(request, {contextId: "personal"});
+      return {
+        actions: [{
+          id: "reset-provider:future",
+          label: "Reset Future Provider storage",
+          description: "Remove provider-owned files.",
+          destructive: true,
+          requiresConfirmation: true,
+          targets: [{label: "Future Provider storage", path: "/contexts/personal/providers/future/auth.json", kind: "file"}],
+        }],
+      };
+    },
+    async runRepairAction(request) {
+      requests.push(request);
+      return {actionId: request.actionId, diagnostics: {groups: []}};
+    },
+  });
+
+  const actions = await api.getRepairActions({contextId: "personal"});
+  assert.equal(actions.ok, true);
+  assert.deepEqual(actions.ok ? actions.data.actions[0].targets[0] : undefined, {
+    label: "Future Provider storage",
+    path: "/contexts/personal/providers/future/auth.json",
+    kind: "file",
+  });
+  assert.deepEqual(await api.runRepairAction({contextId: "personal", actionId: "reset-provider:future"}), {
+    ok: true,
+    data: {actionId: "reset-provider:future", diagnostics: {groups: []}},
+  });
+  assert.deepEqual(requests, [{contextId: "personal", actionId: "reset-provider:future", confirmDestructive: false}]);
+});

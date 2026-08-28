@@ -1,4 +1,4 @@
-type AppRoute = "home" | "contexts" | "projects" | "running" | "history" | "settings";
+type AppRoute = "home" | "contexts" | "projects" | "running" | "history" | "settings" | "diagnostics";
 
 interface AppRouteDefinition {
   id: AppRoute;
@@ -14,13 +14,18 @@ const appRoutes: AppRouteDefinition[] = [
   {id: "settings", label: "Settings"},
 ];
 
+const appRouteDefinitions: AppRouteDefinition[] = [
+  ...appRoutes,
+  {id: "diagnostics", label: "Diagnostics"},
+];
+
 function appRouteFromHash(hash: string): AppRoute {
   const route = hash.replace(/^#/, "");
-  return appRoutes.some((definition) => definition.id === route) ? route as AppRoute : "home";
+  return appRouteDefinitions.some((definition) => definition.id === route) ? route as AppRoute : "home";
 }
 
 function appRouteDefinition(route: AppRoute): AppRouteDefinition {
-  return appRoutes.find((definition) => definition.id === route) ?? appRoutes[0];
+  return appRouteDefinitions.find((definition) => definition.id === route) ?? appRoutes[0];
 }
 
 export { appRouteDefinition, appRouteFromHash, appRoutes };

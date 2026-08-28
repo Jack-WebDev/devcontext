@@ -64,6 +64,34 @@ export namespace application {
 	        this.contextId = source["contextId"];
 	    }
 	}
+	export class GetRepairActionsRequest {
+	    contextId: string;
+
+	    static createFrom(source: any = {}) {
+	        return new GetRepairActionsRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contextId = source["contextId"];
+	    }
+	}
+	export class RunRepairActionRequest {
+	    contextId: string;
+	    actionId: string;
+	    confirmDestructive: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new RunRepairActionRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contextId = source["contextId"];
+	        this.actionId = source["actionId"];
+	        this.confirmDestructive = source["confirmDestructive"];
+	    }
+	}
 	export class GetHomeDashboardRequest {
 	    projectPath?: string;
 	
@@ -134,4 +162,3 @@ export namespace application {
 	}
 
 }
-

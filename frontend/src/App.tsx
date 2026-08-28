@@ -7,6 +7,7 @@ import { HomeView } from "./components/home/HomeView";
 import { RecentProjectConfirmationDialog } from "./components/home/RecentProjectConfirmationDialog";
 import { ProjectsView } from "./components/projects/ProjectsView";
 import { ProjectContextChangeDialog } from "./components/projects/ProjectContextChangeDialog";
+import { DiagnosticsView } from "./components/diagnostics/DiagnosticsView";
 import { ContextsView } from "./components/contexts/ContextsView";
 import { ContextDetailsDrawer, CreateContextDialog } from "./components/contexts/ContextManagement";
 import { AppShell } from "./components/shell/AppShell";
@@ -338,7 +339,7 @@ function App() {
               <p className="text-sm text-muted-foreground">Launch options</p>
               <h2 id="context-selector-heading" className="text-xl font-semibold">Context selector</h2>
             </div>
-          {renderSelectorContent(launchState, handleCreateContext)}
+          {renderSelectorContent(launchState, handleCreateContext, () => handleNavigate("diagnostics"))}
           </section>
         </section>
       ) : activeRoute === "contexts" ? (
@@ -357,6 +358,8 @@ function App() {
             />
           ) : null}
         </>
+      ) : activeRoute === "diagnostics" ? (
+        <DiagnosticsView contexts={contexts.status === "loaded" ? contexts.data : []} load={(contextId) => devContextApi.getDiagnostics({contextId})} />
       ) : (
         <PlaceholderScreen route={activeRoute} />
       )}
@@ -437,6 +440,7 @@ function renderSelectorContent(
     contextId: string,
     importProviderIds?: string[],
   ) => Promise<ApiResult<CreateContextResult>>,
+  onRunDiagnostics: () => void,
 ) {
   if (launchState.status === "loading") {
     return <p className="text-sm text-muted-foreground">Loading selector...</p>;
@@ -455,6 +459,7 @@ function renderSelectorContent(
       onCancel={() => devContextWindow.closeSelector()}
       onCreatePersonalContext={(importProviderIds) => onCreateContext("personal", importProviderIds)}
       onCreateCompanyContext={(importProviderIds) => onCreateContext("company", importProviderIds)}
+      onRunDiagnostics={onRunDiagnostics}
     />
   );
 }

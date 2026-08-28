@@ -130,6 +130,25 @@ func (s *Service) GetDiagnostics(request GetDiagnosticsRequest) (DiagnosticsStat
 	return diagnostics, nil
 }
 
+// GetRepairActions returns backend-owned repair actions and previews for one
+// configured context.
+func (s *Service) GetRepairActions(request GetRepairActionsRequest) (RepairActionsState, *Error) {
+	actions, err := s.getRepairActions(request)
+	if err != nil {
+		return RepairActionsState{}, NewError(err)
+	}
+	return actions, nil
+}
+
+// RunRepairAction executes one backend-advertised repair action.
+func (s *Service) RunRepairAction(request RunRepairActionRequest) (RunRepairActionResult, *Error) {
+	result, err := s.runRepairAction(request)
+	if err != nil {
+		return RunRepairActionResult{}, NewError(err)
+	}
+	return result, nil
+}
+
 func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, error) {
 	projectPath, err := s.validatedProjectPath(request.ProjectPath)
 	if err != nil {

@@ -400,6 +400,50 @@ type DiagnosticDetail struct {
 	IsPath bool   `json:"isPath,omitempty"`
 }
 
+// GetRepairActionsRequest identifies the context whose repair options should
+// be evaluated.
+type GetRepairActionsRequest struct {
+	ContextID string `json:"contextId"`
+}
+
+// RepairActionsState contains the repair actions available for one context.
+type RepairActionsState struct {
+	Actions []RepairAction `json:"actions"`
+}
+
+// RepairAction is a backend-owned repair operation. Targets preview the exact
+// integration-owned paths affected by the operation.
+type RepairAction struct {
+	ID                   string         `json:"id"`
+	Label                string         `json:"label"`
+	Description          string         `json:"description"`
+	Destructive          bool           `json:"destructive"`
+	RequiresConfirmation bool           `json:"requiresConfirmation"`
+	Targets              []RepairTarget `json:"targets"`
+}
+
+// RepairTarget describes one path affected by a repair action. Paths are
+// presentation-safe only when revealed through the frontend's path disclosure.
+type RepairTarget struct {
+	Label string `json:"label"`
+	Path  string `json:"path"`
+	Kind  string `json:"kind"`
+}
+
+// RunRepairActionRequest asks the service to execute one advertised action.
+// ConfirmDestructive must be true for any destructive action.
+type RunRepairActionRequest struct {
+	ContextID          string `json:"contextId"`
+	ActionID           string `json:"actionId"`
+	ConfirmDestructive bool   `json:"confirmDestructive"`
+}
+
+// RunRepairActionResult returns refreshed diagnostics after one action.
+type RunRepairActionResult struct {
+	ActionID    string           `json:"actionId"`
+	Diagnostics DiagnosticsState `json:"diagnostics"`
+}
+
 // ProviderCredentialSessionState describes a detected global provider session
 // using only non-secret metadata that helps the user classify the session.
 type ProviderCredentialSessionState struct {
