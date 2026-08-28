@@ -6,6 +6,7 @@ import { createOnboardingContextAndRefresh } from "./components/selector/onboard
 import { HomeView } from "./components/home/HomeView";
 import { RecentProjectConfirmationDialog } from "./components/home/RecentProjectConfirmationDialog";
 import { ProjectsView } from "./components/projects/ProjectsView";
+import { ProjectContextChangeDialog } from "./components/projects/ProjectContextChangeDialog";
 import { ContextsView } from "./components/contexts/ContextsView";
 import { ContextDetailsDrawer, CreateContextDialog } from "./components/contexts/ContextManagement";
 import { AppShell } from "./components/shell/AppShell";
@@ -67,6 +68,9 @@ function App() {
   const [projectLaunchPath, setProjectLaunchPath] = useState<string>();
   const [projectErrorPath, setProjectErrorPath] = useState<string>();
   const [projectLaunchError, setProjectLaunchError] = useState<DisplayError>();
+  const [projectContextChange, setProjectContextChange] = useState<ProjectListItem>();
+  const [projectContextChangePending, setProjectContextChangePending] = useState(false);
+  const [projectContextChangeError, setProjectContextChangeError] = useState<DisplayError>();
   const [activeRoute, setActiveRoute] = useState<AppRoute>(() => appRouteFromHash(window.location.hash));
 
   useEffect(() => {
@@ -270,17 +274,29 @@ function App() {
     }
   }
 
-  async function handleProjectChangeContext(project: ProjectListItem) {
-    setProjectErrorPath(project.project.path);
-    setProjectLaunchError(undefined);
-    const result = await devContextApi.getLaunchState({projectPath: project.project.path});
-    if (!result.ok) {
-      setProjectLaunchError(result.error);
+  function handleProjectChangeContext(project: ProjectListItem) {
+    setProjectContextChange(project);
+    setProjectContextChangeError(undefined);
+  }
+
+  async function handleProjectContextChange(contextId: string) {
+    if (projectContextChange === undefined || projectContextChangePending) {
       return;
     }
-    setLaunchState({status: "loaded", data: result.data});
-    handleNavigate("home");
-    window.setTimeout(handleReviewLaunchOptions, 0);
+
+    setProjectContextChangePending(true);
+    setProjectContextChangeError(undefined);
+    try {
+      const result = await devContextApi.bindProject({projectPath: projectContextChange.project.path, contextId});
+      if (!result.ok) {
+        setProjectContextChangeError(result.error);
+        return;
+      }
+      setProjectContextChange(undefined);
+      await Promise.all([refreshProjects(), refreshHomeDashboard(), refreshContexts()]);
+    } finally {
+      setProjectContextChangePending(false);
+    }
   }
 
   function handleProjectOpenFolder(project: ProjectListItem) {
@@ -328,7 +344,19 @@ function App() {
       ) : activeRoute === "contexts" ? (
         <>{renderContexts(contexts, setContextDetailsID, () => setCreatingContext(true))}{contextDetailsID ? <ContextDetailsDrawer contextId={contextDetailsID} onClose={() => setContextDetailsID(undefined)} load={(contextId) => devContextApi.getContextDetails({contextId})}/> : null}{creatingContext && contexts.status === "loaded" ? <CreateContextDialog contexts={contexts.data} onClose={() => setCreatingContext(false)} create={async (request) => { const result = await devContextApi.createContext(request); if (result.ok) { await refreshContexts(); setCreatingContext(false); } return result; }}/> : null}</>
       ) : activeRoute === "projects" ? (
-        renderProjects(projects, projectLaunchPath, projectErrorPath, projectLaunchError, handleProjectLaunch, handleProjectChangeContext, handleProjectOpenFolder)
+        <>
+          {renderProjects(projects, projectLaunchPath, projectErrorPath, projectLaunchError, handleProjectLaunch, contexts.status === "loaded" ? handleProjectChangeContext : undefined, handleProjectOpenFolder)}
+          {projectContextChange && contexts.status === "loaded" ? (
+            <ProjectContextChangeDialog
+              project={projectContextChange}
+              contexts={contexts.data.map((item) => item.context)}
+              pending={projectContextChangePending}
+              error={projectContextChangeError}
+              onCancel={() => !projectContextChangePending && setProjectContextChange(undefined)}
+              onConfirm={(contextId) => void handleProjectContextChange(contextId)}
+            />
+          ) : null}
+        </>
       ) : (
         <PlaceholderScreen route={activeRoute} />
       )}
@@ -352,7 +380,7 @@ function renderProjects(
   errorProjectPath: string | undefined,
   launchError: DisplayError | undefined,
   onLaunch: (project: ProjectListItem) => void,
-  onChangeContext: (project: ProjectListItem) => void,
+  onChangeContext: ((project: ProjectListItem) => void) | undefined,
   onOpenFolder: (project: ProjectListItem) => void,
 ) {
   if (projects.status === "loading") {

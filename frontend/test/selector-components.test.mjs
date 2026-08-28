@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import {createElement} from "react";
 import {renderToStaticMarkup} from "react-dom/server";
 
 import {ContextMismatchDialog} from "../.tmp-test/src/components/selector/ContextMismatchDialog.js";
@@ -8,6 +9,7 @@ import {ContextCard} from "../.tmp-test/src/components/selector/ContextCard.js";
 import {HomeView, homeConfidenceSummary} from "../.tmp-test/src/components/home/HomeView.js";
 import {RecentProjectConfirmationDialog} from "../.tmp-test/src/components/home/RecentProjectConfirmationDialog.js";
 import {ProjectsView, formatProjectTime} from "../.tmp-test/src/components/projects/ProjectsView.js";
+import {ProjectContextChangeDialog, safetyImplication} from "../.tmp-test/src/components/projects/ProjectContextChangeDialog.js";
 import {ContextsView, providerSummary} from "../.tmp-test/src/components/contexts/ContextsView.js";
 import {
   ContextAccentIndicator,
@@ -477,6 +479,36 @@ test("Projects lists known projects with safe launch and management entry points
   assert.match(html, /Forget project<\/button>/);
   assert.match(html, /disabled=""/);
   assert.equal(formatProjectTime(undefined), "Never launched");
+});
+
+test("Project context changes are explicit and show backend safety implications", () => {
+  const html = renderToStaticMarkup(createElement(ProjectContextChangeDialog, {
+    project: {
+      project: {name: "api", path: "/work/api"},
+      contextId: "personal",
+      contextName: "Personal",
+      running: false,
+    },
+    contexts: [{
+      id: "personal",
+      name: "Personal",
+      tool: {id: "tool", name: "Future Tool", status: "ready", message: "Ready"},
+      availableTools: [],
+      providers: [],
+      confidence: {contextId: "personal", status: "needs_attention", checks: []},
+    }],
+    pending: false,
+    onCancel: () => {},
+    onConfirm: () => {},
+  }));
+
+  assert.match(html, /role="dialog"/);
+  assert.ok(html.includes("Change project context"));
+  assert.ok(html.includes("Current context"));
+  assert.ok(html.includes("Safety implications"));
+  assert.ok(html.includes("can launch, but its setup needs attention"));
+  assert.ok(html.includes("Use Personal"));
+  assert.equal(safetyImplication("blocked", "Company"), "Company is blocked and cannot launch until its required setup is resolved.");
 });
 
 test("Contexts screen lists backend-owned identity summaries and reserves creation", () => {

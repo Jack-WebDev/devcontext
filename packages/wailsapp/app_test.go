@@ -47,6 +47,7 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 		createContextResult: application.CreateContextResult{
 			Context: application.ContextState{ID: "personal", Name: "Personal"},
 		},
+		diagnostics: application.DiagnosticsState{Groups: []application.DiagnosticGroup{}},
 	}
 	app := New(service)
 	app.Startup(context.Background())
@@ -136,6 +137,15 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	if !reflect.DeepEqual(service.createContextRequest, createContextRequest) {
 		t.Fatalf("create context request = %#v, want %#v", service.createContextRequest, createContextRequest)
 	}
+
+	diagnosticsRequest := application.GetDiagnosticsRequest{ContextID: "personal"}
+	diagnostics := app.GetDiagnostics(diagnosticsRequest)
+	if !reflect.DeepEqual(diagnostics, service.diagnostics) {
+		t.Fatalf("diagnostics = %#v, want %#v", diagnostics, service.diagnostics)
+	}
+	if service.diagnosticsRequest != diagnosticsRequest {
+		t.Fatalf("diagnostics request = %#v, want %#v", service.diagnosticsRequest, diagnosticsRequest)
+	}
 }
 
 func TestAppReturnsApplicationErrorsAsSingleValues(t *testing.T) {
@@ -189,6 +199,10 @@ type fakeService struct {
 	createContextRequest application.CreateContextRequest
 	createContextResult  application.CreateContextResult
 	createContextErr     *application.Error
+
+	diagnosticsRequest application.GetDiagnosticsRequest
+	diagnostics        application.DiagnosticsState
+	diagnosticsErr     *application.Error
 }
 
 func (s *fakeService) GetLaunchState(request application.GetLaunchStateRequest) (application.LaunchState, *application.Error) {
@@ -216,6 +230,11 @@ func (s *fakeService) GetContextDetails(request application.GetContextDetailsReq
 
 func (s *fakeService) GetProjects() (application.ProjectsState, *application.Error) {
 	return s.projects, s.projectsErr
+}
+
+func (s *fakeService) GetDiagnostics(request application.GetDiagnosticsRequest) (application.DiagnosticsState, *application.Error) {
+	s.diagnosticsRequest = request
+	return s.diagnostics, s.diagnosticsErr
 }
 
 func (s *fakeService) PreflightLaunchProject(request application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error) {

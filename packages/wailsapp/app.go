@@ -18,6 +18,7 @@ type service interface {
 	UnbindProject(application.UnbindProjectRequest) (application.ProjectBindingState, *application.Error)
 	CreateContext(application.CreateContextRequest) (application.CreateContextResult, *application.Error)
 	GetProjects() (application.ProjectsState, *application.Error)
+	GetDiagnostics(application.GetDiagnosticsRequest) (application.DiagnosticsState, *application.Error)
 }
 
 func (a *App) GetProjects() any {
@@ -26,6 +27,15 @@ func (a *App) GetProjects() any {
 		return err
 	}
 	return projects
+}
+
+// GetDiagnostics returns structured, presentation-safe diagnostics.
+func (a *App) GetDiagnostics(request application.GetDiagnosticsRequest) any {
+	diagnostics, err := a.service.GetDiagnostics(request)
+	if err != nil {
+		return err
+	}
+	return diagnostics
 }
 
 // GetHomeDashboard returns the Home screen state for the requested project.

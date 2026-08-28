@@ -121,6 +121,13 @@ func (s *Service) GetProjects() (ProjectsState, *Error) {
 	return ProjectsState{Projects: projects}, nil
 }
 
+// GetDiagnostics returns the diagnostics contract. Integration-owned checks
+// are added in later phases, so this initial response intentionally contains
+// no inferred or placeholder check results.
+func (s *Service) GetDiagnostics(request GetDiagnosticsRequest) (DiagnosticsState, *Error) {
+	return DiagnosticsState{Groups: []DiagnosticGroup{}}, nil
+}
+
 func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, error) {
 	projectPath, err := s.validatedProjectPath(request.ProjectPath)
 	if err != nil {

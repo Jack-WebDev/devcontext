@@ -264,6 +264,18 @@ export interface CreateContextResult {
 export interface ProjectsState { projects: ProjectListItem[]; }
 export interface ProjectListItem { project: ProjectState; contextId?: string; contextName?: string; lastLaunchedAt?: string; running: boolean; }
 
+export interface GetDiagnosticsRequest { contextId?: string; }
+export interface DiagnosticsState { groups: DiagnosticGroup[]; }
+export interface DiagnosticGroup { id: string; label: string; checks: DiagnosticCheck[]; }
+export interface DiagnosticCheck {
+  id: string;
+  severity: "ready" | "needs_attention" | "blocked";
+  label: string;
+  message: string;
+  details: DiagnosticDetail[];
+}
+export interface DiagnosticDetail { label: string; value: string; isPath: boolean; }
+
 export interface ProviderCredentialSession {
   providerId: string;
   name: string;
@@ -283,6 +295,7 @@ export interface DevContextApi {
   unbindProject(request?: UnbindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
   createContext(request: CreateContextRequest): Promise<ApiResult<CreateContextResult>>;
   getProjects(): Promise<ApiResult<ProjectsState>>;
+  getDiagnostics(request?: GetDiagnosticsRequest): Promise<ApiResult<DiagnosticsState>>;
 }
 
 export interface WailsBindings {
@@ -297,6 +310,7 @@ export interface WailsBindings {
   unbindProject(request: UnbindProjectRequest): Promise<unknown>;
   createContext(request: CreateContextRequest): Promise<unknown>;
   getProjects(): Promise<unknown>;
+  getDiagnostics(request: GetDiagnosticsRequest): Promise<unknown>;
 }
 
 export function createDevContextApi(bindings: WailsBindings = generatedBindings): DevContextApi {
@@ -346,6 +360,7 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
       return callBinding(() => bindings.createContext(request), normalizeCreateContextResult);
     },
     getProjects() { return callBinding(() => bindings.getProjects(), normalizeProjectsState); },
+    getDiagnostics(request = {}) { return callBinding(() => bindings.getDiagnostics(request), normalizeDiagnosticsState); },
   };
 }
 
@@ -397,6 +412,7 @@ const generatedBindings: WailsBindings = {
     return bindings.CreateContext(request);
   },
   async getProjects() { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetProjects(); },
+  async getDiagnostics(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetDiagnostics(request); },
 };
 
 export const devContextApi = createDevContextApi();
@@ -635,6 +651,10 @@ function normalizeCreateContextResult(value: unknown): CreateContextResult {
 }
 function normalizeProjectsState(value: unknown): ProjectsState { return {projects: arrayValue(objectValue(value).projects).map(normalizeProjectListItem)}; }
 function normalizeProjectListItem(value: unknown): ProjectListItem { const object = objectValue(value); const contextId = optionalString(object.contextId); const contextName = optionalString(object.contextName); const lastLaunchedAt = optionalTimestamp(object.lastLaunchedAt); return {project: normalizeProjectState(object.project), ...(contextId === undefined ? {} : {contextId}), ...(contextName === undefined ? {} : {contextName}), ...(lastLaunchedAt === undefined ? {} : {lastLaunchedAt}), running: booleanValue(object.running)}; }
+function normalizeDiagnosticsState(value: unknown): DiagnosticsState { return {groups: arrayValue(objectValue(value).groups).map(normalizeDiagnosticGroup)}; }
+function normalizeDiagnosticGroup(value: unknown): DiagnosticGroup { const object = objectValue(value); return {id: stringValue(object.id), label: stringValue(object.label), checks: arrayValue(object.checks).map(normalizeDiagnosticCheck)}; }
+function normalizeDiagnosticCheck(value: unknown): DiagnosticCheck { const object = objectValue(value); return {id: stringValue(object.id), severity: normalizeLaunchConfidenceStatus(object.severity), label: stringValue(object.label), message: stringValue(object.message), details: arrayValue(object.details).map(normalizeDiagnosticDetail)}; }
+function normalizeDiagnosticDetail(value: unknown): DiagnosticDetail { const object = objectValue(value); return {label: stringValue(object.label), value: stringValue(object.value), isPath: booleanValue(object.isPath)}; }
 
 function normalizeProjectState(value: unknown): ProjectState {
   const object = objectValue(value);

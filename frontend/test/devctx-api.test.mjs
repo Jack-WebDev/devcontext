@@ -931,3 +931,41 @@ test("adapter normalizes create context onboarding failure responses", async () 
     },
   });
 });
+
+test("adapter normalizes structured diagnostics and preserves path disclosure metadata", async () => {
+  const api = createDevContextApi({
+    async getDiagnostics(request) {
+      assert.deepEqual(request, {contextId: "personal"});
+      return {
+        groups: [{
+          id: "context-storage",
+          label: "Context storage",
+          checks: [{
+            id: "context-root",
+            severity: "needs_attention",
+            label: "Context directory",
+            message: "The context directory needs repair.",
+            details: [{label: "Location", value: "/contexts/personal", isPath: true}],
+          }],
+        }],
+      };
+    },
+  });
+
+  assert.deepEqual(await api.getDiagnostics({contextId: "personal"}), {
+    ok: true,
+    data: {
+      groups: [{
+        id: "context-storage",
+        label: "Context storage",
+        checks: [{
+          id: "context-root",
+          severity: "needs_attention",
+          label: "Context directory",
+          message: "The context directory needs repair.",
+          details: [{label: "Location", value: "/contexts/personal", isPath: true}],
+        }],
+      }],
+    },
+  });
+});

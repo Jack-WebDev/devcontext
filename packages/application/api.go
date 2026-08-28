@@ -353,6 +353,53 @@ type ProjectListItem struct {
 	Running        bool         `json:"running"`
 }
 
+// GetDiagnosticsRequest identifies the context that diagnostics should inspect.
+// An empty ContextID reserves application-wide diagnostics for a later phase.
+type GetDiagnosticsRequest struct {
+	ContextID string `json:"contextId,omitempty"`
+}
+
+// DiagnosticsState contains structured, presentation-safe diagnostics. Checks
+// are added by their owning integration phases; this contract deliberately does
+// not expose raw environment variables, credentials, or filesystem paths.
+type DiagnosticsState struct {
+	Groups []DiagnosticGroup `json:"groups"`
+}
+
+// DiagnosticGroup collects related checks for one diagnostics surface.
+type DiagnosticGroup struct {
+	ID     string            `json:"id"`
+	Label  string            `json:"label"`
+	Checks []DiagnosticCheck `json:"checks"`
+}
+
+// DiagnosticCheck describes one backend-derived diagnostic result.
+type DiagnosticCheck struct {
+	ID       string             `json:"id"`
+	Severity DiagnosticSeverity `json:"severity"`
+	Label    string             `json:"label"`
+	Message  string             `json:"message"`
+	Details  []DiagnosticDetail `json:"details,omitempty"`
+}
+
+// DiagnosticSeverity uses the shared UI status vocabulary for diagnostic
+// presentation without requiring frontend severity inference.
+type DiagnosticSeverity string
+
+const (
+	DiagnosticSeverityReady          DiagnosticSeverity = "ready"
+	DiagnosticSeverityNeedsAttention DiagnosticSeverity = "needs_attention"
+	DiagnosticSeverityBlocked        DiagnosticSeverity = "blocked"
+)
+
+// DiagnosticDetail is a safe backend-provided detail. When IsPath is true,
+// the frontend must keep Value behind its path disclosure control.
+type DiagnosticDetail struct {
+	Label  string `json:"label"`
+	Value  string `json:"value"`
+	IsPath bool   `json:"isPath,omitempty"`
+}
+
 // ProviderCredentialSessionState describes a detected global provider session
 // using only non-secret metadata that helps the user classify the session.
 type ProviderCredentialSessionState struct {
