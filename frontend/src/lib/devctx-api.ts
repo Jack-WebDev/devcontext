@@ -290,7 +290,8 @@ export interface RepairTarget { label: string; path: string; kind: string; }
 export interface RunRepairActionRequest { contextId: string; actionId: string; confirmDestructive?: boolean; }
 export interface RunRepairActionResult { actionId: string; diagnostics: DiagnosticsState; }
 export interface HistoryState { entries: HistoryEntry[]; }
-export interface HistoryEntry { event: string; timestamp: string; projectPath?: string; contextId?: string; toolId?: string; message: string; }
+export type HistoryCategory = "launch" | "configuration" | "warning";
+export interface HistoryEntry { event: string; category: HistoryCategory; timestamp: string; projectPath?: string; contextId?: string; toolId?: string; message: string; }
 
 export interface ProviderCredentialSession {
   providerId: string;
@@ -688,7 +689,14 @@ function normalizeRepairAction(value: unknown): RepairAction { const object = ob
 function normalizeRepairTarget(value: unknown): RepairTarget { const object = objectValue(value); return {label: stringValue(object.label), path: stringValue(object.path), kind: stringValue(object.kind)}; }
 function normalizeRunRepairActionResult(value: unknown): RunRepairActionResult { const object = objectValue(value); return {actionId: stringValue(object.actionId), diagnostics: normalizeDiagnosticsState(object.diagnostics)}; }
 function normalizeHistoryState(value: unknown): HistoryState { return {entries: arrayValue(objectValue(value).entries).map(normalizeHistoryEntry)}; }
-function normalizeHistoryEntry(value: unknown): HistoryEntry { const object = objectValue(value); return {event: stringValue(object.event), timestamp: stringValue(object.timestamp), projectPath: optionalString(object.projectPath), contextId: optionalString(object.contextId), toolId: optionalString(object.toolId), message: stringValue(object.message)}; }
+function normalizeHistoryEntry(value: unknown): HistoryEntry { const object = objectValue(value); return {event: stringValue(object.event), category: normalizeHistoryCategory(object.category), timestamp: stringValue(object.timestamp), projectPath: optionalString(object.projectPath), contextId: optionalString(object.contextId), toolId: optionalString(object.toolId), message: stringValue(object.message)}; }
+
+function normalizeHistoryCategory(value: unknown): HistoryCategory {
+  if (value === "launch" || value === "warning") {
+    return value;
+  }
+  return "configuration";
+}
 
 function normalizeProjectState(value: unknown): ProjectState {
   const object = objectValue(value);

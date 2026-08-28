@@ -18,11 +18,22 @@ func (s *Service) getHistory() (HistoryState, error) {
 	entries := make([]HistoryEntry, 0, len(events))
 	for _, event := range events {
 		entries = append(entries, HistoryEntry{
-			Event: string(event.Name), Timestamp: event.Timestamp.UTC(), ProjectPath: event.ProjectPath,
+			Event: string(event.Name), Category: historyEventCategory(event.Name), Timestamp: event.Timestamp.UTC(), ProjectPath: event.ProjectPath,
 			ContextID: event.ContextID, ToolID: event.ToolID, Message: historyEventMessage(event),
 		})
 	}
 	return HistoryState{Entries: entries}, nil
+}
+
+func historyEventCategory(name devlog.EventName) HistoryCategory {
+	switch name {
+	case devlog.EventContextResolution, devlog.EventLaunchSucceeded:
+		return HistoryCategoryLaunch
+	case devlog.EventLaunchMissingEditor, devlog.EventLaunchConfigError, devlog.EventLaunchProviderMissing, devlog.EventLaunchProcessFailure:
+		return HistoryCategoryWarning
+	default:
+		return HistoryCategoryConfiguration
+	}
 }
 
 func historyEventMessage(event devlog.Event) string {

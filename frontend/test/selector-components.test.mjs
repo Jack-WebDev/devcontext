@@ -14,6 +14,7 @@ import {renderDiagnostics} from "../.tmp-test/src/components/diagnostics/Diagnos
 import {ContextsView, providerSummary} from "../.tmp-test/src/components/contexts/ContextsView.js";
 import {
   HistoryView,
+  filterHistoryEntries,
   formatHistoryEvent,
   groupHistoryEntriesByDate,
 } from "../.tmp-test/src/components/history/HistoryView.js";
@@ -80,9 +81,9 @@ import {createDevContextWindow} from "../.tmp-test/src/lib/devctx-window.js";
 
 test("history groups entries by date and presents project, context, event, and time", () => {
   const entries = [
-    {event: "launch_succeeded", timestamp: "2026-08-14T08:30:00Z", projectPath: "/work/api", contextId: "company", message: "Launch succeeded."},
-    {event: "context_created", timestamp: "2026-08-13T15:00:00Z", contextId: "personal", message: "Context created."},
-    {event: "project_binding_changed", timestamp: "2026-08-14T12:45:00Z", projectPath: "/work/web", contextId: "personal", message: "Project context binding changed."},
+    {event: "launch_succeeded", category: "launch", timestamp: "2026-08-14T08:30:00Z", projectPath: "/work/api", contextId: "company", message: "Launch succeeded."},
+    {event: "context_created", category: "configuration", timestamp: "2026-08-13T15:00:00Z", contextId: "personal", message: "Context created."},
+    {event: "project_binding_changed", category: "configuration", timestamp: "2026-08-14T12:45:00Z", projectPath: "/work/web", contextId: "personal", message: "Project context binding changed."},
   ];
 
   const groups = groupHistoryEntriesByDate(entries);
@@ -91,7 +92,7 @@ test("history groups entries by date and presents project, context, event, and t
   assert.equal(groups[0].entries[0].event, "project_binding_changed");
   assert.equal(formatHistoryEvent("provider_reset"), "Provider Reset");
 
-  const html = renderToStaticMarkup(HistoryView({entries}));
+  const html = renderToStaticMarkup(createElement(HistoryView, {entries}));
   assert.ok(html.includes("History"));
   assert.ok(html.includes("/work/api"));
   assert.ok(html.includes("company"));
@@ -100,8 +101,20 @@ test("history groups entries by date and presents project, context, event, and t
   assert.match(html, /<time[^>]*dateTime="2026-08-14T12:45:00Z"/);
 });
 
+test("history filters by backend category and searches only project and context", () => {
+  const entries = [
+    {event: "launch_succeeded", category: "launch", timestamp: "2026-08-14T08:30:00Z", projectPath: "/work/api", contextId: "company", message: "Launch succeeded."},
+    {event: "provider_reset", category: "configuration", timestamp: "2026-08-14T08:30:00Z", contextId: "personal", message: "Provider storage reset."},
+    {event: "launch_process_failure", category: "warning", timestamp: "2026-08-14T08:30:00Z", projectPath: "/work/web", contextId: "personal", message: "Launch could not start."},
+  ];
+
+  assert.deepEqual(filterHistoryEntries(entries, "launch", ""), [entries[0]]);
+  assert.deepEqual(filterHistoryEntries(entries, "all", "PERSONAL"), [entries[1], entries[2]]);
+  assert.deepEqual(filterHistoryEntries(entries, "warning", "api"), []);
+});
+
 test("history presents an empty activity state", () => {
-  const html = renderToStaticMarkup(HistoryView({entries: []}));
+  const html = renderToStaticMarkup(createElement(HistoryView, {entries: []}));
 
   assert.ok(html.includes("No activity has been recorded yet."));
 });

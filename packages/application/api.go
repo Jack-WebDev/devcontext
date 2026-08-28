@@ -451,12 +451,60 @@ type HistoryState struct {
 
 // HistoryEntry is a presentation-safe local activity record.
 type HistoryEntry struct {
-	Event       string    `json:"event"`
-	Timestamp   time.Time `json:"timestamp"`
-	ProjectPath string    `json:"projectPath,omitempty"`
-	ContextID   string    `json:"contextId,omitempty"`
-	ToolID      string    `json:"toolId,omitempty"`
-	Message     string    `json:"message"`
+	Event       string          `json:"event"`
+	Category    HistoryCategory `json:"category"`
+	Timestamp   time.Time       `json:"timestamp"`
+	ProjectPath string          `json:"projectPath,omitempty"`
+	ContextID   string          `json:"contextId,omitempty"`
+	ToolID      string          `json:"toolId,omitempty"`
+	Message     string          `json:"message"`
+}
+
+// HistoryCategory groups activity entries for user-facing history filters.
+type HistoryCategory string
+
+const (
+	HistoryCategoryLaunch        HistoryCategory = "launch"
+	HistoryCategoryConfiguration HistoryCategory = "configuration"
+	HistoryCategoryWarning       HistoryCategory = "warning"
+)
+
+// RunningEnvironmentState is the presentation-safe model for one immutable
+// coding-tool environment. Population and status refresh follow in later
+// running-environment phases.
+type RunningEnvironmentState struct {
+	ID        string                         `json:"id"`
+	Project   ProjectState                   `json:"project"`
+	Context   RunningEnvironmentContextState `json:"context"`
+	Tool      ToolOption                     `json:"tool"`
+	StartedAt time.Time                      `json:"startedAt"`
+	Process   RunningEnvironmentProcessState `json:"process"`
+	Session   RunningEnvironmentSessionState `json:"session"`
+	Launch    RunningEnvironmentLaunchState  `json:"launch"`
+}
+
+// RunningEnvironmentContextState identifies the immutable context selected at launch.
+type RunningEnvironmentContextState struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// RunningEnvironmentProcessState reports process state without requiring a PID.
+type RunningEnvironmentProcessState struct {
+	State string `json:"state"`
+	PID   *int   `json:"pid,omitempty"`
+}
+
+// RunningEnvironmentSessionState reports coding-tool session state when available.
+type RunningEnvironmentSessionState struct {
+	ID    string `json:"id,omitempty"`
+	State string `json:"state"`
+}
+
+// RunningEnvironmentLaunchState preserves the safe identity of the launch.
+type RunningEnvironmentLaunchState struct {
+	Source           string `json:"source"`
+	ResolutionSource string `json:"resolutionSource"`
 }
 
 // ProviderCredentialSessionState describes a detected global provider session

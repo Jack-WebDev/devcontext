@@ -1,4 +1,7 @@
 import type { HistoryEntry } from "../../lib/devctx-api";
+import { useState } from "react";
+
+import type { HistoryCategory } from "../../lib/devctx-api";
 import { Card, CardContent } from "../ui/card.js";
 
 interface HistoryViewProps {
@@ -10,8 +13,12 @@ interface HistoryDateGroup {
   entries: HistoryEntry[];
 }
 
+type HistoryFilter = "all" | HistoryCategory;
+
 function HistoryView({entries}: HistoryViewProps) {
-  const groups = groupHistoryEntriesByDate(entries);
+  const [filter, setFilter] = useState<HistoryFilter>("all");
+  const [search, setSearch] = useState("");
+  const groups = groupHistoryEntriesByDate(filterHistoryEntries(entries, filter, search));
 
   return (
     <section aria-labelledby="history-heading" className="space-y-6">
@@ -21,10 +28,26 @@ function HistoryView({entries}: HistoryViewProps) {
         <p className="mt-1 text-sm text-muted-foreground">Review launches and changes recorded on this device.</p>
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-[12rem_minmax(0,1fr)]">
+        <label className="grid gap-2 text-sm font-medium" htmlFor="history-filter">
+          Filter history
+          <select id="history-filter" className="h-10 border border-input bg-background px-3 text-sm text-foreground" value={filter} onChange={(event) => setFilter(event.currentTarget.value as HistoryFilter)}>
+            <option value="all">All activity</option>
+            <option value="launch">Launches</option>
+            <option value="configuration">Configuration</option>
+            <option value="warning">Warnings</option>
+          </select>
+        </label>
+        <label className="grid gap-2 text-sm font-medium" htmlFor="history-search">
+          Search project or context
+          <input id="history-search" type="search" className="h-10 border border-input bg-background px-3 text-sm text-foreground" value={search} onChange={(event) => setSearch(event.currentTarget.value)} placeholder="Search by project path or context" />
+        </label>
+      </div>
+
       {groups.length === 0 ? (
         <Card as="section" hierarchy="secondary" className="py-0">
           <CardContent className="p-5 text-sm text-muted-foreground">
-            No activity has been recorded yet. Launches and context changes will appear here.
+            {entries.length === 0 ? "No activity has been recorded yet. Launches and context changes will appear here." : "No activity matches the selected filter or search."}
           </CardContent>
         </Card>
       ) : (
@@ -94,6 +117,19 @@ function groupHistoryEntriesByDate(entries: HistoryEntry[]): HistoryDateGroup[] 
   return [...groups.entries()].map(([date, groupedEntries]) => ({date, entries: groupedEntries}));
 }
 
+function filterHistoryEntries(entries: HistoryEntry[], filter: HistoryFilter, search: string): HistoryEntry[] {
+  const query = search.trim().toLocaleLowerCase();
+  return entries.filter((entry) => {
+    if (filter !== "all" && entry.category !== filter) {
+      return false;
+    }
+    if (query === "") {
+      return true;
+    }
+    return [entry.projectPath, entry.contextId].some((value) => value?.toLocaleLowerCase().includes(query));
+  });
+}
+
 function historyDateKey(timestamp: string): string {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) {
@@ -131,5 +167,5 @@ function historyEntryKey(entry: HistoryEntry, index: number): string {
   return `${entry.timestamp}:${entry.event}:${entry.projectPath ?? ""}:${entry.contextId ?? ""}:${index}`;
 }
 
-export { HistoryView, formatHistoryDate, formatHistoryEvent, formatHistoryTime, groupHistoryEntriesByDate };
-export type { HistoryDateGroup, HistoryViewProps };
+export { HistoryView, filterHistoryEntries, formatHistoryDate, formatHistoryEvent, formatHistoryTime, groupHistoryEntriesByDate };
+export type { HistoryDateGroup, HistoryFilter, HistoryViewProps };
