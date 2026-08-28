@@ -1,17 +1,11 @@
 import { useEffect, useState } from "react";
 
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
-import { SelectorView } from "./components/selector/SelectorView";
 import { createOnboardingContextAndRefresh } from "./components/selector/onboarding-action";
-import { HomeView } from "./components/home/HomeView";
 import { RecentProjectConfirmationDialog } from "./components/home/RecentProjectConfirmationDialog";
-import { ProjectsView } from "./components/projects/ProjectsView";
 import { ProjectContextChangeDialog } from "./components/projects/ProjectContextChangeDialog";
 import { DiagnosticsView } from "./components/diagnostics/DiagnosticsView";
-import { HistoryView } from "./components/history/HistoryView";
-import { RunningView } from "./components/running/RunningView";
 import { RunningEnvironmentConflictDialog } from "./components/running/RunningEnvironmentConflictDialog";
-import { ContextsView } from "./components/contexts/ContextsView";
 import { ContextDetailsDrawer, CreateContextDialog } from "./components/contexts/ContextManagement";
 import { AppShell } from "./components/shell/AppShell";
 import { CommandPalette } from "./components/command-palette/CommandPalette";
@@ -25,69 +19,23 @@ import {
   devContextApi,
   type ApiResult,
   type CreateContextResult,
-  type ContextListItem,
   type DisplayError,
-  type HomeDashboardState,
-  type HistoryState,
-  type LaunchState,
   type ProjectListItem,
-  type ProjectsState,
   type RecentProjectState,
-  type RunningEnvironmentsState,
   type RunningEnvironmentConflict,
   type SettingsState,
 } from "./lib/devctx-api";
-import { devContextWindow } from "./lib/devctx-window";
-
-type LaunchStateLoad =
-  | { status: "loading" }
-  | { status: "loaded"; data: LaunchState }
-  | { status: "error"; error: DisplayError };
-
-type HomeDashboardLoad =
-  | { status: "loading" }
-  | { status: "loaded"; data: HomeDashboardState }
-  | { status: "error"; error: DisplayError };
-
-type RecentProjectsLoad =
-  | { status: "loading" }
-  | { status: "loaded"; data: RecentProjectState[] }
-  | { status: "error"; error: DisplayError };
-
-type ContextsLoad =
-  | { status: "loading" }
-  | { status: "loaded"; data: ContextListItem[] }
-  | { status: "error"; error: DisplayError };
-
-type ProjectsLoad =
-  | { status: "loading" }
-  | { status: "loaded"; data: ProjectsState }
-  | { status: "error"; error: DisplayError };
-
-type HistoryLoad =
-  | { status: "loading" }
-  | { status: "loaded"; data: HistoryState }
-  | { status: "error"; error: DisplayError };
-
-type RunningLoad =
-  | { status: "loading" }
-  | { status: "loaded"; data: RunningEnvironmentsState }
-  | { status: "error"; error: DisplayError };
-type SettingsLoad = {status: "loading"} | {status: "loaded"; data: SettingsState} | {status: "error"; error: DisplayError};
+import { useAppData } from "./components/app/useAppData";
+import { ContextsContent, HistoryContent, HomeDashboardContent, PlaceholderScreen, ProjectsContent, RunningContent, SelectorContent } from "./components/app/AppContent";
 
 interface PendingRunningEnvironmentLaunch { conflict: RunningEnvironmentConflict; request: {projectPath: string; contextId: string}; }
 
 function App() {
-  const [launchState, setLaunchState] = useState<LaunchStateLoad>({
-    status: "loading",
-  });
-  const [homeDashboard, setHomeDashboard] = useState<HomeDashboardLoad>({status: "loading"});
-  const [recentProjects, setRecentProjects] = useState<RecentProjectsLoad>({status: "loading"});
-  const [contexts, setContexts] = useState<ContextsLoad>({status: "loading"});
-  const [projects, setProjects] = useState<ProjectsLoad>({status: "loading"});
-  const [history, setHistory] = useState<HistoryLoad>({status: "loading"});
-  const [running, setRunning] = useState<RunningLoad>({status: "loading"});
-  const [settings, setSettings] = useState<SettingsLoad>({status: "loading"});
+  const [activeRoute, setActiveRoute] = useState<AppRoute>(() => appRouteFromHash(window.location.hash));
+  const {
+    launchState, setLaunchState, homeDashboard, recentProjects, contexts, projects, history, running, settings,
+    refreshHomeDashboard, refreshRecentProjects, refreshContexts, refreshProjects, refreshRunningEnvironments, setSettings,
+  } = useAppData(activeRoute);
   const [settingsPending, setSettingsPending] = useState(false);
   const [pendingRunningEnvironmentLaunch, setPendingRunningEnvironmentLaunch] = useState<PendingRunningEnvironmentLaunch>();
   const [runningEnvironmentLaunchPending, setRunningEnvironmentLaunchPending] = useState(false);
@@ -105,58 +53,10 @@ function App() {
   const [projectContextChange, setProjectContextChange] = useState<ProjectListItem>();
   const [projectContextChangePending, setProjectContextChangePending] = useState(false);
   const [projectContextChangeError, setProjectContextChangeError] = useState<DisplayError>();
-  const [activeRoute, setActiveRoute] = useState<AppRoute>(() => appRouteFromHash(window.location.hash));
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [commandPaletteLaunchPending, setCommandPaletteLaunchPending] = useState(false);
   const [commandPaletteLaunchError, setCommandPaletteLaunchError] = useState<DisplayError>();
 
-  useEffect(() => {
-    let active = true;
-
-    devContextApi.getLaunchState().then((result) => {
-      if (!active) {
-        return;
-      }
-
-      if (result.ok) {
-        setLaunchState({ status: "loaded", data: result.data });
-        return;
-      }
-
-      setLaunchState({ status: "error", error: result.error });
-    });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => { void refreshSettings(); }, []);
-
-  useEffect(() => {
-    void refreshRecentProjects();
-  }, []);
-
-  useEffect(() => {
-    void refreshContexts();
-  }, []);
-
-  useEffect(() => {
-    void refreshProjects();
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    devContextApi.getHomeDashboard().then((result) => {
-      if (!active) {
-        return;
-      }
-      setHomeDashboard(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error});
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     function syncRouteFromHash() {
@@ -181,14 +81,6 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  useEffect(() => {
-    if (activeRoute === "history") {
-      void refreshHistory();
-    }
-    if (activeRoute === "running") {
-      void refreshRunningEnvironments();
-    }
-  }, [activeRoute]);
 
   function handleNavigate(route: AppRoute) {
     if (route !== activeRoute) {
@@ -253,37 +145,6 @@ function App() {
     return { ok: false, error: result.error };
   }
 
-  async function refreshHomeDashboard() {
-    const result = await devContextApi.getHomeDashboard();
-    setHomeDashboard(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error});
-  }
-
-  async function refreshRecentProjects() {
-    const result = await devContextApi.getRecentProjects();
-    setRecentProjects(result.ok ? {status: "loaded", data: result.data.projects} : {status: "error", error: result.error});
-  }
-
-  async function refreshContexts() {
-    const result = await devContextApi.getContexts();
-    setContexts(result.ok ? {status: "loaded", data: result.data.contexts} : {status: "error", error: result.error});
-  }
-
-  async function refreshProjects() {
-    const result = await devContextApi.getProjects();
-    setProjects(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error});
-  }
-
-  async function refreshHistory() {
-    const result = await devContextApi.getHistory();
-    setHistory(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error});
-  }
-
-  async function refreshRunningEnvironments() {
-    const result = await devContextApi.getRunningEnvironments();
-    setRunning(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error});
-  }
-
-  async function refreshSettings() { const result = await devContextApi.getSettings(); setSettings(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error}); }
   async function handleSettingsChange(next: SettingsState) { if (settingsPending) return; setSettingsPending(true); const result = await devContextApi.updateSettings(next); setSettings(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error}); setSettingsPending(false); }
 
   async function handleHomeQuickLaunch() {
@@ -466,15 +327,7 @@ function App() {
             <p className="text-sm text-muted-foreground">{appRouteDefinition(activeRoute).label}</p>
             <h2 id="home-heading" className="text-2xl font-semibold">Home</h2>
           </div>
-          {renderHomeDashboard(
-            homeDashboard,
-            recentProjects,
-            homeLaunchPending,
-            homeLaunchError,
-            handleHomeQuickLaunch,
-            handleReviewLaunchOptions,
-            handleRecentProjectSelect,
-          )}
+          <HomeDashboardContent dashboard={homeDashboard} recentProjects={recentProjects} launchPending={homeLaunchPending} launchError={homeLaunchError} onQuickLaunch={handleHomeQuickLaunch} onReviewLaunchOptions={handleReviewLaunchOptions} onRecentProjectSelect={handleRecentProjectSelect} />
           {recentProjectToLaunch ? (
             <RecentProjectConfirmationDialog
               project={recentProjectToLaunch}
@@ -489,14 +342,14 @@ function App() {
               <p className="text-sm text-muted-foreground">Launch options</p>
               <h2 id="context-selector-heading" className="text-xl font-semibold">Context selector</h2>
             </div>
-          {renderSelectorContent(launchState, handleCreateContext, () => handleNavigate("diagnostics"), settings.status === "loaded" ? settings.data : undefined)}
+          <SelectorContent launchState={launchState} onCreateContext={handleCreateContext} onRunDiagnostics={() => handleNavigate("diagnostics")} settings={settings.status === "loaded" ? settings.data : undefined} />
           </section>
         </section>
       ) : activeRoute === "contexts" ? (
-        <>{renderContexts(contexts, setContextDetailsID, () => setCreatingContext(true))}{contextDetailsID ? <ContextDetailsDrawer contextId={contextDetailsID} onClose={() => setContextDetailsID(undefined)} load={(contextId) => devContextApi.getContextDetails({contextId})} duplicate={async (request) => { const result = await devContextApi.duplicateContext(request); if (result.ok) { await refreshContexts(); } return result; }}/> : null}{creatingContext && contexts.status === "loaded" ? <CreateContextDialog contexts={contexts.data} onClose={() => setCreatingContext(false)} create={async (request) => { const result = await devContextApi.createContext(request); if (result.ok) { await refreshContexts(); setCreatingContext(false); } return result; }} loadTemplates={() => devContextApi.getContextTemplates()}/> : null}</>
+        <><ContextsContent contexts={contexts} onSelect={setContextDetailsID} onNew={() => setCreatingContext(true)} />{contextDetailsID ? <ContextDetailsDrawer contextId={contextDetailsID} onClose={() => setContextDetailsID(undefined)} load={(contextId) => devContextApi.getContextDetails({contextId})} duplicate={async (request) => { const result = await devContextApi.duplicateContext(request); if (result.ok) { await refreshContexts(); } return result; }}/> : null}{creatingContext && contexts.status === "loaded" ? <CreateContextDialog contexts={contexts.data} onClose={() => setCreatingContext(false)} create={async (request) => { const result = await devContextApi.createContext(request); if (result.ok) { await refreshContexts(); setCreatingContext(false); } return result; }} loadTemplates={() => devContextApi.getContextTemplates()}/> : null}</>
       ) : activeRoute === "projects" ? (
         <>
-          {renderProjects(projects, projectLaunchPath, projectErrorPath, projectLaunchError, handleProjectLaunch, contexts.status === "loaded" ? handleProjectChangeContext : undefined, handleProjectOpenFolder)}
+          <ProjectsContent projects={projects} launchingProjectPath={projectLaunchPath} errorProjectPath={projectErrorPath} launchError={projectLaunchError} onLaunch={handleProjectLaunch} onChangeContext={contexts.status === "loaded" ? handleProjectChangeContext : undefined} onOpenFolder={handleProjectOpenFolder} />
           {projectContextChange && contexts.status === "loaded" ? (
             <ProjectContextChangeDialog
               project={projectContextChange}
@@ -511,9 +364,9 @@ function App() {
       ) : activeRoute === "diagnostics" ? (
         <DiagnosticsView contexts={contexts.status === "loaded" ? contexts.data : []} load={(contextId) => devContextApi.getDiagnostics({contextId})} loadRepairActions={(contextId) => devContextApi.getRepairActions({contextId})} runRepairAction={(contextId, actionId, confirmDestructive) => devContextApi.runRepairAction({contextId, actionId, confirmDestructive})} />
       ) : activeRoute === "history" ? (
-        renderHistory(history)
+        <HistoryContent history={history} />
       ) : activeRoute === "running" ? (
-        renderRunning(running)
+        <RunningContent running={running} />
       ) : activeRoute === "settings" ? (
         settings.status === "loaded" ? <SettingsView settings={settings.data} pending={settingsPending} onChange={(next) => void handleSettingsChange(next)} /> : settings.status === "error" ? <GuiErrorNotice error={settings.error} /> : <p className="text-sm text-muted-foreground">Loading settings...</p>
       ) : (
@@ -528,127 +381,6 @@ function App() {
       />
       {pendingRunningEnvironmentLaunch ? <RunningEnvironmentConflictDialog conflict={pendingRunningEnvironmentLaunch.conflict} launchPending={runningEnvironmentLaunchPending} error={runningEnvironmentLaunchError} onCancel={() => !runningEnvironmentLaunchPending && setPendingRunningEnvironmentLaunch(undefined)} onLaunchAnother={() => void handleLaunchAnotherWindow()} /> : null}
     </AppShell>
-  );
-}
-
-function renderHistory(history: HistoryLoad) {
-  if (history.status === "loading") {
-    return <p className="text-sm text-muted-foreground">Loading history...</p>;
-  }
-  if (history.status === "error") {
-    return <GuiErrorNotice error={history.error} />;
-  }
-  return <HistoryView entries={history.data.entries} />;
-}
-
-function renderRunning(running: RunningLoad) {
-  if (running.status === "loading") {
-    return <p className="text-sm text-muted-foreground">Refreshing active environments...</p>;
-  }
-  if (running.status === "error") {
-    return <GuiErrorNotice error={running.error} />;
-  }
-  return <RunningView environments={running.data.environments} />;
-}
-
-function renderContexts(contexts: ContextsLoad, onSelect: (id: string) => void, onNew: () => void) {
-  if (contexts.status === "loading") {
-    return <p className="text-sm text-muted-foreground">Loading contexts...</p>;
-  }
-  if (contexts.status === "error") {
-    return <GuiErrorNotice error={contexts.error} />;
-  }
-  return <ContextsView contexts={contexts.data} onSelect={onSelect} onNew={onNew} />;
-}
-
-function renderProjects(
-  projects: ProjectsLoad,
-  launchingProjectPath: string | undefined,
-  errorProjectPath: string | undefined,
-  launchError: DisplayError | undefined,
-  onLaunch: (project: ProjectListItem) => void,
-  onChangeContext: ((project: ProjectListItem) => void) | undefined,
-  onOpenFolder: (project: ProjectListItem) => void,
-) {
-  if (projects.status === "loading") {
-    return <p className="text-sm text-muted-foreground">Loading projects...</p>;
-  }
-  if (projects.status === "error") {
-    return <GuiErrorNotice error={projects.error} />;
-  }
-  return <ProjectsView projects={projects.data.projects} launchingProjectPath={launchingProjectPath} errorProjectPath={errorProjectPath} launchError={launchError?.message} onLaunch={onLaunch} onChangeContext={onChangeContext} onOpenFolder={onOpenFolder} />;
-}
-
-function renderHomeDashboard(
-  dashboard: HomeDashboardLoad,
-  recentProjects: RecentProjectsLoad,
-  launchPending: boolean,
-  launchError: DisplayError | undefined,
-  onQuickLaunch: () => void,
-  onReviewLaunchOptions: () => void,
-  onRecentProjectSelect: (project: RecentProjectState) => void,
-) {
-  if (dashboard.status === "loading") {
-    return <p className="text-sm text-muted-foreground">Loading Home dashboard...</p>;
-  }
-  if (dashboard.status === "error") {
-    return <GuiErrorNotice error={dashboard.error} />;
-  }
-  const projects = recentProjects.status === "loaded" ? recentProjects.data : [];
-  return (
-    <HomeView
-      dashboard={{...dashboard.data, recentProjects: projects}}
-      launchPending={launchPending}
-      launchError={launchError}
-      onQuickLaunch={onQuickLaunch}
-      onReviewLaunchOptions={onReviewLaunchOptions}
-      onRecentProjectSelect={onRecentProjectSelect}
-    />
-  );
-}
-
-function PlaceholderScreen({ route }: { route: AppRoute }) {
-  const definition = appRouteDefinition(route);
-  return (
-    <section className="max-w-2xl space-y-2" aria-labelledby={`${route}-heading`}>
-      <p className="text-sm text-muted-foreground">{definition.label}</p>
-      <h2 id={`${route}-heading`} className="text-2xl font-semibold">{definition.label}</h2>
-      <p className="text-sm text-muted-foreground">This section will be available as its supporting API is added.</p>
-    </section>
-  );
-}
-
-function renderSelectorContent(
-  launchState: LaunchStateLoad,
-  onCreateContext: (
-    contextId: string,
-    importProviderIds?: string[],
-  ) => Promise<ApiResult<CreateContextResult>>,
-  onRunDiagnostics: () => void,
-  settings?: SettingsState,
-) {
-  if (launchState.status === "loading") {
-    return <p className="text-sm text-muted-foreground">Loading selector...</p>;
-  }
-
-  if (launchState.status === "error") {
-    return <GuiErrorNotice error={launchState.error} />;
-  }
-
-  return (
-    <SelectorView
-      launchState={launchState.data}
-      onBindProject={(request) => devContextApi.bindProject(request)}
-      onPreflightLaunchProject={(request) => devContextApi.preflightLaunchProject(request)}
-      onLaunchProject={(request) => devContextApi.launchProject(request)}
-      onCancel={() => devContextWindow.closeSelector()}
-      onCreatePersonalContext={(importProviderIds) => onCreateContext("personal", importProviderIds)}
-      onCreateCompanyContext={(importProviderIds) => onCreateContext("company", importProviderIds)}
-      onRunDiagnostics={onRunDiagnostics}
-      onCodingToolLaunched={notifyLaunch}
-      launchSuccessCloseBehavior={settings?.closeAfterLaunch ? "close_selector" : "keep_open"}
-      showLaunchVerification={settings?.launchVerification ?? true}
-    />
   );
 }
 

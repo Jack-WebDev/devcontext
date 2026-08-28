@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 import type {
   ApiResult,
-  ContextDetailsState,
   ContextListItem,
   CreateContextResult,
   CreateContextRequest,
   ContextTemplateState,
-  DuplicateContextRequest,
-  DuplicateContextResult,
   DisplayError,
 } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
@@ -18,6 +15,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "../ui/sheet.js";
+import { ContextField } from "./ContextField";
+
+export { ContextDetailsDrawer } from "./ContextDetailsDrawer";
 
 type CustomContextRequest = CreateContextRequest & {
   name: string;
@@ -27,121 +27,6 @@ type CustomContextRequest = CreateContextRequest & {
   toolId: string;
   enabledProviderIds: string[];
 };
-
-export function ContextDetailsDrawer({
-  contextId,
-  onClose,
-  load,
-  duplicate,
-}: {
-  contextId: string;
-  onClose: () => void;
-  load: (id: string) => Promise<ApiResult<ContextDetailsState>>;
-  duplicate: (
-    request: DuplicateContextRequest,
-  ) => Promise<ApiResult<DuplicateContextResult>>;
-}) {
-  const [result, setResult] = useState<
-    ApiResult<ContextDetailsState> | undefined
-  >();
-  const [duplicateID, setDuplicateID] = useState("");
-  const [duplicateName, setDuplicateName] = useState("");
-  const [duplicateError, setDuplicateError] = useState<DisplayError>();
-  const [duplicatePending, setDuplicatePending] = useState(false);
-  useEffect(() => {
-    void load(contextId).then(setResult);
-  }, [contextId, load]);
-  useEffect(() => {
-    if (!result?.ok) {
-      return;
-    }
-    setDuplicateID(`${result.data.context.id}-copy`);
-    setDuplicateName(`${result.data.context.name} copy`);
-  }, [result]);
-  async function submitDuplicate() {
-    if (!result?.ok) {
-      return;
-    }
-    setDuplicatePending(true);
-    setDuplicateError(undefined);
-    const duplicated = await duplicate({
-      sourceContextId: result.data.context.id,
-      contextId: duplicateID,
-      name: duplicateName,
-    });
-    setDuplicatePending(false);
-    if (!duplicated.ok) {
-      setDuplicateError(duplicated.error);
-      return;
-    }
-    onClose();
-  }
-  return (
-    <Sheet open onOpenChange={(open) => !open && onClose()}>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>Context details</SheetTitle>
-          <SheetDescription>
-            Backend-owned context information.
-          </SheetDescription>
-        </SheetHeader>
-        <div className="space-y-3 px-8 pb-8">
-          {!result ? (
-            <p>Loading context details...</p>
-          ) : !result.ok ? (
-            <p className="text-destructive">{result.error.message}</p>
-          ) : (
-            <>
-              <Detail label="Name" value={result.data.context.name} />
-              <Detail label="Location" value={result.data.location} />
-              <Detail
-                label="Created"
-                value={new Date(result.data.createdAt).toLocaleString()}
-              />
-              <Detail
-                label="Projects"
-                value={String(result.data.projectCount)}
-              />
-              <Detail
-                label="Coding tool"
-                value={result.data.context.tool.name}
-              />
-              <Detail
-                label="Providers"
-                value={
-                  result.data.enabledProviders.map((p) => p.name).join(", ") ||
-                  "None"
-                }
-              />
-              <section className="space-y-3 border-t border-border pt-4" aria-labelledby="duplicate-context-heading">
-                <div>
-                  <h3 id="duplicate-context-heading" className="font-medium">Duplicate context</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Copies context metadata, provider settings, and coding-tool settings into a new isolated context. Credentials are not copied.
-                  </p>
-                </div>
-                <Field label="New name" value={duplicateName} onChange={setDuplicateName} />
-                <Field label="New ID" value={duplicateID} onChange={setDuplicateID} />
-                {duplicateError ? <p className="text-destructive">{duplicateError.message}</p> : null}
-                <Button type="button" disabled={duplicatePending || !duplicateID || !duplicateName} onClick={() => void submitDuplicate()}>
-                  {duplicatePending ? "Duplicating..." : "Duplicate context"}
-                </Button>
-              </section>
-            </>
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs uppercase text-muted-foreground">{label}</p>
-      <p className="mt-1 break-all">{value}</p>
-    </div>
-  );
-}
 
 export function CreateContextDialog({
   contexts,
@@ -218,14 +103,14 @@ export function CreateContextDialog({
               {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
             </select>
           </label>
-          <Field label="Name" value={name} onChange={setName} />
-          <Field label="ID" value={contextId} onChange={setContextID} />
-          <Field
+          <ContextField label="Name" value={name} onChange={setName} />
+          <ContextField label="ID" value={contextId} onChange={setContextID} />
+          <ContextField
             label="Description"
             value={description}
             onChange={setDescription}
           />
-          <Field label="Icon" value={icon} onChange={setIcon} />
+          <ContextField label="Icon" value={icon} onChange={setIcon} />
           <label className="block text-sm">
             Accent
             <select
@@ -282,25 +167,5 @@ export function CreateContextDialog({
         </div>
       </SheetContent>
     </Sheet>
-  );
-}
-function Field({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="block text-sm">
-      {label}
-      <input
-        className="mt-1 w-full border p-2"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
   );
 }
