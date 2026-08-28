@@ -1016,6 +1016,42 @@ func TestGetLaunchStateDoesNotInferIdentityMismatchEvidenceFromContextName(t *te
 	}
 }
 
+func TestGetLaunchStateReportsOnlyMeaningfulProviderEmailMismatchEvidence(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	first := applicationFakeProvider{
+		id: "first", displayName: "First", hasIdentity: true,
+		identity:        provider.Identity{Fields: []provider.MetadataField{{Label: "Email", Value: "personal@example.com"}}},
+		statusByContext: map[string]provider.Status{"company": provider.ConfiguredStatus()},
+	}
+	second := applicationFakeProvider{
+		id: "second", displayName: "Second", hasIdentity: true,
+		identity:        provider.Identity{Fields: []provider.MetadataField{{Label: "Email", Value: "work@example.com"}}},
+		statusByContext: map[string]provider.Status{"company": provider.ConfiguredStatus()},
+	}
+	fixture.providerRegistry = provider.MustNewRegistry([]provider.Provider{first, second}, first.ID())
+	ctx := fixture.context("company", "Company")
+	ctx.Providers = provider.Configs{first.ID(): {Enabled: true}, second.ID(): {Enabled: true}}
+	fixture.writeContext(t, ctx)
+
+	state, appErr := fixture.service().GetLaunchState(GetLaunchStateRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get launch state: %v", appErr)
+	}
+	var mismatch *LaunchConfidenceCheck
+	for index := range state.Contexts[0].Confidence.Checks {
+		check := &state.Contexts[0].Confidence.Checks[index]
+		if check.Component == LaunchConfidenceCheckIdentity {
+			mismatch = check
+		}
+	}
+	if mismatch == nil || mismatch.Severity != LaunchConfidenceNeedsAttention {
+		t.Fatalf("mismatch check = %#v, want needs-attention identity check", mismatch)
+	}
+	if state.Contexts[0].Confidence.Status != LaunchConfidenceNeedsAttention {
+		t.Fatalf("confidence status = %q, want needs_attention", state.Contexts[0].Confidence.Status)
+	}
+}
+
 func TestGetLaunchStateReportsDanglingBindingWarning(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.writeContext(t, fixture.context("personal", "Personal"))

@@ -70,6 +70,7 @@ func TestConfidenceCheckComponentsValidate(t *testing.T) {
 		launcher.ConfidenceCheckProvider,
 		launcher.ConfidenceCheckTool,
 		launcher.ConfidenceCheckIsolation,
+		launcher.ConfidenceCheckIdentity,
 	}
 
 	for _, component := range tests {
@@ -80,6 +81,59 @@ func TestConfidenceCheckComponentsValidate(t *testing.T) {
 
 	if launcher.ConfidenceCheckComponent("editor").Valid() {
 		t.Fatal("unknown confidence check component is valid")
+	}
+}
+
+func TestAccountIdentityMismatchConfidenceCheckRequiresConflictingVerifiedEmails(t *testing.T) {
+	tests := []struct {
+		name     string
+		evidence []launcher.AccountIdentityEvidence
+		want     bool
+	}{
+		{
+			name: "conflicting emails",
+			evidence: []launcher.AccountIdentityEvidence{
+				{ProviderID: "codex", Fields: []launcher.AccountIdentityField{{Label: "Email", Value: "person@example.com"}}},
+				{ProviderID: "claude", Fields: []launcher.AccountIdentityField{{Label: "Email", Value: "work@example.com"}}},
+			},
+			want: true,
+		},
+		{
+			name: "matching emails ignore case",
+			evidence: []launcher.AccountIdentityEvidence{
+				{ProviderID: "codex", Fields: []launcher.AccountIdentityField{{Label: "Email", Value: "person@example.com"}}},
+				{ProviderID: "claude", Fields: []launcher.AccountIdentityField{{Label: "Email", Value: "PERSON@example.com"}}},
+			},
+		},
+		{
+			name: "missing email is unknown",
+			evidence: []launcher.AccountIdentityEvidence{
+				{ProviderID: "codex", Fields: []launcher.AccountIdentityField{{Label: "Email", Value: "person@example.com"}}},
+				{ProviderID: "claude", Fields: []launcher.AccountIdentityField{{Label: "Organization", Value: "Example"}}},
+			},
+		},
+		{
+			name: "provider specific account IDs are not comparable",
+			evidence: []launcher.AccountIdentityEvidence{
+				{ProviderID: "codex", Fields: []launcher.AccountIdentityField{{Label: "ChatGPT account ID", Value: "acct-personal"}}},
+				{ProviderID: "claude", Fields: []launcher.AccountIdentityField{{Label: "Organization UUID", Value: "org-company"}}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			check, got := launcher.AccountIdentityMismatchConfidenceCheck(tt.evidence)
+			if got != tt.want {
+				t.Fatalf("mismatch check present = %t, want %t", got, tt.want)
+			}
+			if !got {
+				return
+			}
+			if check.Component != launcher.ConfidenceCheckIdentity || check.Severity != launcher.ConfidenceNeedsAttention || !check.Valid() {
+				t.Fatalf("mismatch check = %#v", check)
+			}
+		})
 	}
 }
 

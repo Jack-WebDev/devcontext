@@ -173,7 +173,7 @@ export interface ProviderMetadataField {
 
 export type LaunchConfidenceStatus = "ready" | "needs_attention" | "blocked";
 
-export type LaunchConfidenceCheckComponent = "provider" | "tool" | "isolation";
+export type LaunchConfidenceCheckComponent = "provider" | "tool" | "isolation" | "identity";
 
 export interface LaunchConfidenceState {
   contextId: string;
@@ -694,6 +694,7 @@ function normalizeLaunchConfidenceCheckComponent(value: unknown): LaunchConfiden
     case "provider":
 	case "tool":
     case "isolation":
+	case "identity":
       return value;
     default:
       throw new Error("Invalid Dev Context response.");

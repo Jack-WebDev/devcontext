@@ -41,13 +41,17 @@ const (
 	// ConfidenceCheckIsolation identifies context and environment isolation
 	// readiness.
 	ConfidenceCheckIsolation ConfidenceCheckComponent = "isolation"
+
+	// ConfidenceCheckIdentity identifies meaningful conflicting verified account
+	// identity evidence across enabled providers.
+	ConfidenceCheckIdentity ConfidenceCheckComponent = "identity"
 )
 
 // Valid reports whether component is one of the bounded confidence check
 // components.
 func (c ConfidenceCheckComponent) Valid() bool {
 	switch c {
-	case ConfidenceCheckProvider, ConfidenceCheckTool, ConfidenceCheckIsolation:
+	case ConfidenceCheckProvider, ConfidenceCheckTool, ConfidenceCheckIsolation, ConfidenceCheckIdentity:
 		return true
 	default:
 		return false

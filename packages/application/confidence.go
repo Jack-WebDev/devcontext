@@ -37,4 +37,8 @@ const (
 	// LaunchConfidenceCheckIsolation identifies context and environment
 	// isolation readiness.
 	LaunchConfidenceCheckIsolation LaunchConfidenceCheckComponent = launcher.ConfidenceCheckIsolation
+
+	// LaunchConfidenceCheckIdentity identifies meaningful conflicting verified
+	// account identity evidence across enabled providers.
+	LaunchConfidenceCheckIdentity LaunchConfidenceCheckComponent = launcher.ConfidenceCheckIdentity
 )

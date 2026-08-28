@@ -1393,6 +1393,9 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 			checks = append(checks, check)
 		}
 	}
+	if identityCheck, ok := launcher.AccountIdentityMismatchConfidenceCheck(identityEvidence(providerEntries)); ok {
+		checks = append(checks, identityCheck)
+	}
 
 	toolID := ctx.Tool.DefaultTool
 	toolConfig := ctx.Tool.ConfigFor(toolID)
@@ -1427,6 +1430,21 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 		Status:    launchConfidenceStatus(checks),
 		Checks:    checks,
 	}
+}
+
+func identityEvidence(entries []providerStateEntry) []launcher.AccountIdentityEvidence {
+	evidence := make([]launcher.AccountIdentityEvidence, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.state.Enabled || entry.state.Identity.Status != ProviderIdentityVerified {
+			continue
+		}
+		fields := make([]launcher.AccountIdentityField, 0, len(entry.state.Identity.Fields))
+		for _, field := range entry.state.Identity.Fields {
+			fields = append(fields, launcher.AccountIdentityField{Label: field.Label, Value: field.Value})
+		}
+		evidence = append(evidence, launcher.AccountIdentityEvidence{ProviderID: entry.state.ID, Fields: fields})
+	}
+	return evidence
 }
 
 func toolState(toolID codingtool.ID, confidence LaunchConfidenceState) ToolState {
