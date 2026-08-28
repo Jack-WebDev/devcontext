@@ -1245,6 +1245,58 @@ func TestLaunchProjectBuildsPlanAndStartsProcess(t *testing.T) {
 	}
 }
 
+func TestLaunchProjectExportsSafeStatusForStatusAwareTool(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.provider = &applicationFakeProvider{
+		id:          "fake",
+		displayName: "Fake Provider",
+		hasIdentity: true,
+		identity: provider.Identity{Fields: []provider.MetadataField{
+			{Label: "Account", Value: "developer@example.com"},
+		}},
+	}
+	statusTool := applicationStatusDataEditor{applicationFakeEditor: fixture.editor, fileName: "integration-status.json"}
+	fixture.toolRegistry = codingtool.MustNewRegistry([]codingtool.RegisteredTool{{Integration: statusTool, DisplayName: "Status Tool"}}, fixture.editor.ID())
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+	if _, appErr := fixture.service().LaunchProject(LaunchProjectRequest{ProjectPath: fixture.projectDir, ContextID: "personal"}); appErr != nil {
+		t.Fatalf("launch project: %v", appErr)
+	}
+
+	statusPath := filepath.Join(fixture.contextsDir, "personal", "tools", string(fixture.editor.ID()), "integration-status.json")
+	data, err := os.ReadFile(statusPath)
+	if err != nil {
+		t.Fatalf("read status data: %v", err)
+	}
+	var status CodingToolStatusData
+	if err := json.Unmarshal(data, &status); err != nil {
+		t.Fatalf("decode status data: %v", err)
+	}
+	if status.SchemaVersion != codingToolStatusSchemaVersion || status.Project != (ProjectState{Name: "current", Path: fixture.projectDir}) {
+		t.Fatalf("status header = %#v", status)
+	}
+	if status.Context.ID != "personal" || status.Context.Name != "Personal" || status.Context.Tool != (ToolOption{ID: "fake-editor", Name: "Status Tool"}) {
+		t.Fatalf("status context = %#v", status.Context)
+	}
+	if !reflect.DeepEqual(status.Providers, []CodingToolStatusProvider{{
+		ID: "fake", Name: "Fake Provider", Identity: ProviderIdentityState{
+			Status: ProviderIdentityVerified,
+			Fields: []ProviderMetadataField{{Label: "Account", Value: "developer@example.com"}},
+		},
+	}}) {
+		t.Fatalf("status providers = %#v", status.Providers)
+	}
+	if status.Isolation.Status != LaunchConfidenceReady || status.Isolation.Message != "Context isolation is ready." {
+		t.Fatalf("status isolation = %#v", status.Isolation)
+	}
+	if strings.Contains(string(data), "FAKE_CONTEXT") || strings.Contains(string(data), fixture.contextsDir) {
+		t.Fatalf("status data contains private runtime information: %s", data)
+	}
+	if len(fixture.process.requests) != 1 {
+		t.Fatalf("process requests = %#v, want launch after export", fixture.process.requests)
+	}
+}
+
 func TestLaunchProjectRecordsLifecycleEvents(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	logger := &applicationRecordingLogger{}

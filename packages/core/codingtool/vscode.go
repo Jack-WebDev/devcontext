@@ -84,10 +84,17 @@ type VSCodeEditor struct {
 }
 
 var _ CodingTool = VSCodeEditor{}
+var _ StatusDataConsumer = VSCodeEditor{}
 
 // ID returns the persisted editor identifier.
 func (VSCodeEditor) ID() ID {
 	return VSCodeID
+}
+
+// StatusDataFileName identifies the local status document made available to a
+// VS Code integration through the isolated VS Code storage directory.
+func (VSCodeEditor) StatusDataFileName() string {
+	return "devctx-status.json"
 }
 
 // DetectExecutable locates the VS Code command available through PATH.

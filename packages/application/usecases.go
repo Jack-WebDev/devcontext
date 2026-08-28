@@ -624,6 +624,9 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 		event.ErrorCategory = devlog.ErrorCategoryProvider
 		s.recordLaunchEvent(event)
 	}
+	if err := s.exportCodingToolStatus(plan); err != nil {
+		return LaunchProjectResult{}, err
+	}
 
 	if err := s.processLauncher().Launch(processRequestFromLaunchPlan(plan, s.dependencies.DetachMode)); err != nil {
 		s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchProcessFailure, plan, err, s.now()))

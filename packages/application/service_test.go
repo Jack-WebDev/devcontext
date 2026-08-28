@@ -395,6 +395,15 @@ type applicationFakeEditor struct {
 	requests   []codingtool.CommandRequest
 }
 
+type applicationStatusDataEditor struct {
+	*applicationFakeEditor
+	fileName string
+}
+
+func (e applicationStatusDataEditor) StatusDataFileName() string {
+	return e.fileName
+}
+
 func (e *applicationFakeEditor) ID() codingtool.ID {
 	return "fake-editor"
 }
