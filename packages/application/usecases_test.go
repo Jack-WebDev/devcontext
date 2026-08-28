@@ -1272,6 +1272,90 @@ func TestDuplicateContextCopiesSafeConfigurationWithoutCredentials(t *testing.T)
 	}
 }
 
+func TestExportContextMetadataIncludesOnlyPortableSafeConfiguration(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	source := fixture.context("personal", "Personal")
+	source.Metadata = devcontext.Metadata{"accent": "sage"}
+	source.Tool.Tools[source.Tool.DefaultTool] = codingtool.Config{ExecutableOverride: "/private/bin/code", Options: map[string]string{"profile": "personal"}}
+	source.Providers["fake"] = provider.Config{Enabled: true, Options: map[string]string{"region": "south"}}
+	fixture.writeContext(t, source)
+	sourcePaths, err := filesystem.DeriveContextPaths(fixture.paths, source.ID)
+	if err != nil {
+		t.Fatalf("derive source paths: %v", err)
+	}
+	writeFile(t, filepath.Join(sourcePaths.ProviderStorageDir("fake"), "credential.json"), []byte(`{"token":"secret"}`))
+
+	exported, appErr := fixture.service().ExportContextMetadata(ExportContextMetadataRequest{ContextID: "personal"})
+	if appErr != nil {
+		t.Fatalf("export context metadata: %v", appErr)
+	}
+	want := ContextMetadataExport{
+		Version: ContextTransferVersion,
+		Context: ContextTransferMetadata{
+			Name: "Personal", Metadata: map[string]string{"accent": "sage"},
+			Providers:    []ContextTransferProvider{{ID: "fake", Enabled: true, Options: map[string]string{"region": "south"}}},
+			LaunchTarget: ContextTransferLaunchTarget{DefaultTool: "fake-editor", Tools: []ContextTransferTool{{ID: "fake-editor", Options: map[string]string{"profile": "personal"}}}},
+		},
+	}
+	if !reflect.DeepEqual(exported, want) {
+		t.Fatalf("export = %#v, want %#v", exported, want)
+	}
+}
+
+func TestImportContextMetadataCreatesFreshStorageWithoutCredentials(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	exported := ContextMetadataExport{
+		Version: ContextTransferVersion,
+		Context: ContextTransferMetadata{
+			Name: "Imported Personal", Metadata: map[string]string{"accent": "sage"},
+			Providers:    []ContextTransferProvider{{ID: "fake", Enabled: true, Options: map[string]string{"region": "south"}}},
+			LaunchTarget: ContextTransferLaunchTarget{DefaultTool: "fake-editor", Tools: []ContextTransferTool{{ID: "fake-editor", Options: map[string]string{"profile": "personal"}}}},
+		},
+	}
+
+	result, appErr := fixture.service().ImportContextMetadata(ImportContextMetadataRequest{ContextID: "imported", Export: exported})
+	if appErr != nil {
+		t.Fatalf("import context metadata: %v", appErr)
+	}
+	if result.Context.ID != "imported" || result.Context.Name != "Imported Personal" {
+		t.Fatalf("import result = %#v", result)
+	}
+	stored, err := devcontext.NewRepository(fixture.contextsDir).Get(devcontext.MustID("imported"))
+	if err != nil {
+		t.Fatalf("get imported context: %v", err)
+	}
+	if stored.CreatedAt.IsZero() || stored.Tool.Tools["fake-editor"].ExecutableOverride != "" {
+		t.Fatalf("imported context = %#v, want fresh creation and no executable override", stored)
+	}
+	paths, err := filesystem.DeriveContextPaths(fixture.paths, stored.ID)
+	if err != nil {
+		t.Fatalf("derive imported paths: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(paths.ProviderStorageDir("fake"), "credential.json")); !os.IsNotExist(err) {
+		t.Fatalf("imported credential file error = %v, want not exist", err)
+	}
+}
+
+func TestImportContextMetadataRejectsUnsupportedVersionAndUnknownIntegration(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	base := ContextMetadataExport{Version: ContextTransferVersion, Context: ContextTransferMetadata{Name: "Imported", LaunchTarget: ContextTransferLaunchTarget{DefaultTool: "fake-editor"}}}
+	for _, testCase := range []struct {
+		name   string
+		export ContextMetadataExport
+	}{
+		{name: "version", export: ContextMetadataExport{Version: ContextTransferVersion + 1, Context: base.Context}},
+		{name: "tool", export: ContextMetadataExport{Version: ContextTransferVersion, Context: ContextTransferMetadata{Name: "Imported", LaunchTarget: ContextTransferLaunchTarget{DefaultTool: "unknown"}}}},
+		{name: "provider", export: ContextMetadataExport{Version: ContextTransferVersion, Context: ContextTransferMetadata{Name: "Imported", Providers: []ContextTransferProvider{{ID: "unknown", Enabled: true}}, LaunchTarget: ContextTransferLaunchTarget{DefaultTool: "fake-editor"}}}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, appErr := fixture.service().ImportContextMetadata(ImportContextMetadataRequest{ContextID: "imported-" + testCase.name, Export: testCase.export})
+			if appErr == nil || appErr.Code != ErrorCodeValidation {
+				t.Fatalf("import error = %#v, want validation error", appErr)
+			}
+		})
+	}
+}
+
 func TestLaunchProjectBuildsPlanAndStartsProcess(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.writeContext(t, fixture.context("personal", "Personal"))

@@ -14,6 +14,10 @@ export function DuplicateContext(arg1) {
   return window['go']['wailsapp']['App']['DuplicateContext'](arg1);
 }
 
+export function ExportContextMetadata(arg1) {
+  return window['go']['wailsapp']['App']['ExportContextMetadata'](arg1);
+}
+
 export function GetContextDetails(arg1) {
   return window['go']['wailsapp']['App']['GetContextDetails'](arg1);
 }
@@ -24,6 +28,10 @@ export function GetContexts() {
 
 export function GetContextTemplates() {
   return window['go']['wailsapp']['App']['GetContextTemplates']();
+}
+
+export function ImportContextMetadata(arg1) {
+  return window['go']['wailsapp']['App']['ImportContextMetadata'](arg1);
 }
 
 export function GetDiagnostics(arg1) {

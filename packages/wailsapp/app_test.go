@@ -51,6 +51,10 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 		duplicateContextResult: application.DuplicateContextResult{
 			Context: application.ContextState{ID: "personal-copy", Name: "Personal copy"},
 		},
+		contextMetadataExport: application.ContextMetadataExport{Version: application.ContextTransferVersion, Context: application.ContextTransferMetadata{Name: "Personal"}},
+		importContextMetadataResult: application.ImportContextMetadataResult{
+			Context: application.ContextState{ID: "imported", Name: "Personal"},
+		},
 		diagnostics:         application.DiagnosticsState{Groups: []application.DiagnosticGroup{}},
 		repairActions:       application.RepairActionsState{Actions: []application.RepairAction{}},
 		repairResult:        application.RunRepairActionResult{ActionID: "recheck-provider-files"},
@@ -155,6 +159,20 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	if service.duplicateContextRequest != duplicateRequest {
 		t.Fatalf("duplicate context request = %#v, want %#v", service.duplicateContextRequest, duplicateRequest)
 	}
+	exportRequest := application.ExportContextMetadataRequest{ContextID: "personal"}
+	if exported := app.ExportContextMetadata(exportRequest); !reflect.DeepEqual(exported, service.contextMetadataExport) {
+		t.Fatalf("context metadata export = %#v, want %#v", exported, service.contextMetadataExport)
+	}
+	if service.contextMetadataExportRequest != exportRequest {
+		t.Fatalf("context metadata export request = %#v, want %#v", service.contextMetadataExportRequest, exportRequest)
+	}
+	importRequest := application.ImportContextMetadataRequest{ContextID: "imported", Export: service.contextMetadataExport}
+	if imported := app.ImportContextMetadata(importRequest); !reflect.DeepEqual(imported, service.importContextMetadataResult) {
+		t.Fatalf("context metadata import = %#v, want %#v", imported, service.importContextMetadataResult)
+	}
+	if !reflect.DeepEqual(service.importContextMetadataRequest, importRequest) {
+		t.Fatalf("context metadata import request = %#v, want %#v", service.importContextMetadataRequest, importRequest)
+	}
 
 	diagnosticsRequest := application.GetDiagnosticsRequest{ContextID: "personal"}
 	diagnostics := app.GetDiagnostics(diagnosticsRequest)
@@ -250,6 +268,13 @@ type fakeService struct {
 	duplicateContextRequest application.DuplicateContextRequest
 	duplicateContextResult  application.DuplicateContextResult
 	duplicateContextErr     *application.Error
+
+	contextMetadataExportRequest application.ExportContextMetadataRequest
+	contextMetadataExport        application.ContextMetadataExport
+	contextMetadataExportErr     *application.Error
+	importContextMetadataRequest application.ImportContextMetadataRequest
+	importContextMetadataResult  application.ImportContextMetadataResult
+	importContextMetadataErr     *application.Error
 
 	diagnosticsRequest application.GetDiagnosticsRequest
 	diagnostics        application.DiagnosticsState
@@ -363,4 +388,14 @@ func (s *fakeService) GetContextTemplates() application.ContextTemplatesState {
 func (s *fakeService) DuplicateContext(request application.DuplicateContextRequest) (application.DuplicateContextResult, *application.Error) {
 	s.duplicateContextRequest = request
 	return s.duplicateContextResult, s.duplicateContextErr
+}
+
+func (s *fakeService) ExportContextMetadata(request application.ExportContextMetadataRequest) (application.ContextMetadataExport, *application.Error) {
+	s.contextMetadataExportRequest = request
+	return s.contextMetadataExport, s.contextMetadataExportErr
+}
+
+func (s *fakeService) ImportContextMetadata(request application.ImportContextMetadataRequest) (application.ImportContextMetadataResult, *application.Error) {
+	s.importContextMetadataRequest = request
+	return s.importContextMetadataResult, s.importContextMetadataErr
 }
