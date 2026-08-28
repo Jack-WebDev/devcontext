@@ -5,6 +5,7 @@ import { SelectorView } from "./components/selector/SelectorView";
 import { createOnboardingContextAndRefresh } from "./components/selector/onboarding-action";
 import { HomeView } from "./components/home/HomeView";
 import { RecentProjectConfirmationDialog } from "./components/home/RecentProjectConfirmationDialog";
+import { ProjectsView } from "./components/projects/ProjectsView";
 import { ContextsView } from "./components/contexts/ContextsView";
 import { ContextDetailsDrawer, CreateContextDialog } from "./components/contexts/ContextManagement";
 import { AppShell } from "./components/shell/AppShell";
@@ -17,6 +18,8 @@ import {
   type DisplayError,
   type HomeDashboardState,
   type LaunchState,
+  type ProjectListItem,
+  type ProjectsState,
   type RecentProjectState,
 } from "./lib/devctx-api";
 import { devContextWindow } from "./lib/devctx-window";
@@ -41,6 +44,11 @@ type ContextsLoad =
   | { status: "loaded"; data: ContextListItem[] }
   | { status: "error"; error: DisplayError };
 
+type ProjectsLoad =
+  | { status: "loading" }
+  | { status: "loaded"; data: ProjectsState }
+  | { status: "error"; error: DisplayError };
+
 function App() {
   const [launchState, setLaunchState] = useState<LaunchStateLoad>({
     status: "loading",
@@ -48,6 +56,7 @@ function App() {
   const [homeDashboard, setHomeDashboard] = useState<HomeDashboardLoad>({status: "loading"});
   const [recentProjects, setRecentProjects] = useState<RecentProjectsLoad>({status: "loading"});
   const [contexts, setContexts] = useState<ContextsLoad>({status: "loading"});
+  const [projects, setProjects] = useState<ProjectsLoad>({status: "loading"});
   const [contextDetailsID, setContextDetailsID] = useState<string>();
   const [creatingContext, setCreatingContext] = useState(false);
   const [homeLaunchPending, setHomeLaunchPending] = useState(false);
@@ -55,6 +64,9 @@ function App() {
   const [recentProjectToLaunch, setRecentProjectToLaunch] = useState<RecentProjectState | undefined>(undefined);
   const [recentProjectLaunchPending, setRecentProjectLaunchPending] = useState(false);
   const [recentProjectLaunchError, setRecentProjectLaunchError] = useState<DisplayError | undefined>(undefined);
+  const [projectLaunchPath, setProjectLaunchPath] = useState<string>();
+  const [projectErrorPath, setProjectErrorPath] = useState<string>();
+  const [projectLaunchError, setProjectLaunchError] = useState<DisplayError>();
   const [activeRoute, setActiveRoute] = useState<AppRoute>(() => appRouteFromHash(window.location.hash));
 
   useEffect(() => {
@@ -84,6 +96,10 @@ function App() {
 
   useEffect(() => {
     void refreshContexts();
+  }, []);
+
+  useEffect(() => {
+    void refreshProjects();
   }, []);
 
   useEffect(() => {
@@ -130,6 +146,7 @@ function App() {
       void refreshHomeDashboard();
       void refreshRecentProjects();
       void refreshContexts();
+      void refreshProjects();
       return { ok: true, data: result.created };
     }
 
@@ -149,6 +166,11 @@ function App() {
   async function refreshContexts() {
     const result = await devContextApi.getContexts();
     setContexts(result.ok ? {status: "loaded", data: result.data.contexts} : {status: "error", error: result.error});
+  }
+
+  async function refreshProjects() {
+    const result = await devContextApi.getProjects();
+    setProjects(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error});
   }
 
   async function handleHomeQuickLaunch() {
@@ -173,6 +195,7 @@ function App() {
       }
       await refreshHomeDashboard();
       await refreshRecentProjects();
+      await refreshProjects();
     } finally {
       setHomeLaunchPending(false);
     }
@@ -211,6 +234,7 @@ function App() {
       }
       setRecentProjectToLaunch(undefined);
       await refreshRecentProjects();
+      await refreshProjects();
     } finally {
       setRecentProjectLaunchPending(false);
     }
@@ -218,6 +242,49 @@ function App() {
 
   function handleReviewLaunchOptions() {
     document.getElementById("context-selector")?.scrollIntoView({behavior: "smooth", block: "start"});
+  }
+
+  async function handleProjectLaunch(project: ProjectListItem) {
+    if (project.contextId === undefined || projectLaunchPath !== undefined) {
+      return;
+    }
+
+    setProjectLaunchPath(project.project.path);
+    setProjectErrorPath(project.project.path);
+    setProjectLaunchError(undefined);
+    try {
+      const request = {projectPath: project.project.path, contextId: project.contextId};
+      const preflight = await devContextApi.preflightLaunchProject(request);
+      if (!preflight.ok) {
+        setProjectLaunchError(preflight.error);
+        return;
+      }
+      const launch = await devContextApi.launchProject(request);
+      if (!launch.ok) {
+        setProjectLaunchError(launch.error);
+        return;
+      }
+      await Promise.all([refreshHomeDashboard(), refreshRecentProjects(), refreshProjects()]);
+    } finally {
+      setProjectLaunchPath(undefined);
+    }
+  }
+
+  async function handleProjectChangeContext(project: ProjectListItem) {
+    setProjectErrorPath(project.project.path);
+    setProjectLaunchError(undefined);
+    const result = await devContextApi.getLaunchState({projectPath: project.project.path});
+    if (!result.ok) {
+      setProjectLaunchError(result.error);
+      return;
+    }
+    setLaunchState({status: "loaded", data: result.data});
+    handleNavigate("home");
+    window.setTimeout(handleReviewLaunchOptions, 0);
+  }
+
+  function handleProjectOpenFolder(project: ProjectListItem) {
+    window.open(new URL(project.project.path, "file://").href, "_blank", "noopener,noreferrer");
   }
 
   return (
@@ -260,6 +327,8 @@ function App() {
         </section>
       ) : activeRoute === "contexts" ? (
         <>{renderContexts(contexts, setContextDetailsID, () => setCreatingContext(true))}{contextDetailsID ? <ContextDetailsDrawer contextId={contextDetailsID} onClose={() => setContextDetailsID(undefined)} load={(contextId) => devContextApi.getContextDetails({contextId})}/> : null}{creatingContext && contexts.status === "loaded" ? <CreateContextDialog contexts={contexts.data} onClose={() => setCreatingContext(false)} create={async (request) => { const result = await devContextApi.createContext(request); if (result.ok) { await refreshContexts(); setCreatingContext(false); } return result; }}/> : null}</>
+      ) : activeRoute === "projects" ? (
+        renderProjects(projects, projectLaunchPath, projectErrorPath, projectLaunchError, handleProjectLaunch, handleProjectChangeContext, handleProjectOpenFolder)
       ) : (
         <PlaceholderScreen route={activeRoute} />
       )}
@@ -275,6 +344,24 @@ function renderContexts(contexts: ContextsLoad, onSelect: (id: string) => void, 
     return <GuiErrorNotice error={contexts.error} />;
   }
   return <ContextsView contexts={contexts.data} onSelect={onSelect} onNew={onNew} />;
+}
+
+function renderProjects(
+  projects: ProjectsLoad,
+  launchingProjectPath: string | undefined,
+  errorProjectPath: string | undefined,
+  launchError: DisplayError | undefined,
+  onLaunch: (project: ProjectListItem) => void,
+  onChangeContext: (project: ProjectListItem) => void,
+  onOpenFolder: (project: ProjectListItem) => void,
+) {
+  if (projects.status === "loading") {
+    return <p className="text-sm text-muted-foreground">Loading projects...</p>;
+  }
+  if (projects.status === "error") {
+    return <GuiErrorNotice error={projects.error} />;
+  }
+  return <ProjectsView projects={projects.data.projects} launchingProjectPath={launchingProjectPath} errorProjectPath={errorProjectPath} launchError={launchError?.message} onLaunch={onLaunch} onChangeContext={onChangeContext} onOpenFolder={onOpenFolder} />;
 }
 
 function renderHomeDashboard(

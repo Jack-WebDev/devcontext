@@ -7,6 +7,7 @@ import {ContextMismatchDialog} from "../.tmp-test/src/components/selector/Contex
 import {ContextCard} from "../.tmp-test/src/components/selector/ContextCard.js";
 import {HomeView, homeConfidenceSummary} from "../.tmp-test/src/components/home/HomeView.js";
 import {RecentProjectConfirmationDialog} from "../.tmp-test/src/components/home/RecentProjectConfirmationDialog.js";
+import {ProjectsView, formatProjectTime} from "../.tmp-test/src/components/projects/ProjectsView.js";
 import {ContextsView, providerSummary} from "../.tmp-test/src/components/contexts/ContextsView.js";
 import {
   ContextAccentIndicator,
@@ -448,6 +449,34 @@ test("Home lists recent projects for review and requires confirmation before lau
   assert.ok(dialogHtml.includes("Dev Context will check this project and context before opening it."));
   assert.ok(dialogHtml.includes("Launch Company"));
   assert.match(dialogHtml, /role="dialog"/);
+});
+
+test("Projects lists known projects with safe launch and management entry points", () => {
+  const html = renderToStaticMarkup(ProjectsView({
+    projects: [{
+      project: {name: "api", path: "/work/api"},
+      contextId: "company",
+      contextName: "Company",
+      lastLaunchedAt: "2026-08-28T10:30:00Z",
+      running: true,
+    }],
+    onLaunch: () => {},
+    onChangeContext: () => {},
+    onOpenFolder: () => {},
+  }));
+
+  assert.ok(html.includes("Known projects"));
+  assert.ok(html.includes("/work/api"));
+  assert.ok(html.includes("Remembered context"));
+  assert.ok(html.includes("Company"));
+  assert.ok(html.includes("Running"));
+  assert.ok(html.includes("Launch Company"));
+  assert.ok(html.includes("Change context"));
+  assert.ok(html.includes("Open folder"));
+  assert.ok(html.includes("Forget project"));
+  assert.match(html, /Forget project<\/button>/);
+  assert.match(html, /disabled=""/);
+  assert.equal(formatProjectTime(undefined), "Never launched");
 });
 
 test("Contexts screen lists backend-owned identity summaries and reserves creation", () => {
