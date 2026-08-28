@@ -6,6 +6,7 @@ import {renderToStaticMarkup} from "react-dom/server";
 import {ContextMismatchDialog} from "../.tmp-test/src/components/selector/ContextMismatchDialog.js";
 import {ContextCard} from "../.tmp-test/src/components/selector/ContextCard.js";
 import {HomeView, homeConfidenceSummary} from "../.tmp-test/src/components/home/HomeView.js";
+import {RecentProjectConfirmationDialog} from "../.tmp-test/src/components/home/RecentProjectConfirmationDialog.js";
 import {
   ContextAccentIndicator,
   contextAccentFromMetadata,
@@ -411,6 +412,42 @@ test("Home shows project, selected context, and context-named quick launch", () 
   assert.ok(html.includes("Future Tool"));
   assert.ok(html.includes("Launch Company"));
   assert.equal(homeConfidenceSummary("blocked"), "This context is blocked until its required setup is resolved.");
+});
+
+test("Home lists recent projects for review and requires confirmation before launch", () => {
+  const recentProject = {
+    project: {name: "api", path: "/work/api"},
+    contextId: "company",
+    contextName: "Company",
+    lastLaunchedAt: "2026-08-28T10:30:00Z",
+  };
+  const homeHtml = renderToStaticMarkup(HomeView({
+    dashboard: {
+      project: {name: "current", path: "/work/current"},
+      recentProjects: [recentProject],
+      running: {count: 0},
+      activity: {count: 0},
+    },
+    launchPending: false,
+    onQuickLaunch: () => {},
+    onReviewLaunchOptions: () => {},
+    onRecentProjectSelect: () => {},
+  }));
+  const dialogHtml = renderToStaticMarkup(RecentProjectConfirmationDialog({
+    project: recentProject,
+    launchPending: false,
+    onCancel: () => {},
+    onConfirm: () => {},
+  }));
+
+  assert.ok(homeHtml.includes("Recent projects"));
+  assert.ok(homeHtml.includes("Review a project before launching it."));
+  assert.ok(homeHtml.includes("/work/api"));
+  assert.ok(homeHtml.includes("Company"));
+  assert.ok(dialogHtml.includes("Launch recent project?"));
+  assert.ok(dialogHtml.includes("Dev Context will check this project and context before opening it."));
+  assert.ok(dialogHtml.includes("Launch Company"));
+  assert.match(dialogHtml, /role="dialog"/);
 });
 
 test("context card summarizes provider, tool, and isolation health from confidence checks", () => {
