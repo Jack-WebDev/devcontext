@@ -59,6 +59,7 @@ interface SelectorViewProps {
   onCreatePersonalContext?: (importProviderIds: string[]) => Promise<ApiResult<CreateContextResult>>;
   onCreateCompanyContext?: (importProviderIds: string[]) => Promise<ApiResult<CreateContextResult>>;
   onRunDiagnostics?: () => void;
+  onCodingToolLaunched?: (result: LaunchProjectResult) => void;
   showLaunchVerification?: boolean;
 }
 
@@ -72,6 +73,7 @@ function SelectorView({
   onCreatePersonalContext,
   onCreateCompanyContext,
   onRunDiagnostics,
+  onCodingToolLaunched,
   showLaunchVerification = true,
 }: SelectorViewProps) {
   const [selectedContextId, setSelectedContextId] = useState<string | undefined>(() =>
@@ -211,6 +213,9 @@ function SelectorView({
         if (result && "runningEnvironmentConflict" in result) {
           setRunningEnvironmentConflict(result.runningEnvironmentConflict);
         } else if (result?.ok) {
+          if ("project" in result.data && "context" in result.data) {
+            onCodingToolLaunched?.(result.data);
+          }
           if (shouldCloseSelectorAfterLaunch(launchSuccessCloseBehavior)) {
             await cancelSelector({ closeSelector: onCancel });
           }

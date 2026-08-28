@@ -88,6 +88,46 @@ import {
   escapeKeyboardAction,
 } from "../.tmp-test/src/components/selector/selector-keyboard.js";
 import {createDevContextWindow} from "../.tmp-test/src/lib/devctx-window.js";
+import {notificationPresentation} from "../.tmp-test/src/components/notifications/notification-policy.js";
+
+test("notification policy permits only meaningful provider, tool, and update events", () => {
+  assert.deepEqual(
+    notificationPresentation({kind: "provider_verified", providerName: "Codex", contextName: "Personal"}),
+    {
+      kind: "provider_verified",
+      title: "Codex verified",
+      description: "Codex is ready in Personal.",
+      severity: "success",
+    },
+  );
+  assert.deepEqual(
+    notificationPresentation({kind: "provider_attention", providerName: "Claude", contextName: "Company", message: "Sign in again."}),
+    {
+      kind: "provider_attention",
+      title: "Claude needs attention",
+      description: "Sign in again.",
+      severity: "warning",
+    },
+  );
+  assert.deepEqual(
+    notificationPresentation({kind: "tool_launched", projectName: "API", contextName: "Company", toolName: "Cursor"}),
+    {
+      kind: "tool_launched",
+      title: "Cursor launched",
+      description: "API opened in Company.",
+      severity: "success",
+    },
+  );
+  assert.deepEqual(
+    notificationPresentation({kind: "update_available", version: "1.2.3"}),
+    {
+      kind: "update_available",
+      title: "Update available",
+      description: "Dev Context 1.2.3 is ready to install.",
+      severity: "info",
+    },
+  );
+});
 
 test("command palette shortcut accepts Ctrl or Command K without modifiers", () => {
   assert.equal(isCommandPaletteShortcut({key: "k", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false}), true);

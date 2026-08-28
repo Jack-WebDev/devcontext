@@ -17,6 +17,7 @@ import { AppShell } from "./components/shell/AppShell";
 import { CommandPalette } from "./components/command-palette/CommandPalette";
 import { SettingsView } from "./components/settings/SettingsView";
 import { AppStatusBar } from "./components/status/AppStatusBar";
+import { notifyCodingToolLaunched } from "./components/notifications/notifications";
 import { launchContextActions, navigationActions } from "./components/command-palette/actions";
 import { isCommandPaletteShortcut } from "./components/command-palette/shortcut";
 import { appRouteDefinition, appRouteDefinitions, appRouteFromHash, type AppRoute } from "./components/shell/routes";
@@ -222,6 +223,7 @@ function App() {
         setCommandPaletteLaunchError(launch.error);
         return;
       }
+      notifyLaunch(launch.data);
       await Promise.all([refreshHomeDashboard(), refreshRecentProjects(), refreshProjects(), refreshRunningEnvironments()]);
     } finally {
       setCommandPaletteLaunchPending(false);
@@ -307,6 +309,7 @@ function App() {
         setHomeLaunchError(launch.error);
         return;
       }
+      notifyLaunch(launch.data);
       await refreshHomeDashboard();
       await refreshRecentProjects();
       await refreshProjects();
@@ -349,6 +352,7 @@ function App() {
         setRecentProjectLaunchError(launch.error);
         return;
       }
+      notifyLaunch(launch.data);
       setRecentProjectToLaunch(undefined);
       await refreshRecentProjects();
       await refreshProjects();
@@ -384,6 +388,7 @@ function App() {
         setProjectLaunchError(launch.error);
         return;
       }
+      notifyLaunch(launch.data);
       await Promise.all([refreshHomeDashboard(), refreshRecentProjects(), refreshProjects()]);
     } finally {
       setProjectLaunchPath(undefined);
@@ -440,6 +445,7 @@ function App() {
         setRunningEnvironmentLaunchError(result.error);
         return;
       }
+      notifyLaunch(result.data);
       setPendingRunningEnvironmentLaunch(undefined);
       await Promise.all([refreshHomeDashboard(), refreshRecentProjects(), refreshProjects(), refreshRunningEnvironments()]);
     } finally {
@@ -639,10 +645,19 @@ function renderSelectorContent(
       onCreatePersonalContext={(importProviderIds) => onCreateContext("personal", importProviderIds)}
       onCreateCompanyContext={(importProviderIds) => onCreateContext("company", importProviderIds)}
       onRunDiagnostics={onRunDiagnostics}
+      onCodingToolLaunched={notifyLaunch}
       launchSuccessCloseBehavior={settings?.closeAfterLaunch ? "close_selector" : "keep_open"}
       showLaunchVerification={settings?.launchVerification ?? true}
     />
   );
+}
+
+function notifyLaunch(result: {project: {name: string}; context: {name: string; tool: {name: string}}}) {
+  notifyCodingToolLaunched({
+    projectName: result.project.name,
+    contextName: result.context.name,
+    toolName: result.context.tool.name,
+  });
 }
 
 export default App;
