@@ -1,4 +1,4 @@
-import type { DisplayError, HomeDashboardState } from "../../lib/devctx-api";
+import type { DisplayError, HomeDashboardState, RecentProjectState } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import { StatusIndicator } from "../status/StatusIndicator.js";
@@ -9,9 +9,17 @@ interface HomeViewProps {
   launchError?: DisplayError;
   onQuickLaunch: () => void;
   onReviewLaunchOptions: () => void;
+  onRecentProjectSelect?: (project: RecentProjectState) => void;
 }
 
-function HomeView({ dashboard, launchPending, launchError, onQuickLaunch, onReviewLaunchOptions }: HomeViewProps) {
+function HomeView({
+  dashboard,
+  launchPending,
+  launchError,
+  onQuickLaunch,
+  onReviewLaunchOptions,
+  onRecentProjectSelect,
+}: HomeViewProps) {
   return (
     <div className="space-y-6">
       <HomeProjectSection project={dashboard.project} onReviewLaunchOptions={onReviewLaunchOptions} />
@@ -22,8 +30,62 @@ function HomeView({ dashboard, launchPending, launchError, onQuickLaunch, onRevi
         error={launchError}
         onQuickLaunch={onQuickLaunch}
       />
+      <HomeRecentProjectsSection projects={dashboard.recentProjects} onSelect={onRecentProjectSelect} />
     </div>
   );
+}
+
+function HomeRecentProjectsSection({
+  projects,
+  onSelect,
+}: {
+  projects: RecentProjectState[];
+  onSelect?: (project: RecentProjectState) => void;
+}) {
+  return (
+    <Card as="section" hierarchy="secondary" className="py-0" aria-labelledby="home-recent-projects-heading">
+      <CardContent className="space-y-3 p-5">
+        <div>
+          <h2 id="home-recent-projects-heading" className="font-semibold">Recent projects</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Review a project before launching it.</p>
+        </div>
+        {projects.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No recent projects yet.</p>
+        ) : (
+          <ul className="divide-y divide-border border-y border-border" aria-label="Recent projects">
+            {projects.map((project) => {
+              const contextName = project.contextName ?? project.contextId;
+              return (
+                <li key={`${project.project.path}:${project.contextId}`}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-auto w-full justify-between gap-4 px-0 py-3 text-left normal-case tracking-normal"
+                    disabled={onSelect === undefined}
+                    onClick={() => onSelect?.(project)}
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold" title={project.project.name}>{project.project.name}</span>
+                      <span className="mt-1 block truncate font-mono text-xs text-muted-foreground" title={project.project.path}>{project.project.path}</span>
+                    </span>
+                    <span className="shrink-0 text-right text-xs text-muted-foreground">
+                      <span className="block">{contextName}</span>
+                      <span className="mt-1 block">{formatRecentProjectTime(project.lastLaunchedAt)}</span>
+                    </span>
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function formatRecentProjectTime(value: string): string {
+  const time = new Date(value);
+  return Number.isNaN(time.getTime()) ? "Unknown" : time.toLocaleString();
 }
 
 function HomeProjectSection({
@@ -140,4 +202,4 @@ function homeConfidenceSummary(status: "ready" | "needs_attention" | "blocked"):
   }
 }
 
-export { HomeView, homeConfidenceSummary };
+export { HomeView, formatRecentProjectTime, homeConfidenceSummary };

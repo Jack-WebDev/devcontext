@@ -146,6 +146,114 @@ func TestLaunchProjectRecordsRecentProjectAfterSuccessfulLaunch(t *testing.T) {
 	}
 }
 
+func TestGetRecentProjectsReturnsNewestFirstWithContextMetadata(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	fixture.writeContext(t, fixture.context("company", "Company"))
+	older := fixture.now.Add(-time.Hour)
+	newer := fixture.now.Add(-time.Minute)
+	if err := project.WriteRecentProjectsFile(fixture.recentsPath, []project.RecentProject{
+		{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "older")), ContextID: devcontext.MustID("personal"), LastLaunchedAt: older},
+		{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "newer")), ContextID: devcontext.MustID("company"), LastLaunchedAt: newer},
+		{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "removed")), ContextID: devcontext.MustID("removed"), LastLaunchedAt: fixture.now},
+	}); err != nil {
+		t.Fatalf("write recents: %v", err)
+	}
+
+	result, appErr := fixture.service().GetRecentProjects()
+	if appErr != nil {
+		t.Fatalf("get recent projects: %v", appErr)
+	}
+	want := []RecentProjectState{
+		{Project: ProjectState{Name: "removed", Path: filepath.Join(fixture.root, "projects", "removed")}, ContextID: "removed", LastLaunchedAt: fixture.now},
+		{Project: ProjectState{Name: "newer", Path: filepath.Join(fixture.root, "projects", "newer")}, ContextID: "company", ContextName: "Company", LastLaunchedAt: newer},
+		{Project: ProjectState{Name: "older", Path: filepath.Join(fixture.root, "projects", "older")}, ContextID: "personal", ContextName: "Personal", LastLaunchedAt: older},
+	}
+	if !reflect.DeepEqual(result.Projects, want) {
+		t.Fatalf("recent projects = %#v, want %#v", result.Projects, want)
+	}
+}
+
+func TestGetContextsReturnsUsageAndReadinessSummaries(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	fixture.writeContext(t, fixture.context("company", "Company"))
+	fixture.writeBindings(t,
+		project.Binding{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "one")), ContextID: devcontext.MustID("personal"), CreatedAt: fixture.now},
+		project.Binding{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "two")), ContextID: devcontext.MustID("personal"), CreatedAt: fixture.now},
+		project.Binding{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "three")), ContextID: devcontext.MustID("removed"), CreatedAt: fixture.now},
+	)
+	older := fixture.now.Add(-time.Hour)
+	newer := fixture.now.Add(-time.Minute)
+	if err := project.WriteRecentProjectsFile(fixture.recentsPath, []project.RecentProject{
+		{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "one")), ContextID: devcontext.MustID("personal"), LastLaunchedAt: older},
+		{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "two")), ContextID: devcontext.MustID("personal"), LastLaunchedAt: newer},
+		{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "three")), ContextID: devcontext.MustID("removed"), LastLaunchedAt: fixture.now},
+	}); err != nil {
+		t.Fatalf("write recents: %v", err)
+	}
+
+	result, appErr := fixture.service().GetContexts()
+	if appErr != nil {
+		t.Fatalf("get contexts: %v", appErr)
+	}
+	if len(result.Contexts) != 2 {
+		t.Fatalf("context count = %d, want 2", len(result.Contexts))
+	}
+	personal := result.Contexts[1]
+	if personal.Context.ID != "personal" || personal.Context.Tool.ID != "fake-editor" ||
+		personal.Context.Confidence.ContextID != "personal" || personal.ProjectCount != 2 {
+		t.Fatalf("personal context summary = %#v", personal)
+	}
+	if len(personal.EnabledProviders) != 1 || !personal.EnabledProviders[0].Enabled || personal.EnabledProviders[0].ID != "fake" {
+		t.Fatalf("enabled providers = %#v, want fake provider", personal.EnabledProviders)
+	}
+	if personal.LastUsedAt == nil || !personal.LastUsedAt.Equal(newer) {
+		t.Fatalf("personal last used = %#v, want %s", personal.LastUsedAt, newer)
+	}
+	company := result.Contexts[0]
+	if company.Context.ID != "company" || company.ProjectCount != 0 || company.LastUsedAt != nil {
+		t.Fatalf("company context summary = %#v", company)
+	}
+}
+
+func TestGetContextDetailsReturnsConfiguredContextMetadata(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "one")),
+		ContextID:   devcontext.MustID("personal"),
+		CreatedAt:   fixture.now,
+	})
+	lastUsed := fixture.now.Add(-time.Minute)
+	if err := project.WriteRecentProjectsFile(fixture.recentsPath, []project.RecentProject{{
+		ProjectPath:    project.Path(filepath.Join(fixture.root, "projects", "one")),
+		ContextID:      devcontext.MustID("personal"),
+		LastLaunchedAt: lastUsed,
+	}}); err != nil {
+		t.Fatalf("write recents: %v", err)
+	}
+
+	details, appErr := fixture.service().GetContextDetails(GetContextDetailsRequest{ContextID: "personal"})
+	if appErr != nil {
+		t.Fatalf("get context details: %v", appErr)
+	}
+	paths, err := filesystem.DeriveContextPaths(fixture.paths, devcontext.MustID("personal"))
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	if details.Context.ID != "personal" || details.Context.Tool.ID != "fake-editor" ||
+		details.Location != paths.RootDir || !details.CreatedAt.Equal(fixture.now) || details.ProjectCount != 1 {
+		t.Fatalf("context details = %#v", details)
+	}
+	if details.LastUsedAt == nil || !details.LastUsedAt.Equal(lastUsed) {
+		t.Fatalf("last used = %#v, want %s", details.LastUsedAt, lastUsed)
+	}
+	if len(details.EnabledProviders) != 1 || details.EnabledProviders[0].ID != "fake" {
+		t.Fatalf("enabled providers = %#v", details.EnabledProviders)
+	}
+}
+
 func TestGetLaunchStateDerivesProviderSetupActions(t *testing.T) {
 	tests := []struct {
 		name         string

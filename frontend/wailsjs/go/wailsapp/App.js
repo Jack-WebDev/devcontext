@@ -14,6 +14,19 @@ export function GetHomeDashboard(arg1) {
   return window['go']['wailsapp']['App']['GetHomeDashboard'](arg1);
 }
 
+export function GetContexts() {
+  return window['go']['wailsapp']['App']['GetContexts']();
+}
+
+export function GetContextDetails(arg1) {
+  return window['go']['wailsapp']['App']['GetContextDetails'](arg1);
+}
+
+export function GetRecentProjects() {
+  return window['go']['wailsapp']['App']['GetRecentProjects']();
+}
+export function GetProjects() { return window['go']['wailsapp']['App']['GetProjects'](); }
+
 export function GetLaunchState(arg1) {
   return window['go']['wailsapp']['App']['GetLaunchState'](arg1);
 }

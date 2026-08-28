@@ -48,6 +48,126 @@ test("adapter normalizes the Home dashboard contract", async () => {
   });
 });
 
+test("adapter normalizes recent projects", async () => {
+  const api = createDevContextApi({
+    async getRecentProjects() {
+      return {
+        projects: [{
+          project: {name: "api", path: "/work/api"},
+          contextId: "personal",
+          contextName: "Personal",
+          lastLaunchedAt: "2026-08-13T12:30:00Z",
+        }],
+      };
+    },
+  });
+
+  assert.deepEqual(await api.getRecentProjects(), {
+    ok: true,
+    data: {
+      projects: [{
+        project: {name: "api", path: "/work/api"},
+        contextId: "personal",
+        contextName: "Personal",
+        lastLaunchedAt: "2026-08-13T12:30:00Z",
+      }],
+    },
+  });
+});
+
+test("adapter normalizes context list summaries", async () => {
+  const api = createDevContextApi({
+    async getContexts() {
+      return {
+        contexts: [{
+          context: {
+            id: "personal",
+            name: "Personal",
+            tool: toolFixture(),
+            availableTools: [toolOptionFixture()],
+            providers: [],
+            confidence: {contextId: "personal", status: "ready", checks: []},
+          },
+          enabledProviders: [{
+            id: "provider",
+            name: "Provider",
+            enabled: true,
+            state: "ready",
+            identity: {status: "none", fields: []},
+          }],
+          projectCount: 2,
+          lastUsedAt: "2026-08-28T10:30:00Z",
+        }],
+      };
+    },
+  });
+
+  const result = await api.getContexts();
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.ok ? result.data.contexts[0] : undefined, {
+    context: {
+      id: "personal",
+      name: "Personal",
+      tool: toolFixture(),
+      availableTools: [toolOptionFixture()],
+      providers: [],
+      confidence: {contextId: "personal", status: "ready", checks: []},
+      metadata: undefined,
+    },
+    enabledProviders: [{
+      id: "provider",
+      name: "Provider",
+      enabled: true,
+      state: "ready",
+      explanation: undefined,
+      identity: {status: "none", message: undefined, fields: []},
+    }],
+    projectCount: 2,
+    lastUsedAt: "2026-08-28T10:30:00Z",
+  });
+});
+
+test("adapter normalizes context details", async () => {
+  const api = createDevContextApi({
+    async getContextDetails(request) {
+      assert.deepEqual(request, {contextId: "personal"});
+      return {
+        context: {
+          id: "personal",
+          name: "Personal",
+          tool: toolFixture(),
+          availableTools: [toolOptionFixture()],
+          providers: [],
+          confidence: {contextId: "personal", status: "ready", checks: []},
+        },
+        location: "/contexts/personal",
+        createdAt: "2026-08-01T10:30:00Z",
+        projectCount: 2,
+        enabledProviders: [],
+      };
+    },
+  });
+
+  assert.deepEqual(await api.getContextDetails({contextId: "personal"}), {
+    ok: true,
+    data: {
+      context: {
+        id: "personal",
+        name: "Personal",
+        tool: toolFixture(),
+        availableTools: [toolOptionFixture()],
+        providers: [],
+        confidence: {contextId: "personal", status: "ready", checks: []},
+        metadata: undefined,
+      },
+      location: "/contexts/personal",
+      createdAt: "2026-08-01T10:30:00Z",
+      projectCount: 2,
+      enabledProviders: [],
+    },
+  });
+});
+
 test("adapter normalizes successful Wails calls", async () => {
   const calls = [];
   const api = createDevContextApi({

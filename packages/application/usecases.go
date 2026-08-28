@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	codingtool "devctx/packages/core/codingtool"
@@ -32,6 +33,36 @@ func (s *Service) GetHomeDashboard(request GetHomeDashboardRequest) (HomeDashboa
 		return HomeDashboardState{}, NewError(err)
 	}
 	return dashboard, nil
+}
+
+// GetRecentProjects returns successful project launches without reading log
+// files. It is independent of project bindings and the currently selected
+// project.
+func (s *Service) GetRecentProjects() (RecentProjectsState, *Error) {
+	projects, err := s.getRecentProjects()
+	if err != nil {
+		return RecentProjectsState{}, NewError(err)
+	}
+	return RecentProjectsState{Projects: projects}, nil
+}
+
+// GetContexts returns all configured development identities with their
+// backend-derived readiness, project usage, and recent launch summaries.
+func (s *Service) GetContexts() (ContextListState, *Error) {
+	contexts, err := s.getContexts()
+	if err != nil {
+		return ContextListState{}, NewError(err)
+	}
+	return ContextListState{Contexts: contexts}, nil
+}
+
+// GetContextDetails returns one context's presentation-safe details.
+func (s *Service) GetContextDetails(request GetContextDetailsRequest) (ContextDetailsState, *Error) {
+	details, err := s.getContextDetails(request)
+	if err != nil {
+		return ContextDetailsState{}, NewError(err)
+	}
+	return details, nil
 }
 
 // LaunchProject builds a launch plan for a selected context and starts the
@@ -79,6 +110,15 @@ func (s *Service) CreateContext(request CreateContextRequest) (CreateContextResu
 		return CreateContextResult{}, NewError(err)
 	}
 	return result, nil
+}
+
+// GetProjects returns known project summaries without requiring log scraping.
+func (s *Service) GetProjects() (ProjectsState, *Error) {
+	projects, err := s.getProjects()
+	if err != nil {
+		return ProjectsState{}, NewError(err)
+	}
+	return ProjectsState{Projects: projects}, nil
 }
 
 func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, error) {
@@ -135,7 +175,7 @@ func (s *Service) getHomeDashboard(request GetHomeDashboardRequest) (HomeDashboa
 
 	dashboard := HomeDashboardState{
 		Project:        launchState.Project,
-		RecentProjects: []HomeRecentProjectState{},
+		RecentProjects: []RecentProjectState{},
 		Running:        HomeRunningSummary{},
 		Activity:       HomeActivitySummary{},
 	}
@@ -152,6 +192,124 @@ func (s *Service) getHomeDashboard(request GetHomeDashboardRequest) (HomeDashboa
 		break
 	}
 	return dashboard, nil
+}
+
+func (s *Service) getRecentProjects() ([]RecentProjectState, error) {
+	recents, err := s.dependencies.RecentProjects.List()
+	if err != nil {
+		return nil, err
+	}
+
+	contexts, err := s.dependencies.Contexts.List()
+	if err != nil {
+		return nil, err
+	}
+	contextNames := make(map[devcontext.ID]string, len(contexts))
+	for _, configuredContext := range contexts {
+		contextNames[configuredContext.ID] = configuredContext.Name
+	}
+
+	projects := make([]RecentProjectState, 0, len(recents))
+	for _, recent := range recents {
+		projects = append(projects, RecentProjectState{
+			Project:        projectState(recent.ProjectPath),
+			ContextID:      recent.ContextID.String(),
+			ContextName:    contextNames[recent.ContextID],
+			LastLaunchedAt: recent.LastLaunchedAt.UTC(),
+		})
+	}
+	sort.SliceStable(projects, func(i, j int) bool {
+		return projects[i].LastLaunchedAt.After(projects[j].LastLaunchedAt)
+	})
+	return projects, nil
+}
+
+func (s *Service) getContexts() ([]ContextListItem, error) {
+	contexts, err := s.dependencies.Contexts.List()
+	if err != nil {
+		return nil, err
+	}
+	usage, err := s.contextUsage()
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]ContextListItem, 0, len(contexts))
+	for _, configuredContext := range contexts {
+		state := s.contextState(configuredContext)
+		item := ContextListItem{
+			Context:          state,
+			EnabledProviders: enabledProviderStates(state.Providers),
+			ProjectCount:     usage.projectCounts[configuredContext.ID],
+		}
+		if lastUsed, found := usage.lastUsedAt[configuredContext.ID]; found {
+			item.LastUsedAt = &lastUsed
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (s *Service) getContextDetails(request GetContextDetailsRequest) (ContextDetailsState, error) {
+	contextID, err := devcontext.NewID(request.ContextID)
+	if err != nil {
+		return ContextDetailsState{}, err
+	}
+	configuredContext, err := s.dependencies.Contexts.Get(contextID)
+	if err != nil {
+		return ContextDetailsState{}, err
+	}
+	paths, err := filesystem.DeriveContextPaths(s.dependencies.Paths, contextID)
+	if err != nil {
+		return ContextDetailsState{}, err
+	}
+	usage, err := s.contextUsage()
+	if err != nil {
+		return ContextDetailsState{}, err
+	}
+
+	state := s.contextState(configuredContext)
+	details := ContextDetailsState{
+		Context:          state,
+		Location:         paths.RootDir,
+		CreatedAt:        configuredContext.CreatedAt.UTC(),
+		ProjectCount:     usage.projectCounts[contextID],
+		EnabledProviders: enabledProviderStates(state.Providers),
+	}
+	if lastUsed, found := usage.lastUsedAt[contextID]; found {
+		details.LastUsedAt = &lastUsed
+	}
+	return details, nil
+}
+
+type contextUsage struct {
+	projectCounts map[devcontext.ID]int
+	lastUsedAt    map[devcontext.ID]time.Time
+}
+
+func (s *Service) contextUsage() (contextUsage, error) {
+	bindings, err := s.dependencies.Projects.List()
+	if err != nil {
+		return contextUsage{}, err
+	}
+	recents, err := s.dependencies.RecentProjects.List()
+	if err != nil {
+		return contextUsage{}, err
+	}
+
+	usage := contextUsage{
+		projectCounts: make(map[devcontext.ID]int),
+		lastUsedAt:    make(map[devcontext.ID]time.Time),
+	}
+	for _, binding := range bindings {
+		usage.projectCounts[binding.ContextID]++
+	}
+	for _, recent := range recents {
+		if previous, found := usage.lastUsedAt[recent.ContextID]; !found || recent.LastLaunchedAt.After(previous) {
+			usage.lastUsedAt[recent.ContextID] = recent.LastLaunchedAt.UTC()
+		}
+	}
+	return usage, nil
 }
 
 func (s *Service) firstRunLaunchState(projectPath project.Path) LaunchState {
@@ -177,7 +335,7 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 		return CreateContextResult{}, err
 	}
 
-	ctx, err := devcontext.DefaultContextForIDWithRegistries(contextID, s.now(), s.dependencies.ProviderRegistry, s.dependencies.ToolRegistry)
+	ctx, err := s.contextFromCreateRequest(contextID, request)
 	if err != nil {
 		return CreateContextResult{}, err
 	}
@@ -199,6 +357,80 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 	}
 
 	return CreateContextResult{Context: s.contextState(ctx)}, nil
+}
+
+func (s *Service) contextFromCreateRequest(contextID devcontext.ID, request CreateContextRequest) (devcontext.Context, error) {
+	if strings.TrimSpace(request.Name) == "" {
+		return devcontext.DefaultContextForIDWithRegistries(contextID, s.now(), s.dependencies.ProviderRegistry, s.dependencies.ToolRegistry)
+	}
+	toolID := codingtool.ID(request.ToolID)
+	if toolID == "" {
+		toolID = s.dependencies.ToolRegistry.DefaultID()
+	}
+	if _, ok := s.dependencies.ToolRegistry.Get(toolID); !ok {
+		return devcontext.Context{}, fmt.Errorf("unknown coding tool %q", toolID)
+	}
+	providers := make(provider.Configs, len(request.EnabledProviderIDs))
+	for _, rawID := range request.EnabledProviderIDs {
+		providerID := provider.ID(rawID)
+		if _, ok := s.dependencies.ProviderRegistry.Get(providerID); !ok {
+			return devcontext.Context{}, fmt.Errorf("unknown provider %q", providerID)
+		}
+		providers[providerID] = provider.Config{Enabled: true}
+	}
+	metadata := devcontext.Metadata{}
+	for key, value := range map[string]string{"description": request.Description, "icon": request.Icon, "accent": request.Accent} {
+		if value = strings.TrimSpace(value); value != "" {
+			metadata[key] = value
+		}
+	}
+	return devcontext.Context{ID: contextID, Name: strings.TrimSpace(request.Name), Tool: codingtool.LaunchTarget{DefaultTool: toolID, Tools: map[codingtool.ID]codingtool.Config{toolID: {}}}, Providers: providers, Metadata: metadata, CreatedAt: s.now().UTC()}, nil
+}
+
+func (s *Service) getProjects() ([]ProjectListItem, error) {
+	bindings, err := s.dependencies.Projects.List()
+	if err != nil {
+		return nil, err
+	}
+	recents, err := s.dependencies.RecentProjects.List()
+	if err != nil {
+		return nil, err
+	}
+	contexts, err := s.dependencies.Contexts.List()
+	if err != nil {
+		return nil, err
+	}
+	names := map[devcontext.ID]string{}
+	for _, ctx := range contexts {
+		names[ctx.ID] = ctx.Name
+	}
+	items := map[project.Path]ProjectListItem{}
+	for _, binding := range bindings {
+		items[binding.ProjectPath] = ProjectListItem{Project: projectState(binding.ProjectPath), ContextID: binding.ContextID.String(), ContextName: names[binding.ContextID]}
+	}
+	for _, recent := range recents {
+		item := items[recent.ProjectPath]
+		if item.Project.Path == "" {
+			item.Project = projectState(recent.ProjectPath)
+		}
+		timestamp := recent.LastLaunchedAt.UTC()
+		item.LastLaunchedAt = &timestamp
+		items[recent.ProjectPath] = item
+	}
+	result := make([]ProjectListItem, 0, len(items))
+	for _, item := range items {
+		result = append(result, item)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].LastLaunchedAt == nil {
+			return false
+		}
+		if result[j].LastLaunchedAt == nil {
+			return true
+		}
+		return result[i].LastLaunchedAt.After(*result[j].LastLaunchedAt)
+	})
+	return result, nil
 }
 
 func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResult, error) {
@@ -429,6 +661,16 @@ func (s *Service) contextState(ctx devcontext.Context) ContextState {
 		Confidence:     confidence,
 		Metadata:       cloneMetadata(ctx.Metadata),
 	}
+}
+
+func enabledProviderStates(providers []ProviderState) []ProviderState {
+	enabled := make([]ProviderState, 0, len(providers))
+	for _, provider := range providers {
+		if provider.Enabled {
+			enabled = append(enabled, provider)
+		}
+	}
+	return enabled
 }
 
 func (s *Service) providerCredentialSessionStates() ([]ProviderCredentialSessionState, error) {

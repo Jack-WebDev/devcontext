@@ -1,5 +1,7 @@
 package application
 
+import "time"
+
 // GetLaunchStateRequest identifies the project the GUI is rendering.
 type GetLaunchStateRequest struct {
 	ProjectPath string `json:"projectPath,omitempty"`
@@ -17,7 +19,7 @@ type GetHomeDashboardRequest struct {
 type HomeDashboardState struct {
 	Project        ProjectState             `json:"project"`
 	CurrentContext *HomeCurrentContextState `json:"currentContext,omitempty"`
-	RecentProjects []HomeRecentProjectState `json:"recentProjects"`
+	RecentProjects []RecentProjectState     `json:"recentProjects"`
 	Running        HomeRunningSummary       `json:"running"`
 	Activity       HomeActivitySummary      `json:"activity"`
 }
@@ -30,9 +32,53 @@ type HomeCurrentContextState struct {
 	Confidence LaunchConfidenceState `json:"confidence"`
 }
 
-// HomeRecentProjectState reserves the safe presentation shape for Phase 110.
-type HomeRecentProjectState struct {
-	Project ProjectState `json:"project"`
+// RecentProjectsState contains recent successful launches for presentation.
+// Entries are ordered from most to least recently launched.
+type RecentProjectsState struct {
+	Projects []RecentProjectState `json:"projects"`
+}
+
+// RecentProjectState is the presentation-safe record of one successful
+// project launch. Context metadata is retained even when a project has no
+// remembered project binding.
+type RecentProjectState struct {
+	Project        ProjectState `json:"project"`
+	ContextID      string       `json:"contextId"`
+	ContextName    string       `json:"contextName,omitempty"`
+	LastLaunchedAt time.Time    `json:"lastLaunchedAt"`
+}
+
+// ContextListState contains every configured context and the aggregate data
+// needed to present an identity list.
+type ContextListState struct {
+	Contexts []ContextListItem `json:"contexts"`
+}
+
+// ContextListItem combines a context's backend-owned readiness state with its
+// project-binding count and most recent successful launch. EnabledProviders is
+// intentionally pre-filtered so clients do not need to infer the summary.
+type ContextListItem struct {
+	Context          ContextState    `json:"context"`
+	EnabledProviders []ProviderState `json:"enabledProviders"`
+	ProjectCount     int             `json:"projectCount"`
+	LastUsedAt       *time.Time      `json:"lastUsedAt,omitempty"`
+}
+
+// GetContextDetailsRequest identifies one configured context.
+type GetContextDetailsRequest struct {
+	ContextID string `json:"contextId"`
+}
+
+// ContextDetailsState contains the backend-owned data for one context's
+// detail view. It extends the list summary with its storage location and
+// creation time.
+type ContextDetailsState struct {
+	Context          ContextState    `json:"context"`
+	Location         string          `json:"location"`
+	CreatedAt        time.Time       `json:"createdAt"`
+	ProjectCount     int             `json:"projectCount"`
+	LastUsedAt       *time.Time      `json:"lastUsedAt,omitempty"`
+	EnabledProviders []ProviderState `json:"enabledProviders"`
 }
 
 // HomeRunningSummary reserves aggregate running-environment data for later
@@ -279,13 +325,32 @@ type ProjectBindingState struct {
 
 // CreateContextRequest asks the service to create one default context.
 type CreateContextRequest struct {
-	ContextID         string   `json:"contextId"`
-	ImportProviderIDs []string `json:"importProviderIds,omitempty"`
+	ContextID          string   `json:"contextId"`
+	Name               string   `json:"name,omitempty"`
+	Description        string   `json:"description,omitempty"`
+	Icon               string   `json:"icon,omitempty"`
+	Accent             string   `json:"accent,omitempty"`
+	EnabledProviderIDs []string `json:"enabledProviderIds,omitempty"`
+	ToolID             string   `json:"toolId,omitempty"`
+	ImportProviderIDs  []string `json:"importProviderIds,omitempty"`
 }
 
 // CreateContextResult describes a newly created context.
 type CreateContextResult struct {
 	Context ContextState `json:"context"`
+}
+
+// ProjectsState contains all known projects from remembered bindings and
+// successful launch history.
+type ProjectsState struct {
+	Projects []ProjectListItem `json:"projects"`
+}
+type ProjectListItem struct {
+	Project        ProjectState `json:"project"`
+	ContextID      string       `json:"contextId,omitempty"`
+	ContextName    string       `json:"contextName,omitempty"`
+	LastLaunchedAt *time.Time   `json:"lastLaunchedAt,omitempty"`
+	Running        bool         `json:"running"`
 }
 
 // ProviderCredentialSessionState describes a detected global provider session

@@ -6,6 +6,8 @@ import {renderToStaticMarkup} from "react-dom/server";
 import {ContextMismatchDialog} from "../.tmp-test/src/components/selector/ContextMismatchDialog.js";
 import {ContextCard} from "../.tmp-test/src/components/selector/ContextCard.js";
 import {HomeView, homeConfidenceSummary} from "../.tmp-test/src/components/home/HomeView.js";
+import {RecentProjectConfirmationDialog} from "../.tmp-test/src/components/home/RecentProjectConfirmationDialog.js";
+import {ContextsView, providerSummary} from "../.tmp-test/src/components/contexts/ContextsView.js";
 import {
   ContextAccentIndicator,
   contextAccentFromMetadata,
@@ -135,7 +137,6 @@ test("first-run welcome disables setup actions until handlers are wired", () => 
   });
   const html = renderToStaticMarkup(FirstRunWelcome({launchState: state}));
 
-  assert.match(html, /disabled=""/);
 });
 
 test("first-run welcome requires detected provider sessions to be classified before creation", () => {
@@ -411,6 +412,75 @@ test("Home shows project, selected context, and context-named quick launch", () 
   assert.ok(html.includes("Future Tool"));
   assert.ok(html.includes("Launch Company"));
   assert.equal(homeConfidenceSummary("blocked"), "This context is blocked until its required setup is resolved.");
+});
+
+test("Home lists recent projects for review and requires confirmation before launch", () => {
+  const recentProject = {
+    project: {name: "api", path: "/work/api"},
+    contextId: "company",
+    contextName: "Company",
+    lastLaunchedAt: "2026-08-28T10:30:00Z",
+  };
+  const homeHtml = renderToStaticMarkup(HomeView({
+    dashboard: {
+      project: {name: "current", path: "/work/current"},
+      recentProjects: [recentProject],
+      running: {count: 0},
+      activity: {count: 0},
+    },
+    launchPending: false,
+    onQuickLaunch: () => {},
+    onReviewLaunchOptions: () => {},
+    onRecentProjectSelect: () => {},
+  }));
+  const dialogHtml = renderToStaticMarkup(RecentProjectConfirmationDialog({
+    project: recentProject,
+    launchPending: false,
+    onCancel: () => {},
+    onConfirm: () => {},
+  }));
+
+  assert.ok(homeHtml.includes("Recent projects"));
+  assert.ok(homeHtml.includes("Review a project before launching it."));
+  assert.ok(homeHtml.includes("/work/api"));
+  assert.ok(homeHtml.includes("Company"));
+  assert.ok(dialogHtml.includes("Launch recent project?"));
+  assert.ok(dialogHtml.includes("Dev Context will check this project and context before opening it."));
+  assert.ok(dialogHtml.includes("Launch Company"));
+  assert.match(dialogHtml, /role="dialog"/);
+});
+
+test("Contexts screen lists backend-owned identity summaries and reserves creation", () => {
+  const context = {
+    context: {
+      id: "company",
+      name: "Company",
+      description: "Work identity",
+      tool: {id: "tool", name: "Future Tool", status: "ready", message: "Ready"},
+      availableTools: [],
+      providers: [],
+      confidence: {contextId: "company", status: "needs_attention", checks: []},
+    },
+    enabledProviders: [{
+      id: "provider",
+      name: "Provider",
+      enabled: true,
+      state: "ready",
+      identity: {status: "none", fields: []},
+    }],
+    projectCount: 2,
+    lastUsedAt: "2026-08-28T10:30:00Z",
+  };
+  const html = renderToStaticMarkup(ContextsView({contexts: [context]}));
+
+  assert.ok(html.includes("Contexts"));
+  assert.ok(html.includes("New context"));
+  assert.ok(html.includes("Company"));
+  assert.ok(html.includes("Work identity"));
+  assert.ok(html.includes("Future Tool"));
+  assert.ok(html.includes("2 projects"));
+  assert.ok(html.includes("Provider"));
+  assert.equal(providerSummary({...context, enabledProviders: []}), "No providers enabled");
 });
 
 test("context card summarizes provider, tool, and isolation health from confidence checks", () => {

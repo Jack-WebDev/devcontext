@@ -35,7 +35,7 @@ export interface GetHomeDashboardRequest {
 export interface HomeDashboardState {
   project: ProjectState;
   currentContext?: HomeCurrentContextState;
-  recentProjects: HomeRecentProjectState[];
+  recentProjects: RecentProjectState[];
   running: HomeRunningSummary;
   activity: HomeActivitySummary;
 }
@@ -47,8 +47,39 @@ export interface HomeCurrentContextState {
   confidence: LaunchConfidenceState;
 }
 
-export interface HomeRecentProjectState {
+export interface RecentProjectsState {
+  projects: RecentProjectState[];
+}
+
+export interface RecentProjectState {
   project: ProjectState;
+  contextId: string;
+  contextName?: string;
+  lastLaunchedAt: string;
+}
+
+export interface ContextListState {
+  contexts: ContextListItem[];
+}
+
+export interface ContextListItem {
+  context: ContextState;
+  enabledProviders: ProviderState[];
+  projectCount: number;
+  lastUsedAt?: string;
+}
+
+export interface GetContextDetailsRequest {
+  contextId: string;
+}
+
+export interface ContextDetailsState {
+  context: ContextState;
+  location: string;
+  createdAt: string;
+  projectCount: number;
+  lastUsedAt?: string;
+  enabledProviders: ProviderState[];
 }
 
 export interface HomeRunningSummary {
@@ -218,12 +249,20 @@ export interface UnbindProjectRequest {
 
 export interface CreateContextRequest {
   contextId: string;
+  name?: string;
+  description?: string;
+  icon?: string;
+  accent?: string;
+  enabledProviderIds?: string[];
+  toolId?: string;
   importProviderIds?: string[];
 }
 
 export interface CreateContextResult {
   context: ContextState;
 }
+export interface ProjectsState { projects: ProjectListItem[]; }
+export interface ProjectListItem { project: ProjectState; contextId?: string; contextName?: string; lastLaunchedAt?: string; running: boolean; }
 
 export interface ProviderCredentialSession {
   providerId: string;
@@ -235,21 +274,29 @@ export interface ProviderCredentialSession {
 export interface DevContextApi {
   getLaunchState(request?: GetLaunchStateRequest): Promise<ApiResult<LaunchState>>;
   getHomeDashboard(request?: GetHomeDashboardRequest): Promise<ApiResult<HomeDashboardState>>;
+  getRecentProjects(): Promise<ApiResult<RecentProjectsState>>;
+  getContexts(): Promise<ApiResult<ContextListState>>;
+  getContextDetails(request: GetContextDetailsRequest): Promise<ApiResult<ContextDetailsState>>;
   preflightLaunchProject(request: PreflightLaunchProjectRequest): Promise<ApiResult<PreflightLaunchProjectResult>>;
   launchProject(request: LaunchProjectRequest): Promise<ApiResult<LaunchProjectResult>>;
   bindProject(request: BindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
   unbindProject(request?: UnbindProjectRequest): Promise<ApiResult<ProjectBindingState>>;
   createContext(request: CreateContextRequest): Promise<ApiResult<CreateContextResult>>;
+  getProjects(): Promise<ApiResult<ProjectsState>>;
 }
 
 export interface WailsBindings {
   getLaunchState(request: GetLaunchStateRequest): Promise<unknown>;
   getHomeDashboard(request: GetHomeDashboardRequest): Promise<unknown>;
+  getRecentProjects(): Promise<unknown>;
+  getContexts(): Promise<unknown>;
+  getContextDetails(request: GetContextDetailsRequest): Promise<unknown>;
   preflightLaunchProject(request: PreflightLaunchProjectRequest): Promise<unknown>;
   launchProject(request: LaunchProjectRequest): Promise<unknown>;
   bindProject(request: BindProjectRequest): Promise<unknown>;
   unbindProject(request: UnbindProjectRequest): Promise<unknown>;
   createContext(request: CreateContextRequest): Promise<unknown>;
+  getProjects(): Promise<unknown>;
 }
 
 export function createDevContextApi(bindings: WailsBindings = generatedBindings): DevContextApi {
@@ -259,6 +306,15 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
     },
     getHomeDashboard(request = {}) {
       return callBinding(() => bindings.getHomeDashboard(request), normalizeHomeDashboardState);
+    },
+    getRecentProjects() {
+      return callBinding(() => bindings.getRecentProjects(), normalizeRecentProjectsState);
+    },
+    getContexts() {
+      return callBinding(() => bindings.getContexts(), normalizeContextListState);
+    },
+    getContextDetails(request) {
+      return callBinding(() => bindings.getContextDetails(request), normalizeContextDetailsState);
     },
     preflightLaunchProject(request) {
       return callBinding(
@@ -289,6 +345,7 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
     createContext(request) {
       return callBinding(() => bindings.createContext(request), normalizeCreateContextResult);
     },
+    getProjects() { return callBinding(() => bindings.getProjects(), normalizeProjectsState); },
   };
 }
 
@@ -300,6 +357,18 @@ const generatedBindings: WailsBindings = {
   async getHomeDashboard(request) {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
     return bindings.GetHomeDashboard(request);
+  },
+  async getRecentProjects() {
+    const bindings = await import("../../wailsjs/go/wailsapp/App");
+    return bindings.GetRecentProjects();
+  },
+  async getContexts() {
+    const bindings = await import("../../wailsjs/go/wailsapp/App");
+    return bindings.GetContexts();
+  },
+  async getContextDetails(request) {
+    const bindings = await import("../../wailsjs/go/wailsapp/App");
+    return bindings.GetContextDetails(request);
   },
   async preflightLaunchProject(request) {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
@@ -327,6 +396,7 @@ const generatedBindings: WailsBindings = {
     const bindings = await import("../../wailsjs/go/wailsapp/App");
     return bindings.CreateContext(request);
   },
+  async getProjects() { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetProjects(); },
 };
 
 export const devContextApi = createDevContextApi();
@@ -383,7 +453,7 @@ function normalizeHomeDashboardState(value: unknown): HomeDashboardState {
   return {
     project: normalizeProjectState(object.project),
     ...(currentContext === undefined ? {} : {currentContext}),
-    recentProjects: arrayValue(object.recentProjects).map(normalizeHomeRecentProjectState),
+    recentProjects: arrayValue(object.recentProjects).map(normalizeRecentProjectState),
     running: normalizeHomeRunningSummary(object.running),
     activity: normalizeHomeActivitySummary(object.activity),
   };
@@ -403,8 +473,47 @@ function normalizeHomeCurrentContextState(value: unknown): HomeCurrentContextSta
   };
 }
 
-function normalizeHomeRecentProjectState(value: unknown): HomeRecentProjectState {
-  return {project: normalizeProjectState(objectValue(value).project)};
+function normalizeRecentProjectsState(value: unknown): RecentProjectsState {
+  return {projects: arrayValue(objectValue(value).projects).map(normalizeRecentProjectState)};
+}
+
+function normalizeRecentProjectState(value: unknown): RecentProjectState {
+  const object = objectValue(value);
+  const contextName = optionalString(object.contextName);
+  return {
+    project: normalizeProjectState(object.project),
+    contextId: stringValue(object.contextId),
+    ...(contextName === undefined ? {} : {contextName}),
+    lastLaunchedAt: timestampValue(object.lastLaunchedAt),
+  };
+}
+
+function normalizeContextListState(value: unknown): ContextListState {
+  return {contexts: arrayValue(objectValue(value).contexts).map(normalizeContextListItem)};
+}
+
+function normalizeContextListItem(value: unknown): ContextListItem {
+  const object = objectValue(value);
+  const lastUsedAt = optionalTimestamp(object.lastUsedAt);
+  return {
+    context: normalizeContextState(object.context),
+    enabledProviders: arrayValue(object.enabledProviders).map(normalizeProviderState),
+    projectCount: numberValue(object.projectCount),
+    ...(lastUsedAt === undefined ? {} : {lastUsedAt}),
+  };
+}
+
+function normalizeContextDetailsState(value: unknown): ContextDetailsState {
+  const object = objectValue(value);
+  const lastUsedAt = optionalTimestamp(object.lastUsedAt);
+  return {
+    context: normalizeContextState(object.context),
+    location: stringValue(object.location),
+    createdAt: timestampValue(object.createdAt),
+    projectCount: numberValue(object.projectCount),
+    enabledProviders: arrayValue(object.enabledProviders).map(normalizeProviderState),
+    ...(lastUsedAt === undefined ? {} : {lastUsedAt}),
+  };
 }
 
 function normalizeHomeRunningSummary(value: unknown): HomeRunningSummary {
@@ -524,6 +633,8 @@ function normalizeCreateContextResult(value: unknown): CreateContextResult {
     context: normalizeContextState(object.context),
   };
 }
+function normalizeProjectsState(value: unknown): ProjectsState { return {projects: arrayValue(objectValue(value).projects).map(normalizeProjectListItem)}; }
+function normalizeProjectListItem(value: unknown): ProjectListItem { const object = objectValue(value); const contextId = optionalString(object.contextId); const contextName = optionalString(object.contextName); const lastLaunchedAt = optionalTimestamp(object.lastLaunchedAt); return {project: normalizeProjectState(object.project), ...(contextId === undefined ? {} : {contextId}), ...(contextName === undefined ? {} : {contextName}), ...(lastLaunchedAt === undefined ? {} : {lastLaunchedAt}), running: booleanValue(object.running)}; }
 
 function normalizeProjectState(value: unknown): ProjectState {
   const object = objectValue(value);
@@ -775,6 +886,21 @@ function stringValue(value: unknown): string {
     return value;
   }
   throw new Error("Invalid Dev Context response.");
+}
+
+function timestampValue(value: unknown): string {
+  const timestamp = stringValue(value);
+  if (Number.isNaN(Date.parse(timestamp))) {
+    throw new Error("Invalid Dev Context response.");
+  }
+  return timestamp;
+}
+
+function optionalTimestamp(value: unknown): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  return timestampValue(value);
 }
 
 function optionalString(value: unknown): string | undefined {

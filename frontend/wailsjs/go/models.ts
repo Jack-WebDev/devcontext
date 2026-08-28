@@ -16,6 +16,12 @@ export namespace application {
 	}
 	export class CreateContextRequest {
 	    contextId: string;
+	    name?: string;
+	    description?: string;
+	    icon?: string;
+	    accent?: string;
+	    enabledProviderIds?: string[];
+	    toolId?: string;
 	    importProviderIds?: string[];
 	
 	    static createFrom(source: any = {}) {
@@ -25,6 +31,12 @@ export namespace application {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.contextId = source["contextId"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.icon = source["icon"];
+	        this.accent = source["accent"];
+	        this.enabledProviderIds = source["enabledProviderIds"];
+	        this.toolId = source["toolId"];
 	        this.importProviderIds = source["importProviderIds"];
 	    }
 	}
@@ -38,6 +50,18 @@ export namespace application {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.projectPath = source["projectPath"];
+	    }
+	}
+	export class GetContextDetailsRequest {
+	    contextId: string;
+
+	    static createFrom(source: any = {}) {
+	        return new GetContextDetailsRequest(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contextId = source["contextId"];
 	    }
 	}
 	export class GetLaunchStateRequest {
@@ -98,4 +122,3 @@ export namespace application {
 	}
 
 }
-

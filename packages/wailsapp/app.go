@@ -9,11 +9,23 @@ import (
 type service interface {
 	GetLaunchState(application.GetLaunchStateRequest) (application.LaunchState, *application.Error)
 	GetHomeDashboard(application.GetHomeDashboardRequest) (application.HomeDashboardState, *application.Error)
+	GetRecentProjects() (application.RecentProjectsState, *application.Error)
+	GetContexts() (application.ContextListState, *application.Error)
+	GetContextDetails(application.GetContextDetailsRequest) (application.ContextDetailsState, *application.Error)
 	PreflightLaunchProject(application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error)
 	LaunchProject(application.LaunchProjectRequest) (application.LaunchProjectResult, *application.Error)
 	BindProject(application.BindProjectRequest) (application.ProjectBindingState, *application.Error)
 	UnbindProject(application.UnbindProjectRequest) (application.ProjectBindingState, *application.Error)
 	CreateContext(application.CreateContextRequest) (application.CreateContextResult, *application.Error)
+	GetProjects() (application.ProjectsState, *application.Error)
+}
+
+func (a *App) GetProjects() any {
+	projects, err := a.service.GetProjects()
+	if err != nil {
+		return err
+	}
+	return projects
 }
 
 // GetHomeDashboard returns the Home screen state for the requested project.
@@ -23,6 +35,33 @@ func (a *App) GetHomeDashboard(request application.GetHomeDashboardRequest) any 
 		return err
 	}
 	return dashboard
+}
+
+// GetRecentProjects returns recent successful launches for presentation.
+func (a *App) GetRecentProjects() any {
+	projects, err := a.service.GetRecentProjects()
+	if err != nil {
+		return err
+	}
+	return projects
+}
+
+// GetContexts returns configured context summaries for presentation.
+func (a *App) GetContexts() any {
+	contexts, err := a.service.GetContexts()
+	if err != nil {
+		return err
+	}
+	return contexts
+}
+
+// GetContextDetails returns one configured context's presentation-safe details.
+func (a *App) GetContextDetails(request application.GetContextDetailsRequest) any {
+	details, err := a.service.GetContextDetails(request)
+	if err != nil {
+		return err
+	}
+	return details
 }
 
 // App is the Wails-bound application surface.

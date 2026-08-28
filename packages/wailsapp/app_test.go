@@ -17,6 +17,15 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 		homeDashboard: application.HomeDashboardState{
 			Project: application.ProjectState{Name: "api", Path: "/work/api"},
 		},
+		recentProjects: application.RecentProjectsState{Projects: []application.RecentProjectState{{
+			Project: application.ProjectState{Name: "api", Path: "/work/api"}, ContextID: "personal",
+		}}},
+		contexts: application.ContextListState{Contexts: []application.ContextListItem{{
+			Context: application.ContextState{ID: "personal", Name: "Personal"}, ProjectCount: 1,
+		}}},
+		contextDetails: application.ContextDetailsState{
+			Context: application.ContextState{ID: "personal", Name: "Personal"}, Location: "/contexts/personal",
+		},
 		launchResult: application.LaunchProjectResult{
 			Project: application.ProjectState{Name: "api", Path: "/work/api"},
 			Context: application.ContextState{ID: "personal", Name: "Personal"},
@@ -62,6 +71,25 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	}
 	if service.homeDashboardRequest != dashboardRequest {
 		t.Fatalf("home dashboard request = %#v, want %#v", service.homeDashboardRequest, dashboardRequest)
+	}
+
+	recentProjects := app.GetRecentProjects()
+	if !reflect.DeepEqual(recentProjects, service.recentProjects) {
+		t.Fatalf("recent projects = %#v, want %#v", recentProjects, service.recentProjects)
+	}
+
+	contexts := app.GetContexts()
+	if !reflect.DeepEqual(contexts, service.contexts) {
+		t.Fatalf("contexts = %#v, want %#v", contexts, service.contexts)
+	}
+
+	detailsRequest := application.GetContextDetailsRequest{ContextID: "personal"}
+	details := app.GetContextDetails(detailsRequest)
+	if !reflect.DeepEqual(details, service.contextDetails) {
+		t.Fatalf("context details = %#v, want %#v", details, service.contextDetails)
+	}
+	if service.contextDetailsRequest != detailsRequest {
+		t.Fatalf("context details request = %#v, want %#v", service.contextDetailsRequest, detailsRequest)
 	}
 
 	preflightRequest := application.PreflightLaunchProjectRequest{ProjectPath: "/work/api", ContextID: "personal"}
@@ -129,6 +157,19 @@ type fakeService struct {
 	homeDashboard        application.HomeDashboardState
 	homeDashboardErr     *application.Error
 
+	recentProjects    application.RecentProjectsState
+	recentProjectsErr *application.Error
+
+	contexts    application.ContextListState
+	contextsErr *application.Error
+
+	contextDetailsRequest application.GetContextDetailsRequest
+	contextDetails        application.ContextDetailsState
+	contextDetailsErr     *application.Error
+
+	projects    application.ProjectsState
+	projectsErr *application.Error
+
 	preflightRequest application.PreflightLaunchProjectRequest
 	preflightResult  application.PreflightLaunchProjectResult
 	preflightErr     *application.Error
@@ -158,6 +199,23 @@ func (s *fakeService) GetLaunchState(request application.GetLaunchStateRequest) 
 func (s *fakeService) GetHomeDashboard(request application.GetHomeDashboardRequest) (application.HomeDashboardState, *application.Error) {
 	s.homeDashboardRequest = request
 	return s.homeDashboard, s.homeDashboardErr
+}
+
+func (s *fakeService) GetRecentProjects() (application.RecentProjectsState, *application.Error) {
+	return s.recentProjects, s.recentProjectsErr
+}
+
+func (s *fakeService) GetContexts() (application.ContextListState, *application.Error) {
+	return s.contexts, s.contextsErr
+}
+
+func (s *fakeService) GetContextDetails(request application.GetContextDetailsRequest) (application.ContextDetailsState, *application.Error) {
+	s.contextDetailsRequest = request
+	return s.contextDetails, s.contextDetailsErr
+}
+
+func (s *fakeService) GetProjects() (application.ProjectsState, *application.Error) {
+	return s.projects, s.projectsErr
 }
 
 func (s *fakeService) PreflightLaunchProject(request application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error) {
