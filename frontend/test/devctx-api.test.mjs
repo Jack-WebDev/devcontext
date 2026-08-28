@@ -48,6 +48,41 @@ test("adapter normalizes the Home dashboard contract", async () => {
   });
 });
 
+test("adapter normalizes active running environments", async () => {
+  const api = createDevContextApi({
+    async getRunningEnvironments() {
+      return {
+        environments: [{
+          id: "environment-1",
+          project: {name: "api", path: "/work/api"},
+          context: {id: "company", name: "Company"},
+          tool: {id: "second-tool", name: "Second Tool"},
+          startedAt: "2026-08-28T10:30:00Z",
+          process: {state: "running"},
+          session: {state: "unknown"},
+          launch: {source: "gui", resolutionSource: "explicit"},
+        }],
+      };
+    },
+  });
+
+  assert.deepEqual(await api.getRunningEnvironments(), {
+    ok: true,
+    data: {
+      environments: [{
+        id: "environment-1",
+        project: {name: "api", path: "/work/api"},
+        context: {id: "company", name: "Company"},
+        tool: {id: "second-tool", name: "Second Tool"},
+        startedAt: "2026-08-28T10:30:00Z",
+        process: {state: "running"},
+        session: {state: "unknown"},
+        launch: {source: "gui", resolutionSource: "explicit"},
+      }],
+    },
+  });
+});
+
 test("adapter normalizes recent projects", async () => {
   const api = createDevContextApi({
     async getRecentProjects() {

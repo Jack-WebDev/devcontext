@@ -23,6 +23,7 @@ type Dependencies struct {
 	Projects            project.Repository
 	RecentProjects      project.RecentRepository
 	RunningEnvironments running.Repository
+	ProcessInspector    running.ProcessInspector
 	Paths               filesystem.PlatformPaths
 	ProviderRegistry    provider.Registry
 	ToolRegistry        codingtool.Registry
@@ -83,6 +84,7 @@ func NewDefaultService(options DefaultOptions) (*Service, error) {
 		Projects:            project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
 		RecentProjects:      project.NewRecentRepository(filepath.Join(layout.HomeDir, "recents.toml")),
 		RunningEnvironments: running.NewRepository(filepath.Join(layout.HomeDir, "running.toml")),
+		ProcessInspector:    running.NativeProcessInspector{},
 		Paths:               paths,
 		ProviderRegistry:    provider.BuiltInRegistry(),
 		ToolRegistry:        codingtool.BuiltInRegistry(),
@@ -143,6 +145,9 @@ func normalizeDependencies(dependencies Dependencies) Dependencies {
 	}
 	if dependencies.ProcessLauncher == nil {
 		dependencies.ProcessLauncher = launcher.NativeProcessLauncher{}
+	}
+	if dependencies.ProcessInspector == nil {
+		dependencies.ProcessInspector = running.NativeProcessInspector{}
 	}
 	if dependencies.StoragePermissions == nil {
 		dependencies.StoragePermissions = filesystem.NewDefaultStoragePermissions()

@@ -293,6 +293,22 @@ export interface HistoryState { entries: HistoryEntry[]; }
 export type HistoryCategory = "launch" | "configuration" | "warning";
 export interface HistoryEntry { event: string; category: HistoryCategory; timestamp: string; projectPath?: string; contextId?: string; toolId?: string; message: string; }
 
+export interface RunningEnvironmentsState { environments: RunningEnvironmentState[]; }
+export interface RunningEnvironmentState {
+  id: string;
+  project: ProjectState;
+  context: RunningEnvironmentContextState;
+  tool: ToolOption;
+  startedAt: string;
+  process: RunningEnvironmentProcessState;
+  session: RunningEnvironmentSessionState;
+  launch: RunningEnvironmentLaunchState;
+}
+export interface RunningEnvironmentContextState { id: string; name: string; }
+export interface RunningEnvironmentProcessState { state: string; pid?: number; }
+export interface RunningEnvironmentSessionState { id?: string; state: string; }
+export interface RunningEnvironmentLaunchState { source: string; resolutionSource: string; }
+
 export interface ProviderCredentialSession {
   providerId: string;
   name: string;
@@ -316,6 +332,7 @@ export interface DevContextApi {
   getRepairActions(request: GetRepairActionsRequest): Promise<ApiResult<RepairActionsState>>;
   runRepairAction(request: RunRepairActionRequest): Promise<ApiResult<RunRepairActionResult>>;
   getHistory(): Promise<ApiResult<HistoryState>>;
+  getRunningEnvironments(): Promise<ApiResult<RunningEnvironmentsState>>;
 }
 
 export interface WailsBindings {
@@ -334,6 +351,7 @@ export interface WailsBindings {
   getRepairActions(request: GetRepairActionsRequest): Promise<unknown>;
   runRepairAction(request: RunRepairActionRequest): Promise<unknown>;
   getHistory(): Promise<unknown>;
+  getRunningEnvironments(): Promise<unknown>;
 }
 
 export function createDevContextApi(bindings: WailsBindings = generatedBindings): DevContextApi {
@@ -387,6 +405,7 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
     getRepairActions(request) { return callBinding(() => bindings.getRepairActions(request), normalizeRepairActionsState); },
     runRepairAction(request) { return callBinding(() => bindings.runRepairAction({...request, confirmDestructive: request.confirmDestructive ?? false}), normalizeRunRepairActionResult); },
     getHistory() { return callBinding(() => bindings.getHistory(), normalizeHistoryState); },
+    getRunningEnvironments() { return callBinding(() => bindings.getRunningEnvironments(), normalizeRunningEnvironmentsState); },
   };
 }
 
@@ -442,6 +461,7 @@ const generatedBindings: WailsBindings = {
   async getRepairActions(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetRepairActions(request); },
   async runRepairAction(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.RunRepairAction({...request, confirmDestructive: request.confirmDestructive ?? false}); },
   async getHistory() { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetHistory(); },
+  async getRunningEnvironments() { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetRunningEnvironments(); },
 };
 
 export const devContextApi = createDevContextApi();
@@ -690,6 +710,12 @@ function normalizeRepairTarget(value: unknown): RepairTarget { const object = ob
 function normalizeRunRepairActionResult(value: unknown): RunRepairActionResult { const object = objectValue(value); return {actionId: stringValue(object.actionId), diagnostics: normalizeDiagnosticsState(object.diagnostics)}; }
 function normalizeHistoryState(value: unknown): HistoryState { return {entries: arrayValue(objectValue(value).entries).map(normalizeHistoryEntry)}; }
 function normalizeHistoryEntry(value: unknown): HistoryEntry { const object = objectValue(value); return {event: stringValue(object.event), category: normalizeHistoryCategory(object.category), timestamp: stringValue(object.timestamp), projectPath: optionalString(object.projectPath), contextId: optionalString(object.contextId), toolId: optionalString(object.toolId), message: stringValue(object.message)}; }
+function normalizeRunningEnvironmentsState(value: unknown): RunningEnvironmentsState { return {environments: arrayValue(objectValue(value).environments).map(normalizeRunningEnvironmentState)}; }
+function normalizeRunningEnvironmentState(value: unknown): RunningEnvironmentState { const object = objectValue(value); return {id: stringValue(object.id), project: normalizeProjectState(object.project), context: normalizeRunningEnvironmentContextState(object.context), tool: normalizeToolOption(object.tool), startedAt: stringValue(object.startedAt), process: normalizeRunningEnvironmentProcessState(object.process), session: normalizeRunningEnvironmentSessionState(object.session), launch: normalizeRunningEnvironmentLaunchState(object.launch)}; }
+function normalizeRunningEnvironmentContextState(value: unknown): RunningEnvironmentContextState { const object = objectValue(value); return {id: stringValue(object.id), name: stringValue(object.name)}; }
+function normalizeRunningEnvironmentProcessState(value: unknown): RunningEnvironmentProcessState { const object = objectValue(value); const pid = optionalNumber(object.pid); return {state: stringValue(object.state), ...(pid === undefined ? {} : {pid})}; }
+function normalizeRunningEnvironmentSessionState(value: unknown): RunningEnvironmentSessionState { const object = objectValue(value); const id = optionalString(object.id); return {state: stringValue(object.state), ...(id === undefined ? {} : {id})}; }
+function normalizeRunningEnvironmentLaunchState(value: unknown): RunningEnvironmentLaunchState { const object = objectValue(value); return {source: stringValue(object.source), resolutionSource: stringValue(object.resolutionSource)}; }
 
 function normalizeHistoryCategory(value: unknown): HistoryCategory {
   if (value === "launch" || value === "warning") {
@@ -984,6 +1010,13 @@ function numberValue(value: unknown): number {
     return value;
   }
   throw new Error("Invalid Dev Context response.");
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  return numberValue(value);
 }
 
 function optionalStringRecord(value: unknown): Record<string, string> | undefined {

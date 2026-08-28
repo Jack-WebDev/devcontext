@@ -12,6 +12,7 @@ import {ProjectsView, formatProjectTime} from "../.tmp-test/src/components/proje
 import {ProjectContextChangeDialog, safetyImplication} from "../.tmp-test/src/components/projects/ProjectContextChangeDialog.js";
 import {renderDiagnostics} from "../.tmp-test/src/components/diagnostics/DiagnosticsView.js";
 import {ContextsView, providerSummary} from "../.tmp-test/src/components/contexts/ContextsView.js";
+import {RunningView, formatRunningTime} from "../.tmp-test/src/components/running/RunningView.js";
 import {
   HistoryView,
   filterHistoryEntries,
@@ -117,6 +118,29 @@ test("history presents an empty activity state", () => {
   const html = renderToStaticMarkup(createElement(HistoryView, {entries: []}));
 
   assert.ok(html.includes("No activity has been recorded yet."));
+});
+
+test("running environments show immutable launch context and tool action entry points", () => {
+  const environments = [{
+    id: "environment-1",
+    project: {name: "api", path: "/work/api"},
+    context: {id: "company", name: "Company"},
+    tool: {id: "second-tool", name: "Second Tool"},
+    startedAt: "2026-08-28T10:30:00Z",
+    process: {state: "running"},
+    session: {state: "unknown"},
+    launch: {source: "gui", resolutionSource: "explicit"},
+  }];
+  const html = renderToStaticMarkup(createElement(RunningView, {environments}));
+
+  assert.ok(html.includes("Running"));
+  assert.ok(html.includes("Company"));
+  assert.ok(html.includes("Second Tool"));
+  assert.ok(html.includes("Reveal"));
+  assert.ok(html.includes("Switch to"));
+  assert.ok(html.includes("Stop"));
+  assert.match(html, /disabled=""/);
+  assert.notEqual(formatRunningTime("invalid"), "Invalid Date");
 });
 
 test("project identity presents the current project name and path in a compact block", () => {

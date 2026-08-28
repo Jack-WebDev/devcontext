@@ -22,6 +22,7 @@ type service interface {
 	GetRepairActions(application.GetRepairActionsRequest) (application.RepairActionsState, *application.Error)
 	RunRepairAction(application.RunRepairActionRequest) (application.RunRepairActionResult, *application.Error)
 	GetHistory() (application.HistoryState, *application.Error)
+	GetRunningEnvironments() (application.RunningEnvironmentsState, *application.Error)
 }
 
 func (a *App) GetProjects() any {
@@ -66,6 +67,15 @@ func (a *App) GetHistory() any {
 		return err
 	}
 	return history
+}
+
+// GetRunningEnvironments returns active coding-tool environments.
+func (a *App) GetRunningEnvironments() any {
+	environments, err := a.service.GetRunningEnvironments()
+	if err != nil {
+		return err
+	}
+	return environments
 }
 
 // GetHomeDashboard returns the Home screen state for the requested project.

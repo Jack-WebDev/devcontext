@@ -1,8 +1,39 @@
 package application
 
 import (
+	"time"
+
+	devlog "devctx/packages/core/logging"
 	coreRunning "devctx/packages/core/running"
 )
+
+func (s *Service) getRunningEnvironments() (RunningEnvironmentsState, error) {
+	result, err := s.dependencies.RunningEnvironments.RefreshProcessStates(s.dependencies.ProcessInspector)
+	if err != nil {
+		return RunningEnvironmentsState{}, err
+	}
+	for _, environment := range result.Stopped {
+		s.recordHistoryEvent(environmentStoppedEvent(environment, s.now()))
+	}
+
+	states := make([]RunningEnvironmentState, 0, len(result.Environments))
+	for _, environment := range result.Environments {
+		if environment.Process.State == coreRunning.ProcessStateRunning {
+			states = append(states, runningEnvironmentState(environment))
+		}
+	}
+	return RunningEnvironmentsState{Environments: states}, nil
+}
+
+func environmentStoppedEvent(environment coreRunning.Environment, timestamp time.Time) devlog.Event {
+	return devlog.NewEvent(devlog.EventInput{
+		Name:        devlog.EventEnvironmentStopped,
+		Timestamp:   timestamp,
+		ProjectPath: string(environment.Project.Path),
+		ContextID:   environment.Context.ID.String(),
+		ToolID:      string(environment.Tool.ID),
+	})
+}
 
 func runningEnvironmentState(environment coreRunning.Environment) RunningEnvironmentState {
 	return RunningEnvironmentState{

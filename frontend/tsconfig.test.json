@@ -20,6 +20,7 @@
     "src/components/contexts/*.tsx",
     "src/components/projects/*.tsx",
     "src/components/diagnostics/*.tsx",
-    "src/components/history/*.tsx"
+    "src/components/history/*.tsx",
+    "src/components/running/*.tsx"
   ]
 }

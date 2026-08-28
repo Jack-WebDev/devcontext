@@ -23,6 +23,12 @@ type Repository struct {
 	path string
 }
 
+// RefreshResult reports persisted environments and records that changed to stopped.
+type RefreshResult struct {
+	Environments []Environment
+	Stopped      []Environment
+}
+
 // NewRepository creates a repository backed by one TOML file.
 func NewRepository(path string) Repository {
 	return Repository{path: path}
@@ -95,6 +101,49 @@ func (r Repository) Record(environment Environment) (Environment, error) {
 		return Environment{}, err
 	}
 	return environment, nil
+}
+
+// RefreshProcessStates marks running environments stopped when their recorded
+// PID is no longer active. Records without a PID remain unchanged because their
+// process state cannot be observed safely.
+func (r Repository) RefreshProcessStates(inspector ProcessInspector) (RefreshResult, error) {
+	if r.IsZero() {
+		return RefreshResult{}, fmt.Errorf("refresh running environments: repository is not configured")
+	}
+	if inspector == nil {
+		return RefreshResult{}, fmt.Errorf("refresh running environments: process inspector is required")
+	}
+	environments, err := r.List()
+	if err != nil {
+		return RefreshResult{}, err
+	}
+	stopped := make([]Environment, 0)
+	changed := false
+	for index := range environments {
+		environment := &environments[index]
+		if environment.Process.State != ProcessStateRunning || environment.Process.PID == nil {
+			continue
+		}
+		running, err := inspector.IsRunning(*environment.Process.PID)
+		if err != nil {
+			return RefreshResult{}, err
+		}
+		if running {
+			continue
+		}
+		environment.Process.State = ProcessStateStopped
+		if environment.Session.State == SessionStateActive {
+			environment.Session.State = SessionStateEnded
+		}
+		stopped = append(stopped, *environment)
+		changed = true
+	}
+	if changed {
+		if err := r.write(environments); err != nil {
+			return RefreshResult{}, err
+		}
+	}
+	return RefreshResult{Environments: environments, Stopped: stopped}, nil
 }
 
 type document struct {

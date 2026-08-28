@@ -507,6 +507,11 @@ type RunningEnvironmentLaunchState struct {
 	ResolutionSource string `json:"resolutionSource"`
 }
 
+// RunningEnvironmentsState contains active coding-tool environments.
+type RunningEnvironmentsState struct {
+	Environments []RunningEnvironmentState `json:"environments"`
+}
+
 // ProviderCredentialSessionState describes a detected global provider session
 // using only non-secret metadata that helps the user classify the session.
 type ProviderCredentialSessionState struct {

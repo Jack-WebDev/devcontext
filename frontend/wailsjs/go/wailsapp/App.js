@@ -34,6 +34,10 @@ export function GetHistory() {
   return window['go']['wailsapp']['App']['GetHistory']();
 }
 
+export function GetRunningEnvironments() {
+  return window['go']['wailsapp']['App']['GetRunningEnvironments']();
+}
+
 export function GetHomeDashboard(arg1) {
   return window['go']['wailsapp']['App']['GetHomeDashboard'](arg1);
 }

@@ -159,6 +159,16 @@ func (s *Service) GetHistory() (HistoryState, *Error) {
 	return history, nil
 }
 
+// GetRunningEnvironments returns active coding-tool environments after
+// refreshing process state where a PID is available.
+func (s *Service) GetRunningEnvironments() (RunningEnvironmentsState, *Error) {
+	state, err := s.getRunningEnvironments()
+	if err != nil {
+		return RunningEnvironmentsState{}, NewError(err)
+	}
+	return state, nil
+}
+
 func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, error) {
 	projectPath, err := s.validatedProjectPath(request.ProjectPath)
 	if err != nil {

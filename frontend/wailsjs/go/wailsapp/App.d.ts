@@ -18,6 +18,8 @@ export function RunRepairAction(arg1:application.RunRepairActionRequest):Promise
 
 export function GetHistory():Promise<any>;
 
+export function GetRunningEnvironments():Promise<any>;
+
 export function GetHomeDashboard(arg1:application.GetHomeDashboardRequest):Promise<any>;
 
 export function GetLaunchState(arg1:application.GetLaunchStateRequest):Promise<any>;
