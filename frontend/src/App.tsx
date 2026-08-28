@@ -9,6 +9,8 @@ import { ProjectsView } from "./components/projects/ProjectsView";
 import { ProjectContextChangeDialog } from "./components/projects/ProjectContextChangeDialog";
 import { DiagnosticsView } from "./components/diagnostics/DiagnosticsView";
 import { HistoryView } from "./components/history/HistoryView";
+import { RunningView } from "./components/running/RunningView";
+import { RunningEnvironmentConflictDialog } from "./components/running/RunningEnvironmentConflictDialog";
 import { ContextsView } from "./components/contexts/ContextsView";
 import { ContextDetailsDrawer, CreateContextDialog } from "./components/contexts/ContextManagement";
 import { AppShell } from "./components/shell/AppShell";
@@ -25,6 +27,8 @@ import {
   type ProjectListItem,
   type ProjectsState,
   type RecentProjectState,
+  type RunningEnvironmentsState,
+  type RunningEnvironmentConflict,
 } from "./lib/devctx-api";
 import { devContextWindow } from "./lib/devctx-window";
 
@@ -58,6 +62,13 @@ type HistoryLoad =
   | { status: "loaded"; data: HistoryState }
   | { status: "error"; error: DisplayError };
 
+type RunningLoad =
+  | { status: "loading" }
+  | { status: "loaded"; data: RunningEnvironmentsState }
+  | { status: "error"; error: DisplayError };
+
+interface PendingRunningEnvironmentLaunch { conflict: RunningEnvironmentConflict; request: {projectPath: string; contextId: string}; }
+
 function App() {
   const [launchState, setLaunchState] = useState<LaunchStateLoad>({
     status: "loading",
@@ -67,6 +78,10 @@ function App() {
   const [contexts, setContexts] = useState<ContextsLoad>({status: "loading"});
   const [projects, setProjects] = useState<ProjectsLoad>({status: "loading"});
   const [history, setHistory] = useState<HistoryLoad>({status: "loading"});
+  const [running, setRunning] = useState<RunningLoad>({status: "loading"});
+  const [pendingRunningEnvironmentLaunch, setPendingRunningEnvironmentLaunch] = useState<PendingRunningEnvironmentLaunch>();
+  const [runningEnvironmentLaunchPending, setRunningEnvironmentLaunchPending] = useState(false);
+  const [runningEnvironmentLaunchError, setRunningEnvironmentLaunchError] = useState<DisplayError>();
   const [contextDetailsID, setContextDetailsID] = useState<string>();
   const [creatingContext, setCreatingContext] = useState(false);
   const [homeLaunchPending, setHomeLaunchPending] = useState(false);
@@ -141,6 +156,9 @@ function App() {
     if (activeRoute === "history") {
       void refreshHistory();
     }
+    if (activeRoute === "running") {
+      void refreshRunningEnvironments();
+    }
   }, [activeRoute]);
 
   function handleNavigate(route: AppRoute) {
@@ -197,6 +215,11 @@ function App() {
     setHistory(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error});
   }
 
+  async function refreshRunningEnvironments() {
+    const result = await devContextApi.getRunningEnvironments();
+    setRunning(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error});
+  }
+
   async function handleHomeQuickLaunch() {
     if (homeDashboard.status !== "loaded" || homeDashboard.data.currentContext === undefined || homeLaunchPending) {
       return;
@@ -210,6 +233,9 @@ function App() {
       const preflight = await devContextApi.preflightLaunchProject(request);
       if (!preflight.ok) {
         setHomeLaunchError(preflight.error);
+        return;
+      }
+      if (deferRunningEnvironmentConflict(preflight.data, request)) {
         return;
       }
       const launch = await devContextApi.launchProject(request);
@@ -251,6 +277,9 @@ function App() {
         setRecentProjectLaunchError(preflight.error);
         return;
       }
+      if (deferRunningEnvironmentConflict(preflight.data, request)) {
+        return;
+      }
       const launch = await devContextApi.launchProject(request);
       if (!launch.ok) {
         setRecentProjectLaunchError(launch.error);
@@ -281,6 +310,9 @@ function App() {
       const preflight = await devContextApi.preflightLaunchProject(request);
       if (!preflight.ok) {
         setProjectLaunchError(preflight.error);
+        return;
+      }
+      if (deferRunningEnvironmentConflict(preflight.data, request)) {
         return;
       }
       const launch = await devContextApi.launchProject(request);
@@ -321,6 +353,34 @@ function App() {
 
   function handleProjectOpenFolder(project: ProjectListItem) {
     window.open(new URL(project.project.path, "file://").href, "_blank", "noopener,noreferrer");
+  }
+
+  function deferRunningEnvironmentConflict(preflight: {runningEnvironmentConflict?: RunningEnvironmentConflict}, request: {projectPath: string; contextId: string}) {
+    if (preflight.runningEnvironmentConflict === undefined) {
+      return false;
+    }
+    setRunningEnvironmentLaunchError(undefined);
+    setPendingRunningEnvironmentLaunch({conflict: preflight.runningEnvironmentConflict, request});
+    return true;
+  }
+
+  async function handleLaunchAnotherWindow() {
+    if (pendingRunningEnvironmentLaunch === undefined || runningEnvironmentLaunchPending) {
+      return;
+    }
+    setRunningEnvironmentLaunchPending(true);
+    setRunningEnvironmentLaunchError(undefined);
+    try {
+      const result = await devContextApi.launchProject(pendingRunningEnvironmentLaunch.request);
+      if (!result.ok) {
+        setRunningEnvironmentLaunchError(result.error);
+        return;
+      }
+      setPendingRunningEnvironmentLaunch(undefined);
+      await Promise.all([refreshHomeDashboard(), refreshRecentProjects(), refreshProjects(), refreshRunningEnvironments()]);
+    } finally {
+      setRunningEnvironmentLaunchPending(false);
+    }
   }
 
   return (
@@ -381,9 +441,12 @@ function App() {
         <DiagnosticsView contexts={contexts.status === "loaded" ? contexts.data : []} load={(contextId) => devContextApi.getDiagnostics({contextId})} loadRepairActions={(contextId) => devContextApi.getRepairActions({contextId})} runRepairAction={(contextId, actionId, confirmDestructive) => devContextApi.runRepairAction({contextId, actionId, confirmDestructive})} />
       ) : activeRoute === "history" ? (
         renderHistory(history)
+      ) : activeRoute === "running" ? (
+        renderRunning(running)
       ) : (
         <PlaceholderScreen route={activeRoute} />
       )}
+      {pendingRunningEnvironmentLaunch ? <RunningEnvironmentConflictDialog conflict={pendingRunningEnvironmentLaunch.conflict} launchPending={runningEnvironmentLaunchPending} error={runningEnvironmentLaunchError} onCancel={() => !runningEnvironmentLaunchPending && setPendingRunningEnvironmentLaunch(undefined)} onLaunchAnother={() => void handleLaunchAnotherWindow()} /> : null}
     </AppShell>
   );
 }
@@ -396,6 +459,16 @@ function renderHistory(history: HistoryLoad) {
     return <GuiErrorNotice error={history.error} />;
   }
   return <HistoryView entries={history.data.entries} />;
+}
+
+function renderRunning(running: RunningLoad) {
+  if (running.status === "loading") {
+    return <p className="text-sm text-muted-foreground">Refreshing active environments...</p>;
+  }
+  if (running.status === "error") {
+    return <GuiErrorNotice error={running.error} />;
+  }
+  return <RunningView environments={running.data.environments} />;
 }
 
 function renderContexts(contexts: ContextsLoad, onSelect: (id: string) => void, onNew: () => void) {

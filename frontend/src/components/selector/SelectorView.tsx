@@ -13,9 +13,11 @@ import type {
   PreflightLaunchProjectResult,
   ProviderCredentialSession,
   ProjectBindingState,
+  RunningEnvironmentConflict,
 } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
+import { RunningEnvironmentConflictDialog } from "../running/RunningEnvironmentConflictDialog";
 import { ContextMismatchDialog } from "./ContextMismatchDialog";
 import { ContextCard } from "./ContextCard";
 import { FirstRunWelcome, shouldRenderFirstRunWelcome } from "./FirstRunWelcome";
@@ -79,6 +81,7 @@ function SelectorView({
   const [launchLifecycle, setLaunchLifecycle] = useState<LaunchLifecycleState>({status: "idle"});
   const [launchError, setLaunchError] = useState<DisplayError | undefined>(undefined);
   const [mismatchError, setMismatchError] = useState<DisplayError | undefined>(undefined);
+  const [runningEnvironmentConflict, setRunningEnvironmentConflict] = useState<RunningEnvironmentConflict | undefined>(undefined);
   const [onboardingPendingContextId, setOnboardingPendingContextId] = useState<string | undefined>(undefined);
   const [onboardingError, setOnboardingError] = useState<DisplayError | undefined>(undefined);
   const [providerSessionAssignments, setProviderSessionAssignments] = useState<ProviderSessionAssignments>({});
@@ -163,7 +166,7 @@ function SelectorView({
     void cancelSelector({ closeSelector: onCancel });
   }
 
-  async function handleLaunch(confirmContextMismatch = false, contextId = selectedContextId) {
+  async function handleLaunch(confirmContextMismatch = false, contextId = selectedContextId, allowExistingEnvironmentLaunch = false) {
     const contextToLaunch = launchState.contexts.find((context) => context.id === contextId);
     if (selectedContextConfidenceBlocked(contextToLaunch)) {
       return;
@@ -182,6 +185,7 @@ function SelectorView({
           selectedContextId: contextId,
           rememberProject,
           confirmContextMismatch,
+          allowExistingEnvironmentLaunch,
           onPreflightComplete: (preflight) => {
             setLaunchLifecycle({status: "launching", steps: preflight.verificationSteps});
           },
@@ -190,7 +194,9 @@ function SelectorView({
           launchProject: onLaunchProject,
         });
 
-        if (result?.ok) {
+        if (result && "runningEnvironmentConflict" in result) {
+          setRunningEnvironmentConflict(result.runningEnvironmentConflict);
+        } else if (result?.ok) {
           if (shouldCloseSelectorAfterLaunch(launchSuccessCloseBehavior)) {
             await cancelSelector({ closeSelector: onCancel });
           }
@@ -350,6 +356,15 @@ function SelectorView({
                   launchPending={launchPending}
                   onCancel={() => setMismatchError(undefined)}
                   onOpenAnyway={() => void handleLaunch(true)}
+                />
+              ) : null}
+
+              {runningEnvironmentConflict ? (
+                <RunningEnvironmentConflictDialog
+                  conflict={runningEnvironmentConflict}
+                  launchPending={launchPending}
+                  onCancel={() => setRunningEnvironmentConflict(undefined)}
+                  onLaunchAnother={() => void handleLaunch(false, selectedContextId, true)}
                 />
               ) : null}
 

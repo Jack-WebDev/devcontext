@@ -22,14 +22,6 @@ export function GetDiagnostics(arg1) {
   return window['go']['wailsapp']['App']['GetDiagnostics'](arg1);
 }
 
-export function GetRepairActions(arg1) {
-  return window['go']['wailsapp']['App']['GetRepairActions'](arg1);
-}
-
-export function RunRepairAction(arg1) {
-  return window['go']['wailsapp']['App']['RunRepairAction'](arg1);
-}
-
 export function GetHistory() {
   return window['go']['wailsapp']['App']['GetHistory']();
 }
@@ -50,12 +42,24 @@ export function GetRecentProjects() {
   return window['go']['wailsapp']['App']['GetRecentProjects']();
 }
 
+export function GetRepairActions(arg1) {
+  return window['go']['wailsapp']['App']['GetRepairActions'](arg1);
+}
+
+export function GetRunningEnvironments() {
+  return window['go']['wailsapp']['App']['GetRunningEnvironments']();
+}
+
 export function LaunchProject(arg1) {
   return window['go']['wailsapp']['App']['LaunchProject'](arg1);
 }
 
 export function PreflightLaunchProject(arg1) {
   return window['go']['wailsapp']['App']['PreflightLaunchProject'](arg1);
+}
+
+export function RunRepairAction(arg1) {
+  return window['go']['wailsapp']['App']['RunRepairAction'](arg1);
 }
 
 export function UnbindProject(arg1) {

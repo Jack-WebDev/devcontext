@@ -84,7 +84,15 @@ type ContextDetailsState struct {
 // HomeRunningSummary reserves aggregate running-environment data for later
 // running-environment tracking phases.
 type HomeRunningSummary struct {
-	Count int `json:"count"`
+	Count              int                       `json:"count"`
+	ContextCounts      []HomeRunningContextCount `json:"contextCounts"`
+	IsolationProtected bool                      `json:"isolationProtected"`
+}
+
+type HomeRunningContextCount struct {
+	ContextID   string `json:"contextId"`
+	ContextName string `json:"contextName"`
+	Count       int    `json:"count"`
 }
 
 // HomeActivitySummary reserves aggregate activity data for later history
@@ -278,11 +286,18 @@ type PreflightLaunchProjectRequest struct {
 // PreflightLaunchProjectResult describes launch readiness before an editor
 // process is started.
 type PreflightLaunchProjectResult struct {
-	Project           ProjectState             `json:"project"`
-	Context           ContextState             `json:"context"`
-	Confidence        LaunchConfidenceState    `json:"confidence"`
-	VerificationSteps []LaunchVerificationStep `json:"verificationSteps,omitempty"`
-	Warnings          []ResolutionWarning      `json:"warnings,omitempty"`
+	Project                    ProjectState                `json:"project"`
+	Context                    ContextState                `json:"context"`
+	Confidence                 LaunchConfidenceState       `json:"confidence"`
+	VerificationSteps          []LaunchVerificationStep    `json:"verificationSteps,omitempty"`
+	Warnings                   []ResolutionWarning         `json:"warnings,omitempty"`
+	RunningEnvironmentConflict *RunningEnvironmentConflict `json:"runningEnvironmentConflict,omitempty"`
+}
+
+// RunningEnvironmentConflict identifies an active environment for the same project.
+type RunningEnvironmentConflict struct {
+	Kind        string                  `json:"kind"`
+	Environment RunningEnvironmentState `json:"environment"`
 }
 
 // LaunchVerificationStepStatus identifies the current state of one
@@ -505,6 +520,11 @@ type RunningEnvironmentSessionState struct {
 type RunningEnvironmentLaunchState struct {
 	Source           string `json:"source"`
 	ResolutionSource string `json:"resolutionSource"`
+}
+
+// RunningEnvironmentsState contains active coding-tool environments.
+type RunningEnvironmentsState struct {
+	Environments []RunningEnvironmentState `json:"environments"`
 }
 
 // ProviderCredentialSessionState describes a detected global provider session

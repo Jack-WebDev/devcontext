@@ -47,10 +47,11 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 		createContextResult: application.CreateContextResult{
 			Context: application.ContextState{ID: "personal", Name: "Personal"},
 		},
-		diagnostics:   application.DiagnosticsState{Groups: []application.DiagnosticGroup{}},
-		repairActions: application.RepairActionsState{Actions: []application.RepairAction{}},
-		repairResult:  application.RunRepairActionResult{ActionID: "recheck-provider-files"},
-		history:       application.HistoryState{Entries: []application.HistoryEntry{}},
+		diagnostics:         application.DiagnosticsState{Groups: []application.DiagnosticGroup{}},
+		repairActions:       application.RepairActionsState{Actions: []application.RepairAction{}},
+		repairResult:        application.RunRepairActionResult{ActionID: "recheck-provider-files"},
+		history:             application.HistoryState{Entries: []application.HistoryEntry{}},
+		runningEnvironments: application.RunningEnvironmentsState{Environments: []application.RunningEnvironmentState{}},
 	}
 	app := New(service)
 	app.Startup(context.Background())
@@ -172,6 +173,10 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	if !reflect.DeepEqual(history, service.history) {
 		t.Fatalf("history = %#v, want %#v", history, service.history)
 	}
+	runningEnvironments := app.GetRunningEnvironments()
+	if !reflect.DeepEqual(runningEnvironments, service.runningEnvironments) {
+		t.Fatalf("running environments = %#v, want %#v", runningEnvironments, service.runningEnvironments)
+	}
 }
 
 func TestAppReturnsApplicationErrorsAsSingleValues(t *testing.T) {
@@ -240,6 +245,9 @@ type fakeService struct {
 
 	history    application.HistoryState
 	historyErr *application.Error
+
+	runningEnvironments    application.RunningEnvironmentsState
+	runningEnvironmentsErr *application.Error
 }
 
 func (s *fakeService) GetLaunchState(request application.GetLaunchStateRequest) (application.LaunchState, *application.Error) {
@@ -286,6 +294,10 @@ func (s *fakeService) RunRepairAction(request application.RunRepairActionRequest
 
 func (s *fakeService) GetHistory() (application.HistoryState, *application.Error) {
 	return s.history, s.historyErr
+}
+
+func (s *fakeService) GetRunningEnvironments() (application.RunningEnvironmentsState, *application.Error) {
+	return s.runningEnvironments, s.runningEnvironmentsErr
 }
 
 func (s *fakeService) PreflightLaunchProject(request application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error) {

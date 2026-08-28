@@ -15,6 +15,7 @@ import (
 	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
 	"devctx/packages/core/provider"
+	coreRunning "devctx/packages/core/running"
 )
 
 // GetLaunchState returns the GUI selector state for one project.
@@ -158,6 +159,16 @@ func (s *Service) GetHistory() (HistoryState, *Error) {
 	return history, nil
 }
 
+// GetRunningEnvironments returns active coding-tool environments after
+// refreshing process state where a PID is available.
+func (s *Service) GetRunningEnvironments() (RunningEnvironmentsState, *Error) {
+	state, err := s.getRunningEnvironments()
+	if err != nil {
+		return RunningEnvironmentsState{}, NewError(err)
+	}
+	return state, nil
+}
+
 func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, error) {
 	projectPath, err := s.validatedProjectPath(request.ProjectPath)
 	if err != nil {
@@ -216,6 +227,11 @@ func (s *Service) getHomeDashboard(request GetHomeDashboardRequest) (HomeDashboa
 		Running:        HomeRunningSummary{},
 		Activity:       HomeActivitySummary{},
 	}
+	running, err := s.homeRunningSummary()
+	if err != nil {
+		return HomeDashboardState{}, err
+	}
+	dashboard.Running = running
 	for _, context := range launchState.Contexts {
 		if context.ID != launchState.SelectedContextID {
 			continue
@@ -541,12 +557,28 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 
 	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchSucceeded, plan, nil, s.now()))
 	_ = s.dependencies.RecentProjects.Record(plan.ProjectPath, plan.Context.ID, s.now())
+	_, _ = s.dependencies.RunningEnvironments.Record(runningEnvironmentFromLaunchPlan(plan, s.now()))
 
 	return LaunchProjectResult{
 		Project:  projectState(plan.ProjectPath),
 		Context:  s.contextState(plan.Context),
 		Warnings: warningStates(plan.Warnings),
 	}, nil
+}
+
+func runningEnvironmentFromLaunchPlan(plan launcher.LaunchPlan, startedAt time.Time) coreRunning.Environment {
+	return coreRunning.Environment{
+		Project:   coreRunning.ProjectIdentity{Path: plan.ProjectPath, Name: projectName(plan.ProjectPath)},
+		Context:   coreRunning.ContextIdentity{ID: plan.Context.ID, Name: plan.Context.Name},
+		Tool:      coreRunning.ToolIdentity{ID: plan.Tool.ID, Name: plan.Tool.DisplayName},
+		StartedAt: startedAt.UTC(),
+		Process:   coreRunning.Process{State: coreRunning.ProcessStateRunning},
+		Session:   coreRunning.Session{State: coreRunning.SessionStateUnknown},
+		Launch: coreRunning.LaunchIdentity{
+			Source:           launcher.InvocationSourceGUI,
+			ResolutionSource: plan.ResolutionSource,
+		},
+	}
 }
 
 func (s *Service) preflightLaunchProject(request PreflightLaunchProjectRequest) (PreflightLaunchProjectResult, error) {
@@ -582,12 +614,17 @@ func (s *Service) preflightLaunchProject(request PreflightLaunchProjectRequest) 
 	}
 
 	contextState := s.contextState(*resolution.Context)
+	runningConflict, err := s.runningEnvironmentConflict(projectPath, contextID)
+	if err != nil {
+		return PreflightLaunchProjectResult{}, err
+	}
 	return PreflightLaunchProjectResult{
-		Project:           projectState(projectPath),
-		Context:           contextState,
-		Confidence:        contextState.Confidence,
-		VerificationSteps: launchVerificationSteps(contextState),
-		Warnings:          warningStates(resolution.Warnings),
+		Project:                    projectState(projectPath),
+		Context:                    contextState,
+		Confidence:                 contextState.Confidence,
+		VerificationSteps:          launchVerificationSteps(contextState),
+		Warnings:                   warningStates(resolution.Warnings),
+		RunningEnvironmentConflict: runningConflict,
 	}, nil
 }
 

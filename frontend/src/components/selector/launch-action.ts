@@ -6,6 +6,7 @@ import type {
   PreflightLaunchProjectRequest,
   PreflightLaunchProjectResult,
   ProjectBindingState,
+  RunningEnvironmentConflict,
 } from "../../lib/devctx-api";
 
 interface LaunchSelectorDependencies {
@@ -13,6 +14,7 @@ interface LaunchSelectorDependencies {
   selectedContextId?: string;
   rememberProject: boolean;
   confirmContextMismatch?: boolean;
+  allowExistingEnvironmentLaunch?: boolean;
   onPreflightComplete?: (result: PreflightLaunchProjectResult) => void;
   bindProject: (request: BindProjectRequest) => Promise<ApiResult<ProjectBindingState>>;
   preflightLaunchProject: (request: PreflightLaunchProjectRequest) => Promise<ApiResult<PreflightLaunchProjectResult>>;
@@ -23,6 +25,7 @@ type LaunchSelectorResult =
   | ApiResult<LaunchProjectResult>
   | ApiResult<PreflightLaunchProjectResult>
   | ApiResult<ProjectBindingState>
+  | {runningEnvironmentConflict: RunningEnvironmentConflict}
   | undefined;
 
 interface LaunchRequestGuard {
@@ -73,6 +76,10 @@ async function launchSelectedContext(dependencies: LaunchSelectorDependencies): 
   const preflight = await dependencies.preflightLaunchProject(launchRequest);
   if (!preflight.ok) {
     return preflight;
+  }
+
+  if (preflight.data.runningEnvironmentConflict && !dependencies.allowExistingEnvironmentLaunch) {
+    return {runningEnvironmentConflict: preflight.data.runningEnvironmentConflict};
   }
 
   dependencies.onPreflightComplete?.(preflight.data);

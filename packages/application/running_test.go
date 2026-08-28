@@ -7,6 +7,7 @@ import (
 	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/launcher"
+	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
 	coreRunning "devctx/packages/core/running"
 )
@@ -34,3 +35,83 @@ func TestRunningEnvironmentStatePreservesSafeLaunchAndRuntimeMetadata(t *testing
 		t.Fatalf("running environment launch state = %#v", state.Launch)
 	}
 }
+
+func TestGetRunningEnvironmentsRefreshesProcessStateAndRecordsStoppedEvent(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	logger := &applicationRecordingLogger{}
+	fixture.logger = logger
+	activePID := 100
+	stoppedPID := 200
+	repository := coreRunning.NewRepository(fixture.runningPath)
+	for _, environment := range []coreRunning.Environment{
+		testRunningEnvironment(fixture, "active", activePID),
+		testRunningEnvironment(fixture, "stopped", stoppedPID),
+	} {
+		if _, err := repository.Record(environment); err != nil {
+			t.Fatalf("record environment: %v", err)
+		}
+	}
+	service := fixture.service()
+	service.dependencies.ProcessInspector = applicationProcessInspector{states: map[int]bool{activePID: true, stoppedPID: false}}
+
+	state, appErr := service.GetRunningEnvironments()
+	if appErr != nil {
+		t.Fatalf("get running environments: %v", appErr)
+	}
+	if len(state.Environments) != 1 || state.Environments[0].Context.ID != "active" || state.Environments[0].Process.State != "running" {
+		t.Fatalf("active running environments = %#v", state.Environments)
+	}
+	if got := applicationEventNames(logger.events); len(got) != 1 || got[0] != devlog.EventEnvironmentStopped {
+		t.Fatalf("history events = %#v, want environment stopped", got)
+	}
+}
+
+func TestRunningSummaryAndPreflightConflictsUseActiveEnvironmentIdentity(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	fixture.writeContext(t, fixture.context("company", "Company"))
+	fixture.writeContext(t, fixture.context("freelance", "Freelance"))
+	repository := coreRunning.NewRepository(fixture.runningPath)
+	for _, environment := range []coreRunning.Environment{
+		testRunningEnvironment(fixture, "personal", 0),
+		testRunningEnvironment(fixture, "company", 0),
+	} {
+		environment.Process.PID = nil
+		if _, err := repository.Record(environment); err != nil {
+			t.Fatalf("record environment: %v", err)
+		}
+	}
+
+	dashboard, appErr := fixture.service().GetHomeDashboard(GetHomeDashboardRequest{ProjectPath: "."})
+	if appErr != nil {
+		t.Fatalf("get home dashboard: %v", appErr)
+	}
+	if dashboard.Running.Count != 2 || !dashboard.Running.IsolationProtected || len(dashboard.Running.ContextCounts) != 2 {
+		t.Fatalf("running summary = %#v", dashboard.Running)
+	}
+
+	same, appErr := fixture.service().PreflightLaunchProject(PreflightLaunchProjectRequest{ProjectPath: ".", ContextID: "personal"})
+	if appErr != nil || same.RunningEnvironmentConflict == nil || same.RunningEnvironmentConflict.Kind != "same_context" {
+		t.Fatalf("same-context conflict = %#v, %v", same.RunningEnvironmentConflict, appErr)
+	}
+	different, appErr := fixture.service().PreflightLaunchProject(PreflightLaunchProjectRequest{ProjectPath: ".", ContextID: "freelance"})
+	if appErr != nil || different.RunningEnvironmentConflict == nil || different.RunningEnvironmentConflict.Kind != "different_context" {
+		t.Fatalf("different-context conflict = %#v, %v", different.RunningEnvironmentConflict, appErr)
+	}
+}
+
+func testRunningEnvironment(fixture applicationFixture, contextID string, pid int) coreRunning.Environment {
+	return coreRunning.Environment{
+		Project:   coreRunning.ProjectIdentity{Path: project.Path(fixture.projectDir), Name: "current"},
+		Context:   coreRunning.ContextIdentity{ID: devcontext.MustID(contextID), Name: contextID},
+		Tool:      coreRunning.ToolIdentity{ID: fixture.editor.ID(), Name: "Fake Tool"},
+		StartedAt: fixture.now,
+		Process:   coreRunning.Process{PID: &pid, State: coreRunning.ProcessStateRunning},
+		Session:   coreRunning.Session{State: coreRunning.SessionStateUnknown},
+		Launch:    coreRunning.LaunchIdentity{Source: launcher.InvocationSourceGUI, ResolutionSource: launcher.ResolutionSourceExplicit},
+	}
+}
+
+type applicationProcessInspector struct{ states map[int]bool }
+
+func (i applicationProcessInspector) IsRunning(pid int) (bool, error) { return i.states[pid], nil }
