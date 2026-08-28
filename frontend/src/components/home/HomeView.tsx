@@ -2,6 +2,7 @@ import type { DisplayError, HomeDashboardState, RecentProjectState } from "../..
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import { StatusIndicator } from "../status/StatusIndicator.js";
+import { ProjectSafetyLabel } from "../projects/ProjectSafetyLabel.js";
 
 interface HomeViewProps {
   dashboard: HomeDashboardState;
@@ -91,7 +92,7 @@ function HomeRecentProjectsSection({
                       <span className="mt-1 block truncate font-mono text-xs text-muted-foreground" title={project.project.path}>{project.project.path}</span>
                     </span>
                     <span className="shrink-0 text-right text-xs text-muted-foreground">
-                      <span className="block">{contextName}</span>
+                      <ProjectSafetyLabel contextName={contextName} />
                       <span className="mt-1 block">{formatRecentProjectTime(project.lastLaunchedAt)}</span>
                     </span>
                   </Button>

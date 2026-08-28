@@ -258,6 +258,9 @@ func (s *fakeService) UpdateSettings(request application.UpdateSettingsRequest) 
 	s.settings = application.SettingsState(request)
 	return s.settings, nil
 }
+func (s *fakeService) GetTrayState() (application.TrayState, *application.Error) {
+	return application.TrayState{}, nil
+}
 
 func (s *fakeService) GetLaunchState(request application.GetLaunchStateRequest) (application.LaunchState, *application.Error) {
 	s.launchStateRequest = request

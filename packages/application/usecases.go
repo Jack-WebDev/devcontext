@@ -44,6 +44,37 @@ func (s *Service) UpdateSettings(request UpdateSettingsRequest) (SettingsState, 
 	return settings, nil
 }
 
+func (s *Service) GetTrayState() (TrayState, *Error) {
+	state, err := s.getTrayState()
+	if err != nil {
+		return TrayState{}, NewError(err)
+	}
+	return state, nil
+}
+
+func (s *Service) getTrayState() (TrayState, error) {
+	settings, err := s.getSettings()
+	if err != nil {
+		return TrayState{}, err
+	}
+	running, err := s.getRunningEnvironments()
+	if err != nil {
+		return TrayState{}, err
+	}
+	recents, err := s.getRecentProjects()
+	if err != nil {
+		return TrayState{}, err
+	}
+	state := TrayState{Enabled: settings.TrayEnabled, Indicator: "normal", Environments: make([]TrayEnvironmentItem, 0, len(running.Environments)), RecentProjects: make([]TrayRecentProjectItem, 0, len(recents))}
+	for _, environment := range running.Environments {
+		state.Environments = append(state.Environments, TrayEnvironmentItem{ID: environment.ID, ProjectName: environment.Project.Name, ContextName: environment.Context.Name, ToolName: environment.Tool.Name})
+	}
+	for _, recent := range recents {
+		state.RecentProjects = append(state.RecentProjects, TrayRecentProjectItem{ProjectName: recent.Project.Name, ContextName: recent.ContextName})
+	}
+	return state, nil
+}
+
 func (s *Service) getSettings() (SettingsState, error) {
 	globalConfig, err := config.ReadGlobalConfigFile(s.dependencies.ConfigPath)
 	if err != nil {

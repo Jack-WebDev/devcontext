@@ -1,6 +1,7 @@
 import type { ProjectListItem } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
+import { ProjectSafetyLabel } from "./ProjectSafetyLabel.js";
 
 interface ProjectsViewProps {
   projects: ProjectListItem[];
@@ -87,7 +88,7 @@ function ProjectCard({
             </h3>
             <p className="mt-1 truncate font-mono text-sm text-muted-foreground" title={project.project.path}>{project.project.path}</p>
           </div>
-          <span className="shrink-0 text-sm font-medium text-muted-foreground">{project.running ? "Running" : "Not running"}</span>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2"><ProjectSafetyLabel contextName={project.contextName ?? project.contextId} /><span className="text-sm font-medium text-muted-foreground">{project.running ? "Running" : "Not running"}</span></div>
         </div>
 
         <dl className="grid gap-3 border-t border-border pt-4 text-sm sm:grid-cols-2">

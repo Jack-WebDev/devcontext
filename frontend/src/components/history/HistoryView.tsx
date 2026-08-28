@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import type { HistoryCategory } from "../../lib/devctx-api";
 import { Card, CardContent } from "../ui/card.js";
+import { ProjectSafetyLabel } from "../projects/ProjectSafetyLabel.js";
 
 interface HistoryViewProps {
   entries: HistoryEntry[];
@@ -84,7 +85,7 @@ function HistoryEntryRow({entry}: {entry: HistoryEntry}) {
       </div>
       <dl className="grid gap-3 text-sm sm:grid-cols-3">
         <HistoryDetail label="Project" value={entry.projectPath ?? "Not associated with a project"} mono={entry.projectPath !== undefined} />
-        <HistoryDetail label="Context" value={entry.contextId ?? "Not associated with a context"} />
+        <div><dt className="text-muted-foreground">Context</dt><dd className="mt-1"><ProjectSafetyLabel contextName={entry.contextId} /></dd></div>
         <HistoryDetail label="Event" value={formatHistoryEvent(entry.event)} />
       </dl>
     </article>

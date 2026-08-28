@@ -25,6 +25,7 @@ type service interface {
 	GetRunningEnvironments() (application.RunningEnvironmentsState, *application.Error)
 	GetSettings() (application.SettingsState, *application.Error)
 	UpdateSettings(application.UpdateSettingsRequest) (application.SettingsState, *application.Error)
+	GetTrayState() (application.TrayState, *application.Error)
 }
 
 func (a *App) GetSettings() any {
@@ -40,6 +41,13 @@ func (a *App) UpdateSettings(request application.UpdateSettingsRequest) any {
 		return err
 	}
 	return settings
+}
+func (a *App) GetTrayState() any {
+	state, err := a.service.GetTrayState()
+	if err != nil {
+		return err
+	}
+	return state
 }
 
 func (a *App) GetProjects() any {
