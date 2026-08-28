@@ -18,6 +18,7 @@
     "src/components/shell/*.ts",
     "src/components/command-palette/*.tsx",
     "src/components/command-palette/*.ts",
+    "src/components/notifications/*.ts",
     "src/components/home/*.tsx",
     "src/components/contexts/*.tsx",
     "src/components/projects/*.tsx",
