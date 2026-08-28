@@ -273,6 +273,14 @@ export interface ContextTemplateState { id: string; name: string; description: s
 export interface ContextTemplatesState { templates: ContextTemplateState[]; }
 export interface DuplicateContextRequest { sourceContextId: string; contextId: string; name?: string; }
 export interface DuplicateContextResult { context: ContextState; }
+export interface ExportContextMetadataRequest { contextId: string; }
+export interface ContextMetadataExport { version: number; context: ContextTransferMetadata; }
+export interface ContextTransferMetadata { name: string; metadata?: Record<string, string>; providers: ContextTransferProvider[]; launchTarget: ContextTransferLaunchTarget; }
+export interface ContextTransferProvider { id: string; enabled: boolean; options?: Record<string, string>; }
+export interface ContextTransferLaunchTarget { defaultTool: string; tools: ContextTransferTool[]; }
+export interface ContextTransferTool { id: string; options?: Record<string, string>; }
+export interface ImportContextMetadataRequest { contextId: string; export: ContextMetadataExport; }
+export interface ImportContextMetadataResult { context: ContextState; }
 export interface ProjectsState { projects: ProjectListItem[]; }
 export interface ProjectListItem { project: ProjectState; contextId?: string; contextName?: string; lastLaunchedAt?: string; running: boolean; }
 
@@ -341,6 +349,8 @@ export interface DevContextApi {
   createContext(request: CreateContextRequest): Promise<ApiResult<CreateContextResult>>;
   getContextTemplates(): Promise<ApiResult<ContextTemplatesState>>;
   duplicateContext(request: DuplicateContextRequest): Promise<ApiResult<DuplicateContextResult>>;
+  exportContextMetadata(request: ExportContextMetadataRequest): Promise<ApiResult<ContextMetadataExport>>;
+  importContextMetadata(request: ImportContextMetadataRequest): Promise<ApiResult<ImportContextMetadataResult>>;
   getProjects(): Promise<ApiResult<ProjectsState>>;
   getDiagnostics(request?: GetDiagnosticsRequest): Promise<ApiResult<DiagnosticsState>>;
   getRepairActions(request: GetRepairActionsRequest): Promise<ApiResult<RepairActionsState>>;
@@ -364,6 +374,8 @@ export interface WailsBindings {
   createContext(request: CreateContextRequest): Promise<unknown>;
   getContextTemplates(): Promise<unknown>;
   duplicateContext(request: DuplicateContextRequest): Promise<unknown>;
+  exportContextMetadata(request: ExportContextMetadataRequest): Promise<unknown>;
+  importContextMetadata(request: ImportContextMetadataRequest): Promise<unknown>;
   getProjects(): Promise<unknown>;
   getDiagnostics(request: GetDiagnosticsRequest): Promise<unknown>;
   getRepairActions(request: GetRepairActionsRequest): Promise<unknown>;
@@ -422,6 +434,8 @@ export function createDevContextApi(bindings: WailsBindings = generatedBindings)
     },
     getContextTemplates() { return callBinding(() => bindings.getContextTemplates(), normalizeContextTemplatesState); },
     duplicateContext(request) { return callBinding(() => bindings.duplicateContext(request), normalizeDuplicateContextResult); },
+    exportContextMetadata(request) { return callBinding(() => bindings.exportContextMetadata(request), normalizeContextMetadataExport); },
+    importContextMetadata(request) { return callBinding(() => bindings.importContextMetadata(request), normalizeImportContextMetadataResult); },
     getProjects() { return callBinding(() => bindings.getProjects(), normalizeProjectsState); },
     getDiagnostics(request = {}) { return callBinding(() => bindings.getDiagnostics(request), normalizeDiagnosticsState); },
     getRepairActions(request) { return callBinding(() => bindings.getRepairActions(request), normalizeRepairActionsState); },
@@ -482,6 +496,14 @@ const generatedBindings: WailsBindings = {
   },
   async getContextTemplates() { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetContextTemplates(); },
   async duplicateContext(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.DuplicateContext(request); },
+  async exportContextMetadata(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.ExportContextMetadata(request); },
+  async importContextMetadata(request) {
+    const [bindings, models] = await Promise.all([
+      import("../../wailsjs/go/wailsapp/App"),
+      import("../../wailsjs/go/models"),
+    ]);
+    return bindings.ImportContextMetadata(models.application.ImportContextMetadataRequest.createFrom(request));
+  },
   async getProjects() { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetProjects(); },
   async getDiagnostics(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetDiagnostics(request); },
   async getRepairActions(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.GetRepairActions(request); },
@@ -737,6 +759,12 @@ function normalizeCreateContextResult(value: unknown): CreateContextResult {
 function normalizeContextTemplatesState(value: unknown): ContextTemplatesState { const object = objectValue(value); return {templates: arrayValue(object.templates).map(normalizeContextTemplateState)}; }
 function normalizeContextTemplateState(value: unknown): ContextTemplateState { const object = objectValue(value); return {id: stringValue(object.id), name: stringValue(object.name), description: stringValue(object.description), icon: optionalString(object.icon), accent: stringValue(object.accent)}; }
 function normalizeDuplicateContextResult(value: unknown): DuplicateContextResult { const object = objectValue(value); return {context: normalizeContextState(object.context)}; }
+function normalizeContextMetadataExport(value: unknown): ContextMetadataExport { const object = objectValue(value); return {version: numberValue(object.version), context: normalizeContextTransferMetadata(object.context)}; }
+function normalizeContextTransferMetadata(value: unknown): ContextTransferMetadata { const object = objectValue(value); const metadata = optionalStringRecord(object.metadata); return {name: stringValue(object.name), ...(metadata === undefined ? {} : {metadata}), providers: arrayValue(object.providers).map(normalizeContextTransferProvider), launchTarget: normalizeContextTransferLaunchTarget(object.launchTarget)}; }
+function normalizeContextTransferProvider(value: unknown): ContextTransferProvider { const object = objectValue(value); const options = optionalStringRecord(object.options); return {id: stringValue(object.id), enabled: booleanValue(object.enabled), ...(options === undefined ? {} : {options})}; }
+function normalizeContextTransferLaunchTarget(value: unknown): ContextTransferLaunchTarget { const object = objectValue(value); return {defaultTool: stringValue(object.defaultTool), tools: arrayValue(object.tools).map(normalizeContextTransferTool)}; }
+function normalizeContextTransferTool(value: unknown): ContextTransferTool { const object = objectValue(value); const options = optionalStringRecord(object.options); return {id: stringValue(object.id), ...(options === undefined ? {} : {options})}; }
+function normalizeImportContextMetadataResult(value: unknown): ImportContextMetadataResult { return {context: normalizeContextState(objectValue(value).context)}; }
 function normalizeProjectsState(value: unknown): ProjectsState { return {projects: arrayValue(objectValue(value).projects).map(normalizeProjectListItem)}; }
 function normalizeProjectListItem(value: unknown): ProjectListItem { const object = objectValue(value); const contextId = optionalString(object.contextId); const contextName = optionalString(object.contextName); const lastLaunchedAt = optionalTimestamp(object.lastLaunchedAt); return {project: normalizeProjectState(object.project), ...(contextId === undefined ? {} : {contextId}), ...(contextName === undefined ? {} : {contextName}), ...(lastLaunchedAt === undefined ? {} : {lastLaunchedAt}), running: booleanValue(object.running)}; }
 function normalizeDiagnosticsState(value: unknown): DiagnosticsState { return {groups: arrayValue(objectValue(value).groups).map(normalizeDiagnosticGroup)}; }

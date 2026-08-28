@@ -19,6 +19,8 @@ type service interface {
 	CreateContext(application.CreateContextRequest) (application.CreateContextResult, *application.Error)
 	GetContextTemplates() application.ContextTemplatesState
 	DuplicateContext(application.DuplicateContextRequest) (application.DuplicateContextResult, *application.Error)
+	ExportContextMetadata(application.ExportContextMetadataRequest) (application.ContextMetadataExport, *application.Error)
+	ImportContextMetadata(application.ImportContextMetadataRequest) (application.ImportContextMetadataResult, *application.Error)
 	GetProjects() (application.ProjectsState, *application.Error)
 	GetDiagnostics(application.GetDiagnosticsRequest) (application.DiagnosticsState, *application.Error)
 	GetRepairActions(application.GetRepairActionsRequest) (application.RepairActionsState, *application.Error)
@@ -217,6 +219,26 @@ func (a *App) GetContextTemplates() any { return a.service.GetContextTemplates()
 // DuplicateContext copies safe context configuration into a new isolation boundary.
 func (a *App) DuplicateContext(request application.DuplicateContextRequest) any {
 	result, err := a.service.DuplicateContext(request)
+	if err != nil {
+		return err
+	}
+	return result
+}
+
+// ExportContextMetadata returns a portable context configuration without
+// credentials or integration-owned storage.
+func (a *App) ExportContextMetadata(request application.ExportContextMetadataRequest) any {
+	result, err := a.service.ExportContextMetadata(request)
+	if err != nil {
+		return err
+	}
+	return result
+}
+
+// ImportContextMetadata creates a fresh isolated context from portable safe
+// metadata. Credential import remains intentionally unavailable.
+func (a *App) ImportContextMetadata(request application.ImportContextMetadataRequest) any {
+	result, err := a.service.ImportContextMetadata(request)
 	if err != nil {
 		return err
 	}

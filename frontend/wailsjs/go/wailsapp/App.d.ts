@@ -8,11 +8,15 @@ export function CreateContext(arg1:application.CreateContextRequest):Promise<any
 
 export function DuplicateContext(arg1:application.DuplicateContextRequest):Promise<any>;
 
+export function ExportContextMetadata(arg1:application.ExportContextMetadataRequest):Promise<any>;
+
 export function GetContextDetails(arg1:application.GetContextDetailsRequest):Promise<any>;
 
 export function GetContexts():Promise<any>;
 
 export function GetContextTemplates():Promise<any>;
+
+export function ImportContextMetadata(arg1:application.ImportContextMetadataRequest):Promise<any>;
 
 export function GetDiagnostics(arg1:application.GetDiagnosticsRequest):Promise<any>;
 

@@ -48,6 +48,34 @@ test("adapter normalizes the Home dashboard contract", async () => {
   });
 });
 
+test("adapter normalizes safe context metadata export and import", async () => {
+  const exported = {
+    version: 1,
+    context: {
+      name: "Personal",
+      metadata: {accent: "sage"},
+      providers: [{id: "fake", enabled: true, options: {region: "south"}}],
+      launchTarget: {defaultTool: "second-tool", tools: [{id: "second-tool", options: {profile: "personal"}}]},
+    },
+  };
+  const api = createDevContextApi({
+    async exportContextMetadata(request) {
+      assert.deepEqual(request, {contextId: "personal"});
+      return exported;
+    },
+    async importContextMetadata(request) {
+      assert.deepEqual(request, {contextId: "imported", export: exported});
+      return {context: {id: "imported", name: "Personal", tool: toolFixture(), availableTools: [], providers: [], confidence: {contextId: "imported", status: "ready", checks: []}}};
+    },
+  });
+
+  assert.deepEqual(await api.exportContextMetadata({contextId: "personal"}), {ok: true, data: exported});
+  assert.deepEqual(await api.importContextMetadata({contextId: "imported", export: exported}), {
+    ok: true,
+    data: {context: {id: "imported", name: "Personal", tool: toolFixture(), availableTools: [], providers: [], confidence: {contextId: "imported", status: "ready", checks: []}, metadata: undefined}},
+  });
+});
+
 test("adapter normalizes active running environments", async () => {
   const api = createDevContextApi({
     async getRunningEnvironments() {

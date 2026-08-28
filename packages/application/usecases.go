@@ -212,6 +212,26 @@ func (s *Service) DuplicateContext(request DuplicateContextRequest) (DuplicateCo
 	return result, nil
 }
 
+// ExportContextMetadata returns a versioned portable configuration for one
+// context. Credentials and context-owned integration storage are never read.
+func (s *Service) ExportContextMetadata(request ExportContextMetadataRequest) (ContextMetadataExport, *Error) {
+	result, err := s.exportContextMetadata(request)
+	if err != nil {
+		return ContextMetadataExport{}, NewError(err)
+	}
+	return result, nil
+}
+
+// ImportContextMetadata creates a new isolated context from a versioned safe
+// metadata export. It does not import credentials or provider storage.
+func (s *Service) ImportContextMetadata(request ImportContextMetadataRequest) (ImportContextMetadataResult, *Error) {
+	result, err := s.importContextMetadata(request)
+	if err != nil {
+		return ImportContextMetadataResult{}, NewError(err)
+	}
+	return result, nil
+}
+
 // GetProjects returns known project summaries without requiring log scraping.
 func (s *Service) GetProjects() (ProjectsState, *Error) {
 	projects, err := s.getProjects()
@@ -613,6 +633,160 @@ func (s *Service) duplicateContext(request DuplicateContextRequest) (DuplicateCo
 	}
 	s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{Name: devlog.EventContextCreated, Timestamp: s.now(), ContextID: copy.ID.String(), ToolID: string(copy.Tool.DefaultTool)}))
 	return DuplicateContextResult{Context: s.contextState(copy)}, nil
+}
+
+func (s *Service) exportContextMetadata(request ExportContextMetadataRequest) (ContextMetadataExport, error) {
+	contextID, err := devcontext.NewID(request.ContextID)
+	if err != nil {
+		return ContextMetadataExport{}, err
+	}
+	ctx, err := s.dependencies.Contexts.Get(contextID)
+	if err != nil {
+		return ContextMetadataExport{}, err
+	}
+
+	providers := make([]ContextTransferProvider, 0, len(ctx.Providers))
+	for _, providerID := range sortedProviderConfigIDs(ctx.Providers) {
+		config := ctx.Providers[providerID]
+		providers = append(providers, ContextTransferProvider{ID: string(providerID), Enabled: config.Enabled, Options: cloneStringMap(config.Options)})
+	}
+	tools := make([]ContextTransferTool, 0, len(ctx.Tool.Tools))
+	for _, toolID := range sortedToolConfigIDs(ctx.Tool.Tools) {
+		config := ctx.Tool.Tools[toolID]
+		tools = append(tools, ContextTransferTool{ID: string(toolID), Options: cloneStringMap(config.Options)})
+	}
+
+	return ContextMetadataExport{
+		Version: ContextTransferVersion,
+		Context: ContextTransferMetadata{
+			Name: ctx.Name, Metadata: cloneStringMap(ctx.Metadata), Providers: providers,
+			LaunchTarget: ContextTransferLaunchTarget{DefaultTool: string(ctx.Tool.DefaultTool), Tools: tools},
+		},
+	}, nil
+}
+
+func (s *Service) importContextMetadata(request ImportContextMetadataRequest) (ImportContextMetadataResult, error) {
+	contextID, err := devcontext.NewID(request.ContextID)
+	if err != nil {
+		return ImportContextMetadataResult{}, err
+	}
+	ctx, err := s.contextFromMetadataExport(contextID, request.Export)
+	if err != nil {
+		return ImportContextMetadataResult{}, err
+	}
+	paths, err := filesystem.DeriveContextPaths(s.dependencies.Paths, contextID)
+	if err != nil {
+		return ImportContextMetadataResult{}, err
+	}
+	if err := filesystem.CreateContextDirectoryTreeWithRegistriesAndPermissions(
+		paths, ctx, s.dependencies.ProviderRegistry, s.dependencies.ToolRegistry, s.dependencies.StoragePermissions,
+	); err != nil {
+		return ImportContextMetadataResult{}, err
+	}
+	s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{Name: devlog.EventContextCreated, Timestamp: s.now(), ContextID: ctx.ID.String(), ToolID: string(ctx.Tool.DefaultTool)}))
+	return ImportContextMetadataResult{Context: s.contextState(ctx)}, nil
+}
+
+func (s *Service) contextFromMetadataExport(contextID devcontext.ID, exported ContextMetadataExport) (devcontext.Context, error) {
+	if exported.Version != ContextTransferVersion {
+		return devcontext.Context{}, fmt.Errorf("%w: unsupported context metadata export version %d", devcontext.ErrInvalidContextConfig, exported.Version)
+	}
+	if strings.TrimSpace(exported.Context.Name) == "" {
+		return devcontext.Context{}, fmt.Errorf("%w: imported context name cannot be empty", devcontext.ErrInvalidContextConfig)
+	}
+	defaultTool := codingtool.ID(exported.Context.LaunchTarget.DefaultTool)
+	if _, ok := s.dependencies.ToolRegistry.Get(defaultTool); !ok {
+		return devcontext.Context{}, fmt.Errorf("%w: unknown coding tool %q", devcontext.ErrInvalidContextConfig, defaultTool)
+	}
+
+	tools := make(map[codingtool.ID]codingtool.Config, len(exported.Context.LaunchTarget.Tools)+1)
+	for _, exportedTool := range exported.Context.LaunchTarget.Tools {
+		toolID := codingtool.ID(exportedTool.ID)
+		if toolID == "" {
+			return devcontext.Context{}, fmt.Errorf("%w: imported coding tool ID cannot be empty", devcontext.ErrInvalidContextConfig)
+		}
+		if _, ok := s.dependencies.ToolRegistry.Get(toolID); !ok {
+			return devcontext.Context{}, fmt.Errorf("%w: unknown coding tool %q", devcontext.ErrInvalidContextConfig, toolID)
+		}
+		if _, exists := tools[toolID]; exists {
+			return devcontext.Context{}, fmt.Errorf("%w: duplicate imported coding tool %q", devcontext.ErrInvalidContextConfig, toolID)
+		}
+		if err := validateNonEmptyOptionKeys("tool", exportedTool.ID, exportedTool.Options); err != nil {
+			return devcontext.Context{}, err
+		}
+		tools[toolID] = codingtool.Config{Options: cloneStringMap(exportedTool.Options)}
+	}
+	if _, ok := tools[defaultTool]; !ok {
+		tools[defaultTool] = codingtool.Config{}
+	}
+
+	providers := make(provider.Configs, len(exported.Context.Providers))
+	for _, exportedProvider := range exported.Context.Providers {
+		providerID := provider.ID(exportedProvider.ID)
+		if providerID == "" {
+			return devcontext.Context{}, fmt.Errorf("%w: imported provider ID cannot be empty", devcontext.ErrInvalidContextConfig)
+		}
+		if _, ok := s.dependencies.ProviderRegistry.Get(providerID); !ok {
+			return devcontext.Context{}, fmt.Errorf("%w: unknown provider %q", devcontext.ErrInvalidContextConfig, providerID)
+		}
+		if _, exists := providers[providerID]; exists {
+			return devcontext.Context{}, fmt.Errorf("%w: duplicate imported provider %q", devcontext.ErrInvalidContextConfig, providerID)
+		}
+		if err := validateNonEmptyOptionKeys("provider", exportedProvider.ID, exportedProvider.Options); err != nil {
+			return devcontext.Context{}, err
+		}
+		providers[providerID] = provider.Config{Enabled: exportedProvider.Enabled, Options: cloneStringMap(exportedProvider.Options)}
+	}
+	if err := validateNonEmptyOptionKeys("metadata", "", exported.Context.Metadata); err != nil {
+		return devcontext.Context{}, err
+	}
+
+	return devcontext.Context{
+		ID: contextID, Name: strings.TrimSpace(exported.Context.Name),
+		Tool:      codingtool.LaunchTarget{DefaultTool: defaultTool, Tools: tools},
+		Providers: providers, Metadata: devcontext.Metadata(cloneStringMap(exported.Context.Metadata)), CreatedAt: s.now().UTC(),
+	}, nil
+}
+
+func validateNonEmptyOptionKeys(kind, id string, values map[string]string) error {
+	for key := range values {
+		if key == "" {
+			if id == "" {
+				return fmt.Errorf("%w: imported %s key cannot be empty", devcontext.ErrInvalidContextConfig, kind)
+			}
+			return fmt.Errorf("%w: imported %s %q option key cannot be empty", devcontext.ErrInvalidContextConfig, kind, id)
+		}
+	}
+	return nil
+}
+
+func cloneStringMap(values map[string]string) map[string]string {
+	if values == nil {
+		return nil
+	}
+	clone := make(map[string]string, len(values))
+	for key, value := range values {
+		clone[key] = value
+	}
+	return clone
+}
+
+func sortedProviderConfigIDs(configs provider.Configs) []provider.ID {
+	ids := make([]provider.ID, 0, len(configs))
+	for id := range configs {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids
+}
+
+func sortedToolConfigIDs(configs map[codingtool.ID]codingtool.Config) []codingtool.ID {
+	ids := make([]codingtool.ID, 0, len(configs))
+	for id := range configs {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids
 }
 
 func cloneLaunchTarget(source codingtool.LaunchTarget) codingtool.LaunchTarget {

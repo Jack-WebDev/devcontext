@@ -415,6 +415,70 @@ type DuplicateContextResult struct {
 	Context ContextState `json:"context"`
 }
 
+// ContextTransferVersion identifies the current safe context metadata format.
+// The format intentionally excludes credentials and integration-owned storage.
+const ContextTransferVersion = 1
+
+// ExportContextMetadataRequest identifies the context whose portable safe
+// configuration should be exported.
+type ExportContextMetadataRequest struct {
+	ContextID string `json:"contextId"`
+}
+
+// ContextMetadataExport is a versioned, portable context configuration. It is
+// constructed only from metadata and non-secret provider and coding-tool
+// settings; it is never a context-directory archive.
+type ContextMetadataExport struct {
+	Version int                     `json:"version"`
+	Context ContextTransferMetadata `json:"context"`
+}
+
+// ContextTransferMetadata contains the portable fields for one development
+// identity. It deliberately has no context ID, timestamps, paths, account
+// identities, credentials, or runtime state.
+type ContextTransferMetadata struct {
+	Name         string                      `json:"name"`
+	Metadata     map[string]string           `json:"metadata,omitempty"`
+	Providers    []ContextTransferProvider   `json:"providers"`
+	LaunchTarget ContextTransferLaunchTarget `json:"launchTarget"`
+}
+
+// ContextTransferProvider contains non-secret configuration for a registered
+// provider. Provider IDs are checked against the receiving registry on import.
+type ContextTransferProvider struct {
+	ID      string            `json:"id"`
+	Enabled bool              `json:"enabled"`
+	Options map[string]string `json:"options,omitempty"`
+}
+
+// ContextTransferLaunchTarget contains the portable selected-tool
+// configuration. Executable overrides are host-specific and are excluded.
+type ContextTransferLaunchTarget struct {
+	DefaultTool string                `json:"defaultTool"`
+	Tools       []ContextTransferTool `json:"tools"`
+}
+
+// ContextTransferTool contains non-secret options for one registered coding
+// tool. The receiving registry validates its ID during import.
+type ContextTransferTool struct {
+	ID      string            `json:"id"`
+	Options map[string]string `json:"options,omitempty"`
+}
+
+// ImportContextMetadataRequest creates a new context from a safe metadata
+// export. ContextID is always supplied by the receiving user and is never
+// taken from an export document.
+type ImportContextMetadataRequest struct {
+	ContextID string                `json:"contextId"`
+	Export    ContextMetadataExport `json:"export"`
+}
+
+// ImportContextMetadataResult describes the fresh isolated context created
+// from an imported metadata document.
+type ImportContextMetadataResult struct {
+	Context ContextState `json:"context"`
+}
+
 // ProjectsState contains all known projects from remembered bindings and
 // successful launch history.
 type ProjectsState struct {
