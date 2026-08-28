@@ -3,13 +3,17 @@ package application
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"devctx/packages/core/filesystem"
+	devlog "devctx/packages/core/logging"
 )
 
 func TestRepairActionsPreviewAndResetOnlyProviderOwnedStorage(t *testing.T) {
 	fixture := newApplicationFixture(t)
+	logger := &applicationRecordingLogger{}
+	fixture.logger = logger
 	ctx := fixture.context("personal", "Personal")
 	fixture.writeContext(t, ctx)
 	paths, err := filesystem.DeriveContextPaths(fixture.paths, ctx.ID)
@@ -44,6 +48,10 @@ func TestRepairActionsPreviewAndResetOnlyProviderOwnedStorage(t *testing.T) {
 	}
 	if info, err := os.Stat(providerStorage); err != nil || !info.IsDir() {
 		t.Fatalf("provider storage = %#v, %v; want preserved directory", info, err)
+	}
+	wantEvents := []devlog.EventName{devlog.EventProviderReset, devlog.EventRepairCompleted}
+	if got := applicationEventNames(logger.events); !reflect.DeepEqual(got, wantEvents) {
+		t.Fatalf("repair events = %#v, want %#v", got, wantEvents)
 	}
 }
 

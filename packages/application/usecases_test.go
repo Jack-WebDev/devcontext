@@ -1165,6 +1165,23 @@ func TestCreateContextReportsDuplicateDefaultContext(t *testing.T) {
 	}
 }
 
+func TestCreateContextRecordsHistoryEvent(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	logger := &applicationRecordingLogger{}
+	fixture.logger = logger
+
+	if _, appErr := fixture.service().CreateContext(CreateContextRequest{ContextID: "personal"}); appErr != nil {
+		t.Fatalf("create context: %v", appErr)
+	}
+
+	if got := applicationEventNames(logger.events); !reflect.DeepEqual(got, []devlog.EventName{devlog.EventContextCreated}) {
+		t.Fatalf("event names = %#v, want context-created event", got)
+	}
+	if event := logger.events[0]; event.ContextID != "personal" || event.ToolID != "fake-editor" {
+		t.Fatalf("context-created event = %#v", event)
+	}
+}
+
 func TestCreateContextReportsPermissionFailure(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.storagePermissions = filesystem.NewStoragePermissions(true, func(string, os.FileMode) error {
@@ -1402,6 +1419,33 @@ func TestUnbindProjectReturnsRefreshedBindingState(t *testing.T) {
 			t.Fatalf("binding state = %#v, want unbound project", state)
 		}
 	})
+}
+
+func TestProjectBindingChangesRecordHistoryEvents(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	logger := &applicationRecordingLogger{}
+	fixture.logger = logger
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+	if _, appErr := fixture.service().BindProject(BindProjectRequest{ProjectPath: ".", ContextID: "personal"}); appErr != nil {
+		t.Fatalf("bind project: %v", appErr)
+	}
+	if _, appErr := fixture.service().UnbindProject(UnbindProjectRequest{ProjectPath: "."}); appErr != nil {
+		t.Fatalf("unbind project: %v", appErr)
+	}
+	if _, appErr := fixture.service().UnbindProject(UnbindProjectRequest{ProjectPath: "."}); appErr != nil {
+		t.Fatalf("repeat unbind project: %v", appErr)
+	}
+
+	want := []devlog.EventName{devlog.EventProjectBindingChanged, devlog.EventProjectBindingChanged}
+	if got := applicationEventNames(logger.events); !reflect.DeepEqual(got, want) {
+		t.Fatalf("event names = %#v, want %#v", got, want)
+	}
+	for _, event := range logger.events {
+		if event.ProjectPath != fixture.projectDir || event.ContextID != "personal" {
+			t.Fatalf("binding event = %#v, want project and context", event)
+		}
+	}
 }
 
 func assertContextStates(t *testing.T, got []ContextState, want []ContextState) {

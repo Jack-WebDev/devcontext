@@ -37,6 +37,18 @@ func historyEventMessage(event devlog.Event) string {
 		return "Launch could not start the selected coding tool."
 	case devlog.EventLaunchConfigError:
 		return "Launch configuration needs attention."
+	case devlog.EventContextCreated:
+		return "Context created."
+	case devlog.EventProviderConnected:
+		return "Provider connected."
+	case devlog.EventProviderReset:
+		return "Provider storage reset."
+	case devlog.EventRepairCompleted:
+		return "Repair completed."
+	case devlog.EventProjectBindingChanged:
+		return "Project context binding changed."
+	case devlog.EventEnvironmentStopped:
+		return "Environment stopped."
 	default:
 		return "Launch context was resolved."
 	}

@@ -23,6 +23,12 @@ const (
 	EventLaunchConfigError     EventName = "launch_configuration_error"
 	EventLaunchProviderMissing EventName = "launch_provider_missing"
 	EventLaunchProcessFailure  EventName = "launch_process_failure"
+	EventContextCreated        EventName = "context_created"
+	EventProviderConnected     EventName = "provider_connected"
+	EventProviderReset         EventName = "provider_reset"
+	EventRepairCompleted       EventName = "repair_completed"
+	EventProjectBindingChanged EventName = "project_binding_changed"
+	EventEnvironmentStopped    EventName = "environment_stopped"
 )
 
 // ErrorCategory identifies a bounded failure class without requiring callers to
