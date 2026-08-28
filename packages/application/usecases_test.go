@@ -18,6 +18,7 @@ import (
 	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
 	"devctx/packages/core/provider"
+	coreRunning "devctx/packages/core/running"
 )
 
 func metadataValueForTest(fields []ProviderMetadataField, label string) string {
@@ -1275,6 +1276,55 @@ func TestLaunchProjectRecordsLifecycleEvents(t *testing.T) {
 	}
 }
 
+func TestLaunchProjectCreatesAndUpdatesRunningEnvironment(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+	launch := func(contextID string) {
+		t.Helper()
+		if _, appErr := fixture.service().LaunchProject(LaunchProjectRequest{ProjectPath: fixture.projectDir, ContextID: contextID}); appErr != nil {
+			t.Fatalf("launch project: %v", appErr)
+		}
+	}
+
+	launch("personal")
+	repository := coreRunning.NewRepository(fixture.runningPath)
+	environments, err := repository.List()
+	if err != nil {
+		t.Fatalf("list running environments: %v", err)
+	}
+	if len(environments) != 1 {
+		t.Fatalf("running environments = %#v, want one", environments)
+	}
+	first := environments[0]
+	if first.ID == "" || first.Project.Path != project.Path(fixture.projectDir) || first.Context.ID.String() != "personal" || first.Tool.Name != "Fake Tool" {
+		t.Fatalf("running environment = %#v", first)
+	}
+	if first.Process.State != coreRunning.ProcessStateRunning || first.Session.State != coreRunning.SessionStateUnknown {
+		t.Fatalf("running environment state = %#v", first)
+	}
+
+	fixture.now = fixture.now.Add(time.Minute)
+	launch("personal")
+	environments, err = repository.List()
+	if err != nil {
+		t.Fatalf("list updated running environments: %v", err)
+	}
+	if len(environments) != 1 || environments[0].ID != first.ID || !environments[0].StartedAt.Equal(fixture.now) {
+		t.Fatalf("updated running environments = %#v", environments)
+	}
+
+	fixture.writeContext(t, fixture.context("company", "Company"))
+	launch("company")
+	environments, err = repository.List()
+	if err != nil {
+		t.Fatalf("list context-specific running environments: %v", err)
+	}
+	if len(environments) != 2 {
+		t.Fatalf("running environments = %#v, want separate records by context", environments)
+	}
+}
+
 func TestLaunchProjectRequiresMismatchConfirmation(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.writeContext(t, fixture.context("personal", "Personal"))
@@ -1506,6 +1556,7 @@ type applicationFixture struct {
 	projectDir         string
 	bindingsPath       string
 	recentsPath        string
+	runningPath        string
 	paths              filesystem.PlatformPaths
 	now                time.Time
 	provider           *applicationFakeProvider
@@ -1528,6 +1579,7 @@ func newApplicationFixture(t *testing.T) applicationFixture {
 		projectDir:   filepath.Join(root, "projects", "current"),
 		bindingsPath: filepath.Join(root, "projects.toml"),
 		recentsPath:  filepath.Join(root, "recents.toml"),
+		runningPath:  filepath.Join(root, "running.toml"),
 		now:          time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC),
 		provider:     &applicationFakeProvider{id: "fake"},
 		editor:       &applicationFakeEditor{},
@@ -1559,18 +1611,19 @@ func (f applicationFixture) service() *Service {
 	}
 
 	return NewServiceWithDependencies(Dependencies{
-		Contexts:           devcontext.NewRepository(f.contextsDir),
-		Projects:           project.NewRepository(f.bindingsPath, f.paths),
-		RecentProjects:     project.NewRecentRepository(f.recentsPath),
-		Paths:              f.paths,
-		ProviderRegistry:   registry,
-		ToolRegistry:       toolRegistry,
-		ProcessLauncher:    f.process,
-		StoragePermissions: f.storagePermissions,
-		ParentEnvironment:  []string{"PATH=/fixture/bin"},
-		WorkingDirectory:   f.projectDir,
-		DetachMode:         launcher.DetachModeAttached,
-		Logger:             f.logger,
+		Contexts:            devcontext.NewRepository(f.contextsDir),
+		Projects:            project.NewRepository(f.bindingsPath, f.paths),
+		RecentProjects:      project.NewRecentRepository(f.recentsPath),
+		RunningEnvironments: coreRunning.NewRepository(f.runningPath),
+		Paths:               f.paths,
+		ProviderRegistry:    registry,
+		ToolRegistry:        toolRegistry,
+		ProcessLauncher:     f.process,
+		StoragePermissions:  f.storagePermissions,
+		ParentEnvironment:   []string{"PATH=/fixture/bin"},
+		WorkingDirectory:    f.projectDir,
+		DetachMode:          launcher.DetachModeAttached,
+		Logger:              f.logger,
 		Now: func() time.Time {
 			return f.now
 		},

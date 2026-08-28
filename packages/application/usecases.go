@@ -15,6 +15,7 @@ import (
 	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
 	"devctx/packages/core/provider"
+	coreRunning "devctx/packages/core/running"
 )
 
 // GetLaunchState returns the GUI selector state for one project.
@@ -541,12 +542,28 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 
 	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchSucceeded, plan, nil, s.now()))
 	_ = s.dependencies.RecentProjects.Record(plan.ProjectPath, plan.Context.ID, s.now())
+	_, _ = s.dependencies.RunningEnvironments.Record(runningEnvironmentFromLaunchPlan(plan, s.now()))
 
 	return LaunchProjectResult{
 		Project:  projectState(plan.ProjectPath),
 		Context:  s.contextState(plan.Context),
 		Warnings: warningStates(plan.Warnings),
 	}, nil
+}
+
+func runningEnvironmentFromLaunchPlan(plan launcher.LaunchPlan, startedAt time.Time) coreRunning.Environment {
+	return coreRunning.Environment{
+		Project:   coreRunning.ProjectIdentity{Path: plan.ProjectPath, Name: projectName(plan.ProjectPath)},
+		Context:   coreRunning.ContextIdentity{ID: plan.Context.ID, Name: plan.Context.Name},
+		Tool:      coreRunning.ToolIdentity{ID: plan.Tool.ID, Name: plan.Tool.DisplayName},
+		StartedAt: startedAt.UTC(),
+		Process:   coreRunning.Process{State: coreRunning.ProcessStateRunning},
+		Session:   coreRunning.Session{State: coreRunning.SessionStateUnknown},
+		Launch: coreRunning.LaunchIdentity{
+			Source:           launcher.InvocationSourceGUI,
+			ResolutionSource: plan.ResolutionSource,
+		},
+	}
 }
 
 func (s *Service) preflightLaunchProject(request PreflightLaunchProjectRequest) (PreflightLaunchProjectResult, error) {

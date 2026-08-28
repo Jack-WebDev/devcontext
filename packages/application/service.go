@@ -14,16 +14,18 @@ import (
 	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
 	"devctx/packages/core/provider"
+	"devctx/packages/core/running"
 )
 
 // Dependencies contains the core collaborators used by application use cases.
 type Dependencies struct {
-	Contexts         devcontext.Repository
-	Projects         project.Repository
-	RecentProjects   project.RecentRepository
-	Paths            filesystem.PlatformPaths
-	ProviderRegistry provider.Registry
-	ToolRegistry     codingtool.Registry
+	Contexts            devcontext.Repository
+	Projects            project.Repository
+	RecentProjects      project.RecentRepository
+	RunningEnvironments running.Repository
+	Paths               filesystem.PlatformPaths
+	ProviderRegistry    provider.Registry
+	ToolRegistry        codingtool.Registry
 	// Tool is retained temporarily for callers that have not yet moved to the
 	// registry contract. New code must provide ToolRegistry.
 	Tool               codingtool.CodingTool
@@ -77,19 +79,20 @@ func NewDefaultService(options DefaultOptions) (*Service, error) {
 	}
 
 	return NewServiceWithDependencies(Dependencies{
-		Contexts:           devcontext.NewRepository(layout.ContextsDir),
-		Projects:           project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
-		RecentProjects:     project.NewRecentRepository(filepath.Join(layout.HomeDir, "recents.toml")),
-		Paths:              paths,
-		ProviderRegistry:   provider.BuiltInRegistry(),
-		ToolRegistry:       codingtool.BuiltInRegistry(),
-		ProcessLauncher:    launcher.NativeProcessLauncher{},
-		StoragePermissions: filesystem.NewDefaultStoragePermissions(),
-		ParentEnvironment:  options.ParentEnvironment,
-		WorkingDirectory:   workingDirectory,
-		DetachMode:         launcher.DetachModeDetached,
-		Now:                options.Now,
-		Logger:             devlog.NewLocalLogger(layout.LogsDir, filesystem.NewDefaultStoragePermissions(), options.Now),
+		Contexts:            devcontext.NewRepository(layout.ContextsDir),
+		Projects:            project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
+		RecentProjects:      project.NewRecentRepository(filepath.Join(layout.HomeDir, "recents.toml")),
+		RunningEnvironments: running.NewRepository(filepath.Join(layout.HomeDir, "running.toml")),
+		Paths:               paths,
+		ProviderRegistry:    provider.BuiltInRegistry(),
+		ToolRegistry:        codingtool.BuiltInRegistry(),
+		ProcessLauncher:     launcher.NativeProcessLauncher{},
+		StoragePermissions:  filesystem.NewDefaultStoragePermissions(),
+		ParentEnvironment:   options.ParentEnvironment,
+		WorkingDirectory:    workingDirectory,
+		DetachMode:          launcher.DetachModeDetached,
+		Now:                 options.Now,
+		Logger:              devlog.NewLocalLogger(layout.LogsDir, filesystem.NewDefaultStoragePermissions(), options.Now),
 	}), nil
 }
 
