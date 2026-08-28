@@ -23,6 +23,23 @@ type service interface {
 	RunRepairAction(application.RunRepairActionRequest) (application.RunRepairActionResult, *application.Error)
 	GetHistory() (application.HistoryState, *application.Error)
 	GetRunningEnvironments() (application.RunningEnvironmentsState, *application.Error)
+	GetSettings() (application.SettingsState, *application.Error)
+	UpdateSettings(application.UpdateSettingsRequest) (application.SettingsState, *application.Error)
+}
+
+func (a *App) GetSettings() any {
+	settings, err := a.service.GetSettings()
+	if err != nil {
+		return err
+	}
+	return settings
+}
+func (a *App) UpdateSettings(request application.UpdateSettingsRequest) any {
+	settings, err := a.service.UpdateSettings(request)
+	if err != nil {
+		return err
+	}
+	return settings
 }
 
 func (a *App) GetProjects() any {

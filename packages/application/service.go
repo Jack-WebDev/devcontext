@@ -34,6 +34,7 @@ type Dependencies struct {
 	StoragePermissions filesystem.StoragePermissions
 	ParentEnvironment  []string
 	WorkingDirectory   string
+	ConfigPath         string
 	DetachMode         launcher.DetachMode
 	Now                func() time.Time
 	Logger             devlog.Logger
@@ -92,6 +93,7 @@ func NewDefaultService(options DefaultOptions) (*Service, error) {
 		StoragePermissions:  filesystem.NewDefaultStoragePermissions(),
 		ParentEnvironment:   options.ParentEnvironment,
 		WorkingDirectory:    workingDirectory,
+		ConfigPath:          layout.ConfigPath,
 		DetachMode:          launcher.DetachModeDetached,
 		Now:                 options.Now,
 		Logger:              devlog.NewLocalLogger(layout.LogsDir, filesystem.NewDefaultStoragePermissions(), options.Now),
@@ -165,6 +167,11 @@ func normalizeDependencies(dependencies Dependencies) Dependencies {
 	}
 	if dependencies.Logger == nil {
 		dependencies.Logger = devlog.NoopLogger{}
+	}
+	if dependencies.ConfigPath == "" {
+		if layout, err := config.DevContextHomeLayout(dependencies.Paths); err == nil {
+			dependencies.ConfigPath = layout.ConfigPath
+		}
 	}
 	return dependencies
 }

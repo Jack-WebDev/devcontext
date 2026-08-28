@@ -50,6 +50,10 @@ export function GetRunningEnvironments() {
   return window['go']['wailsapp']['App']['GetRunningEnvironments']();
 }
 
+export function GetSettings() {
+  return window['go']['wailsapp']['App']['GetSettings']();
+}
+
 export function LaunchProject(arg1) {
   return window['go']['wailsapp']['App']['LaunchProject'](arg1);
 }
@@ -60,6 +64,10 @@ export function PreflightLaunchProject(arg1) {
 
 export function RunRepairAction(arg1) {
   return window['go']['wailsapp']['App']['RunRepairAction'](arg1);
+}
+
+export function UpdateSettings(arg1) {
+  return window['go']['wailsapp']['App']['UpdateSettings'](arg1);
 }
 
 export function UnbindProject(arg1) {

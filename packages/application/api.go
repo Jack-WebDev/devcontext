@@ -7,6 +7,17 @@ type GetLaunchStateRequest struct {
 	ProjectPath string `json:"projectPath,omitempty"`
 }
 
+// SettingsState contains user-configurable application behavior.
+type SettingsState struct {
+	CloseAfterLaunch   bool `json:"closeAfterLaunch"`
+	LaunchVerification bool `json:"launchVerification"`
+	RememberProjects   bool `json:"rememberProjects"`
+	TrayEnabled        bool `json:"trayEnabled"`
+}
+
+// UpdateSettingsRequest replaces the supported application preferences.
+type UpdateSettingsRequest SettingsState
+
 // GetHomeDashboardRequest identifies the project represented by the Home
 // dashboard.
 type GetHomeDashboardRequest struct {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	codingtool "devctx/packages/core/codingtool"
+	"devctx/packages/core/config"
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
@@ -25,6 +26,49 @@ func (s *Service) GetLaunchState(request GetLaunchStateRequest) (LaunchState, *E
 		return LaunchState{}, NewError(err)
 	}
 	return state, nil
+}
+
+func (s *Service) GetSettings() (SettingsState, *Error) {
+	settings, err := s.getSettings()
+	if err != nil {
+		return SettingsState{}, NewError(err)
+	}
+	return settings, nil
+}
+
+func (s *Service) UpdateSettings(request UpdateSettingsRequest) (SettingsState, *Error) {
+	settings, err := s.updateSettings(request)
+	if err != nil {
+		return SettingsState{}, NewError(err)
+	}
+	return settings, nil
+}
+
+func (s *Service) getSettings() (SettingsState, error) {
+	globalConfig, err := config.ReadGlobalConfigFile(s.dependencies.ConfigPath)
+	if err != nil {
+		return SettingsState{}, err
+	}
+	return settingsState(globalConfig), nil
+}
+
+func (s *Service) updateSettings(request UpdateSettingsRequest) (SettingsState, error) {
+	globalConfig, err := config.ReadGlobalConfigFile(s.dependencies.ConfigPath)
+	if err != nil {
+		return SettingsState{}, err
+	}
+	globalConfig.UI.CloseAfterLaunch = request.CloseAfterLaunch
+	globalConfig.UI.LaunchVerification = request.LaunchVerification
+	globalConfig.UI.RememberProjects = request.RememberProjects
+	globalConfig.UI.TrayEnabled = request.TrayEnabled
+	if err := config.WriteGlobalConfigFileWithPermissions(s.dependencies.ConfigPath, globalConfig, s.dependencies.StoragePermissions); err != nil {
+		return SettingsState{}, err
+	}
+	return settingsState(globalConfig), nil
+}
+
+func settingsState(globalConfig config.GlobalConfig) SettingsState {
+	return SettingsState{CloseAfterLaunch: globalConfig.UI.CloseAfterLaunch, LaunchVerification: globalConfig.UI.LaunchVerification, RememberProjects: globalConfig.UI.RememberProjects, TrayEnabled: globalConfig.UI.TrayEnabled}
 }
 
 // GetHomeDashboard returns the backend-owned summary for the Home screen.

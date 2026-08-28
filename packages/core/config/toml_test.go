@@ -218,6 +218,10 @@ default_editor = "vscode"
 
 [ui]
 remember_window_position = false
+close_after_launch = false
+launch_verification = false
+remember_projects = false
+tray_enabled = false
 
 [safety]
 warn_on_context_mismatch = true

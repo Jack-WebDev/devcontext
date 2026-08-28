@@ -26,10 +26,14 @@ export function GetRepairActions(arg1:application.GetRepairActionsRequest):Promi
 
 export function GetRunningEnvironments():Promise<any>;
 
+export function GetSettings():Promise<any>;
+
 export function LaunchProject(arg1:application.LaunchProjectRequest):Promise<any>;
 
 export function PreflightLaunchProject(arg1:application.PreflightLaunchProjectRequest):Promise<any>;
 
 export function RunRepairAction(arg1:application.RunRepairActionRequest):Promise<any>;
+
+export function UpdateSettings(arg1:any):Promise<any>;
 
 export function UnbindProject(arg1:application.UnbindProjectRequest):Promise<any>;

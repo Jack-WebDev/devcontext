@@ -15,6 +15,8 @@ import { ContextsView } from "./components/contexts/ContextsView";
 import { ContextDetailsDrawer, CreateContextDialog } from "./components/contexts/ContextManagement";
 import { AppShell } from "./components/shell/AppShell";
 import { CommandPalette } from "./components/command-palette/CommandPalette";
+import { SettingsView } from "./components/settings/SettingsView";
+import { AppStatusBar } from "./components/status/AppStatusBar";
 import { launchContextActions, navigationActions } from "./components/command-palette/actions";
 import { isCommandPaletteShortcut } from "./components/command-palette/shortcut";
 import { appRouteDefinition, appRouteDefinitions, appRouteFromHash, type AppRoute } from "./components/shell/routes";
@@ -32,6 +34,7 @@ import {
   type RecentProjectState,
   type RunningEnvironmentsState,
   type RunningEnvironmentConflict,
+  type SettingsState,
 } from "./lib/devctx-api";
 import { devContextWindow } from "./lib/devctx-window";
 
@@ -69,6 +72,7 @@ type RunningLoad =
   | { status: "loading" }
   | { status: "loaded"; data: RunningEnvironmentsState }
   | { status: "error"; error: DisplayError };
+type SettingsLoad = {status: "loading"} | {status: "loaded"; data: SettingsState} | {status: "error"; error: DisplayError};
 
 interface PendingRunningEnvironmentLaunch { conflict: RunningEnvironmentConflict; request: {projectPath: string; contextId: string}; }
 
@@ -82,6 +86,8 @@ function App() {
   const [projects, setProjects] = useState<ProjectsLoad>({status: "loading"});
   const [history, setHistory] = useState<HistoryLoad>({status: "loading"});
   const [running, setRunning] = useState<RunningLoad>({status: "loading"});
+  const [settings, setSettings] = useState<SettingsLoad>({status: "loading"});
+  const [settingsPending, setSettingsPending] = useState(false);
   const [pendingRunningEnvironmentLaunch, setPendingRunningEnvironmentLaunch] = useState<PendingRunningEnvironmentLaunch>();
   const [runningEnvironmentLaunchPending, setRunningEnvironmentLaunchPending] = useState(false);
   const [runningEnvironmentLaunchError, setRunningEnvironmentLaunchError] = useState<DisplayError>();
@@ -123,6 +129,8 @@ function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => { void refreshSettings(); }, []);
 
   useEffect(() => {
     void refreshRecentProjects();
@@ -272,6 +280,9 @@ function App() {
     const result = await devContextApi.getRunningEnvironments();
     setRunning(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error});
   }
+
+  async function refreshSettings() { const result = await devContextApi.getSettings(); setSettings(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error}); }
+  async function handleSettingsChange(next: SettingsState) { if (settingsPending) return; setSettingsPending(true); const result = await devContextApi.updateSettings(next); setSettings(result.ok ? {status: "loaded", data: result.data} : {status: "error", error: result.error}); setSettingsPending(false); }
 
   async function handleHomeQuickLaunch() {
     if (homeDashboard.status !== "loaded" || homeDashboard.data.currentContext === undefined || homeLaunchPending) {
@@ -441,6 +452,7 @@ function App() {
       activeRoute={activeRoute}
       onNavigate={handleNavigate}
       currentProject={launchState.status === "loaded" ? launchState.data.project : undefined}
+      statusBar={<AppStatusBar launchState={launchState.status === "loaded" ? launchState.data : undefined} />}
     >
       {activeRoute === "home" ? (
         <section aria-labelledby="home-heading" className="space-y-8">
@@ -471,7 +483,7 @@ function App() {
               <p className="text-sm text-muted-foreground">Launch options</p>
               <h2 id="context-selector-heading" className="text-xl font-semibold">Context selector</h2>
             </div>
-          {renderSelectorContent(launchState, handleCreateContext, () => handleNavigate("diagnostics"))}
+          {renderSelectorContent(launchState, handleCreateContext, () => handleNavigate("diagnostics"), settings.status === "loaded" ? settings.data : undefined)}
           </section>
         </section>
       ) : activeRoute === "contexts" ? (
@@ -496,6 +508,8 @@ function App() {
         renderHistory(history)
       ) : activeRoute === "running" ? (
         renderRunning(running)
+      ) : activeRoute === "settings" ? (
+        settings.status === "loaded" ? <SettingsView settings={settings.data} pending={settingsPending} onChange={(next) => void handleSettingsChange(next)} /> : settings.status === "error" ? <GuiErrorNotice error={settings.error} /> : <p className="text-sm text-muted-foreground">Loading settings...</p>
       ) : (
         <PlaceholderScreen route={activeRoute} />
       )}
@@ -605,6 +619,7 @@ function renderSelectorContent(
     importProviderIds?: string[],
   ) => Promise<ApiResult<CreateContextResult>>,
   onRunDiagnostics: () => void,
+  settings?: SettingsState,
 ) {
   if (launchState.status === "loading") {
     return <p className="text-sm text-muted-foreground">Loading selector...</p>;
@@ -624,6 +639,8 @@ function renderSelectorContent(
       onCreatePersonalContext={(importProviderIds) => onCreateContext("personal", importProviderIds)}
       onCreateCompanyContext={(importProviderIds) => onCreateContext("company", importProviderIds)}
       onRunDiagnostics={onRunDiagnostics}
+      launchSuccessCloseBehavior={settings?.closeAfterLaunch ? "close_selector" : "keep_open"}
+      showLaunchVerification={settings?.launchVerification ?? true}
     />
   );
 }

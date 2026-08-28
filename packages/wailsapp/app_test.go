@@ -190,6 +190,7 @@ func TestAppReturnsApplicationErrorsAsSingleValues(t *testing.T) {
 }
 
 type fakeService struct {
+	settings           application.SettingsState
 	launchStateRequest application.GetLaunchStateRequest
 	launchState        application.LaunchState
 	launchStateErr     *application.Error
@@ -248,6 +249,14 @@ type fakeService struct {
 
 	runningEnvironments    application.RunningEnvironmentsState
 	runningEnvironmentsErr *application.Error
+}
+
+func (s *fakeService) GetSettings() (application.SettingsState, *application.Error) {
+	return s.settings, nil
+}
+func (s *fakeService) UpdateSettings(request application.UpdateSettingsRequest) (application.SettingsState, *application.Error) {
+	s.settings = application.SettingsState(request)
+	return s.settings, nil
 }
 
 func (s *fakeService) GetLaunchState(request application.GetLaunchStateRequest) (application.LaunchState, *application.Error) {
