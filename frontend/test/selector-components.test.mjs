@@ -59,6 +59,7 @@ import {
 import { GuiErrorNotice } from "../.tmp-test/src/components/selector/GuiErrorNotice.js";
 import { LaunchFailureView } from "../.tmp-test/src/components/selector/LaunchFailureView.js";
 import { LauncherSurface } from "../.tmp-test/src/components/launcher/LauncherSurface.js";
+import { ProjectResolvingView } from "../.tmp-test/src/components/launcher/ProjectResolvingView.js";
 import {
 	LaunchVerificationProgress,
 	verificationStepPresentation,
@@ -177,6 +178,16 @@ test("launcher surface is focused on one project", () => {
 	assert.match(html, /Open project/);
 	assert.match(html, /\/work\/api/);
 	assert.doesNotMatch(html, /data-app-shell|aria-label="Main navigation"/);
+});
+
+test("project resolving view explains the launch information being loaded", () => {
+	const html = renderToStaticMarkup(createElement(ProjectResolvingView));
+
+	assert.match(html, /Preparing your project/);
+	assert.match(html, /remembered context/);
+	assert.match(html, /available contexts/);
+	assert.match(html, /readiness/);
+	assert.match(html, /role="status"/);
 });
 
 test("launcher state keeps progress and dialogs mutually exclusive", () => {

@@ -12,6 +12,7 @@ import { GuiErrorNotice } from "../selector/GuiErrorNotice.js";
 import { createOnboardingContextAndRefresh } from "../selector/onboarding-action.js";
 import { SelectorView } from "../selector/SelectorView.js";
 import { LauncherSurface } from "./LauncherSurface.js";
+import { ProjectResolvingView } from "./ProjectResolvingView.js";
 import {
 	type LoadState,
 	loadStateFromResult,
@@ -21,19 +22,28 @@ interface LauncherFlowProps {
 	projectPath: string;
 }
 
+type ProjectLaunchState = LoadState<LaunchState> & { projectPath: string };
+
 // LauncherFlow is intentionally separate from the management shell. Later
 // launcher phases add resolution and selection states inside this focused
 // surface without bringing management navigation into a project launch.
 function LauncherFlow({ projectPath }: LauncherFlowProps) {
-	const [launchState, setLaunchState] = useState<LoadState<LaunchState>>({
+	const [launchState, setLaunchState] = useState<ProjectLaunchState>({
+		projectPath,
 		status: "loading",
 	});
+	const resolving =
+		launchState.projectPath !== projectPath || launchState.status === "loading";
 
 	useEffect(() => {
 		let active = true;
+		setLaunchState({ projectPath, status: "loading" });
 		void devContextApi.getLaunchState({ projectPath }).then((result) => {
 			if (active) {
-				setLaunchState(loadStateFromResult(result));
+				setLaunchState({
+					projectPath,
+					...loadStateFromResult(result),
+				});
 			}
 		});
 		return () => {
@@ -59,16 +69,18 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 			return { ok: false, error: result.error };
 		}
 
-		setLaunchState({ status: "loaded", data: result.launchState });
+		setLaunchState({
+			projectPath,
+			status: "loaded",
+			data: result.launchState,
+		});
 		return { ok: true, data: result.created };
 	}
 
 	return (
 		<LauncherSurface projectPath={projectPath}>
-			{launchState.status === "loading" ? (
-				<p className="text-sm text-muted-foreground" role="status">
-					Loading launch options...
-				</p>
+			{resolving ? (
+				<ProjectResolvingView />
 			) : launchState.status === "error" ? (
 				<GuiErrorNotice error={launchState.error} />
 			) : (
