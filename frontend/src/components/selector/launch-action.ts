@@ -1,93 +1,112 @@
 import type {
-  ApiResult,
-  BindProjectRequest,
-  LaunchProjectRequest,
-  LaunchProjectResult,
-  PreflightLaunchProjectRequest,
-  PreflightLaunchProjectResult,
-  ProjectBindingState,
-  RunningEnvironmentConflict,
+	ApiResult,
+	BindProjectRequest,
+	LaunchProjectRequest,
+	LaunchProjectResult,
+	PreflightLaunchProjectRequest,
+	PreflightLaunchProjectResult,
+	ProjectBindingState,
+	RunningEnvironmentConflict,
 } from "../../lib/devctx-api";
 
 interface LaunchSelectorDependencies {
-  projectPath: string;
-  selectedContextId?: string;
-  rememberProject: boolean;
-  confirmContextMismatch?: boolean;
-  allowExistingEnvironmentLaunch?: boolean;
-  onPreflightComplete?: (result: PreflightLaunchProjectResult) => void;
-  bindProject: (request: BindProjectRequest) => Promise<ApiResult<ProjectBindingState>>;
-  preflightLaunchProject: (request: PreflightLaunchProjectRequest) => Promise<ApiResult<PreflightLaunchProjectResult>>;
-  launchProject: (request: LaunchProjectRequest) => Promise<ApiResult<LaunchProjectResult>>;
+	projectPath: string;
+	selectedContextId?: string;
+	rememberProject: boolean;
+	confirmContextMismatch?: boolean;
+	allowExistingEnvironmentLaunch?: boolean;
+	onPreflightComplete?: (result: PreflightLaunchProjectResult) => void;
+	bindProject: (
+		request: BindProjectRequest,
+	) => Promise<ApiResult<ProjectBindingState>>;
+	preflightLaunchProject: (
+		request: PreflightLaunchProjectRequest,
+	) => Promise<ApiResult<PreflightLaunchProjectResult>>;
+	launchProject: (
+		request: LaunchProjectRequest,
+	) => Promise<ApiResult<LaunchProjectResult>>;
 }
 
 type LaunchSelectorResult =
-  | ApiResult<LaunchProjectResult>
-  | ApiResult<PreflightLaunchProjectResult>
-  | ApiResult<ProjectBindingState>
-  | {runningEnvironmentConflict: RunningEnvironmentConflict}
-  | undefined;
+	| ApiResult<LaunchProjectResult>
+	| ApiResult<PreflightLaunchProjectResult>
+	| ApiResult<ProjectBindingState>
+	| { runningEnvironmentConflict: RunningEnvironmentConflict }
+	| undefined;
 
 interface LaunchRequestGuard {
-  run<T>(operation: () => Promise<T>): Promise<T | undefined>;
+	run<T>(operation: () => Promise<T>): Promise<T | undefined>;
 }
 
 function createLaunchRequestGuard(): LaunchRequestGuard {
-  let inFlight = false;
+	let inFlight = false;
 
-  return {
-    async run(operation) {
-      if (inFlight) {
-        return undefined;
-      }
+	return {
+		async run(operation) {
+			if (inFlight) {
+				return undefined;
+			}
 
-      inFlight = true;
-      try {
-        return await operation();
-      } finally {
-        inFlight = false;
-      }
-    },
-  };
+			inFlight = true;
+			try {
+				return await operation();
+			} finally {
+				inFlight = false;
+			}
+		},
+	};
 }
 
-async function launchSelectedContext(dependencies: LaunchSelectorDependencies): Promise<LaunchSelectorResult> {
-  const contextId = dependencies.selectedContextId;
-  if (contextId === undefined) {
-    return undefined;
-  }
+async function launchSelectedContext(
+	dependencies: LaunchSelectorDependencies,
+): Promise<LaunchSelectorResult> {
+	const contextId = dependencies.selectedContextId;
+	if (contextId === undefined) {
+		return undefined;
+	}
 
-  if (dependencies.rememberProject) {
-    const binding = await dependencies.bindProject({
-      projectPath: dependencies.projectPath,
-      contextId,
-    });
-    if (!binding.ok) {
-      return binding;
-    }
-  }
+	if (dependencies.rememberProject) {
+		const binding = await dependencies.bindProject({
+			projectPath: dependencies.projectPath,
+			contextId,
+		});
+		if (!binding.ok) {
+			return binding;
+		}
+	}
 
-  const launchRequest = {
-    projectPath: dependencies.projectPath,
-    contextId,
-    ...(dependencies.confirmContextMismatch ? { confirmContextMismatch: true } : {}),
-  };
+	const launchRequest = {
+		projectPath: dependencies.projectPath,
+		contextId,
+		...(dependencies.confirmContextMismatch
+			? { confirmContextMismatch: true }
+			: {}),
+	};
 
-  const preflight = await dependencies.preflightLaunchProject(launchRequest);
-  if (!preflight.ok) {
-    return preflight;
-  }
+	const preflight = await dependencies.preflightLaunchProject(launchRequest);
+	if (!preflight.ok) {
+		return preflight;
+	}
 
-  if (preflight.data.runningEnvironmentConflict && !dependencies.allowExistingEnvironmentLaunch) {
-    return {runningEnvironmentConflict: preflight.data.runningEnvironmentConflict};
-  }
+	if (
+		preflight.data.runningEnvironmentConflict &&
+		!dependencies.allowExistingEnvironmentLaunch
+	) {
+		return {
+			runningEnvironmentConflict: preflight.data.runningEnvironmentConflict,
+		};
+	}
 
-  dependencies.onPreflightComplete?.(preflight.data);
+	dependencies.onPreflightComplete?.(preflight.data);
 
-  return dependencies.launchProject({
-    ...launchRequest,
-  });
+	return dependencies.launchProject({
+		...launchRequest,
+	});
 }
 
+export type {
+	LaunchRequestGuard,
+	LaunchSelectorDependencies,
+	LaunchSelectorResult,
+};
 export { createLaunchRequestGuard, launchSelectedContext };
-export type { LaunchRequestGuard, LaunchSelectorDependencies, LaunchSelectorResult };
