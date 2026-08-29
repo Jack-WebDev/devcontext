@@ -28,7 +28,7 @@ import {
   type SettingsState,
 } from "./lib/devctx-api";
 import { useAppData } from "./components/app/useAppData";
-import { ContextsContent, HistoryContent, HomeDashboardContent, PlaceholderScreen, ProjectsContent, RunningContent, SelectorContent, TrustCenterContent } from "./components/app/AppContent";
+import { ContextsContent, HistoryContent, HomeDashboardContent, PlaceholderScreen, ProjectsContent, RunningContent, TrustCenterContent } from "./components/app/AppContent";
 
 interface PendingRunningEnvironmentLaunch { conflict: RunningEnvironmentConflict; request: {projectPath: string; contextId: string}; }
 
@@ -237,7 +237,7 @@ function App() {
   }
 
   function handleReviewLaunchOptions() {
-    document.getElementById("context-selector")?.scrollIntoView({behavior: "smooth", block: "start"});
+    handleNavigate("contexts");
   }
 
   async function handleProjectLaunch(project: ProjectListItem) {
@@ -336,7 +336,7 @@ function App() {
       statusBar={<AppStatusBar launchState={launchState.status === "loaded" ? launchState.data : undefined} />}
     >
       {activeRoute === "home" ? (
-        <section aria-labelledby="home-heading" className="space-y-8">
+        <section aria-labelledby="home-heading">
           <HomeDashboardContent dashboard={homeDashboard} recentProjects={recentProjects} launchPending={homeLaunchPending} launchError={homeLaunchError} onQuickLaunch={handleHomeQuickLaunch} onReviewLaunchOptions={handleReviewLaunchOptions} onRecentProjectSelect={handleRecentProjectSelect} />
           {recentProjectToLaunch ? (
             <RecentProjectConfirmationDialog
@@ -347,13 +347,6 @@ function App() {
               onConfirm={() => void handleRecentProjectConfirm()}
             />
           ) : null}
-          <section id="context-selector" aria-labelledby="context-selector-heading" className="space-y-6">
-            <div>
-              <p className="text-sm text-muted-foreground">Launch options</p>
-              <h2 id="context-selector-heading" className="text-xl font-semibold">Context selector</h2>
-            </div>
-          <SelectorContent launchState={launchState} onCreateContext={handleCreateContext} onRunDiagnostics={() => handleNavigate("diagnostics")} settings={settings.status === "loaded" ? settings.data : undefined} showOnboardingReplay={onboardingReplayVisible} onDismissOnboardingReplay={() => setOnboardingReplayVisible(false)} />
-          </section>
         </section>
       ) : activeRoute === "contexts" ? (
         <><ContextsContent contexts={contexts} onSelect={setContextDetailsID} onNew={() => setCreatingContext(true)} />{contextDetailsID ? <ContextDetailsDrawer contextId={contextDetailsID} onClose={() => setContextDetailsID(undefined)} load={(contextId) => devContextApi.getContextDetails({contextId})} duplicate={async (request) => { const result = await devContextApi.duplicateContext(request); if (result.ok) { await refreshContexts(); } return result; }} exportMetadata={devContextApi.exportContextMetadata} importMetadata={handleImportContextMetadata}/> : null}{creatingContext && contexts.status === "loaded" ? <CreateContextDialog contexts={contexts.data} onClose={() => setCreatingContext(false)} create={async (request) => { const result = await devContextApi.createContext(request); if (result.ok) { await refreshContexts(); setCreatingContext(false); } return result; }} loadTemplates={() => devContextApi.getContextTemplates()}/> : null}</>
