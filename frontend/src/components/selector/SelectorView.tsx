@@ -13,18 +13,13 @@ import type {
 	PreflightLaunchProjectResult,
 	ProjectBindingState,
 	ProviderCredentialSession,
-	RunningEnvironmentConflict,
 } from "../../lib/devctx-api";
-import {
-	contextPositionFromShortcut,
-	keyboardShortcuts,
-} from "../command-palette/shortcut";
+import { contextPositionFromShortcut } from "../command-palette/shortcut";
 import { RunningEnvironmentConflictDialog } from "../running/RunningEnvironmentConflictDialog";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import { AccountIdentityMismatchDialog } from "./AccountIdentityMismatchDialog";
 import { hasAccountIdentityMismatch } from "./account-identity-mismatch";
-import { ContextCard } from "./ContextCard";
 import { ContextMismatchDialog } from "./ContextMismatchDialog";
 import { cancelSelector } from "./cancel-action";
 import { missingDefaultContextIds } from "./default-context-actions";
@@ -50,10 +45,11 @@ import {
 	type ProviderSessionAssignments,
 } from "./ProviderCredentialClassification.js";
 import { RememberProjectControl } from "./RememberProjectControl";
-import { recommendationReason } from "./recommendation";
 import { SelectorActions } from "./SelectorActions";
 import { SelectorConfidenceSummary } from "./SelectorConfidenceSummary";
+import { ContextChoiceList } from "./ContextChoiceList";
 import { SelectorLayout } from "./SelectorLayout";
+import { SingleContextLaunchView } from "./SingleContextLaunchView";
 import {
 	type ContextNavigationDirection,
 	initialRovingContextId,
@@ -65,6 +61,13 @@ import {
 	canLaunchSelectedContextFromKeyboard,
 	escapeKeyboardAction,
 } from "./selector-keyboard";
+import {
+	launcherSelection,
+	launcherStateIsPending,
+	selectingLauncherState,
+	type LauncherSelection,
+	type LauncherState,
+} from "./launcher-state";
 
 interface SelectorViewProps {
 	launchState: LaunchState;
@@ -107,28 +110,9 @@ function SelectorView({
 	showOnboardingReplay = false,
 	onDismissOnboardingReplay,
 }: SelectorViewProps) {
-	const [selectedContextId, setSelectedContextId] = useState<
-		string | undefined
-	>(() => initialSelectedContextId(launchState));
-	const [rovingContextId, setRovingContextId] = useState<string | undefined>(
-		() => initialRovingContextId(launchState),
+	const [launcherState, setLauncherState] = useState<LauncherState>(() =>
+		selectingLauncherState(initialLauncherSelection(launchState)),
 	);
-	const [rememberProject, setRememberProject] = useState(false);
-	const [launchLifecycle, setLaunchLifecycle] = useState<LaunchLifecycleState>({
-		status: "idle",
-	});
-	const [launchError, setLaunchError] = useState<DisplayError | undefined>(
-		undefined,
-	);
-	const [mismatchError, setMismatchError] = useState<DisplayError | undefined>(
-		undefined,
-	);
-	const [identityMismatchContextID, setIdentityMismatchContextID] = useState<
-		string | undefined
-	>(undefined);
-	const [runningEnvironmentConflict, setRunningEnvironmentConflict] = useState<
-		RunningEnvironmentConflict | undefined
-	>(undefined);
 	const [onboardingPendingContextId, setOnboardingPendingContextId] = useState<
 		string | undefined
 	>(undefined);
@@ -137,16 +121,25 @@ function SelectorView({
 	>(undefined);
 	const [providerSessionAssignments, setProviderSessionAssignments] =
 		useState<ProviderSessionAssignments>({});
+	const [showContextChoices, setShowContextChoices] = useState(false);
+	const [contextSearch, setContextSearch] = useState("");
 	const contextButtonRefs = useRef(new Map<string, HTMLButtonElement>());
 	const launchGuard = useRef(createLaunchRequestGuard());
+	const selection = launcherSelection(launcherState);
+	const selectedContextId = selection?.selectedContextId;
+	const rovingContextId = selection?.rovingContextId;
+	const rememberProject = selection?.rememberProject ?? false;
 	const mismatchDialogOpen =
-		mismatchError?.contextMismatch !== undefined ||
-		identityMismatchContextID !== undefined;
+		launcherState.status === "context_mismatch" ||
+		launcherState.status === "identity_mismatch";
 	const selectedContext = launchState.contexts.find(
 		(context) => context.id === selectedContextId,
 	);
-	const launchPending = launchLifecycle.status !== "idle";
+	const launchPending = launcherStateIsPending(launcherState);
 	const launchBlocked = selectedContextConfidenceBlocked(selectedContext);
+	const singleHealthyContext = singleHealthyLaunchContext(launchState);
+	const showSingleContextConfirmation =
+		singleHealthyContext !== undefined && !showContextChoices;
 	const keyboardLaunchAvailable = canLaunchSelectedContextFromKeyboard({
 		selectedContextId,
 		launchPending: launchPending || launchBlocked,
@@ -154,16 +147,14 @@ function SelectorView({
 	});
 
 	useEffect(() => {
-		setSelectedContextId(initialSelectedContextId(launchState));
-		setRovingContextId(initialRovingContextId(launchState));
-		setRememberProject(false);
-		setLaunchLifecycle({ status: "idle" });
-		setLaunchError(undefined);
-		setMismatchError(undefined);
-		setIdentityMismatchContextID(undefined);
+		setLauncherState(
+			selectingLauncherState(initialLauncherSelection(launchState)),
+		);
 		setOnboardingPendingContextId(undefined);
 		setOnboardingError(undefined);
 		setProviderSessionAssignments({});
+		setShowContextChoices(false);
+		setContextSearch("");
 		launchGuard.current = createLaunchRequestGuard();
 	}, [launchState]);
 
@@ -178,20 +169,27 @@ function SelectorView({
 	}
 
 	function handleSelectContext(contextId: string) {
+		if (launcherState.status !== "selecting") {
+			return;
+		}
 		const nextContextId = nextSelectedContextId(
 			launchState.contexts,
 			contextId,
 		);
-		setSelectedContextId(nextContextId);
-		setRovingContextId(nextContextId);
-		setIdentityMismatchContextID(undefined);
+		setLauncherState(
+			selectingLauncherState({
+				...launcherState.selection,
+				selectedContextId: nextContextId,
+				rovingContextId: nextContextId,
+			}),
+		);
 	}
 
 	function handleContextNavigation(
 		contextId: string,
 		direction: ContextNavigationDirection,
 	) {
-		if (launchPending) {
+		if (launcherState.status !== "selecting") {
 			return;
 		}
 
@@ -204,8 +202,13 @@ function SelectorView({
 			return;
 		}
 
-		setSelectedContextId(nextContextId);
-		setRovingContextId(nextContextId);
+		setLauncherState(
+			selectingLauncherState({
+				...launcherState.selection,
+				selectedContextId: nextContextId,
+				rovingContextId: nextContextId,
+			}),
+		);
 		contextButtonRefs.current.get(nextContextId)?.focus();
 	}
 
@@ -241,9 +244,8 @@ function SelectorView({
 		event.preventDefault();
 		event.stopPropagation();
 
-		if (action === "close-dialog") {
-			setMismatchError(undefined);
-			setIdentityMismatchContextID(undefined);
+		if (action === "close-dialog" && selection !== undefined) {
+			setLauncherState(selectingLauncherState(selection));
 			return;
 		}
 
@@ -256,6 +258,10 @@ function SelectorView({
 		allowExistingEnvironmentLaunch = false,
 		confirmIdentityMismatch = false,
 	}: LaunchAttemptOptions = {}) {
+		const currentSelection = launcherSelection(launcherState);
+		if (currentSelection === undefined) {
+			return;
+		}
 		const contextToLaunch = launchState.contexts.find(
 			(context) => context.id === contextId,
 		);
@@ -266,19 +272,21 @@ function SelectorView({
 			!confirmIdentityMismatch &&
 			hasAccountIdentityMismatch(contextToLaunch)
 		) {
-			setIdentityMismatchContextID(contextId);
+			if (contextId !== undefined) {
+				setLauncherState({
+					status: "identity_mismatch",
+					selection: currentSelection,
+					contextId,
+				});
+			}
 			return;
 		}
 
 		await launchGuard.current.run(async () => {
-			setLaunchLifecycle({ status: "preflighting" });
-			setLaunchError(undefined);
-			if (confirmContextMismatch) {
-				setMismatchError(undefined);
-			}
-			if (confirmIdentityMismatch) {
-				setIdentityMismatchContextID(undefined);
-			}
+			setLauncherState({
+				status: "preflighting",
+				selection: currentSelection,
+			});
 
 			try {
 				const result = await launchSelectedContext({
@@ -288,8 +296,9 @@ function SelectorView({
 					confirmContextMismatch,
 					allowExistingEnvironmentLaunch,
 					onPreflightComplete: (preflight) => {
-						setLaunchLifecycle({
+						setLauncherState({
 							status: "launching",
+							selection: currentSelection,
 							steps: preflight.verificationSteps,
 						});
 					},
@@ -299,7 +308,11 @@ function SelectorView({
 				});
 
 				if (result && "runningEnvironmentConflict" in result) {
-					setRunningEnvironmentConflict(result.runningEnvironmentConflict);
+					setLauncherState({
+						status: "existing_workspace",
+						selection: currentSelection,
+						conflict: result.runningEnvironmentConflict,
+					});
 				} else if (result?.ok) {
 					if ("project" in result.data && "context" in result.data) {
 						onCodingToolLaunched?.(result.data);
@@ -307,20 +320,47 @@ function SelectorView({
 					if (shouldCloseSelectorAfterLaunch(launchSuccessCloseBehavior)) {
 						await cancelSelector({ closeSelector: onCancel });
 					}
+					setLauncherState(selectingLauncherState(currentSelection));
 				} else if (result && !result.ok) {
 					if (
 						result.error.code === "context_mismatch_requires_confirmation" &&
 						result.error.contextMismatch
 					) {
-						setMismatchError(result.error);
+						setLauncherState({
+							status: "context_mismatch",
+							selection: currentSelection,
+							error: result.error,
+						});
 					} else {
-						setLaunchError(result.error);
+						setLauncherState({
+							status: "failure",
+							selection: currentSelection,
+							error: result.error,
+						});
 					}
+				} else {
+					setLauncherState(selectingLauncherState(currentSelection));
 				}
-			} finally {
-				setLaunchLifecycle({ status: "idle" });
+			} catch (error) {
+				setLauncherState({
+					status: "failure",
+					selection: currentSelection,
+					error: unexpectedLaunchError(error),
+				});
 			}
 		});
+	}
+
+	function handleRememberProjectChange(rememberProject: boolean) {
+		if (launcherState.status !== "selecting") {
+			return;
+		}
+		setLauncherState(
+			selectingLauncherState({
+				...launcherState.selection,
+				rememberProject,
+			}),
+		);
 	}
 
 	function handleClassifyProviderSession(
@@ -405,36 +445,30 @@ function SelectorView({
 					projectIdentity={<ProjectIdentity project={launchState.project} />}
 					contextCards={
 						<>
-							{launchState.contexts.length === 0 ? (
-								<SelectorEmptyContextState />
+							{showSingleContextConfirmation ? (
+								<SingleContextLaunchView
+									context={singleHealthyContext}
+									projectName={launchState.project.name}
+									onChooseAnother={() => setShowContextChoices(true)}
+								/>
 							) : (
-								<div className="grid gap-4 sm:grid-cols-2">
-									{launchState.contexts.map((context) => (
-										<ContextCard
-											key={context.id}
-											context={context}
-											selected={selectedContextId === context.id}
-											recommendation={recommendationForContext(
-												launchState,
-												context.id,
-											)}
-											disabled={launchPending}
-											tabIndex={rovingContextId === context.id ? 0 : -1}
-											buttonRef={setContextButtonRef(context.id)}
-											onSelect={handleSelectContext}
-											onNavigate={handleContextNavigation}
-											onLaunchSelected={
-												keyboardLaunchAvailable
-													? () => void handleLaunch()
-													: undefined
-											}
-											onProviderSetup={(contextId) => {
-												handleSelectContext(contextId);
-												void handleLaunch({ contextId });
-											}}
-										/>
-									))}
-								</div>
+								<ContextChoiceList
+									launchState={launchState}
+									selectedContextId={selectedContextId}
+									rovingContextId={rovingContextId}
+									launchPending={launchPending}
+									keyboardLaunchAvailable={keyboardLaunchAvailable}
+									search={contextSearch}
+									onSearchChange={setContextSearch}
+									buttonRef={setContextButtonRef}
+									onSelect={handleSelectContext}
+									onNavigate={handleContextNavigation}
+									onLaunch={() => void handleLaunch()}
+									onProviderSetup={(contextId) => {
+										handleSelectContext(contextId);
+										void handleLaunch({ contextId });
+									}}
+								/>
 							)}
 
 							<MissingDefaultContextActions
@@ -468,10 +502,12 @@ function SelectorView({
 						</>
 					}
 					confidenceSummary={
-						<SelectorConfidenceSummary
-							context={selectedContext}
-							project={launchState.project}
-						/>
+						showSingleContextConfirmation ? null : (
+							<SelectorConfidenceSummary
+								context={selectedContext}
+								project={launchState.project}
+							/>
+						)
 					}
 					rememberControl={
 						<RememberProjectControl
@@ -480,7 +516,7 @@ function SelectorView({
 							rememberProject={rememberProject}
 							selectedContextId={selectedContextId}
 							disabled={launchPending}
-							onRememberProjectChange={setRememberProject}
+							onRememberProjectChange={handleRememberProjectChange}
 						/>
 					}
 					launchActions={
@@ -491,17 +527,17 @@ function SelectorView({
 										projectName={launchState.project.name}
 										contextName={selectedContext?.name ?? "selected context"}
 										steps={
-											launchLifecycle.status === "launching"
-												? launchLifecycle.steps
+											launcherState.status === "launching"
+												? launcherState.steps
 												: undefined
 										}
 									/>
 								</div>
 							) : null}
 
-							{launchError ? (
+							{launcherState.status === "failure" ? (
 								<LaunchFailureView
-									error={launchError}
+									error={launcherState.error}
 									onRetry={() => void handleLaunch()}
 									onRunDiagnostics={onRunDiagnostics}
 									onCancel={() =>
@@ -510,14 +546,19 @@ function SelectorView({
 								/>
 							) : null}
 
-							{mismatchError?.contextMismatch ? (
+							{launcherState.status === "context_mismatch" &&
+							launcherState.error.contextMismatch ? (
 								<ContextMismatchDialog
-									mismatch={mismatchError.contextMismatch}
+									mismatch={launcherState.error.contextMismatch}
 									contexts={launchState.contexts}
 									launchPending={launchPending}
-									onCancel={() => setMismatchError(undefined)}
+									onCancel={() =>
+										setLauncherState(
+											selectingLauncherState(launcherState.selection),
+										)
+									}
 									onOpenAnyway={() => {
-										const mismatch = mismatchError.contextMismatch;
+										const mismatch = launcherState.error.contextMismatch;
 										if (mismatch !== undefined) {
 											void handleLaunch({
 												contextId: mismatch.requestedContextId,
@@ -529,33 +570,43 @@ function SelectorView({
 								/>
 							) : null}
 
-							{identityMismatchContextID !== undefined ? (
+							{launcherState.status === "identity_mismatch" ? (
 								<AccountIdentityMismatchDialog
 									contextName={
 										launchState.contexts.find(
-											(context) => context.id === identityMismatchContextID,
+											(context) => context.id === launcherState.contextId,
 										)?.name ?? "selected context"
 									}
 									launchPending={launchPending}
-									onCancel={() => setIdentityMismatchContextID(undefined)}
+									onCancel={() =>
+										setLauncherState(
+											selectingLauncherState(launcherState.selection),
+										)
+									}
 									onReviewConfiguration={() => {
-										setIdentityMismatchContextID(undefined);
+										setLauncherState(
+											selectingLauncherState(launcherState.selection),
+										);
 										onRunDiagnostics?.();
 									}}
 									onLaunchAnyway={() =>
 										void handleLaunch({
-											contextId: identityMismatchContextID,
+											contextId: launcherState.contextId,
 											confirmIdentityMismatch: true,
 										})
 									}
 								/>
 							) : null}
 
-							{runningEnvironmentConflict ? (
+							{launcherState.status === "existing_workspace" ? (
 								<RunningEnvironmentConflictDialog
-									conflict={runningEnvironmentConflict}
+									conflict={launcherState.conflict}
 									launchPending={launchPending}
-									onCancel={() => setRunningEnvironmentConflict(undefined)}
+									onCancel={() =>
+										setLauncherState(
+											selectingLauncherState(launcherState.selection),
+										)
+									}
 									onLaunchAnother={() =>
 										void handleLaunch({ allowExistingEnvironmentLaunch: true })
 									}
@@ -583,14 +634,6 @@ function SelectorView({
 	);
 }
 
-type LaunchLifecycleState =
-	| { status: "idle" }
-	| { status: "preflighting" }
-	| {
-			status: "launching";
-			steps?: PreflightLaunchProjectResult["verificationSteps"];
-	  };
-
 interface LaunchAttemptOptions {
 	confirmContextMismatch?: boolean;
 	contextId?: string;
@@ -604,37 +647,21 @@ function selectedContextConfidenceBlocked(
 	return context?.confidence?.status === "blocked";
 }
 
-function SelectorEmptyContextState() {
-	return (
-		<Card
-			as="section"
-			size="sm"
-			className="border border-border bg-muted/30 p-5"
-			aria-labelledby="empty-context-title"
-		>
-			<h3 id="empty-context-title" className="font-medium">
-				Create a development context
-			</h3>
-			<p className="mt-2 text-sm text-muted-foreground">
-				Contexts keep provider accounts and coding-tool storage separate for the
-				projects you open.
-			</p>
-			<ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-				<li>
-					<span className="font-medium text-foreground">Personal:</span>{" "}
-					personal projects and accounts.
-				</li>
-				<li>
-					<span className="font-medium text-foreground">Company:</span> work or
-					client projects and accounts.
-				</li>
-				<li>
-					<span className="font-medium text-foreground">Custom:</span> create a
-					tailored context from Contexts when custom creation is available.
-				</li>
-			</ul>
-		</Card>
-	);
+function initialLauncherSelection(launchState: LaunchState): LauncherSelection {
+	return {
+		selectedContextId: initialSelectedContextId(launchState),
+		rovingContextId: initialRovingContextId(launchState),
+		rememberProject: false,
+	};
+}
+
+function unexpectedLaunchError(error: unknown): DisplayError {
+	const message = error instanceof Error ? error.message : "Launch failed.";
+	return {
+		code: "unexpected_error",
+		message,
+		recovery: "Retry the launch. If it keeps failing, review diagnostics.",
+	};
 }
 
 function MissingDefaultContextActions({
@@ -742,15 +769,18 @@ function MissingDefaultContextActions({
 	);
 }
 
-function recommendationForContext(
+function singleHealthyLaunchContext(
 	launchState: LaunchState,
-	contextId: string,
-): string | undefined {
-	if (launchState.selectedContextId !== contextId) {
+): ContextState | undefined {
+	const [context] = launchState.contexts;
+	if (
+		launchState.contexts.length !== 1 ||
+		context?.tool.status !== "ready" ||
+		context.confidence?.status !== "ready"
+	) {
 		return undefined;
 	}
-
-	return recommendationReason(launchState.resolutionSource);
+	return context;
 }
 
 export { SelectorView };

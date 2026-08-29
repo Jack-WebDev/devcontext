@@ -42,6 +42,9 @@ type Error struct {
 	Code     ErrorCode `json:"code"`
 	Message  string    `json:"message"`
 	Recovery string    `json:"recovery"`
+	// ProjectPathIssue identifies a safe project-path recovery category when
+	// the request could not resolve a project directory.
+	ProjectPathIssue string `json:"projectPathIssue,omitempty"`
 	// TechnicalDetails contains sanitized diagnostic information. The GUI must
 	// keep it behind an explicit disclosure.
 	TechnicalDetails string `json:"technicalDetails,omitempty"`
@@ -103,7 +106,14 @@ func NewError(err error) *Error {
 		)
 	case errors.As(err, &projectPathError):
 		message, recovery := projectPathMessageAndRecovery(projectPathError)
-		return applicationError(ErrorCodeValidation, message, recovery, err)
+		return &Error{
+			Code:             ErrorCodeValidation,
+			Message:          message,
+			Recovery:         recovery,
+			ProjectPathIssue: projectPathIssue(projectPathError),
+			TechnicalDetails: devlog.SanitizeError(err, nil),
+			cause:            err,
+		}
 	case errors.As(err, &missingContextError):
 		return applicationError(
 			ErrorCodeValidation,
@@ -138,6 +148,19 @@ func NewError(err error) *Error {
 		return applicationError(ErrorCodeValidation, "Unable to complete request.", "Check the selected project and context, then retry.", err)
 	default:
 		return applicationError(ErrorCodeInternal, "Dev Context failed unexpectedly.", "Retry the action. If it keeps failing, include debug details in a bug report.", err)
+	}
+}
+
+func projectPathIssue(err *project.PathError) string {
+	switch {
+	case errors.Is(err, project.ErrProjectDirectoryNotFound):
+		return "not_found"
+	case errors.Is(err, project.ErrProjectPathNotDirectory):
+		return "not_directory"
+	case errors.Is(err, project.ErrProjectDirectoryUnreadable):
+		return "unreadable"
+	default:
+		return "invalid"
 	}
 }
 

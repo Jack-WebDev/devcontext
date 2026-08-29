@@ -7,6 +7,8 @@ export function BindProject(arg1:application.BindProjectRequest):Promise<any>;
 
 export function CreateContext(arg1:application.CreateContextRequest):Promise<any>;
 
+export function ChooseProjectDirectory():Promise<any>;
+
 export function DuplicateContext(arg1:application.DuplicateContextRequest):Promise<any>;
 
 export function ExportContextMetadata(arg1:application.ExportContextMetadataRequest):Promise<any>;

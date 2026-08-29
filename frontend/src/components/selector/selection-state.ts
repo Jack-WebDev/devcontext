@@ -11,7 +11,9 @@ function initialSelectedContextId(
 		launchState.binding.dangling ||
 		boundContextId === undefined
 	) {
-		return undefined;
+		return launchState.contexts.length === 1
+			? launchState.contexts[0]?.id
+			: undefined;
 	}
 
 	return contextExists(launchState.contexts, boundContextId)

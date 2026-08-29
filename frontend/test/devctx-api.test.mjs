@@ -39,6 +39,47 @@ test("adapter rejects an invalid application mode", async () => {
 	}
 });
 
+test("adapter preserves the typed project-path recovery category", async () => {
+	const api = createDevContextApi({
+		async getLaunchState() {
+			return {
+				code: "validation_error",
+				message: "Project path does not exist.",
+				recovery: "Choose an existing project directory.",
+				projectPathIssue: "not_found",
+			};
+		},
+	});
+
+	const result = await api.getLaunchState({ projectPath: "/missing/project" });
+	assert.equal(result.ok, false);
+	if (!result.ok) {
+		assert.equal(result.error.projectPathIssue, "not_found");
+	}
+});
+
+test("adapter returns the selected project directory or a canceled selection", async () => {
+	const selectedApi = createDevContextApi({
+		async chooseProjectDirectory() {
+			return "/work/recovered-project";
+		},
+	});
+	const canceledApi = createDevContextApi({
+		async chooseProjectDirectory() {
+			return "";
+		},
+	});
+
+	assert.deepEqual(await selectedApi.chooseProjectDirectory(), {
+		ok: true,
+		data: "/work/recovered-project",
+	});
+	assert.deepEqual(await canceledApi.chooseProjectDirectory(), {
+		ok: true,
+		data: undefined,
+	});
+});
+
 test("adapter normalizes the Home dashboard contract", async () => {
 	const api = createDevContextApi({
 		async getHomeDashboard(request) {

@@ -59,6 +59,14 @@ import {
 import { GuiErrorNotice } from "../.tmp-test/src/components/selector/GuiErrorNotice.js";
 import { LaunchFailureView } from "../.tmp-test/src/components/selector/LaunchFailureView.js";
 import { LauncherSurface } from "../.tmp-test/src/components/launcher/LauncherSurface.js";
+import { ProjectResolvingView } from "../.tmp-test/src/components/launcher/ProjectResolvingView.js";
+import { ProjectNotFoundView } from "../.tmp-test/src/components/launcher/ProjectNotFoundView.js";
+import {
+	ContextChoiceList,
+	filterContexts,
+	groupContexts,
+	shouldShowContextSearch,
+} from "../.tmp-test/src/components/selector/ContextChoiceList.js";
 import {
 	LaunchVerificationProgress,
 	verificationStepPresentation,
@@ -82,7 +90,7 @@ import {
 	boundContextName,
 	RememberProjectControl,
 } from "../.tmp-test/src/components/selector/RememberProjectControl.js";
-import { recommendationReason } from "../.tmp-test/src/components/selector/recommendation.js";
+import { contextRecommendation } from "../.tmp-test/src/components/selector/recommendation.js";
 import {
 	launchConfidenceFeedback,
 	SelectorActions,
@@ -98,6 +106,12 @@ import {
 	nextKeyboardContextId,
 	nextSelectedContextId,
 } from "../.tmp-test/src/components/selector/selection-state.js";
+import { SingleContextLaunchView } from "../.tmp-test/src/components/selector/SingleContextLaunchView.js";
+import {
+	launcherSelection,
+	launcherStateIsPending,
+	selectingLauncherState,
+} from "../.tmp-test/src/components/selector/launcher-state.js";
 import {
 	canLaunchSelectedContextFromKeyboard,
 	escapeKeyboardAction,
@@ -172,6 +186,64 @@ test("launcher surface is focused on one project", () => {
 	assert.match(html, /Open project/);
 	assert.match(html, /\/work\/api/);
 	assert.doesNotMatch(html, /data-app-shell|aria-label="Main navigation"/);
+});
+
+test("project resolving view explains the launch information being loaded", () => {
+	const html = renderToStaticMarkup(createElement(ProjectResolvingView));
+
+	assert.match(html, /Preparing your project/);
+	assert.match(html, /remembered context/);
+	assert.match(html, /available contexts/);
+	assert.match(html, /readiness/);
+	assert.match(html, /role="status"/);
+});
+
+test("project-not-found recovery uses folder selection instead of raw errors", () => {
+	const html = renderToStaticMarkup(
+		createElement(ProjectNotFoundView, {
+			choosingFolder: false,
+			onChooseFolder() {},
+			onCancel() {},
+		}),
+	);
+
+	assert.match(html, /Project not found/);
+	assert.match(html, /Choose folder/);
+	assert.match(html, /Cancel/);
+	assert.doesNotMatch(html, /Project path does not exist/);
+});
+
+test("launcher state keeps progress and dialogs mutually exclusive", () => {
+	const selection = {
+		selectedContextId: "company",
+		rovingContextId: "company",
+		rememberProject: true,
+	};
+
+	assert.deepEqual(selectingLauncherState(selection), {
+		status: "selecting",
+		selection,
+	});
+	assert.equal(
+		launcherStateIsPending({ status: "preflighting", selection }),
+		true,
+	);
+	assert.equal(
+		launcherStateIsPending({
+			status: "identity_mismatch",
+			selection,
+			contextId: "company",
+		}),
+		false,
+	);
+	assert.deepEqual(
+		launcherSelection({
+			status: "existing_workspace",
+			selection,
+			conflict: { kind: "same_context", environment: {} },
+		}),
+		selection,
+	);
 });
 
 test("notification policy permits only meaningful provider, tool, and update events", () => {
@@ -652,6 +724,111 @@ test("first-run predicate separates new and returning users", () => {
 		true,
 	);
 	assert.equal(shouldRenderFirstRunWelcome(launchStateFixture()), false);
+	assert.equal(
+		shouldRenderFirstRunWelcome(
+			launchStateFixture({ contexts: [], firstRun: false }),
+		),
+		true,
+	);
+});
+
+test("a single unbound context is selected so it can be launched", () => {
+	const state = launchStateFixture({
+		contexts: [contextFixture("personal", "Personal")],
+	});
+
+	assert.equal(initialSelectedContextId(state), "personal");
+});
+
+test("single-context confirmation stays concise and offers alternatives", () => {
+	const html = renderToStaticMarkup(
+		createElement(SingleContextLaunchView, {
+			context: contextFixture("personal", "Personal"),
+			projectName: "api",
+			onChooseAnother() {},
+		}),
+	);
+
+	assert.match(html, /Open api with Personal/);
+	assert.match(html, /Personal is ready to open this project/);
+	assert.match(html, /Choose another context/);
+});
+
+test("context choices separate recommendations and search only larger collections", () => {
+	const contexts = [
+		contextFixture("personal", "Personal"),
+		contextFixture("company", "Company"),
+		contextFixture("client-a", "Client A"),
+	];
+	const rememberedContext = contexts[1];
+	assert.deepEqual(
+		groupContexts(
+			contexts.map((context) => ({
+				context,
+				recommendation:
+					context.id === rememberedContext.id
+						? {
+								category: "remembered",
+								label: "Remembered",
+								detail: "Remembered for this project.",
+								reasons: ["api is bound to Company."],
+							}
+						: undefined,
+			})),
+		).map((group) => [
+			group.label,
+			group.contexts.map(({ context }) => context.id),
+		]),
+		[
+			["Remembered context", ["company"]],
+			["Other contexts", ["personal", "client-a"]],
+		],
+	);
+	assert.deepEqual(filterContexts(contexts, "client"), [contexts[2]]);
+	assert.equal(shouldShowContextSearch(contexts), false);
+	assert.equal(
+		shouldShowContextSearch([
+			...contexts,
+			contextFixture("four", "Four"),
+			contextFixture("five", "Five"),
+			contextFixture("six", "Six"),
+		]),
+		true,
+	);
+
+	const html = renderToStaticMarkup(
+		createElement(ContextChoiceList, {
+			launchState: launchStateFixture({
+				contexts,
+				selectedContextId: "company",
+				resolutionSource: "project_binding",
+				binding: {
+					projectPath: "/work/api",
+					bound: true,
+					contextId: "company",
+					dangling: false,
+				},
+			}),
+			selectedContextId: "company",
+			rovingContextId: "company",
+			launchPending: false,
+			keyboardLaunchAvailable: true,
+			search: "",
+			onSearchChange() {},
+			buttonRef() {
+				return null;
+			},
+			onSelect() {},
+			onNavigate() {},
+			onLaunch() {},
+			onProviderSetup() {},
+		}),
+	);
+	assert.match(html, /Remembered context/);
+	assert.match(html, /Remembered/);
+	assert.match(html, /Other contexts/);
+	assert.doesNotMatch(html, /Recommended/);
+	assert.doesNotMatch(html, /Enabled providers/);
 });
 
 test("onboarding replay does not offer duplicate context creation", () => {
@@ -724,27 +901,85 @@ test("context card can represent a selected context", () => {
 	assert.match(html, />Selected</);
 });
 
-test("context card presents a backend-supported recommendation with its reason", () => {
+test("context card presents an evidence-backed label with its reason", () => {
 	const context = contextFixture("company", "Company");
 	const html = renderToStaticMarkup(
-		ContextCard({ context, recommendation: "Remembered for this project" }),
+		ContextCard({
+			context,
+			recommendation: {
+				category: "remembered",
+				label: "Remembered",
+				detail: "Remembered for this project.",
+				reasons: ["api is bound to Company."],
+			},
+		}),
 	);
 
-	assert.match(html, />Recommended</);
-	assert.ok(html.includes("Remembered for this project"));
+	assert.match(html, />Remembered</);
+	assert.ok(html.includes("Remembered for this project."));
+	assert.match(html, /Why this context/);
+	assert.ok(html.includes("api is bound to Company."));
+	assert.match(html, /<details/);
+	assert.doesNotMatch(html, /<details[^>]*open/);
 });
 
-test("recommendation reasons use plain language for known backend sources", () => {
+test("recommendation labels only reflect backend binding, verification, and conflict evidence", () => {
+	const context = {
+		...contextFixture("company", "Company"),
+		confidence: { contextId: "company", status: "ready", checks: [] },
+	};
+	const remembered = launchStateFixture({
+		contexts: [context],
+		binding: {
+			projectPath: "/work/api",
+			bound: true,
+			contextId: "company",
+			dangling: false,
+		},
+		resolutionSource: "project_binding",
+	});
+	assert.deepEqual(contextRecommendation(remembered, context), {
+		category: "remembered",
+		label: "Remembered",
+		detail: "Remembered for this project.",
+		reasons: ["api is bound to Company."],
+	});
+
+	const verified = launchStateFixture({ contexts: [context] });
+	assert.deepEqual(contextRecommendation(verified, context), {
+		category: "verified",
+		label: "Verified",
+		detail: "Dev Context verified the required launch checks.",
+		reasons: ["Required launch checks are ready."],
+	});
+
+	const conflict = launchStateFixture({
+		contexts: [context],
+		warnings: [
+			{
+				code: "context_mismatch",
+				message: "Mismatch",
+				requestedContextId: "company",
+			},
+		],
+	});
+	assert.deepEqual(contextRecommendation(conflict, context), {
+		category: "conflict",
+		label: "Conflict",
+		detail: "This context conflicts with the project's remembered context.",
+		reasons: ["Mismatch"],
+	});
 	assert.equal(
-		recommendationReason("project_binding"),
-		"Remembered for this project",
+		contextRecommendation(launchStateFixture({ contexts: [context] }), {
+			...context,
+			confidence: {
+				contextId: "company",
+				status: "needs_attention",
+				checks: [],
+			},
+		}),
+		undefined,
 	);
-	assert.equal(
-		recommendationReason("remembered_context"),
-		"Remembered context",
-	);
-	assert.equal(recommendationReason("last_launch"), "Used for the last launch");
-	assert.equal(recommendationReason("user_selection"), undefined);
 });
 
 test("context card renders backend-provided description and accent metadata", () => {
