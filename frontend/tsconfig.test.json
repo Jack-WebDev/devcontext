@@ -1,30 +1,30 @@
 {
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "composite": false,
-    "declaration": false,
-    "noEmit": false,
-    "outDir": ".tmp-test",
-    "rootDir": ".",
-    "sourceMap": false,
-    "tsBuildInfoFile": ".tmp-test/tsconfig.test.tsbuildinfo"
-  },
-  "include": [
-    "src/lib/devctx-api.ts",
-    "src/lib/devctx-window.ts",
-    "src/components/selector/*.tsx",
-    "src/components/selector/*.ts",
-    "src/components/shell/*.tsx",
-    "src/components/shell/*.ts",
-    "src/components/command-palette/*.tsx",
-    "src/components/command-palette/*.ts",
-    "src/components/notifications/*.ts",
-    "src/components/home/*.tsx",
-    "src/components/contexts/*.tsx",
-    "src/components/projects/*.tsx",
-    "src/components/diagnostics/*.tsx",
-    "src/components/history/*.tsx",
-    "src/components/running/*.tsx",
-    "src/components/trust/*.tsx"
-  ]
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"declaration": false,
+		"noEmit": false,
+		"outDir": ".tmp-test",
+		"rootDir": ".",
+		"sourceMap": false,
+		"tsBuildInfoFile": ".tmp-test/tsconfig.test.tsbuildinfo"
+	},
+	"include": [
+		"src/lib/devctx-api.ts",
+		"src/lib/devctx-window.ts",
+		"src/components/selector/*.tsx",
+		"src/components/selector/*.ts",
+		"src/components/shell/*.tsx",
+		"src/components/shell/*.ts",
+		"src/components/command-palette/*.tsx",
+		"src/components/command-palette/*.ts",
+		"src/components/notifications/*.ts",
+		"src/components/home/*.tsx",
+		"src/components/contexts/*.tsx",
+		"src/components/projects/*.tsx",
+		"src/components/diagnostics/*.tsx",
+		"src/components/history/*.tsx",
+		"src/components/running/*.tsx",
+		"src/components/trust/*.tsx"
+	]
 }

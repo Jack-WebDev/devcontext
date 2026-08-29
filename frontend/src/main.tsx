@@ -1,16 +1,16 @@
-import React from 'react'
-import {createRoot} from 'react-dom/client'
-import './style.css'
-import App from './App'
-import { Toaster } from './components/ui/sonner'
+import React from "react";
+import { createRoot } from "react-dom/client";
+import "./style.css";
+import App from "./App";
+import { Toaster } from "./components/ui/sonner";
 
-const container = document.getElementById('root')
+const container = document.getElementById("root");
 
-const root = createRoot(container!)
+const root = createRoot(container!);
 
 root.render(
-    <React.StrictMode>
-        <App/>
-        <Toaster position="bottom-right" closeButton />
-    </React.StrictMode>
-)
+	<React.StrictMode>
+		<App />
+		<Toaster position="bottom-right" closeButton />
+	</React.StrictMode>,
+);
