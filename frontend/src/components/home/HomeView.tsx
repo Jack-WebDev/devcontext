@@ -19,6 +19,7 @@ import { Button } from "../ui/button.js";
 
 interface HomeViewProps {
 	dashboard: HomeDashboardState;
+	isFirstRun: boolean;
 	launchPending: boolean;
 	launchError?: DisplayError;
 	onQuickLaunch: () => void;
@@ -27,6 +28,10 @@ interface HomeViewProps {
 }
 
 export function HomeView(props: HomeViewProps) {
+	if (props.isFirstRun) {
+		return <FirstRunHome {...props} />;
+	}
+
 	return (
 		<div className="home-content">
 			<header className="home-header">
@@ -64,6 +69,121 @@ export function HomeView(props: HomeViewProps) {
 					onSelect={props.onRecentProjectSelect}
 				/>
 				<RecentActivity projects={props.dashboard.recentProjects} />
+			</div>
+		</div>
+	);
+}
+
+function FirstRunHome({
+	dashboard,
+	onReviewLaunchOptions,
+}: Pick<HomeViewProps, "dashboard" | "onReviewLaunchOptions">) {
+	return (
+		<div className="home-content w-full max-w-[820px] pt-14">
+			<header className="max-w-[680px]">
+				<h2 id="home-heading" className="home-title">
+					Welcome to Dev Context
+				</h2>
+				<p className="mt-2 text-[15px] font-medium text-foreground">
+					Keep different development identities separate.
+				</p>
+				<p className="mt-2 max-w-[620px] text-[13px] leading-[1.5] text-muted-foreground">
+					A context keeps its own tools, AI accounts, and settings. Create as
+					many as you need.
+				</p>
+			</header>
+
+			<p className="mt-6 text-[12px] font-semibold text-muted-foreground">
+				Common examples
+			</p>
+			<section
+				className="mt-[10px] grid grid-cols-2 gap-[12px]"
+				aria-label="Examples of separate development identities"
+			>
+				<ContextExplanation
+					icon={UserRound}
+					title="Personal"
+					description="Your personal projects, tools, and accounts."
+					tone="personal"
+				/>
+				<ContextExplanation
+					icon={Building2}
+					title="Work"
+					description="Employer or client projects, tools, and accounts."
+					tone="work"
+				/>
+			</section>
+
+			<div className="mt-6">
+				<Button
+					type="button"
+					className="h-[42px] rounded-[10px] bg-[var(--green-strong)] px-[18px] text-[13px] font-semibold normal-case tracking-normal text-white shadow-[0_1px_2px_rgb(0_0_0/0.12)] transition-[background-color,transform,box-shadow] duration-150 ease-out hover:bg-[var(--green)] active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-[var(--green-strong)]/30 focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none"
+					onClick={onReviewLaunchOptions}
+				>
+					Set up your first context
+				</Button>
+				<p className="mt-[7px] text-[11px] text-muted-foreground">
+					Takes about a minute
+				</p>
+			</div>
+
+			<section
+				className="mt-7 max-w-[620px] rounded-[11px] border border-black/[0.045] bg-white/60 px-[15px] py-[13px] shadow-[0_1px_2px_rgb(0_0_0/0.018)]"
+				aria-labelledby="home-current-project-heading"
+			>
+				<p
+					id="home-current-project-heading"
+					className="text-xs font-medium text-muted-foreground"
+				>
+					Current project
+				</p>
+				<div className="mt-3 flex min-w-0 items-center gap-3">
+					<Folder
+						className="size-5 shrink-0 text-muted-foreground"
+						strokeWidth={1.6}
+					/>
+					<div className="min-w-0">
+						<h3 className="truncate text-base font-semibold">
+							{dashboard.project.name}
+						</h3>
+						<p
+							className="mt-1 truncate font-mono text-xs text-muted-foreground"
+							title={dashboard.project.path}
+						>
+							{dashboard.project.path}
+						</p>
+					</div>
+				</div>
+			</section>
+		</div>
+	);
+}
+
+function ContextExplanation({
+	icon: Icon,
+	title,
+	description,
+	tone,
+}: {
+	icon: typeof UserRound;
+	title: string;
+	description: string;
+	tone: "personal" | "work";
+}) {
+	return (
+		<div
+			className="flex min-h-[84px] gap-3 rounded-[11px] border border-black/[0.05] bg-white/70 px-[14px] py-[13px] shadow-[0_1px_2px_rgb(0_0_0/0.02)]"
+		>
+			<span
+				className={`grid size-8 shrink-0 place-items-center rounded-[8px] ${tone === "personal" ? "bg-[var(--company-soft)] text-[var(--company-accent)]" : "bg-[var(--green-soft)] text-[var(--green-strong)]"}`}
+			>
+				<Icon className="size-4" />
+			</span>
+			<div>
+				<h3 className="text-sm font-semibold">{title}</h3>
+				<p className="mt-[5px] text-[12px] leading-[1.5] text-muted-foreground">
+					{description}
+				</p>
 			</div>
 		</div>
 	);

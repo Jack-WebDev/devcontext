@@ -117,6 +117,7 @@ export function ProjectsContent({
 
 export function HomeDashboardContent({
 	dashboard,
+	contexts,
 	recentProjects,
 	launchPending,
 	launchError,
@@ -125,6 +126,7 @@ export function HomeDashboardContent({
 	onRecentProjectSelect,
 }: {
 	dashboard: LoadState<HomeDashboardState>;
+	contexts: LoadState<ContextListItem[]>;
 	recentProjects: LoadState<RecentProjectState[]>;
 	launchPending: boolean;
 	launchError?: DisplayError;
@@ -136,11 +138,14 @@ export function HomeDashboardContent({
 		return <LoadingMessage>Loading Home dashboard...</LoadingMessage>;
 	if (dashboard.status === "error")
 		return <GuiErrorNotice error={dashboard.error} />;
+	if (contexts.status === "loading")
+		return <LoadingMessage>Loading contexts...</LoadingMessage>;
 	const projects =
 		recentProjects.status === "loaded" ? recentProjects.data : [];
 	return (
 		<HomeView
 			dashboard={{ ...dashboard.data, recentProjects: projects }}
+			isFirstRun={contexts.status === "loaded" && contexts.data.length === 0}
 			launchPending={launchPending}
 			launchError={launchError}
 			onQuickLaunch={onQuickLaunch}

@@ -75,6 +75,8 @@ function App() {
 		refreshRunningEnvironments,
 		setSettings,
 	} = useAppData(activeRoute);
+	const isFirstRun =
+		contexts.status === "loaded" && contexts.data.length === 0;
 	const [settingsPending, setSettingsPending] = useState(false);
 	const [onboardingReplayVisible, setOnboardingReplayVisible] = useState(false);
 	const [pendingRunningEnvironmentLaunch, setPendingRunningEnvironmentLaunch] =
@@ -448,6 +450,7 @@ function App() {
 		<AppShell
 			activeRoute={activeRoute}
 			onNavigate={handleNavigate}
+			isFirstRun={isFirstRun}
 			currentProject={
 				launchState.status === "loaded" ? launchState.data.project : undefined
 			}
@@ -463,6 +466,7 @@ function App() {
 				<section aria-labelledby="home-heading">
 					<HomeDashboardContent
 						dashboard={homeDashboard}
+						contexts={contexts}
 						recentProjects={recentProjects}
 						launchPending={homeLaunchPending}
 						launchError={homeLaunchError}
