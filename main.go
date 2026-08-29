@@ -33,12 +33,27 @@ func main() {
 		os.Exit(int(runCLI(args)))
 	}
 
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		fmt.Fprint(os.Stderr, "Unable to determine the current directory.\n")
+		os.Exit(int(cli.ExitInternalError))
+	}
+	mode, err := desktopApplicationMode(
+		args,
+		workingDirectory,
+		filesystem.NewDefaultPlatformPaths(),
+	)
+	if err != nil {
+		reportStartupError(err)
+		os.Exit(int(cli.ExitCodeForError(err)))
+	}
+
 	service, err := application.NewService()
 	if err != nil {
 		fmt.Fprint(os.Stderr, application.NewError(err).Error()+"\n")
 		os.Exit(1)
 	}
-	app := wailsapp.New(service)
+	app := wailsapp.New(service, mode)
 
 	err = wails.Run(&options.App{
 		Title:  "devctx",
@@ -57,6 +72,26 @@ func main() {
 	if err != nil {
 		println("Error:", err.Error())
 	}
+}
+
+// desktopApplicationMode converts a non-CLI invocation into host-owned Wails
+// startup intent. It deliberately reuses the root launch parser so desktop and
+// CLI project paths share canonicalization and validation rules.
+func desktopApplicationMode(args []string, workingDirectory string, paths filesystem.PlatformPaths) (wailsapp.ApplicationMode, error) {
+	if len(args) == 0 {
+		return wailsapp.ManagementMode(), nil
+	}
+
+	request, err := cli.ParseLaunchRequest(args, workingDirectory, paths)
+	if err != nil {
+		return wailsapp.ApplicationMode{}, err
+	}
+	return wailsapp.LauncherMode(string(request.ProjectPath)), nil
+}
+
+func reportStartupError(err error) {
+	appError := application.NewError(err)
+	fmt.Fprintf(os.Stderr, "%s\n%s\n", appError.Message, appError.Recovery)
 }
 
 func shouldRunCLI(args []string) bool {

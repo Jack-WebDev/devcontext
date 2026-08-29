@@ -377,3 +377,22 @@ export namespace application {
 
 }
 
+export namespace wailsapp {
+	
+	export class ApplicationMode {
+	    type: string;
+	    projectPath?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApplicationMode(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.projectPath = source["projectPath"];
+	    }
+	}
+
+}
+

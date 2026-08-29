@@ -18,6 +18,10 @@ export function ExportContextMetadata(arg1) {
   return window['go']['wailsapp']['App']['ExportContextMetadata'](arg1);
 }
 
+export function GetApplicationMode() {
+  return window['go']['wailsapp']['App']['GetApplicationMode']();
+}
+
 export function GetContextDetails(arg1) {
   return window['go']['wailsapp']['App']['GetContextDetails'](arg1);
 }

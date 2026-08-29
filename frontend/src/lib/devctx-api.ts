@@ -27,6 +27,11 @@ export interface ContextMismatch {
 export interface GetLaunchStateRequest {
 	projectPath?: string;
 }
+
+export type ApplicationMode =
+	| { type: "management" }
+	| { type: "launcher"; projectPath: string };
+
 export interface SettingsState {
 	closeAfterLaunch: boolean;
 	launchVerification: boolean;
@@ -505,6 +510,7 @@ export interface ProviderCredentialSession {
 }
 
 export interface DevContextApi {
+	getApplicationMode(): Promise<ApiResult<ApplicationMode>>;
 	getLaunchState(
 		request?: GetLaunchStateRequest,
 	): Promise<ApiResult<LaunchState>>;
@@ -561,6 +567,7 @@ export interface DevContextApi {
 }
 
 export interface WailsBindings {
+	getApplicationMode(): Promise<unknown>;
 	getLaunchState(request: GetLaunchStateRequest): Promise<unknown>;
 	getHomeDashboard(request: GetHomeDashboardRequest): Promise<unknown>;
 	getRecentProjects(): Promise<unknown>;
@@ -596,6 +603,12 @@ export function createDevContextApi(
 	bindings: WailsBindings = generatedBindings,
 ): DevContextApi {
 	return {
+		getApplicationMode() {
+			return callBinding(
+				() => bindings.getApplicationMode(),
+				normalizeApplicationMode,
+			);
+		},
 		getLaunchState(request = {}) {
 			return callBinding(
 				() => bindings.getLaunchState(request),
@@ -741,6 +754,10 @@ export function createDevContextApi(
 }
 
 const generatedBindings: WailsBindings = {
+	async getApplicationMode() {
+		const bindings = await import("../../wailsjs/go/wailsapp/App");
+		return bindings.GetApplicationMode();
+	},
 	async getLaunchState(request) {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
 		return bindings.GetLaunchState(request);
@@ -907,6 +924,17 @@ function normalizeLaunchState(value: unknown): LaunchState {
 			object.providerCredentialSessions,
 		).map(normalizeProviderCredentialSession),
 	};
+}
+
+function normalizeApplicationMode(value: unknown): ApplicationMode {
+	const object = objectValue(value);
+	if (object.type === "management") {
+		return { type: "management" };
+	}
+	if (object.type === "launcher") {
+		return { type: "launcher", projectPath: stringValue(object.projectPath) };
+	}
+	throw new Error("Invalid Dev Context response.");
 }
 
 function normalizeHomeDashboardState(value: unknown): HomeDashboardState {

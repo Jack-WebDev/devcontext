@@ -62,7 +62,7 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 		history:             application.HistoryState{Entries: []application.HistoryEntry{}},
 		runningEnvironments: application.RunningEnvironmentsState{Environments: []application.RunningEnvironmentState{}},
 	}
-	app := New(service)
+	app := New(service, ManagementMode())
 	app.Startup(context.Background())
 
 	if app.ctx == nil {
@@ -217,11 +217,37 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 
 func TestAppReturnsApplicationErrorsAsSingleValues(t *testing.T) {
 	want := application.NewError(project.ErrProjectDirectoryNotFound)
-	app := New(&fakeService{launchStateErr: want})
+	app := New(&fakeService{launchStateErr: want}, ManagementMode())
 
 	got := app.GetLaunchState(application.GetLaunchStateRequest{})
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("error value = %#v, want %#v", got, want)
+	}
+}
+
+func TestNewRetainsHostSelectedApplicationMode(t *testing.T) {
+	service := &fakeService{}
+	tests := []struct {
+		name string
+		mode ApplicationMode
+	}{
+		{
+			name: "management",
+			mode: ManagementMode(),
+		},
+		{
+			name: "launcher",
+			mode: LauncherMode("/work/api"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := New(service, tt.mode)
+			if got := app.GetApplicationMode(); !reflect.DeepEqual(got, tt.mode) {
+				t.Fatalf("application mode = %#v, want %#v", got, tt.mode)
+			}
+		})
 	}
 }
 

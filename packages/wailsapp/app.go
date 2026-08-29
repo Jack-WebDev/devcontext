@@ -158,16 +158,22 @@ func (a *App) GetTrustCenter() any {
 type App struct {
 	ctx     context.Context
 	service service
+	mode    ApplicationMode
 }
 
 // New creates the application surface bound by Wails.
-func New(service service) *App {
-	return &App{service: service}
+func New(service service, mode ApplicationMode) *App {
+	return &App{service: service, mode: mode}
 }
 
 // Startup stores the process context supplied by Wails.
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
+}
+
+// GetApplicationMode returns the startup intent selected by the desktop host.
+func (a *App) GetApplicationMode() ApplicationMode {
+	return a.mode
 }
 
 // GetLaunchState returns selector state for the current project.
