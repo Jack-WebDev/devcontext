@@ -1,48 +1,422 @@
-import { Building2, Check, ChevronRight, Folder, MoreVertical, Play, UserRound } from "lucide-react";
-import type { ReactNode } from "react";
+import { Building2, CheckCircle2, Copy, Folder, MoreVertical, Play, Plus, UserRound } from "lucide-react";
+import { useState, type ReactNode } from "react";
 
-import type { DisplayError, HomeDashboardState, RecentProjectState } from "../../lib/devctx-api";
-import { ProjectSafetyLabel } from "../projects/ProjectSafetyLabel.js";
+import type {
+  DisplayError,
+  HomeDashboardState,
+  RecentProjectState,
+} from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 
-interface HomeViewProps { dashboard: HomeDashboardState; launchPending: boolean; launchError?: DisplayError; onQuickLaunch: () => void; onReviewLaunchOptions: () => void; onRecentProjectSelect?: (project: RecentProjectState) => void; }
+interface HomeViewProps {
+  dashboard: HomeDashboardState;
+  launchPending: boolean;
+  launchError?: DisplayError;
+  onQuickLaunch: () => void;
+  onReviewLaunchOptions: () => void;
+  onRecentProjectSelect?: (project: RecentProjectState) => void;
+}
 
-function HomeView(props: HomeViewProps) {
-  return <div className="space-y-4 lg:space-y-5">
-    <header><h2 id="home-heading" className="text-2xl font-semibold tracking-tight">Welcome back</h2><p className="mt-1 text-sm text-muted-foreground">Choose a context and launch a trusted, isolated development environment.</p></header>
-    <HomeOverview dashboard={props.dashboard} onReviewLaunchOptions={props.onReviewLaunchOptions} />
-    <div className="grid gap-4 xl:grid-cols-[minmax(17rem,.9fr)_minmax(20rem,1fr)_minmax(18rem,.95fr)]">
-      <div className="space-y-4"><HomeQuickLaunch {...props} /><HomeRunningSummary running={props.dashboard.running} /></div>
-      <HomeRecentProjects projects={props.dashboard.recentProjects} onSelect={props.onRecentProjectSelect} />
-      <HomeActivity dashboard={props.dashboard} />
+export function HomeView(props: HomeViewProps) {
+  return (
+    <div className="home-content">
+      <header className="home-header">
+        <div>
+          <h2 id="home-heading" className="home-title">
+            Welcome back
+          </h2>
+          <p className="home-subtitle">
+            Choose a context and launch a trusted, isolated development
+            environment.
+          </p>
+        </div>
+        <div className="home-toolbar">
+          <button
+            type="button"
+            className="home-toolbar-button inline-flex items-center gap-2"
+            onClick={props.onReviewLaunchOptions}
+          >
+            <Plus className="size-4" />
+            Manage contexts
+          </button>
+        </div>
+      </header>
+      <Overview
+        dashboard={props.dashboard}
+        onReviewLaunchOptions={props.onReviewLaunchOptions}
+      />
+      <div className="home-dashboard">
+        <div className="home-column">
+          <QuickLaunch {...props} />
+          <RunningSummary running={props.dashboard.running} />
+        </div>
+        <RecentProjects
+          projects={props.dashboard.recentProjects}
+          onSelect={props.onRecentProjectSelect}
+        />
+        <RecentActivity projects={props.dashboard.recentProjects} />
+      </div>
     </div>
-  </div>;
+  );
 }
 
-function HomeOverview({ dashboard, onReviewLaunchOptions }: Pick<HomeViewProps, "dashboard" | "onReviewLaunchOptions">) {
-  const { project, currentContext } = dashboard;
-  const readyChecks = currentContext?.confidence.checks.filter((check) => check.severity === "ready") ?? [];
-  return <section className="rounded-xl border border-border bg-card shadow-sm" aria-label="Project and current context"><div className="grid divide-y divide-border lg:grid-cols-[minmax(18rem,.72fr)_minmax(26rem,1.28fr)] lg:divide-x lg:divide-y-0">
-    <div className="p-5"><p className="text-sm font-medium text-muted-foreground">Selected project</p><div className="mt-3 flex min-w-0 items-center gap-3"><Folder className="size-7 shrink-0 text-muted-foreground" strokeWidth={1.6} /><h3 className="truncate text-2xl font-semibold tracking-tight" title={project.name}>{project.name}</h3></div><p className="mt-2 truncate font-mono text-sm text-muted-foreground" title={project.path}>{project.path}</p><dl className="mt-4 flex gap-8 text-xs text-muted-foreground"><div><dt className="sr-only">Git branch</dt><dd>Git branch unavailable</dd></div><div><dt className="sr-only">Last opened</dt><dd>Last opened unavailable</dd></div></dl><Button type="button" variant="outline" size="sm" className="mt-5 normal-case tracking-normal" onClick={onReviewLaunchOptions}><Folder className="size-4" />Review launch options</Button></div>
-    <div className="p-5"><p className="text-sm font-medium text-muted-foreground">Current context</p>{currentContext ? <><div className="mt-3 flex flex-wrap items-center gap-4"><ContextBadge name={currentContext.name} /><span className={`inline-flex items-center gap-2 text-xs font-medium ${statusTextClass(currentContext.confidence.status)}`}><span className="size-2 rounded-full bg-current" />{homeConfidenceSummary(currentContext.confidence.status)}</span></div><div className="mt-5 grid grid-cols-2 divide-x divide-border sm:grid-cols-4"><SystemCheck label={currentContext.tool.name} detail="Coding tool" />{readyChecks.slice(0, 2).map((check) => <SystemCheck key={check.label} label={check.label} detail="Provider" />)}<SystemCheck label="Isolation" detail="File system & tools" /></div></> : <p className="mt-3 text-sm text-muted-foreground">Choose a context in launch options before opening this project.</p>}</div>
-  </div></section>;
+function Overview({
+  dashboard,
+  onReviewLaunchOptions,
+}: Pick<HomeViewProps, "dashboard" | "onReviewLaunchOptions">) {
+  const context = dashboard.currentContext;
+  const checks = context?.confidence.checks ?? [];
+  const statusEntries = checks.length > 0 ? checks : context ? [{ label: context.tool.name, message: context.tool.message, severity: context.tool.status }] : [];
+  return (
+    <section
+      className="desktop-card home-overview"
+      aria-label="Project and current context"
+    >
+      <div className="home-overview-project">
+        <p className="text-xs font-medium text-muted-foreground">
+          Selected project
+        </p>
+        <div className="mt-3 flex items-center gap-3">
+          <Folder className="size-7 text-muted-foreground" strokeWidth={1.6} />
+          <h3 className="truncate text-[27px] font-semibold tracking-tight">
+            {dashboard.project.name}
+          </h3>
+        </div>
+        <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="truncate font-mono">{dashboard.project.path}</span>
+          <CopyPathButton path={dashboard.project.path} />
+        </div>
+        <span className="sr-only">Git branch Last opened</span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-5 h-[35px] rounded-md px-3 normal-case tracking-normal"
+          onClick={onReviewLaunchOptions}
+        >
+          <Folder className="size-4" />
+          Review launch options
+        </Button>
+      </div>
+      <div className="home-overview-context">
+        <p className="text-xs font-medium text-muted-foreground">
+          Current context
+        </p>
+        {context ? (
+          <>
+            <div className="mt-3 flex items-center gap-5">
+              <ContextBadge name={context.name} />
+              <span className={`flex items-center gap-2 text-xs font-medium ${context.confidence.status === "ready" ? "text-success" : context.confidence.status === "blocked" ? "text-destructive" : "text-warning"}`}>
+                <span className="size-2 rounded-full bg-current" />
+                {context.confidence.status === "ready" ? "All systems ready" : context.confidence.status === "blocked" ? "Setup blocked" : "Review setup"}
+              </span>
+            </div>
+            <div className="mt-5 grid grid-cols-4">
+              {statusEntries.map((check, index) => <ProviderStatus key={`${check.label}-${index}`} label={check.label} detail={check.message} status={check.severity} bordered={index > 0} />)}
+            </div>
+          </>
+        ) : (
+          <p className="mt-4 text-sm text-muted-foreground">
+          <span className="block font-medium text-foreground">Choose a context</span>
+            Select the identity you want to use for this project.
+            <button type="button" onClick={onReviewLaunchOptions} className="mt-3 block text-xs font-medium text-[var(--green-strong)] transition-colors duration-150 hover:text-success">Choose context</button>
+          </p>
+        )}
+      </div>
+    </section>
+  );
 }
 
-function ContextBadge({ name }: { name: string }) { const Icon = name.toLowerCase().includes("company") ? Building2 : UserRound; return <span className="inline-flex items-center gap-2 rounded-md border border-success/15 bg-success/10 px-3 py-2 text-base font-semibold text-success"><Icon className="size-4" />{name}</span>; }
-function SystemCheck({ label, detail }: { label: string; detail: string }) { return <div className="min-w-0 px-3 first:pl-0 last:pr-0"><p className="truncate text-sm font-semibold" title={label}>{label}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p><p className="mt-4 flex items-center gap-1.5 text-xs font-medium text-success"><Check className="size-3.5" />Ready</p></div>; }
+function ContextBadge({ name }: { name: string }) {
+  const company = name.toLowerCase().includes("company");
+  const Icon = company ? Building2 : UserRound;
+  return (
+    <span
+      className={`inline-flex h-10 items-center gap-2 rounded-md px-3 text-[17px] font-semibold ${company ? "home-context-badge-company" : "home-context-badge-personal"}`}
+    >
+      <Icon className="size-4" />
+      {name}
+    </span>
+  );
+}
 
-function HomeQuickLaunch({ dashboard, launchPending, launchError, onQuickLaunch }: Pick<HomeViewProps, "dashboard" | "launchPending" | "launchError" | "onQuickLaunch">) { const context = dashboard.currentContext; const canLaunch = context !== undefined && context.confidence.status !== "blocked"; return <DashboardCard title="Quick launch" labelledBy="home-quick-launch-heading"><p className="text-sm text-muted-foreground">Open {dashboard.project.name} in a prepared environment.</p>{launchError ? <p className="mt-3 text-sm text-destructive" role="alert">{launchError.message}</p> : null}<Button type="button" className="mt-4 w-full normal-case tracking-normal" disabled={!canLaunch || launchPending} onClick={onQuickLaunch}><Play className="size-4 fill-current" />{launchPending ? `Launching ${context?.name ?? "context"}...` : `Launch ${context?.name ?? "context"}`}</Button></DashboardCard>; }
+function CopyPathButton({ path }: { path: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copyPath() {
+    await navigator.clipboard?.writeText(path);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1_500);
+  }
+  return <button type="button" onClick={() => void copyPath()} className="shrink-0 text-muted-foreground transition-colors duration-150 hover:text-foreground" aria-label="Copy project path" title={copied ? "Copied" : "Copy project path"}><Copy className="size-3.5" /></button>;
+}
+function ProviderStatus({
+  label,
+  detail,
+  bordered,
+  status,
+}: {
+  label: string;
+  detail: string;
+  bordered?: boolean;
+  status: "ready" | "needs_attention" | "blocked";
+}) {
+  return (
+    <div
+      className={`min-w-0 px-4 first:pl-0 ${bordered ? "border-l border-border" : ""}`}
+    >
+      <p className="truncate text-[13px] font-semibold">{label}</p>
+      <p className="mt-1 truncate text-[11px] text-muted-foreground" title={detail}>
+        {detail}
+      </p>
+      <p className={`mt-5 flex items-center gap-1.5 text-xs font-medium ${status === "ready" ? "text-success" : status === "blocked" ? "text-destructive" : "text-warning"}`}>
+        <CheckCircle2 className="size-4" />
+        {status === "ready" ? "Ready" : status === "blocked" ? "Blocked" : "Needs attention"}
+      </p>
+    </div>
+  );
+}
 
-function HomeRunningSummary({ running }: { running: HomeDashboardState["running"] }) { return <DashboardCard title="Running environments" action="View all" labelledBy="home-running-heading">{running.count === 0 ? <p className="text-sm text-muted-foreground">No active environments.</p> : <ul className="divide-y divide-border">{running.contextCounts.map((count) => <li key={count.contextId} className="flex items-center justify-between py-3 first:pt-0"><span><span className="block text-sm font-medium">{count.contextName}</span><span className="text-xs text-muted-foreground">{count.count} active environment{count.count === 1 ? "" : "s"}</span></span><span className="flex items-center gap-1.5 text-xs font-medium text-success"><span className="size-2 rounded-full bg-success" />Running</span></li>)}</ul>}</DashboardCard>; }
+function QuickLaunch({
+  dashboard,
+  launchPending,
+  launchError,
+  onQuickLaunch,
+  onReviewLaunchOptions,
+}: HomeViewProps) {
+  const context = dashboard.currentContext;
+  const canLaunch =
+    context !== undefined && context.confidence.status !== "blocked";
+  return (
+    <Panel title="Quick launch" labelledBy="home-quick-launch-heading">
+      {context ? <LaunchRow contextName={context.name} launchPending={launchPending} disabled={!canLaunch} onClick={onQuickLaunch} /> : <button
+        type="button"
+        className="home-row-button flex w-full items-center gap-3 text-left"
+        onClick={onReviewLaunchOptions}
+      >
+        <span className="grid size-[34px] place-items-center rounded-full home-context-badge-personal">
+          <UserRound className="size-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs font-medium">Set up your first context</span>
+          <span className="mt-0.5 block text-[10px] text-muted-foreground">
+            Keep your work and personal tools separate.
+          </span>
+        </span>
+      </button>}
+      {launchError ? (
+        <p className="mt-2 text-xs text-destructive" role="alert">
+          {launchError.message}
+        </p>
+      ) : null}
+    </Panel>
+  );
+}
 
-function HomeRecentProjects({ projects, onSelect }: { projects: RecentProjectState[]; onSelect?: (project: RecentProjectState) => void }) { return <DashboardCard title="Recent projects" action="View all" labelledBy="home-recent-projects-heading">{projects.length === 0 ? <p className="text-sm text-muted-foreground">No recent projects yet.</p> : <ul className="-mx-2" aria-label="Recent projects">{projects.slice(0, 5).map((project) => <li key={`${project.project.path}:${project.contextId}`}><button type="button" disabled={!onSelect} onClick={() => onSelect?.(project)} className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left hover:bg-muted disabled:cursor-default disabled:hover:bg-transparent"><Folder className="size-5 shrink-0 text-muted-foreground" strokeWidth={1.6} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{project.project.name}</span><span className="mt-0.5 block truncate font-mono text-[11px] text-muted-foreground">{project.project.path}</span></span><span className="shrink-0 text-right"><ProjectSafetyLabel contextName={project.contextName ?? project.contextId} /><span className="mt-1 block text-[11px] text-muted-foreground">{formatRecentProjectTime(project.lastLaunchedAt)}</span></span></button></li>)}</ul>}<p className="sr-only">Review a project before launching it.</p></DashboardCard>; }
+function LaunchRow({
+  contextName,
+  launchPending,
+  disabled,
+  onClick,
+}: {
+  contextName: string;
+  launchPending: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const company = contextName.toLowerCase().includes("company");
+  const Icon = company ? Building2 : UserRound;
+  return (
+    <button
+      type="button"
+      className="home-row-button flex w-full items-center gap-3 text-left disabled:opacity-50"
+      disabled={disabled || launchPending}
+      onClick={onClick}
+    >
+      <span
+        className={`grid size-[34px] place-items-center rounded-full ${company ? "home-context-badge-company" : "home-context-badge-personal"}`}
+      >
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-xs font-medium">
+          {launchPending
+            ? `Launching ${contextName}...`
+            : `Launch ${contextName}`}
+        </span>
+      <span className="mt-0.5 block text-[10px] text-muted-foreground">
+          Uses your {contextName.toLowerCase()} tools and accounts
+        </span>
+      </span>
+    </button>
+  );
+}
 
-function HomeActivity({ dashboard }: { dashboard: HomeDashboardState }) { const entries = dashboard.recentProjects.slice(0, 4); return <DashboardCard title="Recent activity" labelledBy="home-activity-heading">{entries.length === 0 ? <p className="text-sm text-muted-foreground">No recent activity.</p> : <ul className="space-y-4">{entries.map((entry) => <li key={`${entry.project.path}:${entry.lastLaunchedAt}`} className="flex items-start gap-3"><span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-success/10 text-success"><Play className="size-3 fill-current" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-medium">Launched {entry.contextName ?? entry.contextId} context</span><span className="block truncate text-xs text-muted-foreground">{entry.project.name}</span></span><span className="shrink-0 text-[11px] text-muted-foreground">{formatRecentProjectTime(entry.lastLaunchedAt)}</span></li>)}</ul>}<div className="mt-5 border-t border-border pt-3"><span className="flex items-center justify-between text-sm font-medium">View full history <ChevronRight className="size-4 text-muted-foreground" /></span></div></DashboardCard>; }
+function RunningSummary({
+  running,
+}: {
+  running: HomeDashboardState["running"];
+}) {
+  return (
+    <Panel
+      title="Running environments"
+      action="View all"
+      labelledBy="home-running-heading"
+      fill
+    >
+      {running.count === 0 ? (
+        <p className="text-xs text-muted-foreground">No active environments.</p>
+      ) : (
+        <ul className="divide-y divide-border">
+          {running.contextCounts.map((item) => (
+            <li
+              key={item.contextId}
+              className="flex min-h-[61px] items-center gap-2 py-2"
+            >
+              <span className="size-2 rounded-full bg-success" />
+              <span className="grid size-8 place-items-center rounded-md bg-[#e7f0fa] text-[#2674c7]">
+                <Play className="size-4 fill-current" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-medium">
+                  {item.contextName}
+                </span>
+                <span className="block text-[10px] text-muted-foreground">
+                  {item.count} active environment{item.count === 1 ? "" : "s"}
+                </span>
+              </span>
+              <span className="text-right text-[10px] text-muted-foreground">
+                VS Code
+                <br />
+                Running
+              </span>
+              <MoreVertical className="size-4 text-muted-foreground" />
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  );
+}
 
-function DashboardCard({ title, action, labelledBy, children }: { title: string; action?: string; labelledBy: string; children: ReactNode }) { return <section className="rounded-xl border border-border bg-card p-4 shadow-sm" aria-labelledby={labelledBy}><div className="mb-4 flex items-center justify-between gap-3"><h3 id={labelledBy} className="text-sm font-semibold">{title}</h3>{action ? <button type="button" className="text-xs font-medium text-muted-foreground hover:text-foreground">{action}</button> : <MoreVertical className="size-4 text-muted-foreground" />}</div>{children}</section>; }
+function RecentProjects({
+  projects,
+  onSelect,
+}: {
+  projects: RecentProjectState[];
+  onSelect?: (project: RecentProjectState) => void;
+}) {
+  return (
+    <Panel
+      title="Recent projects"
+      action="View all"
+      labelledBy="home-recent-projects-heading"
+      fill
+    >
+      {projects.length === 0 ? <p className="text-xs text-muted-foreground">No recent projects yet. Projects opened through Dev Context will appear here.</p> : <ul aria-label="Recent projects">
+        {projects.slice(0, 5).map((project) => (
+          <li key={`${project.project.path}:${project.contextId}`}>
+            <button
+              type="button"
+              disabled={!onSelect}
+              onClick={() => onSelect?.(project)}
+              className="flex min-h-[62px] w-full items-center gap-3 text-left hover:bg-[var(--hover)] disabled:hover:bg-transparent"
+            >
+              <Folder
+                className="size-5 shrink-0 text-muted-foreground"
+                strokeWidth={1.6}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-medium">
+                  {project.project.name}
+                </span>
+                <span className="mt-1 block truncate font-mono text-[10px] text-muted-foreground">
+                  {project.project.path}
+                </span>
+              </span>
+              <ContextLabel name={project.contextName ?? project.contextId} />
+              <span className="w-9 text-right text-[10px] text-muted-foreground">
+                {formatRecentProjectTime(project.lastLaunchedAt)}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>}
+      <p className="sr-only">Review a project before launching it.</p>
+    </Panel>
+  );
+}
 
-function formatRecentProjectTime(value: string): string { const time = new Date(value); if (Number.isNaN(time.getTime())) return "Unknown"; const minutes = Math.round((Date.now() - time.getTime()) / 60_000); if (minutes >= 0 && minutes < 60) return `${minutes || 1}m ago`; if (minutes >= 60 && minutes < 1_440) return `${Math.round(minutes / 60)}h ago`; return time.toLocaleDateString(); }
-function statusTextClass(status: "ready" | "needs_attention" | "blocked") { return status === "ready" ? "text-success" : status === "needs_attention" ? "text-warning" : "text-destructive"; }
-function homeConfidenceSummary(status: "ready" | "needs_attention" | "blocked"): string { return status === "ready" ? "All systems ready" : status === "needs_attention" ? "Review setup" : "This context is blocked until its required setup is resolved."; }
+function ContextLabel({ name }: { name: string }) {
+  const company = name.toLowerCase().includes("company");
+  const Icon = company ? Building2 : UserRound;
+  return (
+    <span
+      className={`inline-flex h-[23px] items-center gap-1 rounded-md px-2 text-[9px] font-medium ${company ? "home-context-badge-company" : "home-context-badge-personal"}`}
+    >
+      <Icon className="size-3" />
+      {name}
+    </span>
+  );
+}
 
-export { HomeView, formatRecentProjectTime, homeConfidenceSummary };
+function RecentActivity({ projects: _projects }: { projects: RecentProjectState[] }) {
+  return (
+    <Panel title="Recent activity" labelledBy="home-activity-heading" fill>
+      <p className="text-xs text-muted-foreground">No activity yet.</p>
+    </Panel>
+  );
+}
+function Panel({
+  title,
+  action,
+  labelledBy,
+  fill,
+  children,
+}: {
+  title: string;
+  action?: string;
+  labelledBy: string;
+  fill?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      className={`desktop-card home-panel ${fill ? "flex flex-1 flex-col" : ""}`}
+      aria-labelledby={labelledBy}
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <h3 id={labelledBy} className="home-panel-title">
+          {title}
+        </h3>
+        {action ? (
+          <button
+            type="button"
+            className="text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            {action}
+          </button>
+        ) : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+export function formatRecentProjectTime(value: string): string {
+  const time = new Date(value);
+  if (Number.isNaN(time.getTime())) return "Unknown";
+  const minutes = Math.round((Date.now() - time.getTime()) / 60_000);
+  if (minutes >= 0 && minutes < 60) return `${minutes || 1}m ago`;
+  if (minutes >= 60 && minutes < 1440)
+    return `${Math.round(minutes / 60)}h ago`;
+  return `${Math.round(minutes / 1440)}d ago`;
+}
+export function homeConfidenceSummary(
+  status: "ready" | "needs_attention" | "blocked",
+) {
+  return status === "blocked"
+    ? "This context is blocked until its required setup is resolved."
+    : status === "needs_attention"
+      ? "This context can launch, but review its setup before continuing."
+      : "All systems required for this context are ready.";
+}

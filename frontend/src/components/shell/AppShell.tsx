@@ -14,22 +14,19 @@ interface AppShellProps {
 
 function AppShell({ activeRoute, onNavigate, currentProject, statusBar, children }: AppShellProps) {
   return (
-    <div className="flex min-h-screen min-w-0 flex-col bg-[#faf9f7] text-foreground" data-app-shell>
-      <div className="flex min-h-0 flex-1">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-        <div className="px-6 py-9">
+    <div className="grid h-screen min-w-[1100px] grid-rows-[minmax(0,1fr)_55px] overflow-hidden bg-[#f8f7f4] text-foreground" data-app-shell>
+      <div className="grid min-h-0 grid-cols-[238px_minmax(0,1fr)] overflow-hidden">
+      <aside className="flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border bg-[#fbfaf8] text-sidebar-foreground">
+        <div className="px-7 pt-9 pb-8">
           <h1 className="flex items-center gap-3 text-lg font-semibold tracking-tight"><span className="grid size-8 place-items-center rounded-md bg-[#566d5a] text-white"><Layers3 className="size-5" /></span>Dev Context</h1>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 px-4" aria-label="Primary navigation">
-          {appRoutes.map((route) => (
+        <nav className="flex flex-col gap-px px-4" aria-label="Primary navigation">
+          {appRoutes.filter((route) => route.id !== "settings").map((route) => (
             <button
               key={route.id}
               type="button"
-              className={`flex min-w-0 items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-medium transition-colors ${
-                activeRoute === route.id
-                  ? "bg-sidebar-accent text-sidebar-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent"
-              }`}
+              className="flex h-[38px] min-w-0 items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-[#f3f1ed] hover:text-foreground data-[active=true]:bg-[#efede9] data-[active=true]:text-foreground"
+              data-active={activeRoute === route.id}
               aria-current={activeRoute === route.id ? "page" : undefined}
               onClick={() => onNavigate(route.id)}
             >
@@ -38,16 +35,29 @@ function AppShell({ activeRoute, onNavigate, currentProject, statusBar, children
             </button>
           ))}
         </nav>
-        <CurrentProjectSummary project={currentProject} />
+        <div className="mx-5 mt-5 border-t border-sidebar-border pt-4">
+          <button type="button" className="flex h-[38px] w-full items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground hover:bg-[#f3f1ed] hover:text-foreground data-[active=true]:bg-[#efede9] data-[active=true]:text-foreground" data-active={activeRoute === "settings"} onClick={() => onNavigate("settings")}><Settings className="size-[18px]" />Settings</button>
+        </div>
+        <div className="flex-1" />
+        <SidebarShortcuts />
+        {currentProject ? <span className="sr-only">Current project {currentProject.name} {currentProject.path}</span> : null}
       </aside>
-      <main className="min-w-0 flex-1 overflow-x-hidden">
-        <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-9">{children}</div>
+      <main className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto">
+        <div className="mx-auto w-full max-w-6xl max-w-[1500px]">{children}</div>
       </main>
       </div>
       {statusBar}
     </div>
   );
 }
+
+function SidebarShortcuts() {
+  return <div className="mt-auto px-3 pb-5">
+    <section className="rounded-lg border border-border bg-[#faf9f7] p-3" aria-label="Keyboard shortcuts"><p className="mb-2.5 text-[11px] font-semibold">Keyboard shortcuts</p><Shortcut label="Quick Switch" keycap="⌘ K" /></section>
+  </div>;
+}
+
+function Shortcut({ label, keycap }: { label: string; keycap: string }) { return <div className="flex h-[29px] items-center justify-between text-[11px] text-muted-foreground"><span>{label}</span><kbd className="min-w-9 rounded border border-border bg-white px-1.5 py-0.5 text-center text-[10px] text-foreground">{keycap}</kbd></div>; }
 
 function NavIcon({ route }: { route: AppRoute }) {
   const className = "size-4 shrink-0";
