@@ -59,7 +59,7 @@ function FirstRunWelcome({
 				<p className="max-w-2xl text-sm text-muted-foreground">
 					{replay
 						? "Review how Dev Context keeps development identities separate on this machine."
-						: "Dev Context creates local identities for this machine so each project can open with the right provider folders and authentication setup."}
+						: `Create a local development context to continue opening ${launchState.project.name} with separate provider folders and authentication setup.`}
 				</p>
 			</div>
 
@@ -217,7 +217,7 @@ function FirstRunErrorNotice({ error }: { error: DisplayError }) {
 }
 
 function shouldRenderFirstRunWelcome(launchState: LaunchState): boolean {
-	return launchState.firstRun;
+	return launchState.contexts.length === 0;
 }
 
 export { FirstRunWelcome, shouldRenderFirstRunWelcome };

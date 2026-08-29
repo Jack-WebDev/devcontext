@@ -62,6 +62,12 @@ import { LauncherSurface } from "../.tmp-test/src/components/launcher/LauncherSu
 import { ProjectResolvingView } from "../.tmp-test/src/components/launcher/ProjectResolvingView.js";
 import { ProjectNotFoundView } from "../.tmp-test/src/components/launcher/ProjectNotFoundView.js";
 import {
+	ContextChoiceList,
+	filterContexts,
+	groupContexts,
+	shouldShowContextSearch,
+} from "../.tmp-test/src/components/selector/ContextChoiceList.js";
+import {
 	LaunchVerificationProgress,
 	verificationStepPresentation,
 } from "../.tmp-test/src/components/selector/LaunchVerificationProgress.js";
@@ -100,6 +106,7 @@ import {
 	nextKeyboardContextId,
 	nextSelectedContextId,
 } from "../.tmp-test/src/components/selector/selection-state.js";
+import { SingleContextLaunchView } from "../.tmp-test/src/components/selector/SingleContextLaunchView.js";
 import {
 	launcherSelection,
 	launcherStateIsPending,
@@ -222,7 +229,11 @@ test("launcher state keeps progress and dialogs mutually exclusive", () => {
 		true,
 	);
 	assert.equal(
-		launcherStateIsPending({ status: "identity_mismatch", selection, contextId: "company" }),
+		launcherStateIsPending({
+			status: "identity_mismatch",
+			selection,
+			contextId: "company",
+		}),
 		false,
 	);
 	assert.deepEqual(
@@ -713,6 +724,89 @@ test("first-run predicate separates new and returning users", () => {
 		true,
 	);
 	assert.equal(shouldRenderFirstRunWelcome(launchStateFixture()), false);
+	assert.equal(
+		shouldRenderFirstRunWelcome(
+			launchStateFixture({ contexts: [], firstRun: false }),
+		),
+		true,
+	);
+});
+
+test("a single unbound context is selected so it can be launched", () => {
+	const state = launchStateFixture({
+		contexts: [contextFixture("personal", "Personal")],
+	});
+
+	assert.equal(initialSelectedContextId(state), "personal");
+});
+
+test("single-context confirmation stays concise and offers alternatives", () => {
+	const html = renderToStaticMarkup(
+		createElement(SingleContextLaunchView, {
+			context: contextFixture("personal", "Personal"),
+			projectName: "api",
+			onChooseAnother() {},
+		}),
+	);
+
+	assert.match(html, /Open api with Personal/);
+	assert.match(html, /Personal is ready to open this project/);
+	assert.match(html, /Choose another context/);
+});
+
+test("context choices separate recommendations and search only larger collections", () => {
+	const contexts = [
+		contextFixture("personal", "Personal"),
+		contextFixture("company", "Company"),
+		contextFixture("client-a", "Client A"),
+	];
+	assert.deepEqual(
+		groupContexts(contexts, "company", "project_binding").map((group) => [
+			group.label,
+			group.contexts.map((context) => context.id),
+		]),
+		[
+			["Recommended", ["company"]],
+			["Other contexts", ["personal", "client-a"]],
+		],
+	);
+	assert.deepEqual(filterContexts(contexts, "client"), [contexts[2]]);
+	assert.equal(shouldShowContextSearch(contexts), false);
+	assert.equal(
+		shouldShowContextSearch([
+			...contexts,
+			contextFixture("four", "Four"),
+			contextFixture("five", "Five"),
+			contextFixture("six", "Six"),
+		]),
+		true,
+	);
+
+	const html = renderToStaticMarkup(
+		createElement(ContextChoiceList, {
+			launchState: launchStateFixture({
+				contexts,
+				selectedContextId: "company",
+				resolutionSource: "project_binding",
+			}),
+			selectedContextId: "company",
+			rovingContextId: "company",
+			launchPending: false,
+			keyboardLaunchAvailable: true,
+			search: "",
+			onSearchChange() {},
+			buttonRef() {
+				return null;
+			},
+			onSelect() {},
+			onNavigate() {},
+			onLaunch() {},
+			onProviderSetup() {},
+		}),
+	);
+	assert.match(html, /Recommended/);
+	assert.match(html, /Other contexts/);
+	assert.doesNotMatch(html, /Enabled providers/);
 });
 
 test("onboarding replay does not offer duplicate context creation", () => {

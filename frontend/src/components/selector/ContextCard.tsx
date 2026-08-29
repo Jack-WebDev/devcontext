@@ -19,6 +19,7 @@ interface ContextCardProps {
 	context: ContextState;
 	selected?: boolean;
 	recommendation?: string;
+	compact?: boolean;
 	disabled?: boolean;
 	tabIndex?: number;
 	buttonRef?: Ref<HTMLButtonElement>;
@@ -35,6 +36,7 @@ function ContextCard({
 	context,
 	selected = false,
 	recommendation,
+	compact = false,
 	disabled = false,
 	tabIndex = 0,
 	buttonRef,
@@ -118,15 +120,19 @@ function ContextCard({
 					recommendation={recommendation}
 				/>
 				<ToolStatusRow context={context} />
-				<ProviderSummary
-					context={context}
-					providers={enabledProviders}
-					onProviderSetup={onProviderSetup}
-				/>
-				<ContextHealthSummary
-					context={context}
-					enabledProviderCount={enabledProviders.length}
-				/>
+				{!compact ? (
+					<>
+						<ProviderSummary
+							context={context}
+							providers={enabledProviders}
+							onProviderSetup={onProviderSetup}
+						/>
+						<ContextHealthSummary
+							context={context}
+							enabledProviderCount={enabledProviders.length}
+						/>
+					</>
+				) : null}
 			</CardContent>
 		</Card>
 	);

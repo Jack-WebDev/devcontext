@@ -14,16 +14,12 @@ import type {
 	ProjectBindingState,
 	ProviderCredentialSession,
 } from "../../lib/devctx-api";
-import {
-	contextPositionFromShortcut,
-	keyboardShortcuts,
-} from "../command-palette/shortcut";
+import { contextPositionFromShortcut } from "../command-palette/shortcut";
 import { RunningEnvironmentConflictDialog } from "../running/RunningEnvironmentConflictDialog";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import { AccountIdentityMismatchDialog } from "./AccountIdentityMismatchDialog";
 import { hasAccountIdentityMismatch } from "./account-identity-mismatch";
-import { ContextCard } from "./ContextCard";
 import { ContextMismatchDialog } from "./ContextMismatchDialog";
 import { cancelSelector } from "./cancel-action";
 import { missingDefaultContextIds } from "./default-context-actions";
@@ -49,10 +45,11 @@ import {
 	type ProviderSessionAssignments,
 } from "./ProviderCredentialClassification.js";
 import { RememberProjectControl } from "./RememberProjectControl";
-import { recommendationReason } from "./recommendation";
 import { SelectorActions } from "./SelectorActions";
 import { SelectorConfidenceSummary } from "./SelectorConfidenceSummary";
+import { ContextChoiceList } from "./ContextChoiceList";
 import { SelectorLayout } from "./SelectorLayout";
+import { SingleContextLaunchView } from "./SingleContextLaunchView";
 import {
 	type ContextNavigationDirection,
 	initialRovingContextId,
@@ -124,6 +121,8 @@ function SelectorView({
 	>(undefined);
 	const [providerSessionAssignments, setProviderSessionAssignments] =
 		useState<ProviderSessionAssignments>({});
+	const [showContextChoices, setShowContextChoices] = useState(false);
+	const [contextSearch, setContextSearch] = useState("");
 	const contextButtonRefs = useRef(new Map<string, HTMLButtonElement>());
 	const launchGuard = useRef(createLaunchRequestGuard());
 	const selection = launcherSelection(launcherState);
@@ -138,6 +137,9 @@ function SelectorView({
 	);
 	const launchPending = launcherStateIsPending(launcherState);
 	const launchBlocked = selectedContextConfidenceBlocked(selectedContext);
+	const singleHealthyContext = singleHealthyLaunchContext(launchState);
+	const showSingleContextConfirmation =
+		singleHealthyContext !== undefined && !showContextChoices;
 	const keyboardLaunchAvailable = canLaunchSelectedContextFromKeyboard({
 		selectedContextId,
 		launchPending: launchPending || launchBlocked,
@@ -151,6 +153,8 @@ function SelectorView({
 		setOnboardingPendingContextId(undefined);
 		setOnboardingError(undefined);
 		setProviderSessionAssignments({});
+		setShowContextChoices(false);
+		setContextSearch("");
 		launchGuard.current = createLaunchRequestGuard();
 	}, [launchState]);
 
@@ -441,36 +445,30 @@ function SelectorView({
 					projectIdentity={<ProjectIdentity project={launchState.project} />}
 					contextCards={
 						<>
-							{launchState.contexts.length === 0 ? (
-								<SelectorEmptyContextState />
+							{showSingleContextConfirmation ? (
+								<SingleContextLaunchView
+									context={singleHealthyContext}
+									projectName={launchState.project.name}
+									onChooseAnother={() => setShowContextChoices(true)}
+								/>
 							) : (
-								<div className="grid gap-4 sm:grid-cols-2">
-									{launchState.contexts.map((context) => (
-										<ContextCard
-											key={context.id}
-											context={context}
-											selected={selectedContextId === context.id}
-											recommendation={recommendationForContext(
-												launchState,
-												context.id,
-											)}
-											disabled={launchPending}
-											tabIndex={rovingContextId === context.id ? 0 : -1}
-											buttonRef={setContextButtonRef(context.id)}
-											onSelect={handleSelectContext}
-											onNavigate={handleContextNavigation}
-											onLaunchSelected={
-												keyboardLaunchAvailable
-													? () => void handleLaunch()
-													: undefined
-											}
-											onProviderSetup={(contextId) => {
-												handleSelectContext(contextId);
-												void handleLaunch({ contextId });
-											}}
-										/>
-									))}
-								</div>
+								<ContextChoiceList
+									launchState={launchState}
+									selectedContextId={selectedContextId}
+									rovingContextId={rovingContextId}
+									launchPending={launchPending}
+									keyboardLaunchAvailable={keyboardLaunchAvailable}
+									search={contextSearch}
+									onSearchChange={setContextSearch}
+									buttonRef={setContextButtonRef}
+									onSelect={handleSelectContext}
+									onNavigate={handleContextNavigation}
+									onLaunch={() => void handleLaunch()}
+									onProviderSetup={(contextId) => {
+										handleSelectContext(contextId);
+										void handleLaunch({ contextId });
+									}}
+								/>
 							)}
 
 							<MissingDefaultContextActions
@@ -504,10 +502,12 @@ function SelectorView({
 						</>
 					}
 					confidenceSummary={
-						<SelectorConfidenceSummary
-							context={selectedContext}
-							project={launchState.project}
-						/>
+						showSingleContextConfirmation ? null : (
+							<SelectorConfidenceSummary
+								context={selectedContext}
+								project={launchState.project}
+							/>
+						)
 					}
 					rememberControl={
 						<RememberProjectControl
@@ -664,39 +664,6 @@ function unexpectedLaunchError(error: unknown): DisplayError {
 	};
 }
 
-function SelectorEmptyContextState() {
-	return (
-		<Card
-			as="section"
-			size="sm"
-			className="border border-border bg-muted/30 p-5"
-			aria-labelledby="empty-context-title"
-		>
-			<h3 id="empty-context-title" className="font-medium">
-				Create a development context
-			</h3>
-			<p className="mt-2 text-sm text-muted-foreground">
-				Contexts keep provider accounts and coding-tool storage separate for the
-				projects you open.
-			</p>
-			<ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-				<li>
-					<span className="font-medium text-foreground">Personal:</span>{" "}
-					personal projects and accounts.
-				</li>
-				<li>
-					<span className="font-medium text-foreground">Company:</span> work or
-					client projects and accounts.
-				</li>
-				<li>
-					<span className="font-medium text-foreground">Custom:</span> create a
-					tailored context from Contexts when custom creation is available.
-				</li>
-			</ul>
-		</Card>
-	);
-}
-
 function MissingDefaultContextActions({
 	launchState,
 	providerCredentialSessions,
@@ -802,15 +769,18 @@ function MissingDefaultContextActions({
 	);
 }
 
-function recommendationForContext(
+function singleHealthyLaunchContext(
 	launchState: LaunchState,
-	contextId: string,
-): string | undefined {
-	if (launchState.selectedContextId !== contextId) {
+): ContextState | undefined {
+	const [context] = launchState.contexts;
+	if (
+		launchState.contexts.length !== 1 ||
+		context?.tool.status !== "ready" ||
+		context.confidence?.status !== "ready"
+	) {
 		return undefined;
 	}
-
-	return recommendationReason(launchState.resolutionSource);
+	return context;
 }
 
 export { SelectorView };
