@@ -512,7 +512,7 @@ func (s *Service) firstRunLaunchState(projectPath project.Path) LaunchState {
 }
 
 func (s *Service) createContext(request CreateContextRequest) (CreateContextResult, error) {
-	contextID, err := devcontext.NewID(request.ContextID)
+	contextID, err := s.contextIDForCreateRequest(request)
 	if err != nil {
 		return CreateContextResult{}, err
 	}
@@ -562,6 +562,61 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 	}
 
 	return CreateContextResult{Context: s.contextState(ctx)}, nil
+}
+
+func (s *Service) contextIDForCreateRequest(request CreateContextRequest) (devcontext.ID, error) {
+	if rawID := strings.TrimSpace(request.ContextID); rawID != "" {
+		return devcontext.NewID(rawID)
+	}
+
+	name := strings.TrimSpace(request.Name)
+	if name == "" && request.TemplateID != "" {
+		if template, ok := devcontext.TemplateByID(request.TemplateID); ok {
+			name = template.Name
+		}
+	}
+	base := contextIDSlug(name)
+	contexts, err := s.dependencies.Contexts.List()
+	if err != nil {
+		return devcontext.ID{}, fmt.Errorf("list contexts while generating context ID: %w", err)
+	}
+	existing := make(map[string]struct{}, len(contexts))
+	for _, ctx := range contexts {
+		existing[ctx.ID.String()] = struct{}{}
+	}
+	for suffix := 1; ; suffix++ {
+		candidate := base
+		if suffix > 1 {
+			candidate = fmt.Sprintf("%s-%d", base, suffix)
+		}
+		if _, found := existing[candidate]; found {
+			continue
+		}
+		return devcontext.NewID(candidate)
+	}
+}
+
+// contextIDSlug converts a display name to the restricted identifier format
+// used by persisted context directories. It intentionally keeps IDs internal.
+func contextIDSlug(name string) string {
+	var builder strings.Builder
+	separatorPending := false
+	for _, r := range strings.ToLower(strings.TrimSpace(name)) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			if separatorPending && builder.Len() > 0 {
+				builder.WriteByte('-')
+			}
+			builder.WriteRune(r)
+			separatorPending = false
+		default:
+			separatorPending = builder.Len() > 0
+		}
+	}
+	if builder.Len() == 0 {
+		return "context"
+	}
+	return builder.String()
 }
 
 func (s *Service) contextFromCreateRequest(contextID devcontext.ID, request CreateContextRequest) (devcontext.Context, error) {

@@ -44,7 +44,6 @@ export function CreateContextDialog({
 	>;
 }) {
 	const [name, setName] = useState("");
-	const [contextId, setContextID] = useState("");
 	const [description, setDescription] = useState("");
 	const [icon, setIcon] = useState("");
 	const [accent, setAccent] = useState("custom");
@@ -76,7 +75,6 @@ export function CreateContextDialog({
 		setPending(true);
 		setError(undefined);
 		const request: CustomContextRequest = {
-			contextId,
 			templateId: templateID,
 			name,
 			description,
@@ -118,7 +116,6 @@ export function CreateContextDialog({
 						</select>
 					</label>
 					<ContextField label="Name" value={name} onChange={setName} />
-					<ContextField label="ID" value={contextId} onChange={setContextID} />
 					<ContextField
 						label="Description"
 						value={description}
@@ -137,20 +134,27 @@ export function CreateContextDialog({
 							))}
 						</select>
 					</label>
-					<label className="block text-sm">
-						Coding tool
-						<select
-							className="mt-1 w-full border p-2"
-							value={toolId}
-							onChange={(e) => setToolID(e.target.value)}
-						>
-							{options.map((tool) => (
-								<option key={tool.id} value={tool.id}>
-									{tool.name}
-								</option>
-							))}
-						</select>
-					</label>
+					{options.length > 0 ? (
+						<label className="block text-sm">
+							Coding tool
+							<select
+								className="mt-1 w-full border p-2"
+								value={toolId}
+								onChange={(e) => setToolID(e.target.value)}
+							>
+								{options.map((tool) => (
+									<option key={tool.id} value={tool.id}>
+										{tool.name}
+									</option>
+								))}
+							</select>
+						</label>
+					) : (
+						<p className="text-sm text-muted-foreground">
+							No coding tools detected. You can create this context now and
+							configure a coding tool later.
+						</p>
+					)}
 					<fieldset>
 						<legend className="text-sm">Providers</legend>
 						{providerOptions.map((provider) => (
@@ -173,7 +177,7 @@ export function CreateContextDialog({
 					{error ? <p className="text-destructive">{error.message}</p> : null}
 					<Button
 						type="button"
-						disabled={pending || !name || !contextId || !toolId}
+						disabled={pending || !name}
 						onClick={() => void submit()}
 					>
 						{pending ? "Creating..." : "Create context"}

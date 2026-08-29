@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -81,6 +82,11 @@ type VSCodeEditor struct {
 	// OperatingSystem defaults to runtime.GOOS. Tests can set it to exercise
 	// platform-specific command candidates without depending on the host OS.
 	OperatingSystem string
+
+	// WindowsInstallPaths augments the standard Windows installation locations.
+	// It exists primarily for deterministic tests and packaged deployments with
+	// a known installation directory.
+	WindowsInstallPaths []string
 }
 
 var _ CodingTool = VSCodeEditor{}
@@ -113,11 +119,36 @@ func (e VSCodeEditor) DetectExecutable(config Config) (Executable, error) {
 			return Executable(path), nil
 		}
 	}
+	for _, path := range e.windowsInstallPaths(goos) {
+		info, err := probe.Stat(path)
+		if err == nil && isUsableExecutable(info, goos) {
+			return Executable(path), nil
+		}
+		candidates = append(candidates, path)
+	}
 
 	return "", &ExecutableNotFoundError{
 		ToolID:     VSCodeID,
 		Candidates: candidates,
 	}
+}
+
+func (e VSCodeEditor) windowsInstallPaths(goos string) []string {
+	if goos != "windows" {
+		return nil
+	}
+	paths := append([]string(nil), e.WindowsInstallPaths...)
+	for _, root := range []string{
+		os.Getenv("LOCALAPPDATA"),
+		os.Getenv("ProgramFiles"),
+		os.Getenv("ProgramFiles(x86)"),
+	} {
+		if root == "" {
+			continue
+		}
+		paths = append(paths, filepath.Join(root, "Microsoft VS Code", "Code.exe"))
+	}
+	return paths
 }
 
 // BuildLaunchCommand returns the structured VS Code command for one project.

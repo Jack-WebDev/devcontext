@@ -2,14 +2,19 @@ import { ShieldCheck } from "lucide-react";
 import type { LaunchState } from "../../lib/devctx-api";
 
 function AppStatusBar({ launchState }: { launchState?: LaunchState }) {
-	const checkingIsolation = launchState?.confidence === undefined;
+	const setupRequired = launchState?.firstRun === true;
+	const checkingIsolation =
+		launchState === undefined ||
+		(!setupRequired && launchState.confidence === undefined);
 	const needsAttention =
-		!checkingIsolation &&
+		!checkingIsolation && !setupRequired &&
 		(launchState?.confidence?.status !== "ready" ||
 			(launchState?.warnings.length ?? 0) > 0);
 	const isolation =
 		checkingIsolation
 			? "Checking isolation"
+			: setupRequired
+				? "Isolation will be checked after setup"
 			: launchState?.confidence?.status !== "ready"
 				? "Isolation needs attention"
 				: "Isolation ready";
@@ -22,9 +27,11 @@ function AppStatusBar({ launchState }: { launchState?: LaunchState }) {
 				</div>
 				<div className="flex items-center gap-2 px-5">
 					<span
-						className={`size-2 rounded-full ${checkingIsolation ? "bg-muted-foreground" : needsAttention ? "bg-warning" : "bg-success"}`}
+						className={`size-2 rounded-full ${checkingIsolation ? "bg-muted-foreground" : setupRequired || needsAttention ? "bg-warning" : "bg-success"}`}
 					/>
-					{needsAttention
+					{setupRequired
+						? "Setup required"
+						: needsAttention
 						? "System needs attention"
 						: checkingIsolation
 							? "Checking system status"

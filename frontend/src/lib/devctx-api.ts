@@ -324,7 +324,8 @@ export interface UnbindProjectRequest {
 }
 
 export interface CreateContextRequest {
-	contextId: string;
+	/** Internal IDs are generated from name when omitted. */
+	contextId?: string;
 	templateId?: string;
 	name?: string;
 	description?: string;
@@ -788,7 +789,7 @@ const generatedBindings: WailsBindings = {
 	},
 	async createContext(request) {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
-		return bindings.CreateContext(request);
+		return bindings.CreateContext({ ...request, contextId: request.contextId ?? "" });
 	},
 	async getContextTemplates() {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
