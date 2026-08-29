@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"devctx/packages/application"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type service interface {
@@ -174,6 +175,18 @@ func (a *App) Startup(ctx context.Context) {
 // GetApplicationMode returns the startup intent selected by the desktop host.
 func (a *App) GetApplicationMode() ApplicationMode {
 	return a.mode
+}
+
+// ChooseProjectDirectory opens the host-owned folder picker used by focused
+// launcher recovery flows. An empty result means the user canceled it.
+func (a *App) ChooseProjectDirectory() any {
+	path, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Choose a project folder",
+	})
+	if err != nil {
+		return application.NewError(err)
+	}
+	return path
 }
 
 // GetLaunchState returns selector state for the current project.

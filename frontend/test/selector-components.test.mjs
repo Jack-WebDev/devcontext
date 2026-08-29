@@ -60,6 +60,7 @@ import { GuiErrorNotice } from "../.tmp-test/src/components/selector/GuiErrorNot
 import { LaunchFailureView } from "../.tmp-test/src/components/selector/LaunchFailureView.js";
 import { LauncherSurface } from "../.tmp-test/src/components/launcher/LauncherSurface.js";
 import { ProjectResolvingView } from "../.tmp-test/src/components/launcher/ProjectResolvingView.js";
+import { ProjectNotFoundView } from "../.tmp-test/src/components/launcher/ProjectNotFoundView.js";
 import {
 	LaunchVerificationProgress,
 	verificationStepPresentation,
@@ -188,6 +189,21 @@ test("project resolving view explains the launch information being loaded", () =
 	assert.match(html, /available contexts/);
 	assert.match(html, /readiness/);
 	assert.match(html, /role="status"/);
+});
+
+test("project-not-found recovery uses folder selection instead of raw errors", () => {
+	const html = renderToStaticMarkup(
+		createElement(ProjectNotFoundView, {
+			choosingFolder: false,
+			onChooseFolder() {},
+			onCancel() {},
+		}),
+	);
+
+	assert.match(html, /Project not found/);
+	assert.match(html, /Choose folder/);
+	assert.match(html, /Cancel/);
+	assert.doesNotMatch(html, /Project path does not exist/);
 });
 
 test("launcher state keeps progress and dialogs mutually exclusive", () => {

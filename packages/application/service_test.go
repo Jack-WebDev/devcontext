@@ -248,11 +248,12 @@ func TestNewErrorProvidesSanitizedTechnicalDetails(t *testing.T) {
 
 func TestNewErrorReturnsActionableRecoveryDetails(t *testing.T) {
 	tests := []struct {
-		name         string
-		err          error
-		wantCode     ErrorCode
-		wantMessage  string
-		wantRecovery []string
+		name          string
+		err           error
+		wantCode      ErrorCode
+		wantMessage   string
+		wantPathIssue string
+		wantRecovery  []string
 	}{
 		{
 			name: "project path",
@@ -260,9 +261,10 @@ func TestNewErrorReturnsActionableRecoveryDetails(t *testing.T) {
 				Path: "/missing/project",
 				Err:  project.ErrProjectDirectoryNotFound,
 			},
-			wantCode:     ErrorCodeValidation,
-			wantMessage:  "Project path does not exist.",
-			wantRecovery: []string{"/missing/project", "existing project directory"},
+			wantCode:      ErrorCodeValidation,
+			wantMessage:   "Project path does not exist.",
+			wantPathIssue: "not_found",
+			wantRecovery:  []string{"/missing/project", "existing project directory"},
 		},
 		{
 			name: "missing context",
@@ -305,6 +307,9 @@ func TestNewErrorReturnsActionableRecoveryDetails(t *testing.T) {
 			got := NewError(tt.err)
 			if got.Code != tt.wantCode {
 				t.Fatalf("code = %q, want %q", got.Code, tt.wantCode)
+			}
+			if tt.wantPathIssue != "" && got.ProjectPathIssue != tt.wantPathIssue {
+				t.Fatalf("ProjectPathIssue = %q, want %q", got.ProjectPathIssue, tt.wantPathIssue)
 			}
 			if got.Message != tt.wantMessage {
 				t.Fatalf("message = %q, want %q", got.Message, tt.wantMessage)

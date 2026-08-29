@@ -15,8 +15,15 @@ export interface DisplayError {
 	message: string;
 	recovery: string;
 	technicalDetails?: string;
+	projectPathIssue?: ProjectPathIssue;
 	contextMismatch?: ContextMismatch;
 }
+
+export type ProjectPathIssue =
+	| "not_found"
+	| "not_directory"
+	| "unreadable"
+	| "invalid";
 
 export interface ContextMismatch {
 	projectPath: string;
@@ -511,6 +518,7 @@ export interface ProviderCredentialSession {
 
 export interface DevContextApi {
 	getApplicationMode(): Promise<ApiResult<ApplicationMode>>;
+	chooseProjectDirectory(): Promise<ApiResult<string | undefined>>;
 	getLaunchState(
 		request?: GetLaunchStateRequest,
 	): Promise<ApiResult<LaunchState>>;
@@ -568,6 +576,7 @@ export interface DevContextApi {
 
 export interface WailsBindings {
 	getApplicationMode(): Promise<unknown>;
+	chooseProjectDirectory(): Promise<unknown>;
 	getLaunchState(request: GetLaunchStateRequest): Promise<unknown>;
 	getHomeDashboard(request: GetHomeDashboardRequest): Promise<unknown>;
 	getRecentProjects(): Promise<unknown>;
@@ -607,6 +616,12 @@ export function createDevContextApi(
 			return callBinding(
 				() => bindings.getApplicationMode(),
 				normalizeApplicationMode,
+			);
+		},
+		chooseProjectDirectory() {
+			return callBinding(
+				() => bindings.chooseProjectDirectory(),
+				optionalString,
 			);
 		},
 		getLaunchState(request = {}) {
@@ -757,6 +772,10 @@ const generatedBindings: WailsBindings = {
 	async getApplicationMode() {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
 		return bindings.GetApplicationMode();
+	},
+	async chooseProjectDirectory() {
+		const bindings = await import("../../wailsjs/go/wailsapp/App");
+		return bindings.ChooseProjectDirectory();
 	},
 	async getLaunchState(request) {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
@@ -1698,13 +1717,27 @@ function normalizeResolutionWarning(value: unknown): ResolutionWarning {
 
 function normalizeApplicationError(value: ApplicationErrorLike): DisplayError {
 	const technicalDetails = optionalString(value.technicalDetails);
+	const projectPathIssue = normalizeProjectPathIssue(value.projectPathIssue);
 	return {
 		code: knownErrorCode(value.code),
 		message: stringValue(value.message),
 		recovery: stringValue(value.recovery),
 		...(technicalDetails === undefined ? {} : { technicalDetails }),
+		...(projectPathIssue === undefined ? {} : { projectPathIssue }),
 		contextMismatch: normalizeContextMismatch(value.contextMismatch),
 	};
+}
+
+function normalizeProjectPathIssue(value: unknown): ProjectPathIssue | undefined {
+	switch (value) {
+		case "not_found":
+		case "not_directory":
+		case "unreadable":
+		case "invalid":
+			return value;
+		default:
+			return undefined;
+	}
 }
 
 function normalizeRejectedError(value: unknown): DisplayError {
@@ -1757,6 +1790,7 @@ interface ApplicationErrorLike {
 	message: unknown;
 	recovery: unknown;
 	technicalDetails?: unknown;
+	projectPathIssue?: unknown;
 	contextMismatch?: unknown;
 }
 
