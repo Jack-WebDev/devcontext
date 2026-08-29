@@ -12,6 +12,33 @@ const toolFixture = () => ({
 
 const toolOptionFixture = () => ({ id: "second-tool", name: "Second Tool" });
 
+test("adapter exposes the host-selected application mode", async () => {
+	const api = createDevContextApi({
+		async getApplicationMode() {
+			return { type: "launcher", projectPath: "/work/api" };
+		},
+	});
+
+	assert.deepEqual(await api.getApplicationMode(), {
+		ok: true,
+		data: { type: "launcher", projectPath: "/work/api" },
+	});
+});
+
+test("adapter rejects an invalid application mode", async () => {
+	const api = createDevContextApi({
+		async getApplicationMode() {
+			return { type: "launcher" };
+		},
+	});
+
+	const result = await api.getApplicationMode();
+	assert.equal(result.ok, false);
+	if (!result.ok) {
+		assert.equal(result.error.code, "unexpected_error");
+	}
+});
+
 test("adapter normalizes the Home dashboard contract", async () => {
 	const api = createDevContextApi({
 		async getHomeDashboard(request) {

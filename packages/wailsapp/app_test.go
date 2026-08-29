@@ -244,8 +244,8 @@ func TestNewRetainsHostSelectedApplicationMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := New(service, tt.mode)
-			if !reflect.DeepEqual(app.mode, tt.mode) {
-				t.Fatalf("app mode = %#v, want %#v", app.mode, tt.mode)
+			if got := app.GetApplicationMode(); !reflect.DeepEqual(got, tt.mode) {
+				t.Fatalf("application mode = %#v, want %#v", got, tt.mode)
 			}
 		})
 	}

@@ -14,6 +14,8 @@ export function GetContextDetails(arg1:application.GetContextDetailsRequest):Pro
 
 export function GetContextTemplates():Promise<any>;
 
+export function GetApplicationMode():Promise<any>;
+
 export function GetContexts():Promise<any>;
 
 export function GetDiagnostics(arg1:application.GetDiagnosticsRequest):Promise<any>;

@@ -26,6 +26,10 @@ export function GetContextTemplates() {
   return window['go']['wailsapp']['App']['GetContextTemplates']();
 }
 
+export function GetApplicationMode() {
+  return window['go']['wailsapp']['App']['GetApplicationMode']();
+}
+
 export function GetContexts() {
   return window['go']['wailsapp']['App']['GetContexts']();
 }

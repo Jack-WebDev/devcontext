@@ -171,6 +171,11 @@ func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
+// GetApplicationMode returns the startup intent selected by the desktop host.
+func (a *App) GetApplicationMode() ApplicationMode {
+	return a.mode
+}
+
 // GetLaunchState returns selector state for the current project.
 func (a *App) GetLaunchState(request application.GetLaunchStateRequest) any {
 	state, err := a.service.GetLaunchState(request)
