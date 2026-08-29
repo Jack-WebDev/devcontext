@@ -99,6 +99,11 @@ import {
 	nextSelectedContextId,
 } from "../.tmp-test/src/components/selector/selection-state.js";
 import {
+	launcherSelection,
+	launcherStateIsPending,
+	selectingLauncherState,
+} from "../.tmp-test/src/components/selector/launcher-state.js";
+import {
 	canLaunchSelectedContextFromKeyboard,
 	escapeKeyboardAction,
 } from "../.tmp-test/src/components/selector/selector-keyboard.js";
@@ -172,6 +177,35 @@ test("launcher surface is focused on one project", () => {
 	assert.match(html, /Open project/);
 	assert.match(html, /\/work\/api/);
 	assert.doesNotMatch(html, /data-app-shell|aria-label="Main navigation"/);
+});
+
+test("launcher state keeps progress and dialogs mutually exclusive", () => {
+	const selection = {
+		selectedContextId: "company",
+		rovingContextId: "company",
+		rememberProject: true,
+	};
+
+	assert.deepEqual(selectingLauncherState(selection), {
+		status: "selecting",
+		selection,
+	});
+	assert.equal(
+		launcherStateIsPending({ status: "preflighting", selection }),
+		true,
+	);
+	assert.equal(
+		launcherStateIsPending({ status: "identity_mismatch", selection, contextId: "company" }),
+		false,
+	);
+	assert.deepEqual(
+		launcherSelection({
+			status: "existing_workspace",
+			selection,
+			conflict: { kind: "same_context", environment: {} },
+		}),
+		selection,
+	);
 });
 
 test("notification policy permits only meaningful provider, tool, and update events", () => {
