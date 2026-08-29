@@ -14,11 +14,12 @@ import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import type { ContextNavigationDirection } from "./selection-state";
+import type { ContextRecommendation } from "./recommendation";
 
 interface ContextCardProps {
 	context: ContextState;
 	selected?: boolean;
-	recommendation?: string;
+	recommendation?: ContextRecommendation;
 	compact?: boolean;
 	disabled?: boolean;
 	tabIndex?: number;
@@ -331,7 +332,7 @@ function ContextIdentity({
 	description?: string;
 	accent: ContextAccent;
 	selected: boolean;
-	recommendation?: string;
+	recommendation?: ContextRecommendation;
 }) {
 	return (
 		<div className="min-w-0 space-y-2">
@@ -351,9 +352,9 @@ function ContextIdentity({
 								<Badge
 									variant="secondary"
 									className="border border-foreground/20 bg-muted/50 px-2 py-0.5 text-xs font-semibold text-foreground"
-									title={recommendation}
+									title={recommendation.detail}
 								>
-									Recommended
+									{recommendation.label}
 								</Badge>
 							) : null}
 							<Badge
@@ -378,7 +379,7 @@ function ContextIdentity({
 					) : null}
 					{recommendation ? (
 						<p className="mt-2 text-xs text-muted-foreground">
-							{recommendation}
+							{recommendation.detail}
 						</p>
 					) : null}
 				</div>

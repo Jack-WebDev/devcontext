@@ -90,7 +90,7 @@ import {
 	boundContextName,
 	RememberProjectControl,
 } from "../.tmp-test/src/components/selector/RememberProjectControl.js";
-import { recommendationReason } from "../.tmp-test/src/components/selector/recommendation.js";
+import { contextRecommendation } from "../.tmp-test/src/components/selector/recommendation.js";
 import {
 	launchConfidenceFeedback,
 	SelectorActions,
@@ -760,13 +760,26 @@ test("context choices separate recommendations and search only larger collection
 		contextFixture("company", "Company"),
 		contextFixture("client-a", "Client A"),
 	];
+	const rememberedContext = contexts[1];
 	assert.deepEqual(
-		groupContexts(contexts, "company", "project_binding").map((group) => [
+		groupContexts(
+			contexts.map((context) => ({
+				context,
+				recommendation:
+					context.id === rememberedContext.id
+						? {
+								category: "remembered",
+								label: "Remembered",
+								detail: "Remembered for this project.",
+							}
+						: undefined,
+			})),
+		).map((group) => [
 			group.label,
-			group.contexts.map((context) => context.id),
+			group.contexts.map(({ context }) => context.id),
 		]),
 		[
-			["Recommended", ["company"]],
+			["Remembered context", ["company"]],
 			["Other contexts", ["personal", "client-a"]],
 		],
 	);
@@ -788,6 +801,12 @@ test("context choices separate recommendations and search only larger collection
 				contexts,
 				selectedContextId: "company",
 				resolutionSource: "project_binding",
+				binding: {
+					projectPath: "/work/api",
+					bound: true,
+					contextId: "company",
+					dangling: false,
+				},
 			}),
 			selectedContextId: "company",
 			rovingContextId: "company",
@@ -804,8 +823,10 @@ test("context choices separate recommendations and search only larger collection
 			onProviderSetup() {},
 		}),
 	);
-	assert.match(html, /Recommended/);
+	assert.match(html, /Remembered context/);
+	assert.match(html, /Remembered/);
 	assert.match(html, /Other contexts/);
+	assert.doesNotMatch(html, /Recommended/);
 	assert.doesNotMatch(html, /Enabled providers/);
 });
 
@@ -879,27 +900,77 @@ test("context card can represent a selected context", () => {
 	assert.match(html, />Selected</);
 });
 
-test("context card presents a backend-supported recommendation with its reason", () => {
+test("context card presents an evidence-backed label with its reason", () => {
 	const context = contextFixture("company", "Company");
 	const html = renderToStaticMarkup(
-		ContextCard({ context, recommendation: "Remembered for this project" }),
+		ContextCard({
+			context,
+			recommendation: {
+				category: "remembered",
+				label: "Remembered",
+				detail: "Remembered for this project.",
+			},
+		}),
 	);
 
-	assert.match(html, />Recommended</);
-	assert.ok(html.includes("Remembered for this project"));
+	assert.match(html, />Remembered</);
+	assert.ok(html.includes("Remembered for this project."));
 });
 
-test("recommendation reasons use plain language for known backend sources", () => {
+test("recommendation labels only reflect backend binding, verification, and conflict evidence", () => {
+	const context = {
+		...contextFixture("company", "Company"),
+		confidence: { contextId: "company", status: "ready", checks: [] },
+	};
+	const remembered = launchStateFixture({
+		contexts: [context],
+		binding: {
+			projectPath: "/work/api",
+			bound: true,
+			contextId: "company",
+			dangling: false,
+		},
+		resolutionSource: "project_binding",
+	});
+	assert.deepEqual(contextRecommendation(remembered, context), {
+		category: "remembered",
+		label: "Remembered",
+		detail: "Remembered for this project.",
+	});
+
+	const verified = launchStateFixture({ contexts: [context] });
+	assert.deepEqual(contextRecommendation(verified, context), {
+		category: "verified",
+		label: "Verified",
+		detail: "Dev Context verified the required launch checks.",
+	});
+
+	const conflict = launchStateFixture({
+		contexts: [context],
+		warnings: [
+			{
+				code: "context_mismatch",
+				message: "Mismatch",
+				requestedContextId: "company",
+			},
+		],
+	});
+	assert.deepEqual(contextRecommendation(conflict, context), {
+		category: "conflict",
+		label: "Conflict",
+		detail: "This context conflicts with the project's remembered context.",
+	});
 	assert.equal(
-		recommendationReason("project_binding"),
-		"Remembered for this project",
+		contextRecommendation(launchStateFixture({ contexts: [context] }), {
+			...context,
+			confidence: {
+				contextId: "company",
+				status: "needs_attention",
+				checks: [],
+			},
+		}),
+		undefined,
 	);
-	assert.equal(
-		recommendationReason("remembered_context"),
-		"Remembered context",
-	);
-	assert.equal(recommendationReason("last_launch"), "Used for the last launch");
-	assert.equal(recommendationReason("user_selection"), undefined);
 });
 
 test("context card renders backend-provided description and accent metadata", () => {

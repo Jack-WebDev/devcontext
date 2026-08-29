@@ -1,6 +1,7 @@
 import type { Ref } from "react";
 import type { ContextState, LaunchState } from "../../lib/devctx-api";
 import { ContextCard } from "./ContextCard.js";
+import { contextRecommendation } from "./recommendation.js";
 import type { ContextNavigationDirection } from "./selection-state.js";
 
 const contextSearchThreshold = 6;
@@ -39,9 +40,10 @@ function ContextChoiceList({
 }: ContextChoiceListProps) {
 	const contexts = filterContexts(launchState.contexts, search);
 	const groups = groupContexts(
-		contexts,
-		launchState.selectedContextId,
-		launchState.resolutionSource,
+		contexts.map((context) => ({
+			context,
+			recommendation: contextRecommendation(launchState, context),
+		})),
 	);
 
 	return (
@@ -75,17 +77,13 @@ function ContextChoiceList({
 							{group.label}
 						</h3>
 						<div className="grid gap-4 sm:grid-cols-2">
-							{group.contexts.map((context) => (
+							{group.contexts.map(({ context, recommendation }) => (
 								<ContextCard
 									key={context.id}
 									context={context}
 									compact
 									selected={selectedContextId === context.id}
-									recommendation={
-										group.label === "Recommended"
-											? recommendationLabel(launchState.resolutionSource)
-											: undefined
-									}
+									recommendation={recommendation}
 									disabled={launchPending}
 									tabIndex={rovingContextId === context.id ? 0 : -1}
 									buttonRef={buttonRef(context.id)}
@@ -125,46 +123,30 @@ function filterContexts(
 }
 
 function groupContexts(
-	contexts: ContextState[],
-	recommendedContextId: string | undefined,
-	resolutionSource: string | undefined,
+	contexts: Array<{
+		context: ContextState;
+		recommendation: ReturnType<typeof contextRecommendation>;
+	}>,
 ): Array<{
-	label: "Recommended" | "Other contexts" | "Contexts";
-	contexts: ContextState[];
+	label: "Remembered context" | "Other contexts" | "Contexts";
+	contexts: typeof contexts;
 }> {
-	const recommended =
-		recommendedContextId === undefined ||
-		recommendationLabel(resolutionSource) === undefined
-			? undefined
-			: contexts.find((context) => context.id === recommendedContextId);
-	if (recommended === undefined) {
+	const remembered = contexts.find(
+		({ recommendation }) => recommendation?.category === "remembered",
+	);
+	if (remembered === undefined) {
 		return contexts.length === 0 ? [] : [{ label: "Contexts", contexts }];
 	}
 
 	const otherContexts = contexts.filter(
-		(context) => context.id !== recommended.id,
+		({ context }) => context.id !== remembered.context.id,
 	);
 	return [
-		{ label: "Recommended", contexts: [recommended] },
+		{ label: "Remembered context", contexts: [remembered] },
 		...(otherContexts.length === 0
 			? []
 			: [{ label: "Other contexts" as const, contexts: otherContexts }]),
 	];
-}
-
-function recommendationLabel(
-	resolutionSource: string | undefined,
-): string | undefined {
-	switch (resolutionSource) {
-		case "project_binding":
-			return "Remembered for this project";
-		case "remembered_context":
-			return "Remembered context";
-		case "last_launch":
-			return "Used for the last launch";
-		default:
-			return undefined;
-	}
 }
 
 export {
