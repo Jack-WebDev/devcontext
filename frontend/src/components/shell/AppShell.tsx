@@ -16,6 +16,7 @@ import { type AppRoute, appRoutes } from "./routes.js";
 interface AppShellProps {
 	activeRoute: AppRoute;
 	onNavigate: (route: AppRoute) => void;
+	isFirstRun?: boolean;
 	currentProject?: ProjectState;
 	statusBar?: ReactNode;
 	children: ReactNode;
@@ -24,13 +25,14 @@ interface AppShellProps {
 function AppShell({
 	activeRoute,
 	onNavigate,
+	isFirstRun = false,
 	currentProject,
 	statusBar,
 	children,
 }: AppShellProps) {
 	return (
 		<div
-			className="grid h-screen min-w-[1100px] grid-rows-[minmax(0,1fr)_55px] overflow-hidden bg-[#f8f7f4] text-foreground"
+			className="grid h-screen min-w-[1100px] grid-rows-[minmax(0,1fr)_48px] overflow-hidden bg-[#f8f7f4] text-foreground"
 			data-app-shell
 		>
 			<div className="grid min-h-0 grid-cols-[238px_minmax(0,1fr)] overflow-hidden">
@@ -53,7 +55,7 @@ function AppShell({
 								<button
 									key={route.id}
 									type="button"
-									className="flex h-[38px] min-w-0 items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-[#f3f1ed] hover:text-foreground data-[active=true]:bg-[#efede9] data-[active=true]:text-foreground"
+									className="flex h-[38px] min-w-0 items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-[#f3f1ed] hover:text-foreground data-[active=true]:bg-[#efede9] data-[active=true]:text-foreground"
 									data-active={activeRoute === route.id}
 									aria-current={activeRoute === route.id ? "page" : undefined}
 									onClick={() => onNavigate(route.id)}
@@ -66,7 +68,7 @@ function AppShell({
 					<div className="mx-5 mt-5 border-t border-sidebar-border pt-4">
 						<button
 							type="button"
-							className="flex h-[38px] w-full items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground hover:bg-[#f3f1ed] hover:text-foreground data-[active=true]:bg-[#efede9] data-[active=true]:text-foreground"
+							className="flex h-[38px] w-full items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-[#f3f1ed] hover:text-foreground data-[active=true]:bg-[#efede9] data-[active=true]:text-foreground"
 							data-active={activeRoute === "settings"}
 							onClick={() => onNavigate("settings")}
 						>
@@ -75,7 +77,7 @@ function AppShell({
 						</button>
 					</div>
 					<div className="flex-1" />
-					<SidebarShortcuts />
+					{isFirstRun ? null : <SidebarShortcuts />}
 					{currentProject ? (
 						<span className="sr-only">
 							Current project {currentProject.name} {currentProject.path}
