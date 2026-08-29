@@ -26,6 +26,7 @@ import { ProjectContextChangeDialog } from "./components/projects/ProjectContext
 import { RunningEnvironmentConflictDialog } from "./components/running/RunningEnvironmentConflictDialog";
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
 import { createOnboardingContextAndRefresh } from "./components/selector/onboarding-action";
+import { LauncherFlow } from "./components/launcher/LauncherFlow";
 import { SettingsView } from "./components/settings/SettingsView";
 import { AppShell } from "./components/shell/AppShell";
 import {
@@ -37,6 +38,7 @@ import {
 import { AppStatusBar } from "./components/status/AppStatusBar";
 import {
 	type ApiResult,
+	type ApplicationMode,
 	type CreateContextResult,
 	type DisplayError,
 	devContextApi,
@@ -54,6 +56,52 @@ interface PendingRunningEnvironmentLaunch {
 }
 
 function App() {
+	const [applicationMode, setApplicationMode] = useState<
+		ApplicationMode | undefined
+	>();
+	const [applicationModeError, setApplicationModeError] = useState<
+		DisplayError | undefined
+	>();
+
+	useEffect(() => {
+		let active = true;
+		void devContextApi.getApplicationMode().then((result) => {
+			if (!active) {
+				return;
+			}
+			if (result.ok) {
+				setApplicationMode(result.data);
+				return;
+			}
+			setApplicationModeError(result.error);
+		});
+		return () => {
+			active = false;
+		};
+	}, []);
+
+	if (applicationModeError !== undefined) {
+		return (
+			<main className="p-6">
+				<GuiErrorNotice error={applicationModeError} />
+			</main>
+		);
+	}
+	if (applicationMode === undefined) {
+		return (
+			<main className="flex min-h-screen items-center justify-center p-6">
+				<p className="text-sm text-muted-foreground">Opening Dev Context...</p>
+			</main>
+		);
+	}
+	if (applicationMode.type === "launcher") {
+		return <LauncherFlow projectPath={applicationMode.projectPath} />;
+	}
+
+	return <ManagementApp />;
+}
+
+function ManagementApp() {
 	const [activeRoute, setActiveRoute] = useState<AppRoute>(() =>
 		appRouteFromHash(window.location.hash),
 	);

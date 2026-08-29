@@ -58,6 +58,7 @@ import {
 } from "../.tmp-test/src/components/selector/FirstRunWelcome.js";
 import { GuiErrorNotice } from "../.tmp-test/src/components/selector/GuiErrorNotice.js";
 import { LaunchFailureView } from "../.tmp-test/src/components/selector/LaunchFailureView.js";
+import { LauncherFlow } from "../.tmp-test/src/components/launcher/LauncherFlow.js";
 import {
 	LaunchVerificationProgress,
 	verificationStepPresentation,
@@ -156,6 +157,17 @@ test("account identity mismatch review is limited to backend identity evidence",
 	assert.ok(html.includes("Review configuration"));
 	assert.ok(html.includes("Launch anyway"));
 	assert.ok(html.includes("Cancel"));
+});
+
+test("launcher flow is a focused project surface", () => {
+	const html = renderToStaticMarkup(
+		createElement(LauncherFlow, { projectPath: "/work/api" }),
+	);
+
+	assert.match(html, /data-launcher-flow/);
+	assert.match(html, /Open project/);
+	assert.match(html, /\/work\/api/);
+	assert.doesNotMatch(html, /data-app-shell|aria-label="Main navigation"/);
 });
 
 test("notification policy permits only meaningful provider, tool, and update events", () => {
