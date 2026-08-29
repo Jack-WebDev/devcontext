@@ -58,7 +58,7 @@ import {
 } from "../.tmp-test/src/components/selector/FirstRunWelcome.js";
 import { GuiErrorNotice } from "../.tmp-test/src/components/selector/GuiErrorNotice.js";
 import { LaunchFailureView } from "../.tmp-test/src/components/selector/LaunchFailureView.js";
-import { LauncherFlow } from "../.tmp-test/src/components/launcher/LauncherFlow.js";
+import { LauncherSurface } from "../.tmp-test/src/components/launcher/LauncherSurface.js";
 import {
 	LaunchVerificationProgress,
 	verificationStepPresentation,
@@ -159,9 +159,13 @@ test("account identity mismatch review is limited to backend identity evidence",
 	assert.ok(html.includes("Cancel"));
 });
 
-test("launcher flow is a focused project surface", () => {
+test("launcher surface is focused on one project", () => {
 	const html = renderToStaticMarkup(
-		createElement(LauncherFlow, { projectPath: "/work/api" }),
+		createElement(
+			LauncherSurface,
+			{ projectPath: "/work/api" },
+			"Loading launch options...",
+		),
 	);
 
 	assert.match(html, /data-launcher-flow/);
