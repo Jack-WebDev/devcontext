@@ -158,11 +158,12 @@ func (a *App) GetTrustCenter() any {
 type App struct {
 	ctx     context.Context
 	service service
+	mode    ApplicationMode
 }
 
 // New creates the application surface bound by Wails.
-func New(service service) *App {
-	return &App{service: service}
+func New(service service, mode ApplicationMode) *App {
+	return &App{service: service, mode: mode}
 }
 
 // Startup stores the process context supplied by Wails.

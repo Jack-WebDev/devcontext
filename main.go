@@ -38,7 +38,7 @@ func main() {
 		fmt.Fprint(os.Stderr, application.NewError(err).Error()+"\n")
 		os.Exit(1)
 	}
-	app := wailsapp.New(service)
+	app := wailsapp.New(service, wailsapp.ManagementMode())
 
 	err = wails.Run(&options.App{
 		Title:  "devctx",
