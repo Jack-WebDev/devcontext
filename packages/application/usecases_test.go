@@ -1229,6 +1229,22 @@ func TestCreateContextReportsDuplicateDefaultContext(t *testing.T) {
 	}
 }
 
+func TestCreateContextGeneratesUniqueIDFromName(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("my-work", "Existing work"))
+
+	result, appErr := fixture.service().CreateContext(CreateContextRequest{Name: "My Work"})
+	if appErr != nil {
+		t.Fatalf("create context: %v", appErr)
+	}
+	if result.Context.ID != "my-work-2" {
+		t.Fatalf("generated context ID = %q, want my-work-2", result.Context.ID)
+	}
+	if result.Context.Name != "My Work" {
+		t.Fatalf("context name = %q, want My Work", result.Context.Name)
+	}
+}
+
 func TestCreateContextRecordsHistoryEvent(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	logger := &applicationRecordingLogger{}

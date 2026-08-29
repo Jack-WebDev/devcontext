@@ -88,6 +88,25 @@ func TestVSCodeEditorDetectsWindowsExecutableFormsFromSearchPath(t *testing.T) {
 	}
 }
 
+func TestVSCodeEditorDetectsWindowsInstalledApplication(t *testing.T) {
+	installed := `C:\\Users\\Alex\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe`
+	probe := fakeExecutableProbe{files: map[string]os.FileInfo{
+		installed: fakeFileInfo{mode: 0o644},
+	}}
+
+	executable, err := (codingtool.VSCodeEditor{
+		Probe:               &probe,
+		OperatingSystem:     "windows",
+		WindowsInstallPaths: []string{installed},
+	}).DetectExecutable(codingtool.DefaultConfig())
+	if err != nil {
+		t.Fatalf("detect installed VS Code: %v", err)
+	}
+	if executable != codingtool.Executable(installed) {
+		t.Fatalf("executable = %q, want %q", executable, installed)
+	}
+}
+
 func TestVSCodeEditorReportsTypedExecutableNotFoundError(t *testing.T) {
 	probe := fakeExecutableProbe{}
 

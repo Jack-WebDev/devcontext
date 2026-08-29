@@ -435,6 +435,9 @@ type ProjectBindingState struct {
 
 // CreateContextRequest asks the service to create one default context.
 type CreateContextRequest struct {
+	// ContextID is retained for imports and API callers that need to preserve an
+	// existing identifier. New UI flows should omit it; the service derives a
+	// stable filesystem-safe ID from Name.
 	ContextID          string   `json:"contextId"`
 	TemplateID         string   `json:"templateId,omitempty"`
 	Name               string   `json:"name,omitempty"`
