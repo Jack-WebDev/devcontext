@@ -13,6 +13,7 @@ import { StatusIndicator } from "../status/StatusIndicator.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
+import { ContextRecommendationExplanation } from "./ContextRecommendationExplanation.js";
 import type { ContextNavigationDirection } from "./selection-state";
 import type { ContextRecommendation } from "./recommendation";
 
@@ -378,9 +379,7 @@ function ContextIdentity({
 						</p>
 					) : null}
 					{recommendation ? (
-						<p className="mt-2 text-xs text-muted-foreground">
-							{recommendation.detail}
-						</p>
+						<ContextRecommendationExplanation recommendation={recommendation} />
 					) : null}
 				</div>
 			</div>

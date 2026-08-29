@@ -771,6 +771,7 @@ test("context choices separate recommendations and search only larger collection
 								category: "remembered",
 								label: "Remembered",
 								detail: "Remembered for this project.",
+								reasons: ["api is bound to Company."],
 							}
 						: undefined,
 			})),
@@ -909,12 +910,17 @@ test("context card presents an evidence-backed label with its reason", () => {
 				category: "remembered",
 				label: "Remembered",
 				detail: "Remembered for this project.",
+				reasons: ["api is bound to Company."],
 			},
 		}),
 	);
 
 	assert.match(html, />Remembered</);
 	assert.ok(html.includes("Remembered for this project."));
+	assert.match(html, /Why this context/);
+	assert.ok(html.includes("api is bound to Company."));
+	assert.match(html, /<details/);
+	assert.doesNotMatch(html, /<details[^>]*open/);
 });
 
 test("recommendation labels only reflect backend binding, verification, and conflict evidence", () => {
@@ -936,6 +942,7 @@ test("recommendation labels only reflect backend binding, verification, and conf
 		category: "remembered",
 		label: "Remembered",
 		detail: "Remembered for this project.",
+		reasons: ["api is bound to Company."],
 	});
 
 	const verified = launchStateFixture({ contexts: [context] });
@@ -943,6 +950,7 @@ test("recommendation labels only reflect backend binding, verification, and conf
 		category: "verified",
 		label: "Verified",
 		detail: "Dev Context verified the required launch checks.",
+		reasons: ["Required launch checks are ready."],
 	});
 
 	const conflict = launchStateFixture({
@@ -959,6 +967,7 @@ test("recommendation labels only reflect backend binding, verification, and conf
 		category: "conflict",
 		label: "Conflict",
 		detail: "This context conflicts with the project's remembered context.",
+		reasons: ["Mismatch"],
 	});
 	assert.equal(
 		contextRecommendation(launchStateFixture({ contexts: [context] }), {

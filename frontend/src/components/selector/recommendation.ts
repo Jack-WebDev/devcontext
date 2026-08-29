@@ -6,17 +6,20 @@ interface ContextRecommendation {
 	category: ContextRecommendationCategory;
 	label: "Remembered" | "Verified" | "Conflict";
 	detail: string;
+	reasons: string[];
 }
 
 function contextRecommendation(
 	launchState: LaunchState,
 	context: ContextState,
 ): ContextRecommendation | undefined {
-	if (hasContextConflict(launchState, context.id)) {
+	const conflictWarning = contextConflictWarning(launchState, context.id);
+	if (conflictWarning) {
 		return {
 			category: "conflict",
 			label: "Conflict",
 			detail: "This context conflicts with the project's remembered context.",
+			reasons: [conflictWarning.message],
 		};
 	}
 
@@ -29,6 +32,7 @@ function contextRecommendation(
 			category: "remembered",
 			label: "Remembered",
 			detail: "Remembered for this project.",
+			reasons: [`${launchState.project.name} is bound to ${context.name}.`],
 		};
 	}
 
@@ -37,17 +41,28 @@ function contextRecommendation(
 			category: "verified",
 			label: "Verified",
 			detail: "Dev Context verified the required launch checks.",
+			reasons: verificationReasons(context),
 		};
 	}
 
 	return undefined;
 }
 
-function hasContextConflict(
+function verificationReasons(context: ContextState): string[] {
+	const readyChecks = context.confidence?.checks.filter(
+		(check) => check.severity === "ready",
+	);
+	if (readyChecks === undefined || readyChecks.length === 0) {
+		return ["Required launch checks are ready."];
+	}
+	return readyChecks.map((check) => `${check.label}: ${check.message}`);
+}
+
+function contextConflictWarning(
 	launchState: LaunchState,
 	contextId: string,
-): boolean {
-	return launchState.warnings.some(
+): LaunchState["warnings"][number] | undefined {
+	return launchState.warnings.find(
 		(warning) =>
 			warning.code === "context_mismatch" &&
 			(warning.boundContextId === contextId ||
