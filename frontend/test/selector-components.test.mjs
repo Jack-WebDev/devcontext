@@ -48,8 +48,10 @@ import {
 } from "../.tmp-test/src/components/running/RunningView.js";
 import { AccountIdentityMismatchDialog } from "../.tmp-test/src/components/selector/AccountIdentityMismatchDialog.js";
 import { hasAccountIdentityMismatch } from "../.tmp-test/src/components/selector/account-identity-mismatch.js";
+import { bindingReplacementForLaunch } from "../.tmp-test/src/components/selector/binding-replacement.js";
 import { ContextCard } from "../.tmp-test/src/components/selector/ContextCard.js";
 import { ContextMismatchDialog } from "../.tmp-test/src/components/selector/ContextMismatchDialog.js";
+import { DanglingBindingDialog } from "../.tmp-test/src/components/selector/DanglingBindingDialog.js";
 import { cancelSelector } from "../.tmp-test/src/components/selector/cancel-action.js";
 import { missingDefaultContextIds } from "../.tmp-test/src/components/selector/default-context-actions.js";
 import {
@@ -91,8 +93,10 @@ import { ProjectIdentity } from "../.tmp-test/src/components/selector/ProjectIde
 import { ProviderCredentialClassification } from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
 import {
 	boundContextName,
+	canRememberProject,
 	RememberProjectControl,
 } from "../.tmp-test/src/components/selector/RememberProjectControl.js";
+import { ReplaceBindingDialog } from "../.tmp-test/src/components/selector/ReplaceBindingDialog.js";
 import { contextRecommendation } from "../.tmp-test/src/components/selector/recommendation.js";
 import {
 	launchConfidenceFeedback,
@@ -1860,6 +1864,50 @@ test("remember control renders existing binding without a checkbox", () => {
 		html.includes("will be suggested the next time you open this project"),
 	);
 	assert.equal(boundContextName(state.binding, state.contexts), "Company");
+	assert.equal(canRememberProject(state.binding), false);
+});
+
+test("remember control does not treat a dangling binding as unbound", () => {
+	const state = launchStateFixture({
+		binding: {
+			projectPath: "/work/api",
+			bound: false,
+			dangling: true,
+			missingContextId: "company",
+		},
+	});
+	const html = renderToStaticMarkup(
+		RememberProjectControl({
+			binding: state.binding,
+			contexts: state.contexts,
+			rememberProject: false,
+			selectedContextId: "personal",
+		}),
+	);
+
+	assert.doesNotMatch(html, /type="checkbox"/);
+	assert.ok(html.includes("Remembered context unavailable"));
+	assert.ok(html.includes("without changing its remembered context"));
+	assert.equal(canRememberProject(state.binding), false);
+});
+
+test("dangling binding recovery offers temporary launch, removal, and cancel", () => {
+	const html = renderToStaticMarkup(
+		DanglingBindingDialog({
+			missingContextId: "company",
+			pending: false,
+			onChooseContext: () => {},
+			onRemoveBinding: () => {},
+			onCancel: () => {},
+		}),
+	);
+
+	assert.match(html, /role="dialog"/);
+	assert.ok(html.includes("Remembered context unavailable"));
+	assert.ok(html.includes("company"));
+	assert.ok(html.includes("Choose a context"));
+	assert.ok(html.includes("Remove remembered context"));
+	assert.ok(html.includes("Cancel"));
 });
 
 test("remember control is disabled when no context is selected", () => {
@@ -1875,6 +1923,7 @@ test("remember control is disabled when no context is selected", () => {
 	assert.match(html, /type="checkbox"/);
 	assert.match(html, /disabled=""/);
 	assert.ok(html.includes("Select a context before remembering this project."));
+	assert.equal(canRememberProject(state.binding), true);
 });
 
 test("selector actions disable launch without a selected context", () => {
@@ -2194,7 +2243,7 @@ test("selector critical path renders selected context and submits remembered lau
 	const result = await launchSelectedContext({
 		projectPath: launchState.project.path,
 		selectedContextId,
-		rememberProject: true,
+		bindingContextId: "company",
 		bindProject(request) {
 			calls.push(["bindProject", request]);
 			return Promise.resolve(projectBindingResult());
@@ -2224,7 +2273,6 @@ test("launch action does nothing without a selected context", async () => {
 	const calls = [];
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
-		rememberProject: false,
 		bindProject(request) {
 			calls.push(["bindProject", request]);
 			return Promise.resolve(projectBindingResult());
@@ -2248,7 +2296,6 @@ test("launch action launches the selected context when remember is off", async (
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
 		selectedContextId: "personal",
-		rememberProject: false,
 		bindProject(request) {
 			calls.push(["bindProject", request]);
 			return Promise.resolve(projectBindingResult());
@@ -2287,7 +2334,6 @@ test("launch action exposes preflight verification steps before starting the cod
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
 		selectedContextId: "personal",
-		rememberProject: false,
 		bindProject: () => Promise.resolve(projectBindingResult()),
 		preflightLaunchProject(request) {
 			calls.push(["preflight", request]);
@@ -2318,7 +2364,7 @@ test("launch action binds before launch when remember is on", async () => {
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
 		selectedContextId: "company",
-		rememberProject: true,
+		bindingContextId: "company",
 		bindProject(request) {
 			calls.push(["bindProject", request]);
 			return Promise.resolve(projectBindingResult());
@@ -2344,12 +2390,39 @@ test("launch action binds before launch when remember is on", async () => {
 	]);
 });
 
+test("launch action rejects a binding target that differs from the launch context", async () => {
+	const calls = [];
+
+	await assert.rejects(
+		launchSelectedContext({
+			projectPath: "/work/api",
+			selectedContextId: "personal",
+			bindingContextId: "company",
+			bindProject(request) {
+				calls.push(["bindProject", request]);
+				return Promise.resolve(projectBindingResult());
+			},
+			preflightLaunchProject(request) {
+				calls.push(["preflightLaunchProject", request]);
+				return Promise.resolve(preflightLaunchProjectResult());
+			},
+			launchProject(request) {
+				calls.push(["launchProject", request]);
+				return Promise.resolve(launchProjectResult());
+			},
+		}),
+		/Binding context must match the selected launch context/,
+	);
+
+	assert.deepEqual(calls, []);
+});
+
 test("launch action returns binding errors without launching", async () => {
 	const calls = [];
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
 		selectedContextId: "company",
-		rememberProject: true,
+		bindingContextId: "company",
 		bindProject(request) {
 			calls.push(["bindProject", request]);
 			return Promise.resolve(
@@ -2393,7 +2466,6 @@ test("launch action returns preflight errors without launching", async () => {
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
 		selectedContextId: "personal",
-		rememberProject: false,
 		bindProject(request) {
 			calls.push(["bindProject", request]);
 			return Promise.resolve(projectBindingResult());
@@ -2422,7 +2494,6 @@ test("launch action resubmits explicit context mismatch confirmation", async () 
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
 		selectedContextId: "personal",
-		rememberProject: false,
 		confirmContextMismatch: true,
 		bindProject(request) {
 			calls.push(["bindProject", request]);
@@ -2507,6 +2578,39 @@ test("context mismatch open anyway pending state disables actions", () => {
 	assert.match(html, /disabled=""/);
 });
 
+test("successful temporary launches offer an explicit binding replacement", () => {
+	const binding = {
+		projectPath: "/work/api",
+		bound: true,
+		contextId: "company",
+		dangling: false,
+	};
+	assert.deepEqual(bindingReplacementForLaunch(binding, "personal"), {
+		boundContextId: "company",
+		replacementContextId: "personal",
+	});
+	assert.equal(bindingReplacementForLaunch(binding, "company"), undefined);
+	assert.equal(
+		bindingReplacementForLaunch({ ...binding, dangling: true }, "personal"),
+		undefined,
+	);
+
+	const html = renderToStaticMarkup(
+		ReplaceBindingDialog({
+			boundContextName: "Company",
+			replacementContextName: "Personal",
+			pending: false,
+			onKeepCurrent: () => {},
+			onReplace: () => {},
+		}),
+	);
+
+	assert.match(html, /role="dialog"/);
+	assert.ok(html.includes("still remembered for Company"));
+	assert.ok(html.includes("Keep Company"));
+	assert.ok(html.includes("Remember Personal"));
+});
+
 test("context mismatch cancel exits without launch side effects", () => {
 	const calls = [];
 	const props = {
@@ -2536,7 +2640,6 @@ test("context mismatch open anyway submits exactly one confirmed launch", async 
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
 		selectedContextId: "personal",
-		rememberProject: false,
 		confirmContextMismatch: true,
 		bindProject(request) {
 			calls.push(["bindProject", request]);

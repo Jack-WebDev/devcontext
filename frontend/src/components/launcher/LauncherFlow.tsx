@@ -125,6 +125,7 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 				<SelectorView
 					launchState={launchState.data}
 					onBindProject={devContextApi.bindProject}
+					onUnbindProject={devContextApi.unbindProject}
 					onPreflightLaunchProject={devContextApi.preflightLaunchProject}
 					onLaunchProject={devContextApi.launchProject}
 					onCancel={devContextWindow.closeSelector}

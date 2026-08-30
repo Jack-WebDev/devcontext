@@ -12,7 +12,7 @@ import type {
 interface LaunchSelectorDependencies {
 	projectPath: string;
 	selectedContextId?: string;
-	rememberProject: boolean;
+	bindingContextId?: string;
 	confirmContextMismatch?: boolean;
 	allowExistingEnvironmentLaunch?: boolean;
 	onPreflightComplete?: (result: PreflightLaunchProjectResult) => void;
@@ -65,10 +65,13 @@ async function launchSelectedContext(
 		return undefined;
 	}
 
-	if (dependencies.rememberProject) {
+	if (dependencies.bindingContextId !== undefined) {
+		if (dependencies.bindingContextId !== contextId) {
+			throw new Error("Binding context must match the selected launch context.");
+		}
 		const binding = await dependencies.bindProject({
 			projectPath: dependencies.projectPath,
-			contextId,
+			contextId: dependencies.bindingContextId,
 		});
 		if (!binding.ok) {
 			return binding;
