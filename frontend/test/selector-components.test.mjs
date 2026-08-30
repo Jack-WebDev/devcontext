@@ -91,6 +91,7 @@ import { ProjectIdentity } from "../.tmp-test/src/components/selector/ProjectIde
 import { ProviderCredentialClassification } from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
 import {
 	boundContextName,
+	canRememberProject,
 	RememberProjectControl,
 } from "../.tmp-test/src/components/selector/RememberProjectControl.js";
 import { contextRecommendation } from "../.tmp-test/src/components/selector/recommendation.js";
@@ -1860,6 +1861,31 @@ test("remember control renders existing binding without a checkbox", () => {
 		html.includes("will be suggested the next time you open this project"),
 	);
 	assert.equal(boundContextName(state.binding, state.contexts), "Company");
+	assert.equal(canRememberProject(state.binding), false);
+});
+
+test("remember control does not treat a dangling binding as unbound", () => {
+	const state = launchStateFixture({
+		binding: {
+			projectPath: "/work/api",
+			bound: false,
+			dangling: true,
+			missingContextId: "company",
+		},
+	});
+	const html = renderToStaticMarkup(
+		RememberProjectControl({
+			binding: state.binding,
+			contexts: state.contexts,
+			rememberProject: false,
+			selectedContextId: "personal",
+		}),
+	);
+
+	assert.doesNotMatch(html, /type="checkbox"/);
+	assert.ok(html.includes("Remembered context unavailable"));
+	assert.ok(html.includes("without changing its remembered context"));
+	assert.equal(canRememberProject(state.binding), false);
 });
 
 test("remember control is disabled when no context is selected", () => {
@@ -1875,6 +1901,7 @@ test("remember control is disabled when no context is selected", () => {
 	assert.match(html, /type="checkbox"/);
 	assert.match(html, /disabled=""/);
 	assert.ok(html.includes("Select a context before remembering this project."));
+	assert.equal(canRememberProject(state.binding), true);
 });
 
 test("selector actions disable launch without a selected context", () => {

@@ -33,6 +33,19 @@ function RememberProjectControl({
 			</Card>
 		);
 	}
+	if (binding.dangling) {
+		return (
+			<Card as="div" size="sm" hierarchy="inset" className="p-3 text-sm">
+				<p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+					Remembered context unavailable
+				</p>
+				<p className="mt-1 text-muted-foreground">
+					Choose a context to launch this project without changing its remembered
+					context.
+				</p>
+			</Card>
+		);
+	}
 
 	const disabled = disabledByParent || selectedContextId === undefined;
 	const selectedContext = contexts.find(
@@ -85,4 +98,8 @@ function boundContextName(
 	return context?.name ?? binding.contextId;
 }
 
-export { boundContextName, RememberProjectControl };
+function canRememberProject(binding: ProjectBindingState): boolean {
+	return !binding.bound && !binding.dangling;
+}
+
+export { boundContextName, canRememberProject, RememberProjectControl };

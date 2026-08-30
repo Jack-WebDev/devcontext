@@ -52,7 +52,10 @@ import {
 	ProviderCredentialClassification,
 	type ProviderSessionAssignments,
 } from "./ProviderCredentialClassification.js";
-import { RememberProjectControl } from "./RememberProjectControl";
+import {
+	canRememberProject,
+	RememberProjectControl,
+} from "./RememberProjectControl";
 import { SelectorActions } from "./SelectorActions";
 import { SelectorConfidenceSummary } from "./SelectorConfidenceSummary";
 import { SelectorLayout } from "./SelectorLayout";
@@ -299,9 +302,10 @@ function SelectorView({
 
 			try {
 				const result = await launchSelectedContext({
-					projectPath: launchState.project.path,
-					selectedContextId: contextId,
-					rememberProject,
+				projectPath: launchState.project.path,
+				selectedContextId: contextId,
+				rememberProject:
+					canRememberProject(launchState.binding) && rememberProject,
 					confirmContextMismatch,
 					allowExistingEnvironmentLaunch,
 					onPreflightComplete: (preflight) => {
@@ -361,7 +365,10 @@ function SelectorView({
 	}
 
 	function handleRememberProjectChange(rememberProject: boolean) {
-		if (launcherState.status !== "selecting") {
+		if (
+			launcherState.status !== "selecting" ||
+			!canRememberProject(launchState.binding)
+		) {
 			return;
 		}
 		setLauncherState(
