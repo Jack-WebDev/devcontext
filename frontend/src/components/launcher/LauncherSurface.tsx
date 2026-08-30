@@ -8,14 +8,16 @@ interface LauncherSurfaceProps {
 function LauncherSurface({ projectPath, children }: LauncherSurfaceProps) {
 	return (
 		<main
-			className="flex min-h-screen items-center justify-center bg-background p-6"
+			className="launcher-surface flex min-h-screen items-center justify-center bg-background"
 			data-launcher-flow
 		>
 			<section
 				aria-labelledby="launcher-heading"
-				className="w-full max-w-5xl border border-border bg-card p-6 shadow-sm"
+				className="launcher-container border border-border bg-card shadow-sm"
 			>
-				<p className="text-sm font-semibold text-muted-foreground">Dev Context</p>
+				<p className="text-sm font-semibold text-muted-foreground">
+					Dev Context
+				</p>
 				<h1 id="launcher-heading" className="mt-2 text-2xl font-semibold">
 					Open project
 				</h1>

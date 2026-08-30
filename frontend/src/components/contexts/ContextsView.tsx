@@ -11,7 +11,10 @@ interface ContextsViewProps {
 
 function ContextsView({ contexts, onSelect, onNew }: ContextsViewProps) {
 	return (
-		<section aria-labelledby="contexts-heading" className="space-y-6">
+		<section
+			aria-labelledby="contexts-heading"
+			className="page-content page-section-stack"
+		>
 			<div className="flex items-start justify-between gap-4">
 				<div>
 					<p className="text-sm text-muted-foreground">
@@ -28,7 +31,7 @@ function ContextsView({ contexts, onSelect, onNew }: ContextsViewProps) {
 
 			{contexts.length === 0 ? (
 				<Card as="section" hierarchy="secondary" className="py-0">
-					<CardContent className="p-5 text-sm text-muted-foreground">
+					<CardContent className="inset-group text-sm text-muted-foreground">
 						No contexts are configured yet. Create a context to set up an
 						isolated development identity.
 					</CardContent>
@@ -63,7 +66,7 @@ function ContextListCard({
 			className="py-0"
 			aria-labelledby={`context-${context.id}-heading`}
 		>
-			<CardContent className="space-y-4 p-5">
+			<CardContent className="inset-group space-y-4">
 				<div className="flex items-start justify-between gap-3">
 					<div className="min-w-0">
 						<h3

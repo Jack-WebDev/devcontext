@@ -7,6 +7,22 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /*
+   * Desktop layout primitives. Use these for page shells and grouped content
+   * instead of introducing feature-specific spacing values.
+   */
+  --layout-min-window-width: 1100px;
+  --layout-sidebar-width: 15rem;
+  --layout-page-max-width: 75rem;
+  --layout-reading-column-width: 54rem;
+  --layout-page-inline-padding: clamp(2rem, 4vw, 4rem);
+  --layout-page-block-padding: clamp(2.5rem, 5vw, 4.5rem);
+  --layout-section-gap: 2.5rem;
+  --layout-group-gap: 1rem;
+  --layout-card-padding: 1.5rem;
+  --layout-list-row-min-height: 3.5rem;
+  --layout-launcher-width: 58rem;
+  --layout-launcher-padding: clamp(2rem, 6vw, 5rem);
   --app-background: #f8f7f4;
   --sidebar-background: #fbfaf8;
   --surface: #ffffff;
@@ -63,12 +79,47 @@
 }
 
 .desktop-shell {
-  min-width: 1100px;
+  min-width: var(--layout-min-window-width);
   background: var(--app-background);
 }
 .desktop-sidebar {
-  width: 238px;
+  width: var(--layout-sidebar-width);
   background: var(--sidebar-background);
+}
+.app-shell {
+  min-width: var(--layout-min-window-width);
+  background: var(--app-background);
+}
+.app-shell-grid {
+  grid-template-columns: var(--layout-sidebar-width) minmax(0, 1fr);
+}
+.app-page-container {
+  width: min(100%, var(--layout-page-max-width));
+  margin-inline: auto;
+}
+.page-content {
+  padding: var(--layout-page-block-padding) var(--layout-page-inline-padding);
+}
+.page-reading-column {
+  max-width: var(--layout-reading-column-width);
+}
+.page-section-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--layout-section-gap);
+}
+.inset-group {
+  padding: var(--layout-card-padding);
+}
+.list-row {
+  min-height: var(--layout-list-row-min-height);
+}
+.launcher-surface {
+  padding: var(--layout-launcher-padding);
+}
+.launcher-container {
+  width: min(100%, var(--layout-launcher-width));
+  padding: var(--layout-card-padding);
 }
 .desktop-card {
   border: 1px solid rgb(0 0 0 / 5%);
@@ -92,8 +143,7 @@
   color: var(--foreground);
 }
 .home-content {
-  max-width: none;
-  padding: 34px 34px 20px;
+  padding: var(--layout-page-block-padding) var(--layout-page-inline-padding);
 }
 .home-header {
   display: flex;
@@ -146,42 +196,42 @@
   place-items: center;
 }
 .home-overview {
-  margin-top: 28px;
+  margin-top: var(--layout-section-gap);
   min-height: 224px;
   display: grid;
   grid-template-columns: 35% 65%;
 }
 .home-overview-project,
 .home-overview-context {
-  padding: 20px;
+  padding: var(--layout-card-padding);
 }
 .home-overview-project {
   border-right: 1px solid var(--border);
 }
 .home-dashboard {
-  margin-top: 15px;
+  margin-top: var(--layout-group-gap);
   display: grid;
   grid-template-columns: minmax(300px, 0.95fr) minmax(330px, 1.05fr) minmax(
       340px,
       1.08fr
     );
-  gap: 14px;
+  gap: var(--layout-group-gap);
   align-items: stretch;
 }
 .home-column {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--layout-group-gap);
 }
 .home-panel {
-  padding: 14px;
+  padding: var(--layout-card-padding);
 }
 .home-panel-title {
   font-size: 13px;
   font-weight: 600;
 }
 .home-row-button {
-  min-height: 54px;
+  min-height: var(--layout-list-row-min-height);
   border: 1px solid transparent;
   border-radius: 8px;
   background: var(--surface-subtle);
