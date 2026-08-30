@@ -48,6 +48,7 @@ import {
 } from "../.tmp-test/src/components/running/RunningView.js";
 import { AccountIdentityMismatchDialog } from "../.tmp-test/src/components/selector/AccountIdentityMismatchDialog.js";
 import { hasAccountIdentityMismatch } from "../.tmp-test/src/components/selector/account-identity-mismatch.js";
+import { bindingReplacementForLaunch } from "../.tmp-test/src/components/selector/binding-replacement.js";
 import { ContextCard } from "../.tmp-test/src/components/selector/ContextCard.js";
 import { ContextMismatchDialog } from "../.tmp-test/src/components/selector/ContextMismatchDialog.js";
 import { cancelSelector } from "../.tmp-test/src/components/selector/cancel-action.js";
@@ -94,6 +95,7 @@ import {
 	canRememberProject,
 	RememberProjectControl,
 } from "../.tmp-test/src/components/selector/RememberProjectControl.js";
+import { ReplaceBindingDialog } from "../.tmp-test/src/components/selector/ReplaceBindingDialog.js";
 import { contextRecommendation } from "../.tmp-test/src/components/selector/recommendation.js";
 import {
 	launchConfidenceFeedback,
@@ -2554,6 +2556,39 @@ test("context mismatch open anyway pending state disables actions", () => {
 
 	assert.ok(html.includes("Opening..."));
 	assert.match(html, /disabled=""/);
+});
+
+test("successful temporary launches offer an explicit binding replacement", () => {
+	const binding = {
+		projectPath: "/work/api",
+		bound: true,
+		contextId: "company",
+		dangling: false,
+	};
+	assert.deepEqual(bindingReplacementForLaunch(binding, "personal"), {
+		boundContextId: "company",
+		replacementContextId: "personal",
+	});
+	assert.equal(bindingReplacementForLaunch(binding, "company"), undefined);
+	assert.equal(
+		bindingReplacementForLaunch({ ...binding, dangling: true }, "personal"),
+		undefined,
+	);
+
+	const html = renderToStaticMarkup(
+		ReplaceBindingDialog({
+			boundContextName: "Company",
+			replacementContextName: "Personal",
+			pending: false,
+			onKeepCurrent: () => {},
+			onReplace: () => {},
+		}),
+	);
+
+	assert.match(html, /role="dialog"/);
+	assert.ok(html.includes("still remembered for Company"));
+	assert.ok(html.includes("Keep Company"));
+	assert.ok(html.includes("Remember Personal"));
 });
 
 test("context mismatch cancel exits without launch side effects", () => {

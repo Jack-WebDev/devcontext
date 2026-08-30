@@ -35,6 +35,14 @@ type LauncherState =
 			conflict: RunningEnvironmentConflict;
 	  }
 	| {
+			status: "binding_replacement";
+			selection: LauncherSelection;
+			boundContextId: string;
+			replacementContextId: string;
+			pending: boolean;
+			error?: DisplayError;
+	  }
+	| {
 			status: "failure";
 			selection: LauncherSelection;
 			error: DisplayError;
@@ -51,7 +59,11 @@ function launcherSelection(state: LauncherState): LauncherSelection | undefined 
 }
 
 function launcherStateIsPending(state: LauncherState): boolean {
-	return state.status === "preflighting" || state.status === "launching";
+	return (
+		state.status === "preflighting" ||
+		state.status === "launching" ||
+		(state.status === "binding_replacement" && state.pending)
+	);
 }
 
 export type { LauncherSelection, LauncherState };

@@ -20,6 +20,7 @@ import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import { AccountIdentityMismatchDialog } from "./AccountIdentityMismatchDialog";
 import { hasAccountIdentityMismatch } from "./account-identity-mismatch";
+import { bindingReplacementForLaunch } from "./binding-replacement";
 import { ContextChoiceList } from "./ContextChoiceList";
 import { ContextMismatchDialog } from "./ContextMismatchDialog";
 import { cancelSelector } from "./cancel-action";
@@ -56,6 +57,7 @@ import {
 	canRememberProject,
 	RememberProjectControl,
 } from "./RememberProjectControl";
+import { ReplaceBindingDialog } from "./ReplaceBindingDialog";
 import { SelectorActions } from "./SelectorActions";
 import { SelectorConfidenceSummary } from "./SelectorConfidenceSummary";
 import { SelectorLayout } from "./SelectorLayout";
@@ -331,11 +333,21 @@ function SelectorView({
 				} else if (result?.ok) {
 					if ("project" in result.data && "context" in result.data) {
 						onCodingToolLaunched?.(result.data);
+						const replacement = bindingReplacementForLaunch(
+							launchState.binding,
+							result.data.context.id,
+						);
+						if (replacement !== undefined) {
+							setLauncherState({
+								status: "binding_replacement",
+								selection: currentSelection,
+								...replacement,
+								pending: false,
+							});
+							return;
+						}
 					}
-					if (shouldCloseSelectorAfterLaunch(launchSuccessCloseBehavior)) {
-						await cancelSelector({ closeSelector: onCancel });
-					}
-					setLauncherState(selectingLauncherState(currentSelection));
+					await finishSuccessfulLaunch(currentSelection);
 				} else if (result && !result.ok) {
 					if (
 						result.error.code === "context_mismatch_requires_confirmation" &&
@@ -364,6 +376,38 @@ function SelectorView({
 				});
 			}
 		});
+	}
+
+	async function finishSuccessfulLaunch(selection: LauncherSelection) {
+		if (shouldCloseSelectorAfterLaunch(launchSuccessCloseBehavior)) {
+			await cancelSelector({ closeSelector: onCancel });
+		}
+		setLauncherState(selectingLauncherState(selection));
+	}
+
+	async function handleBindingReplacement() {
+		if (launcherState.status !== "binding_replacement" || launcherState.pending) {
+			return;
+		}
+
+		setLauncherState({ ...launcherState, pending: true, error: undefined });
+		try {
+			const result = await onBindProject({
+				projectPath: launchState.project.path,
+				contextId: launcherState.replacementContextId,
+			});
+			if (!result.ok) {
+				setLauncherState({ ...launcherState, pending: false, error: result.error });
+				return;
+			}
+			await finishSuccessfulLaunch(launcherState.selection);
+		} catch (error) {
+			setLauncherState({
+				...launcherState,
+				pending: false,
+				error: unexpectedBindingError(error),
+			});
+		}
 	}
 
 	function handleRememberProjectChange(rememberProject: boolean) {
@@ -568,6 +612,28 @@ function SelectorView({
 								/>
 							) : null}
 
+							{launcherState.status === "binding_replacement" ? (
+								<ReplaceBindingDialog
+									boundContextName={
+										launchState.contexts.find(
+											(context) => context.id === launcherState.boundContextId,
+										)?.name ?? launcherState.boundContextId
+									}
+									replacementContextName={
+										launchState.contexts.find(
+											(context) =>
+												context.id === launcherState.replacementContextId,
+										)?.name ?? launcherState.replacementContextId
+									}
+									pending={launcherState.pending}
+									error={launcherState.error}
+									onKeepCurrent={() =>
+										void finishSuccessfulLaunch(launcherState.selection)
+									}
+									onReplace={() => void handleBindingReplacement()}
+								/>
+							) : null}
+
 							{launcherState.status === "context_mismatch" &&
 							launcherState.error.contextMismatch ? (
 								<ContextMismatchDialog
@@ -683,6 +749,16 @@ function unexpectedLaunchError(error: unknown): DisplayError {
 		code: "unexpected_error",
 		message,
 		recovery: "Retry the launch. If it keeps failing, review diagnostics.",
+	};
+}
+
+function unexpectedBindingError(error: unknown): DisplayError {
+	const message =
+		error instanceof Error ? error.message : "Could not remember this context.";
+	return {
+		code: "unexpected_error",
+		message,
+		recovery: "Try again or keep the current remembered context.",
 	};
 }
 
