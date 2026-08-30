@@ -60,7 +60,10 @@ import { GuiErrorNotice } from "../.tmp-test/src/components/selector/GuiErrorNot
 import { LaunchFailureView } from "../.tmp-test/src/components/selector/LaunchFailureView.js";
 import { LauncherSurface } from "../.tmp-test/src/components/launcher/LauncherSurface.js";
 import { ProjectResolvingView } from "../.tmp-test/src/components/launcher/ProjectResolvingView.js";
-import { ProjectNotFoundView } from "../.tmp-test/src/components/launcher/ProjectNotFoundView.js";
+import {
+	ProjectNotFoundView,
+	projectRecoveryEscapeAction,
+} from "../.tmp-test/src/components/launcher/ProjectNotFoundView.js";
 import {
 	ContextChoiceList,
 	filterContexts,
@@ -211,6 +214,8 @@ test("project-not-found recovery uses folder selection instead of raw errors", (
 	assert.match(html, /Choose folder/);
 	assert.match(html, /Cancel/);
 	assert.doesNotMatch(html, /Project path does not exist/);
+	assert.equal(projectRecoveryEscapeAction(false), "close-selector");
+	assert.equal(projectRecoveryEscapeAction(true), "none");
 });
 
 test("launcher state keeps progress and dialogs mutually exclusive", () => {
@@ -1779,6 +1784,15 @@ test("escape cancels the active selector layer", () => {
 	assert.equal(
 		escapeKeyboardAction({
 			selectedContextId: "personal",
+			launchPending: false,
+			mismatchDialogOpen: false,
+			dialogOpen: true,
+		}),
+		"close-dialog",
+	);
+	assert.equal(
+		escapeKeyboardAction({
+			selectedContextId: "personal",
 			launchPending: true,
 			mismatchDialogOpen: true,
 		}),
@@ -2687,6 +2701,13 @@ test("cancel closes the selector without launch or binding side effects", async 
 		},
 	});
 
+	assert.deepEqual(calls, ["closeSelector"]);
+
+	const blocked = await cancelSelector({
+		canCancel: false,
+		closeSelector: () => window.closeSelector(),
+	});
+	assert.equal(blocked, false);
 	assert.deepEqual(calls, ["closeSelector"]);
 });
 

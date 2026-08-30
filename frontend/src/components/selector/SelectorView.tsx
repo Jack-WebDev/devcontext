@@ -20,6 +20,7 @@ import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import { AccountIdentityMismatchDialog } from "./AccountIdentityMismatchDialog";
 import { hasAccountIdentityMismatch } from "./account-identity-mismatch";
+import { ContextChoiceList } from "./ContextChoiceList";
 import { ContextMismatchDialog } from "./ContextMismatchDialog";
 import { cancelSelector } from "./cancel-action";
 import { missingDefaultContextIds } from "./default-context-actions";
@@ -39,6 +40,13 @@ import {
 	type LaunchSuccessCloseBehavior,
 	shouldCloseSelectorAfterLaunch,
 } from "./launch-success-close-behavior";
+import {
+	type LauncherSelection,
+	type LauncherState,
+	launcherSelection,
+	launcherStateIsPending,
+	selectingLauncherState,
+} from "./launcher-state";
 import { ProjectIdentity } from "./ProjectIdentity";
 import {
 	ProviderCredentialClassification,
@@ -47,7 +55,6 @@ import {
 import { RememberProjectControl } from "./RememberProjectControl";
 import { SelectorActions } from "./SelectorActions";
 import { SelectorConfidenceSummary } from "./SelectorConfidenceSummary";
-import { ContextChoiceList } from "./ContextChoiceList";
 import { SelectorLayout } from "./SelectorLayout";
 import { SingleContextLaunchView } from "./SingleContextLaunchView";
 import {
@@ -61,13 +68,6 @@ import {
 	canLaunchSelectedContextFromKeyboard,
 	escapeKeyboardAction,
 } from "./selector-keyboard";
-import {
-	launcherSelection,
-	launcherStateIsPending,
-	selectingLauncherState,
-	type LauncherSelection,
-	type LauncherState,
-} from "./launcher-state";
 
 interface SelectorViewProps {
 	launchState: LaunchState;
@@ -136,14 +136,18 @@ function SelectorView({
 		(context) => context.id === selectedContextId,
 	);
 	const launchPending = launcherStateIsPending(launcherState);
+	const cancellationPending =
+		launchPending || onboardingPendingContextId !== undefined;
 	const launchBlocked = selectedContextConfidenceBlocked(selectedContext);
 	const singleHealthyContext = singleHealthyLaunchContext(launchState);
 	const showSingleContextConfirmation =
 		singleHealthyContext !== undefined && !showContextChoices;
 	const keyboardLaunchAvailable = canLaunchSelectedContextFromKeyboard({
 		selectedContextId,
-		launchPending: launchPending || launchBlocked,
+		launchPending: cancellationPending || launchBlocked,
 		mismatchDialogOpen,
+		dialogOpen:
+			mismatchDialogOpen || launcherState.status === "existing_workspace",
 	});
 
 	useEffect(() => {
@@ -216,8 +220,8 @@ function SelectorView({
 		const contextPosition = contextPositionFromShortcut(event);
 		if (
 			contextPosition !== undefined &&
-			!launchPending &&
-			!mismatchDialogOpen
+			!cancellationPending &&
+			!(mismatchDialogOpen || launcherState.status === "existing_workspace")
 		) {
 			const context = launchState.contexts[contextPosition];
 			if (context !== undefined) {
@@ -234,8 +238,10 @@ function SelectorView({
 
 		const action = escapeKeyboardAction({
 			selectedContextId,
-			launchPending,
+			launchPending: cancellationPending,
 			mismatchDialogOpen,
+			dialogOpen:
+				mismatchDialogOpen || launcherState.status === "existing_workspace",
 		});
 		if (action === "none") {
 			return;
@@ -249,7 +255,10 @@ function SelectorView({
 			return;
 		}
 
-		void cancelSelector({ closeSelector: onCancel });
+		void cancelSelector({
+			closeSelector: onCancel,
+			canCancel: !cancellationPending,
+		});
 	}
 
 	async function handleLaunch({
@@ -406,7 +415,11 @@ function SelectorView({
 	}
 
 	return (
-		<div className="space-y-8" onKeyDown={handleSelectorKeyDown}>
+		<section
+			className="space-y-8"
+			aria-label="Project launch options"
+			onKeyDown={handleSelectorKeyDown}
+		>
 			{shouldRenderFirstRunWelcome(launchState) || showOnboardingReplay ? (
 				<>
 					<ProjectIdentity project={launchState.project} />
@@ -630,7 +643,7 @@ function SelectorView({
 					}
 				/>
 			)}
-		</div>
+		</section>
 	);
 }
 
