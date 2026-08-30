@@ -1,5 +1,6 @@
 import type { ContextState, ProjectBindingState } from "../../lib/devctx-api";
 import { Card } from "../ui/card.js";
+import { Checkbox } from "../ui/checkbox.js";
 
 interface RememberProjectControlProps {
 	binding: ProjectBindingState;
@@ -21,11 +22,7 @@ function RememberProjectControl({
 	const boundContext = boundContextName(binding, contexts);
 	if (boundContext !== undefined) {
 		return (
-			<Card
-				as="div"
-				size="sm"
-				className="border border-border bg-muted/30 p-3 text-sm"
-			>
+			<Card as="div" size="sm" hierarchy="inset" className="p-3 text-sm">
 				<p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
 					Remembered context
 				</p>
@@ -49,16 +46,15 @@ function RememberProjectControl({
 		<Card
 			as="label"
 			size="sm"
-			className="flex-row items-start gap-3 border border-border p-3 text-sm"
+			hierarchy="selection"
+			className="flex-row items-start gap-3 p-3 text-sm has-checked:border-primary has-checked:ring-2 has-checked:ring-ring/30"
 		>
-			<input
-				type="checkbox"
-				className="mt-0.5 size-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed"
+			<Checkbox
+				className="mt-0.5"
 				checked={rememberProject}
 				disabled={disabled}
-				readOnly={onRememberProjectChange === undefined}
-				onChange={(event) =>
-					onRememberProjectChange?.(event.currentTarget.checked)
+				onCheckedChange={(checked) =>
+					onRememberProjectChange?.(checked === true)
 				}
 			/>
 			<span className="space-y-1">

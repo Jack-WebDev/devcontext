@@ -14,8 +14,8 @@ import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import { ContextRecommendationExplanation } from "./ContextRecommendationExplanation.js";
-import type { ContextNavigationDirection } from "./selection-state";
 import type { ContextRecommendation } from "./recommendation";
+import type { ContextNavigationDirection } from "./selection-state";
 
 interface ContextCardProps {
 	context: ContextState;
@@ -84,6 +84,7 @@ function ContextCard({
 		<Card
 			as="article"
 			size="sm"
+			hierarchy="selection"
 			className={`relative ${className}`}
 			aria-labelledby={contextNameId}
 			data-selected={selected ? "true" : undefined}

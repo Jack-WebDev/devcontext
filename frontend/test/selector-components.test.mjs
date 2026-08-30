@@ -60,7 +60,10 @@ import { GuiErrorNotice } from "../.tmp-test/src/components/selector/GuiErrorNot
 import { LaunchFailureView } from "../.tmp-test/src/components/selector/LaunchFailureView.js";
 import { LauncherSurface } from "../.tmp-test/src/components/launcher/LauncherSurface.js";
 import { ProjectResolvingView } from "../.tmp-test/src/components/launcher/ProjectResolvingView.js";
-import { ProjectNotFoundView } from "../.tmp-test/src/components/launcher/ProjectNotFoundView.js";
+import {
+	ProjectNotFoundView,
+	projectRecoveryEscapeAction,
+} from "../.tmp-test/src/components/launcher/ProjectNotFoundView.js";
 import {
 	ContextChoiceList,
 	filterContexts,
@@ -211,6 +214,8 @@ test("project-not-found recovery uses folder selection instead of raw errors", (
 	assert.match(html, /Choose folder/);
 	assert.match(html, /Cancel/);
 	assert.doesNotMatch(html, /Project path does not exist/);
+	assert.equal(projectRecoveryEscapeAction(false), "close-selector");
+	assert.equal(projectRecoveryEscapeAction(true), "none");
 });
 
 test("launcher state keeps progress and dialogs mutually exclusive", () => {
@@ -920,7 +925,7 @@ test("context card presents an evidence-backed label with its reason", () => {
 	assert.match(html, /Why this context/);
 	assert.ok(html.includes("api is bound to Company."));
 	assert.match(html, /<details/);
-	assert.doesNotMatch(html, /<details[^>]*open/);
+	assert.doesNotMatch(html, /<details(?:\s[^>]*)?\sopen(?:=|\s|>)/);
 });
 
 test("recommendation labels only reflect backend binding, verification, and conflict evidence", () => {
@@ -1034,14 +1039,18 @@ test("status indicator renders approved status labels with non-color text", () =
 	assert.match(html, /bg-destructive/);
 });
 
-test("card hierarchy differentiates primary, secondary, and tertiary surfaces", () => {
+test("card hierarchy differentiates primary, inset, secondary, tertiary, and selection surfaces", () => {
 	const primary = renderToStaticMarkup(Card({ hierarchy: "primary" }));
+	const inset = renderToStaticMarkup(Card({ hierarchy: "inset" }));
 	const secondary = renderToStaticMarkup(Card({ hierarchy: "secondary" }));
 	const tertiary = renderToStaticMarkup(Card({ hierarchy: "tertiary" }));
+	const selection = renderToStaticMarkup(Card({ hierarchy: "selection" }));
 
 	assert.match(primary, /shadow-sm/);
+	assert.match(inset, /surface-subtle/);
 	assert.match(secondary, /bg-surface-muted/);
 	assert.match(tertiary, /bg-transparent/);
+	assert.match(selection, /data-hierarchy="selection"/);
 });
 
 test("app shell exposes stable navigation, current project state, and a responsive content boundary", () => {
@@ -1057,7 +1066,7 @@ test("app shell exposes stable navigation, current project state, and a responsi
 	assert.match(html, /data-app-shell="true"/);
 	assert.match(html, /aria-label="Primary navigation"/);
 	assert.match(html, /aria-current="page"/);
-	assert.match(html, /max-w-6xl/);
+	assert.match(html, /app-page-container/);
 	assert.match(html, /min-w-0/);
 	assert.ok(html.includes("Current project"));
 	assert.ok(html.includes("api"));
@@ -1775,6 +1784,15 @@ test("escape cancels the active selector layer", () => {
 	assert.equal(
 		escapeKeyboardAction({
 			selectedContextId: "personal",
+			launchPending: false,
+			mismatchDialogOpen: false,
+			dialogOpen: true,
+		}),
+		"close-dialog",
+	);
+	assert.equal(
+		escapeKeyboardAction({
+			selectedContextId: "personal",
 			launchPending: true,
 			mismatchDialogOpen: true,
 		}),
@@ -1795,7 +1813,7 @@ test("remember control renders unchecked for unbound selected projects", () => {
 
 	assert.match(html, /type="checkbox"/);
 	assert.match(html, /focus-visible:ring-2/);
-	assert.doesNotMatch(html, /checked=""/);
+	assert.match(html, /aria-checked="false"/);
 	assert.doesNotMatch(html, /disabled=""/);
 	assert.ok(html.includes("Remember Personal for this project"));
 	assert.ok(html.includes("Dev Context will suggest this context next time"));
@@ -2632,7 +2650,7 @@ test("launch failure view hides technical details until requested", () => {
 	assert.ok(html.includes("Technical details"));
 	assert.ok(html.includes("/work/api"));
 	assert.match(html, /<details/);
-	assert.doesNotMatch(html, /<details[^>]*open/);
+	assert.doesNotMatch(html, /<details(?:\s[^>]*)?\sopen(?:=|\s|>)/);
 });
 
 test("launch progress guard allows only one in-flight launch and restores after rejection", async () => {
@@ -2683,6 +2701,13 @@ test("cancel closes the selector without launch or binding side effects", async 
 		},
 	});
 
+	assert.deepEqual(calls, ["closeSelector"]);
+
+	const blocked = await cancelSelector({
+		canCancel: false,
+		closeSelector: () => window.closeSelector(),
+	});
+	assert.equal(blocked, false);
 	assert.deepEqual(calls, ["closeSelector"]);
 });
 

@@ -32,10 +32,10 @@ function AppShell({
 }: AppShellProps) {
 	return (
 		<div
-			className="grid h-screen min-w-[1100px] grid-rows-[minmax(0,1fr)_48px] overflow-hidden bg-[#f8f7f4] text-foreground"
+			className="app-shell grid h-screen grid-rows-[minmax(0,1fr)_48px] overflow-hidden text-foreground"
 			data-app-shell
 		>
-			<div className="grid min-h-0 grid-cols-[238px_minmax(0,1fr)] overflow-hidden">
+			<div className="app-shell-grid grid min-h-0 overflow-hidden">
 				<aside className="flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border bg-[#fbfaf8] text-sidebar-foreground">
 					<div className="px-7 pt-9 pb-8">
 						<h1 className="flex items-center gap-3 text-lg font-semibold tracking-tight">
@@ -85,9 +85,7 @@ function AppShell({
 					) : null}
 				</aside>
 				<main className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto">
-					<div className="mx-auto w-full max-w-6xl max-w-[1500px]">
-						{children}
-					</div>
+					<div className="app-page-container">{children}</div>
 				</main>
 			</div>
 			{statusBar}

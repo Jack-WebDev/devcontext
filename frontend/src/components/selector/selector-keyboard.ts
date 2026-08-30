@@ -2,6 +2,7 @@ interface SelectorKeyboardState {
 	selectedContextId?: string;
 	launchPending: boolean;
 	mismatchDialogOpen: boolean;
+	dialogOpen?: boolean;
 }
 
 type EscapeKeyboardAction = "close-dialog" | "close-selector" | "none";
@@ -23,7 +24,9 @@ function escapeKeyboardAction(
 		return "none";
 	}
 
-	return state.mismatchDialogOpen ? "close-dialog" : "close-selector";
+	return state.dialogOpen || state.mismatchDialogOpen
+		? "close-dialog"
+		: "close-selector";
 }
 
 export type { EscapeKeyboardAction, SelectorKeyboardState };

@@ -36,10 +36,10 @@ export function HomeView(props: HomeViewProps) {
 		<div className="home-content">
 			<header className="home-header">
 				<div>
-					<h2 id="home-heading" className="home-title">
+					<h2 id="home-heading" className="home-title text-page-title">
 						Welcome back
 					</h2>
-					<p className="home-subtitle">
+					<p className="home-subtitle text-body text-secondary">
 						Choose a context and launch a trusted, isolated development
 						environment.
 					</p>
@@ -81,21 +81,19 @@ function FirstRunHome({
 	return (
 		<div className="home-content w-full max-w-[820px] pt-14">
 			<header className="max-w-[680px]">
-				<h2 id="home-heading" className="home-title">
+				<h2 id="home-heading" className="home-title text-page-title">
 					Welcome to Dev Context
 				</h2>
-				<p className="mt-2 text-[15px] font-medium text-foreground">
+				<p className="mt-2 text-body font-medium text-foreground">
 					Keep different development identities separate.
 				</p>
-				<p className="mt-2 max-w-[620px] text-[13px] leading-[1.5] text-muted-foreground">
+				<p className="text-body text-secondary mt-2 max-w-[620px]">
 					A context keeps its own tools, AI accounts, and settings. Create as
 					many as you need.
 				</p>
 			</header>
 
-			<p className="mt-6 text-[12px] font-semibold text-muted-foreground">
-				Common examples
-			</p>
+			<p className="text-label text-secondary mt-6">Common examples</p>
 			<section
 				className="mt-[10px] grid grid-cols-2 gap-[12px]"
 				aria-label="Examples of separate development identities"
@@ -171,9 +169,7 @@ function ContextExplanation({
 	tone: "personal" | "work";
 }) {
 	return (
-		<div
-			className="flex min-h-[84px] gap-3 rounded-[11px] border border-black/[0.05] bg-white/70 px-[14px] py-[13px] shadow-[0_1px_2px_rgb(0_0_0/0.02)]"
-		>
+		<div className="flex min-h-[84px] gap-3 rounded-[11px] border border-black/[0.05] bg-white/70 px-[14px] py-[13px] shadow-[0_1px_2px_rgb(0_0_0/0.02)]">
 			<span
 				className={`grid size-8 shrink-0 place-items-center rounded-[8px] ${tone === "personal" ? "bg-[var(--company-soft)] text-[var(--company-accent)]" : "bg-[var(--green-soft)] text-[var(--green-strong)]"}`}
 			>
