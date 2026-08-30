@@ -302,10 +302,12 @@ function SelectorView({
 
 			try {
 				const result = await launchSelectedContext({
-				projectPath: launchState.project.path,
-				selectedContextId: contextId,
-				rememberProject:
-					canRememberProject(launchState.binding) && rememberProject,
+					projectPath: launchState.project.path,
+					selectedContextId: contextId,
+					bindingContextId:
+						canRememberProject(launchState.binding) && rememberProject
+							? contextId
+							: undefined,
 					confirmContextMismatch,
 					allowExistingEnvironmentLaunch,
 					onPreflightComplete: (preflight) => {

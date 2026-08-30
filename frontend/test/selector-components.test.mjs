@@ -2221,7 +2221,7 @@ test("selector critical path renders selected context and submits remembered lau
 	const result = await launchSelectedContext({
 		projectPath: launchState.project.path,
 		selectedContextId,
-		rememberProject: true,
+		bindingContextId: "company",
 		bindProject(request) {
 			calls.push(["bindProject", request]);
 			return Promise.resolve(projectBindingResult());
@@ -2251,7 +2251,6 @@ test("launch action does nothing without a selected context", async () => {
 	const calls = [];
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
-		rememberProject: false,
 		bindProject(request) {
 			calls.push(["bindProject", request]);
 			return Promise.resolve(projectBindingResult());
@@ -2275,7 +2274,6 @@ test("launch action launches the selected context when remember is off", async (
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
 		selectedContextId: "personal",
-		rememberProject: false,
 		bindProject(request) {
 			calls.push(["bindProject", request]);
 			return Promise.resolve(projectBindingResult());
@@ -2314,7 +2312,6 @@ test("launch action exposes preflight verification steps before starting the cod
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
 		selectedContextId: "personal",
-		rememberProject: false,
 		bindProject: () => Promise.resolve(projectBindingResult()),
 		preflightLaunchProject(request) {
 			calls.push(["preflight", request]);
@@ -2345,7 +2342,7 @@ test("launch action binds before launch when remember is on", async () => {
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
 		selectedContextId: "company",
-		rememberProject: true,
+		bindingContextId: "company",
 		bindProject(request) {
 			calls.push(["bindProject", request]);
 			return Promise.resolve(projectBindingResult());
@@ -2371,12 +2368,39 @@ test("launch action binds before launch when remember is on", async () => {
 	]);
 });
 
+test("launch action rejects a binding target that differs from the launch context", async () => {
+	const calls = [];
+
+	await assert.rejects(
+		launchSelectedContext({
+			projectPath: "/work/api",
+			selectedContextId: "personal",
+			bindingContextId: "company",
+			bindProject(request) {
+				calls.push(["bindProject", request]);
+				return Promise.resolve(projectBindingResult());
+			},
+			preflightLaunchProject(request) {
+				calls.push(["preflightLaunchProject", request]);
+				return Promise.resolve(preflightLaunchProjectResult());
+			},
+			launchProject(request) {
+				calls.push(["launchProject", request]);
+				return Promise.resolve(launchProjectResult());
+			},
+		}),
+		/Binding context must match the selected launch context/,
+	);
+
+	assert.deepEqual(calls, []);
+});
+
 test("launch action returns binding errors without launching", async () => {
 	const calls = [];
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
 		selectedContextId: "company",
-		rememberProject: true,
+		bindingContextId: "company",
 		bindProject(request) {
 			calls.push(["bindProject", request]);
 			return Promise.resolve(
@@ -2420,7 +2444,6 @@ test("launch action returns preflight errors without launching", async () => {
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
 		selectedContextId: "personal",
-		rememberProject: false,
 		bindProject(request) {
 			calls.push(["bindProject", request]);
 			return Promise.resolve(projectBindingResult());
@@ -2449,7 +2472,6 @@ test("launch action resubmits explicit context mismatch confirmation", async () 
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
 		selectedContextId: "personal",
-		rememberProject: false,
 		confirmContextMismatch: true,
 		bindProject(request) {
 			calls.push(["bindProject", request]);
@@ -2563,7 +2585,6 @@ test("context mismatch open anyway submits exactly one confirmed launch", async 
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
 		selectedContextId: "personal",
-		rememberProject: false,
 		confirmContextMismatch: true,
 		bindProject(request) {
 			calls.push(["bindProject", request]);

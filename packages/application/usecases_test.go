@@ -1654,6 +1654,19 @@ func TestLaunchProjectAcceptsConfirmedMismatch(t *testing.T) {
 	if len(fixture.process.requests) != 1 {
 		t.Fatalf("process request count = %d, want 1", len(fixture.process.requests))
 	}
+
+	bindings, err := project.ReadProjectBindingsFile(fixture.bindingsPath)
+	if err != nil {
+		t.Fatalf("read project bindings: %v", err)
+	}
+	want := []project.Binding{{
+		ProjectPath: project.Path(fixture.projectDir),
+		ContextID:   devcontext.MustID("company"),
+		CreatedAt:   fixture.now,
+	}}
+	if !reflect.DeepEqual(bindings, want) {
+		t.Fatalf("bindings = %#v, want unchanged company binding", bindings)
+	}
 }
 
 func TestLaunchProjectReturnsPresentationSafeLaunchFailure(t *testing.T) {
