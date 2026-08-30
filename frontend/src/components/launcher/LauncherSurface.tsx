@@ -15,14 +15,12 @@ function LauncherSurface({ projectPath, children }: LauncherSurfaceProps) {
 				aria-labelledby="launcher-heading"
 				className="launcher-container border border-border bg-card shadow-sm"
 			>
-				<p className="text-sm font-semibold text-muted-foreground">
-					Dev Context
-				</p>
-				<h1 id="launcher-heading" className="mt-2 text-2xl font-semibold">
+				<p className="text-label text-secondary">Dev Context</p>
+				<h1 id="launcher-heading" className="text-launcher-title mt-2">
 					Open project
 				</h1>
 				<p
-					className="mt-4 break-all font-mono text-sm text-muted-foreground"
+					className="text-technical text-secondary mt-4 break-all"
 					data-launcher-project-path
 				>
 					{projectPath}

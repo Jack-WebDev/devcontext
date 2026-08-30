@@ -17,10 +17,8 @@ function ContextsView({ contexts, onSelect, onNew }: ContextsViewProps) {
 		>
 			<div className="flex items-start justify-between gap-4">
 				<div>
-					<p className="text-sm text-muted-foreground">
-						Development identities
-					</p>
-					<h2 id="contexts-heading" className="text-2xl font-semibold">
+					<p className="text-body text-secondary">Development identities</p>
+					<h2 id="contexts-heading" className="text-page-title">
 						Contexts
 					</h2>
 				</div>
