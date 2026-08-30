@@ -3,7 +3,17 @@ import * as React from "react";
 import { cn } from "../../lib/utils.js";
 
 type CardElement = "article" | "div" | "label" | "p" | "section";
-type CardHierarchy = "primary" | "secondary" | "tertiary";
+/**
+ * Surface purpose: primary is a standalone decision, inset groups related
+ * content, secondary supports a primary surface, tertiary stays in page flow,
+ * and selection is an interactive choice.
+ */
+type CardHierarchy =
+	| "primary"
+	| "inset"
+	| "secondary"
+	| "tertiary"
+	| "selection";
 
 function Card({
 	as: Component = "div",
@@ -20,8 +30,9 @@ function Card({
 		...props,
 		"data-slot": "card",
 		"data-size": size,
+		"data-hierarchy": hierarchy,
 		className: cn(
-			"group/card flex flex-col gap-(--card-spacing) overflow-hidden py-(--card-spacing) text-sm text-card-foreground [--card-spacing:--spacing(8)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(5)] *:[img:first-child]:rounded-none *:[img:last-child]:rounded-none",
+			"group/card flex flex-col gap-4 overflow-hidden rounded-xl py-[var(--card-spacing)] text-sm text-card-foreground [--card-spacing:var(--layout-card-padding)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:1rem] *:[img:first-child]:rounded-none *:[img:last-child]:rounded-none",
 			cardHierarchyClassName(hierarchy),
 			className,
 		),
@@ -31,11 +42,15 @@ function Card({
 function cardHierarchyClassName(hierarchy: CardHierarchy): string {
 	switch (hierarchy) {
 		case "primary":
-			return "bg-card shadow-sm ring-1 ring-foreground/5";
+			return "border border-border/70 bg-card shadow-sm";
+		case "inset":
+			return "border border-border bg-[var(--surface-subtle)] shadow-none";
 		case "secondary":
 			return "border border-border bg-surface-muted shadow-none";
 		case "tertiary":
-			return "border border-border/70 bg-transparent shadow-none";
+			return "bg-transparent shadow-none";
+		case "selection":
+			return "border border-border bg-card shadow-sm transition-[border-color,box-shadow,background-color] duration-150 hover:border-foreground/20 data-[selected=true]:border-primary data-[selected=true]:ring-2 data-[selected=true]:ring-ring/40";
 	}
 }
 
@@ -56,10 +71,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		<div
 			data-slot="card-title"
-			className={cn(
-				"font-heading text-lg font-semibold tracking-wider uppercase",
-				className,
-			)}
+			className={cn("text-section-title", className)}
 			{...props}
 		/>
 	);
@@ -69,7 +81,7 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		<div
 			data-slot="card-description"
-			className={cn("text-sm leading-relaxed text-muted-foreground", className)}
+			className={cn("text-body text-secondary", className)}
 			{...props}
 		/>
 	);

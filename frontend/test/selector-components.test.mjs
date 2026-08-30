@@ -1034,14 +1034,18 @@ test("status indicator renders approved status labels with non-color text", () =
 	assert.match(html, /bg-destructive/);
 });
 
-test("card hierarchy differentiates primary, secondary, and tertiary surfaces", () => {
+test("card hierarchy differentiates primary, inset, secondary, tertiary, and selection surfaces", () => {
 	const primary = renderToStaticMarkup(Card({ hierarchy: "primary" }));
+	const inset = renderToStaticMarkup(Card({ hierarchy: "inset" }));
 	const secondary = renderToStaticMarkup(Card({ hierarchy: "secondary" }));
 	const tertiary = renderToStaticMarkup(Card({ hierarchy: "tertiary" }));
+	const selection = renderToStaticMarkup(Card({ hierarchy: "selection" }));
 
 	assert.match(primary, /shadow-sm/);
+	assert.match(inset, /surface-subtle/);
 	assert.match(secondary, /bg-surface-muted/);
 	assert.match(tertiary, /bg-transparent/);
+	assert.match(selection, /data-hierarchy="selection"/);
 });
 
 test("app shell exposes stable navigation, current project state, and a responsive content boundary", () => {
@@ -1795,7 +1799,7 @@ test("remember control renders unchecked for unbound selected projects", () => {
 
 	assert.match(html, /type="checkbox"/);
 	assert.match(html, /focus-visible:ring-2/);
-	assert.doesNotMatch(html, /checked=""/);
+	assert.match(html, /aria-checked="false"/);
 	assert.doesNotMatch(html, /disabled=""/);
 	assert.ok(html.includes("Remember Personal for this project"));
 	assert.ok(html.includes("Dev Context will suggest this context next time"));
