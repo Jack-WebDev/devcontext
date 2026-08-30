@@ -43,6 +43,12 @@ type LauncherState =
 			error?: DisplayError;
 	  }
 	| {
+			status: "dangling_binding";
+			selection: LauncherSelection;
+			pending: boolean;
+			error?: DisplayError;
+	  }
+	| {
 			status: "failure";
 			selection: LauncherSelection;
 			error: DisplayError;
@@ -62,7 +68,8 @@ function launcherStateIsPending(state: LauncherState): boolean {
 	return (
 		state.status === "preflighting" ||
 		state.status === "launching" ||
-		(state.status === "binding_replacement" && state.pending)
+		(state.status === "binding_replacement" && state.pending) ||
+		(state.status === "dangling_binding" && state.pending)
 	);
 }
 

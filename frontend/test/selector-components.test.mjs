@@ -51,6 +51,7 @@ import { hasAccountIdentityMismatch } from "../.tmp-test/src/components/selector
 import { bindingReplacementForLaunch } from "../.tmp-test/src/components/selector/binding-replacement.js";
 import { ContextCard } from "../.tmp-test/src/components/selector/ContextCard.js";
 import { ContextMismatchDialog } from "../.tmp-test/src/components/selector/ContextMismatchDialog.js";
+import { DanglingBindingDialog } from "../.tmp-test/src/components/selector/DanglingBindingDialog.js";
 import { cancelSelector } from "../.tmp-test/src/components/selector/cancel-action.js";
 import { missingDefaultContextIds } from "../.tmp-test/src/components/selector/default-context-actions.js";
 import {
@@ -1888,6 +1889,25 @@ test("remember control does not treat a dangling binding as unbound", () => {
 	assert.ok(html.includes("Remembered context unavailable"));
 	assert.ok(html.includes("without changing its remembered context"));
 	assert.equal(canRememberProject(state.binding), false);
+});
+
+test("dangling binding recovery offers temporary launch, removal, and cancel", () => {
+	const html = renderToStaticMarkup(
+		DanglingBindingDialog({
+			missingContextId: "company",
+			pending: false,
+			onChooseContext: () => {},
+			onRemoveBinding: () => {},
+			onCancel: () => {},
+		}),
+	);
+
+	assert.match(html, /role="dialog"/);
+	assert.ok(html.includes("Remembered context unavailable"));
+	assert.ok(html.includes("company"));
+	assert.ok(html.includes("Choose a context"));
+	assert.ok(html.includes("Remove remembered context"));
+	assert.ok(html.includes("Cancel"));
 });
 
 test("remember control is disabled when no context is selected", () => {

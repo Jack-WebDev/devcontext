@@ -13,6 +13,7 @@ import type {
 	PreflightLaunchProjectResult,
 	ProjectBindingState,
 	ProviderCredentialSession,
+	UnbindProjectRequest,
 } from "../../lib/devctx-api";
 import { contextPositionFromShortcut } from "../command-palette/shortcut";
 import { RunningEnvironmentConflictDialog } from "../running/RunningEnvironmentConflictDialog";
@@ -23,6 +24,7 @@ import { hasAccountIdentityMismatch } from "./account-identity-mismatch";
 import { bindingReplacementForLaunch } from "./binding-replacement";
 import { ContextChoiceList } from "./ContextChoiceList";
 import { ContextMismatchDialog } from "./ContextMismatchDialog";
+import { DanglingBindingDialog } from "./DanglingBindingDialog";
 import { cancelSelector } from "./cancel-action";
 import { missingDefaultContextIds } from "./default-context-actions";
 import {
@@ -79,6 +81,9 @@ interface SelectorViewProps {
 	onBindProject: (
 		request: BindProjectRequest,
 	) => Promise<ApiResult<ProjectBindingState>>;
+	onUnbindProject: (
+		request: UnbindProjectRequest,
+	) => Promise<ApiResult<ProjectBindingState>>;
 	onPreflightLaunchProject: (
 		request: PreflightLaunchProjectRequest,
 	) => Promise<ApiResult<PreflightLaunchProjectResult>>;
@@ -103,6 +108,7 @@ interface SelectorViewProps {
 function SelectorView({
 	launchState,
 	onBindProject,
+	onUnbindProject,
 	onPreflightLaunchProject,
 	onLaunchProject,
 	onCancel,
@@ -116,7 +122,7 @@ function SelectorView({
 	onDismissOnboardingReplay,
 }: SelectorViewProps) {
 	const [launcherState, setLauncherState] = useState<LauncherState>(() =>
-		selectingLauncherState(initialLauncherSelection(launchState)),
+		initialLauncherState(launchState),
 	);
 	const [onboardingPendingContextId, setOnboardingPendingContextId] = useState<
 		string | undefined
@@ -137,6 +143,7 @@ function SelectorView({
 	const mismatchDialogOpen =
 		launcherState.status === "context_mismatch" ||
 		launcherState.status === "identity_mismatch";
+	const danglingBindingDialogOpen = launcherState.status === "dangling_binding";
 	const selectedContext = launchState.contexts.find(
 		(context) => context.id === selectedContextId,
 	);
@@ -150,15 +157,15 @@ function SelectorView({
 	const keyboardLaunchAvailable = canLaunchSelectedContextFromKeyboard({
 		selectedContextId,
 		launchPending: cancellationPending || launchBlocked,
-		mismatchDialogOpen,
+		mismatchDialogOpen: mismatchDialogOpen || danglingBindingDialogOpen,
 		dialogOpen:
-			mismatchDialogOpen || launcherState.status === "existing_workspace",
+			mismatchDialogOpen ||
+			danglingBindingDialogOpen ||
+			launcherState.status === "existing_workspace",
 	});
 
 	useEffect(() => {
-		setLauncherState(
-			selectingLauncherState(initialLauncherSelection(launchState)),
-		);
+		setLauncherState(initialLauncherState(launchState));
 		setOnboardingPendingContextId(undefined);
 		setOnboardingError(undefined);
 		setProviderSessionAssignments({});
@@ -272,6 +279,9 @@ function SelectorView({
 		allowExistingEnvironmentLaunch = false,
 		confirmIdentityMismatch = false,
 	}: LaunchAttemptOptions = {}) {
+		if (launcherState.status === "dangling_binding") {
+			return;
+		}
 		const currentSelection = launcherSelection(launcherState);
 		if (currentSelection === undefined) {
 			return;
@@ -406,6 +416,30 @@ function SelectorView({
 				...launcherState,
 				pending: false,
 				error: unexpectedBindingError(error),
+			});
+		}
+	}
+
+	async function handleDanglingBindingRemoval() {
+		if (launcherState.status !== "dangling_binding" || launcherState.pending) {
+			return;
+		}
+
+		setLauncherState({ ...launcherState, pending: true, error: undefined });
+		try {
+			const result = await onUnbindProject({
+				projectPath: launchState.project.path,
+			});
+			if (!result.ok) {
+				setLauncherState({ ...launcherState, pending: false, error: result.error });
+				return;
+			}
+			setLauncherState(selectingLauncherState(launcherState.selection));
+		} catch (error) {
+			setLauncherState({
+				...launcherState,
+				pending: false,
+				error: unexpectedBindingRemovalError(error),
 			});
 		}
 	}
@@ -634,6 +668,23 @@ function SelectorView({
 								/>
 							) : null}
 
+							{launcherState.status === "dangling_binding" ? (
+								<DanglingBindingDialog
+									missingContextId={launchState.binding.missingContextId}
+									pending={launcherState.pending}
+									error={launcherState.error}
+									onChooseContext={() =>
+										setLauncherState(
+											selectingLauncherState(launcherState.selection),
+										)
+									}
+									onRemoveBinding={() => void handleDanglingBindingRemoval()}
+									onCancel={() =>
+										void cancelSelector({ closeSelector: onCancel })
+									}
+								/>
+							) : null}
+
 							{launcherState.status === "context_mismatch" &&
 							launcherState.error.contextMismatch ? (
 								<ContextMismatchDialog
@@ -703,7 +754,9 @@ function SelectorView({
 
 							<SelectorActions
 								launchDisabled={
-									selectedContextId === undefined || launchBlocked
+									selectedContextId === undefined ||
+									launchBlocked ||
+									danglingBindingDialogOpen
 								}
 								launchPending={launchPending}
 								projectName={launchState.project.name}
@@ -743,6 +796,14 @@ function initialLauncherSelection(launchState: LaunchState): LauncherSelection {
 	};
 }
 
+function initialLauncherState(launchState: LaunchState): LauncherState {
+	const selection = initialLauncherSelection(launchState);
+	if (launchState.binding.dangling) {
+		return { status: "dangling_binding", selection, pending: false };
+	}
+	return selectingLauncherState(selection);
+}
+
 function unexpectedLaunchError(error: unknown): DisplayError {
 	const message = error instanceof Error ? error.message : "Launch failed.";
 	return {
@@ -759,6 +820,18 @@ function unexpectedBindingError(error: unknown): DisplayError {
 		code: "unexpected_error",
 		message,
 		recovery: "Try again or keep the current remembered context.",
+	};
+}
+
+function unexpectedBindingRemovalError(error: unknown): DisplayError {
+	const message =
+		error instanceof Error
+			? error.message
+			: "Could not remove the remembered context.";
+	return {
+		code: "unexpected_error",
+		message,
+		recovery: "Try again or choose a context for this launch without removing it.",
 	};
 }
 
