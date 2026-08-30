@@ -920,7 +920,7 @@ test("context card presents an evidence-backed label with its reason", () => {
 	assert.match(html, /Why this context/);
 	assert.ok(html.includes("api is bound to Company."));
 	assert.match(html, /<details/);
-	assert.doesNotMatch(html, /<details[^>]*open/);
+	assert.doesNotMatch(html, /<details(?:\s[^>]*)?\sopen(?:=|\s|>)/);
 });
 
 test("recommendation labels only reflect backend binding, verification, and conflict evidence", () => {
@@ -2636,7 +2636,7 @@ test("launch failure view hides technical details until requested", () => {
 	assert.ok(html.includes("Technical details"));
 	assert.ok(html.includes("/work/api"));
 	assert.match(html, /<details/);
-	assert.doesNotMatch(html, /<details[^>]*open/);
+	assert.doesNotMatch(html, /<details(?:\s[^>]*)?\sopen(?:=|\s|>)/);
 });
 
 test("launch progress guard allows only one in-flight launch and restores after rejection", async () => {

@@ -1,5 +1,6 @@
 import type { DisplayError } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
+import { Disclosure } from "../ui/disclosure.js";
 import { GuiErrorNotice } from "./GuiErrorNotice.js";
 
 interface LaunchFailureViewProps {
@@ -57,14 +58,11 @@ function LaunchFailureView({
 				</Button>
 			</div>
 			{error.technicalDetails ? (
-				<details className="border-t border-border pt-4 text-sm">
-					<summary className="cursor-pointer font-medium">
-						Technical details
-					</summary>
+				<Disclosure summary="Technical details">
 					<pre className="mt-3 overflow-x-auto whitespace-pre-wrap wrap-break-word bg-muted/40 p-3 text-xs text-muted-foreground">
 						{error.technicalDetails}
 					</pre>
-				</details>
+				</Disclosure>
 			) : null}
 		</section>
 	);

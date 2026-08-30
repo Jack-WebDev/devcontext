@@ -12,6 +12,7 @@ import type {
 import { StatusIndicator } from "../status/StatusIndicator.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
+import { Disclosure } from "../ui/disclosure.js";
 
 interface DiagnosticsViewProps {
 	contexts: ContextListItem[];
@@ -367,12 +368,9 @@ function DiagnosticCheckRow({
 				<DiagnosticDetails details={visibleDetails} />
 			) : null}
 			{pathDetails.length > 0 ? (
-				<details className="text-sm">
-					<summary className="cursor-pointer font-medium text-muted-foreground">
-						Show paths
-					</summary>
+				<Disclosure summary="Show paths">
 					<DiagnosticDetails details={pathDetails} className="mt-3" />
-				</details>
+				</Disclosure>
 			) : null}
 		</li>
 	);
