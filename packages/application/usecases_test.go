@@ -1305,17 +1305,50 @@ func TestCreateContextReportsDuplicateDefaultContext(t *testing.T) {
 
 func TestCreateContextGeneratesUniqueIDFromName(t *testing.T) {
 	fixture := newApplicationFixture(t)
-	fixture.writeContext(t, fixture.context("my-work", "Existing work"))
 
-	result, appErr := fixture.service().CreateContext(CreateContextRequest{Name: "My Work"})
+	first, appErr := fixture.service().CreateContext(CreateContextRequest{Name: "My Work"})
+	if appErr != nil {
+		t.Fatalf("create first context: %v", appErr)
+	}
+	if first.Context.ID != "my-work" {
+		t.Fatalf("first generated context ID = %q, want my-work", first.Context.ID)
+	}
+
+	second, appErr := fixture.service().CreateContext(CreateContextRequest{Name: "My Work"})
+	if appErr != nil {
+		t.Fatalf("create duplicate display name: %v", appErr)
+	}
+	if second.Context.ID != "my-work-2" {
+		t.Fatalf("second generated context ID = %q, want my-work-2", second.Context.ID)
+	}
+	if first.Context.Name != "My Work" || second.Context.Name != "My Work" {
+		t.Fatalf("context names = %q, %q, want both My Work", first.Context.Name, second.Context.Name)
+	}
+}
+
+func TestCreateContextPersistsOptionalPurposeSeparatelyFromDescription(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	result, appErr := fixture.service().CreateContext(CreateContextRequest{
+		Name:        "Personal",
+		Purpose:     "Personal repositories and experiments",
+		Description: "A longer note about the development work in this context.",
+	})
 	if appErr != nil {
 		t.Fatalf("create context: %v", appErr)
 	}
-	if result.Context.ID != "my-work-2" {
-		t.Fatalf("generated context ID = %q, want my-work-2", result.Context.ID)
+	if result.Context.Purpose != "Personal repositories and experiments" {
+		t.Fatalf("purpose = %q", result.Context.Purpose)
 	}
-	if result.Context.Name != "My Work" {
-		t.Fatalf("context name = %q, want My Work", result.Context.Name)
+	if result.Context.Description != "A longer note about the development work in this context." {
+		t.Fatalf("description = %q", result.Context.Description)
+	}
+
+	stored, err := devcontext.NewRepository(fixture.contextsDir).Get(devcontext.MustID("personal"))
+	if err != nil {
+		t.Fatalf("get stored context: %v", err)
+	}
+	if stored.Metadata["purpose"] != result.Context.Purpose || stored.Metadata["description"] != result.Context.Description {
+		t.Fatalf("stored metadata = %#v", stored.Metadata)
 	}
 }
 

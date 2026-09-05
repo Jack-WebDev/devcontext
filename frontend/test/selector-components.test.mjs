@@ -94,7 +94,30 @@ import {
 	defaultLaunchSuccessCloseBehavior,
 	shouldCloseSelectorAfterLaunch,
 } from "../.tmp-test/src/components/selector/launch-success-close-behavior.js";
-import { createOnboardingContextAndRefresh } from "../.tmp-test/src/components/selector/onboarding-action.js";
+import { createContextAndRefresh } from "../.tmp-test/src/components/contexts/context-creation.js";
+import {
+	ContextCreateIdentityScreen,
+	contextPurposeMaxLength,
+	contextPurposeValidation,
+} from "../.tmp-test/src/components/contexts/ContextCreateIdentityScreen.js";
+import { ContextPreview } from "../.tmp-test/src/components/contexts/ContextPreview.js";
+import {
+	contextIdentityTemplates,
+	draftFromContextIdentityTemplate,
+} from "../.tmp-test/src/components/contexts/context-identity-templates.js";
+import {
+	contextAccentOptions,
+	contextIconOptions,
+} from "../.tmp-test/src/components/contexts/context-identity-options.js";
+import {
+	beginContextCreation,
+	completeContextCreation,
+	initialContextCreateFlow,
+	nextContextCreateStep,
+	previousContextCreateStep,
+	returnToContextCreateReview,
+	updateContextCreateDraft,
+} from "../.tmp-test/src/components/contexts/context-create-flow.js";
 import { ProjectIdentity } from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import { ProviderCredentialClassification } from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
 import {
@@ -3057,18 +3080,22 @@ test("cancel closes the selector without launch or binding side effects", async 
 	assert.deepEqual(calls, ["closeSelector"]);
 });
 
-test("onboarding context creation refreshes launch state after success", async () => {
+test("context creation refreshes launch state after success", async () => {
 	const calls = [];
 	const refreshedState = launchStateFixture({
 		contexts: [contextFixture("personal", "Personal")],
 		firstRun: false,
 	});
 
-	const result = await createOnboardingContextAndRefresh({
+	const request = {
 		contextId: "personal",
+		name: "Personal",
 		importProviderIds: ["codex"],
-		createContext(contextId, importProviderIds) {
-			calls.push(["createContext", contextId, importProviderIds]);
+	};
+	const result = await createContextAndRefresh({
+		request,
+		createContext(receivedRequest) {
+			calls.push(["createContext", receivedRequest]);
 			return Promise.resolve({
 				ok: true,
 				data: {
@@ -3093,12 +3120,12 @@ test("onboarding context creation refreshes launch state after success", async (
 		launchState: refreshedState,
 	});
 	assert.deepEqual(calls, [
-		["createContext", "personal", ["codex"]],
+		["createContext", request],
 		["getLaunchState"],
 	]);
 });
 
-test("onboarding context creation returns failures without refreshing", async () => {
+test("context creation returns failures without refreshing", async () => {
 	const calls = [];
 	const error = apiError(
 		"validation_error",
@@ -3106,10 +3133,11 @@ test("onboarding context creation returns failures without refreshing", async ()
 		"Check the selected project and context, then retry.",
 	);
 
-	const result = await createOnboardingContextAndRefresh({
-		contextId: "company",
-		createContext(contextId, importProviderIds) {
-			calls.push(["createContext", contextId, importProviderIds]);
+	const request = { contextId: "company" };
+	const result = await createContextAndRefresh({
+		request,
+		createContext(receivedRequest) {
+			calls.push(["createContext", receivedRequest]);
 			return Promise.resolve(error);
 		},
 		getLaunchState() {
@@ -3122,7 +3150,143 @@ test("onboarding context creation returns failures without refreshing", async ()
 		ok: false,
 		error: error.error,
 	});
-	assert.deepEqual(calls, [["createContext", "company", []]]);
+	assert.deepEqual(calls, [["createContext", request]]);
+});
+
+test("context creation flow preserves its draft across forward and back steps", () => {
+	let flow = initialContextCreateFlow({
+		name: "Personal",
+		purpose: "Personal projects",
+		icon: "heart",
+		accent: "sage",
+	});
+	flow = updateContextCreateDraft(flow, {
+		description: "Personal repositories and experiments",
+		enabledProviderIds: ["codex"],
+	});
+	flow = nextContextCreateStep(flow);
+	flow = nextContextCreateStep(flow);
+	flow = previousContextCreateStep(flow);
+
+	assert.equal(flow.status, "projects");
+	assert.deepEqual(flow.draft, {
+		name: "Personal",
+		purpose: "Personal projects",
+		description: "Personal repositories and experiments",
+		icon: "heart",
+		accent: "sage",
+		enabledProviderIds: ["codex"],
+	});
+});
+
+test("context creation flow permits creation only from review", () => {
+	let flow = initialContextCreateFlow();
+	assert.equal(beginContextCreation(flow), flow);
+
+	flow = nextContextCreateStep(flow);
+	flow = nextContextCreateStep(flow);
+	flow = nextContextCreateStep(flow);
+	flow = beginContextCreation(flow);
+	assert.equal(flow.status, "creating");
+
+	flow = returnToContextCreateReview(flow);
+	assert.equal(flow.status, "review");
+	flow = beginContextCreation(flow);
+	flow = completeContextCreation(flow);
+	assert.equal(flow.status, "success");
+});
+
+test("context identity screen asks one question before continuing", () => {
+	const blank = renderToStaticMarkup(
+		createElement(ContextCreateIdentityScreen, {
+			draft: {},
+			onDraftChange() {},
+			onContinue() {},
+		}),
+	);
+	const named = renderToStaticMarkup(
+		createElement(ContextCreateIdentityScreen, {
+			draft: draftFromContextIdentityTemplate(contextIdentityTemplates[0]),
+			onDraftChange() {},
+			onContinue() {},
+		}),
+	);
+
+	assert.ok(blank.includes("What kind of development identity are you creating?"));
+	assert.ok(blank.includes("Context name"));
+	assert.ok(blank.includes("Continue"));
+	assert.match(blank, /disabled=""/);
+	assert.doesNotMatch(blank, /Enabled providers/);
+	assert.doesNotMatch(blank, /Coding tool/);
+	assert.doesNotMatch(named, /disabled=""/);
+	assert.ok(named.includes("Preview"));
+	assert.ok(named.includes("Personal"));
+	assert.ok(named.includes("Purpose"));
+	assert.ok(named.includes("Description"));
+	assert.ok(named.includes("Choose an icon"));
+	assert.ok(named.includes("Choose an accent"));
+});
+
+test("context preview reflects the complete identity draft", () => {
+	const html = renderToStaticMarkup(
+		createElement(ContextPreview, {
+			draft: {
+				name: "Client Aurora",
+				purpose: "Aurora product work",
+				description: "Repositories and tools for the Aurora engagement.",
+				icon: "building",
+				accent: "amber",
+			},
+		}),
+	);
+
+	assert.match(html, /Context preview: Client Aurora, Building, Amber/);
+	assert.ok(html.includes("Aurora product work"));
+	assert.ok(html.includes("Aurora engagement"));
+});
+
+test("identity templates update an editable request without exposing an ID", () => {
+	const ids = contextIdentityTemplates.map((template) => template.id);
+	assert.deepEqual(ids, ["personal", "work", "client", "open-source", "custom"]);
+
+	const draft = draftFromContextIdentityTemplate(contextIdentityTemplates[1]);
+	assert.deepEqual(draft, {
+		templateId: "company",
+		name: "Work",
+		description: "Development work for your employer.",
+		icon: "building",
+		accent: "slate-blue",
+	});
+	assert.equal("contextId" in draft, false);
+});
+
+test("identity options are curated and purpose validation is user-facing", () => {
+	assert.deepEqual(
+		contextIconOptions.map((icon) => icon.id),
+		["user", "building", "users", "code", "heart", "sparkles"],
+	);
+	assert.deepEqual(
+		contextAccentOptions.map((accent) => accent.label),
+		["Sage", "Slate blue", "Amber", "Orchid"],
+	);
+	assert.equal(contextPurposeValidation("A clear purpose"), undefined);
+	assert.equal(
+		contextPurposeValidation("x".repeat(contextPurposeMaxLength + 1)),
+		"Keep the purpose to 120 characters or fewer.",
+	);
+
+	const invalid = renderToStaticMarkup(
+		createElement(ContextCreateIdentityScreen, {
+			draft: {
+				name: "Personal",
+				purpose: "x".repeat(contextPurposeMaxLength + 1),
+			},
+			onDraftChange() {},
+			onContinue() {},
+		}),
+	);
+	assert.match(invalid, /role="alert"/);
+	assert.match(invalid, /disabled=""/);
 });
 
 function contextFixture(id, name, providers = []) {

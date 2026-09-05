@@ -187,6 +187,7 @@ export interface ProjectState {
 export interface ContextState {
 	id: string;
 	name: string;
+	purpose?: string;
 	description?: string;
 	tool: ToolState;
 	availableTools: ToolOption[];
@@ -374,6 +375,7 @@ export interface CreateContextRequest {
 	contextId?: string;
 	templateId?: string;
 	name?: string;
+	purpose?: string;
 	description?: string;
 	icon?: string;
 	accent?: string;
@@ -1629,10 +1631,12 @@ function normalizeProjectState(value: unknown): ProjectState {
 
 function normalizeContextState(value: unknown): ContextState {
 	const object = objectValue(value);
+	const purpose = optionalString(object.purpose);
 	const description = optionalString(object.description);
 	return {
 		id: stringValue(object.id),
 		name: stringValue(object.name),
+		...(purpose === undefined ? {} : { purpose }),
 		...(description === undefined ? {} : { description }),
 		tool: normalizeToolState(object.tool),
 		availableTools: arrayValue(object.availableTools).map(normalizeToolOption),

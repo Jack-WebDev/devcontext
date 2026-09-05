@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import type {
 	ApiResult,
+	CreateContextRequest,
 	CreateContextResult,
 	LaunchState,
 } from "../../lib/devctx-api";
@@ -9,7 +10,7 @@ import { devContextApi } from "../../lib/devctx-api.js";
 import { devContextWindow } from "../../lib/devctx-window.js";
 import { notifyCodingToolLaunched } from "../notifications/notifications.js";
 import { GuiErrorNotice } from "../selector/GuiErrorNotice.js";
-import { createOnboardingContextAndRefresh } from "../selector/onboarding-action.js";
+import { createContextAndRefresh } from "../contexts/context-creation.js";
 import { SelectorView } from "../selector/SelectorView.js";
 import { LauncherSurface } from "./LauncherSurface.js";
 import { ProjectNotFoundView } from "./ProjectNotFoundView.js";
@@ -66,17 +67,11 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 	}, [activeProjectPath]);
 
 	async function createContext(
-		contextId: string,
-		importProviderIds: string[],
+		request: CreateContextRequest,
 	): Promise<ApiResult<CreateContextResult>> {
-		const result = await createOnboardingContextAndRefresh({
-			contextId,
-			importProviderIds,
-			createContext: (requestedContextId, requestedProviderIDs) =>
-				devContextApi.createContext({
-					contextId: requestedContextId,
-					importProviderIds: requestedProviderIDs,
-				}),
+		const result = await createContextAndRefresh({
+			request,
+			createContext: devContextApi.createContext,
 			getLaunchState: () =>
 				devContextApi.getLaunchState({ projectPath: activeProjectPath }),
 		});
@@ -129,12 +124,7 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 					onPreflightLaunchProject={devContextApi.preflightLaunchProject}
 					onLaunchProject={devContextApi.launchProject}
 					onCancel={devContextWindow.closeSelector}
-					onCreatePersonalContext={(providerIds) =>
-						createContext("personal", providerIds)
-					}
-					onCreateCompanyContext={(providerIds) =>
-						createContext("company", providerIds)
-					}
+					onCreateContext={createContext}
 					onCodingToolLaunched={(result) =>
 						notifyCodingToolLaunched({
 							projectName: result.project.name,

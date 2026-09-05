@@ -5,7 +5,6 @@ import type {
 	ContextTemplateState,
 	CreateContextRequest,
 	CreateContextResult,
-	DisplayError,
 } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import {
@@ -16,6 +15,7 @@ import {
 	SheetTitle,
 } from "../ui/sheet.js";
 import { ContextField } from "./ContextField";
+import { useContextCreation } from "./context-creation";
 
 export { ContextDetailsDrawer } from "./ContextDetailsDrawer";
 
@@ -51,8 +51,7 @@ export function CreateContextDialog({
 	const [providers, setProviders] = useState<string[]>([]);
 	const [templates, setTemplates] = useState<ContextTemplateState[]>([]);
 	const [templateID, setTemplateID] = useState("custom");
-	const [error, setError] = useState<DisplayError>();
-	const [pending, setPending] = useState(false);
+	const contextCreation = useContextCreation(create);
 	const options = contexts[0]?.context.availableTools ?? [];
 	const providerOptions = contexts
 		.flatMap((c) => c.context.providers)
@@ -72,8 +71,6 @@ export function CreateContextDialog({
 		setAccent(template.accent);
 	}
 	async function submit() {
-		setPending(true);
-		setError(undefined);
 		const request: CustomContextRequest = {
 			templateId: templateID,
 			name,
@@ -83,10 +80,8 @@ export function CreateContextDialog({
 			toolId,
 			enabledProviderIds: providers,
 		};
-		const result = await create(request);
-		setPending(false);
-		if (!result.ok) {
-			setError(result.error);
+		const result = await contextCreation.create(request);
+		if (result === undefined || !result.ok) {
 			return;
 		}
 		onClose();
@@ -174,13 +169,15 @@ export function CreateContextDialog({
 							</label>
 						))}
 					</fieldset>
-					{error ? <p className="text-destructive">{error.message}</p> : null}
+					{contextCreation.error ? (
+						<p className="text-destructive">{contextCreation.error.message}</p>
+					) : null}
 					<Button
 						type="button"
-						disabled={pending || !name}
+						disabled={contextCreation.pending || !name}
 						onClick={() => void submit()}
 					>
-						{pending ? "Creating..." : "Create context"}
+						{contextCreation.pending ? "Creating..." : "Create context"}
 					</Button>
 				</div>
 			</SheetContent>

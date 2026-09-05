@@ -25,7 +25,7 @@ import { notifyCodingToolLaunched } from "./components/notifications/notificatio
 import { ProjectContextChangeDialog } from "./components/projects/ProjectContextChangeDialog";
 import { RunningEnvironmentConflictDialog } from "./components/running/RunningEnvironmentConflictDialog";
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
-import { createOnboardingContextAndRefresh } from "./components/selector/onboarding-action";
+import { createContextAndRefresh } from "./components/contexts/context-creation";
 import { LauncherFlow } from "./components/launcher/LauncherFlow";
 import { SettingsView } from "./components/settings/SettingsView";
 import { AppShell } from "./components/shell/AppShell";
@@ -40,6 +40,7 @@ import {
 	type ApiResult,
 	type ApplicationMode,
 	type CreateContextResult,
+	type CreateContextRequest,
 	type DisplayError,
 	devContextApi,
 	type ImportContextMetadataRequest,
@@ -236,17 +237,11 @@ function ManagementApp() {
 	}
 
 	async function handleCreateContext(
-		contextId: string,
-		importProviderIds: string[] = [],
+		request: CreateContextRequest,
 	): Promise<ApiResult<CreateContextResult>> {
-		const result = await createOnboardingContextAndRefresh({
-			contextId,
-			importProviderIds,
-			createContext: (requestedContextId, requestedImportProviderIds) =>
-				devContextApi.createContext({
-					contextId: requestedContextId,
-					importProviderIds: requestedImportProviderIds,
-				}),
+		const result = await createContextAndRefresh({
+			request,
+			createContext: devContextApi.createContext,
 			getLaunchState: () => devContextApi.getLaunchState(),
 		});
 		if (result.ok) {
