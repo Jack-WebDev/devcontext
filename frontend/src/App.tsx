@@ -564,7 +564,6 @@ function ManagementApp() {
 								}
 								return result;
 							}}
-							loadTemplates={() => devContextApi.getContextTemplates()}
 						/>
 					) : null}
 				</>
