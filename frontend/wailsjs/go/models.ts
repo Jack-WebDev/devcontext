@@ -152,6 +152,7 @@ export namespace application {
 	    contextId: string;
 	    templateId?: string;
 	    name?: string;
+	    purpose?: string;
 	    description?: string;
 	    icon?: string;
 	    accent?: string;
@@ -168,6 +169,7 @@ export namespace application {
 	        this.contextId = source["contextId"];
 	        this.templateId = source["templateId"];
 	        this.name = source["name"];
+	        this.purpose = source["purpose"];
 	        this.description = source["description"];
 	        this.icon = source["icon"];
 	        this.accent = source["accent"];

@@ -1,37 +1,23 @@
 import { Button } from "../ui/button.js";
 import type { CreateContextRequest } from "../../lib/devctx-api";
+import { ContextPreview } from "./ContextPreview.js";
 import {
 	contextIdentityTemplates,
 	draftFromContextIdentityTemplate,
 } from "./context-identity-templates.js";
+import {
+	contextAccentOptions,
+	contextIconOptions,
+} from "./context-identity-options.js";
 
 interface ContextCreateIdentityScreenProps {
 	draft: CreateContextRequest;
 	onDraftChange: (draft: CreateContextRequest) => void;
+	onBack?: () => void;
 	onContinue: () => void;
 }
 
 const contextPurposeMaxLength = 120;
-
-const contextIconOptions = [
-	{ id: "user", label: "Person", symbol: "●" },
-	{ id: "building", label: "Building", symbol: "▦" },
-	{ id: "users", label: "People", symbol: "◉" },
-	{ id: "code", label: "Code", symbol: "⌘" },
-	{ id: "heart", label: "Heart", symbol: "♥" },
-	{ id: "sparkles", label: "Sparkles", symbol: "✦" },
-] as const;
-
-const contextAccentOptions = [
-	{ id: "sage", label: "Sage", swatchClassName: "bg-accent-personal" },
-	{
-		id: "slate-blue",
-		label: "Slate blue",
-		swatchClassName: "bg-accent-company",
-	},
-	{ id: "amber", label: "Amber", swatchClassName: "bg-accent-freelance" },
-	{ id: "custom", label: "Orchid", swatchClassName: "bg-accent-custom" },
-] as const;
 
 function contextPurposeValidation(purpose: string | undefined): string | undefined {
 	if ((purpose?.length ?? 0) > contextPurposeMaxLength) {
@@ -43,6 +29,7 @@ function contextPurposeValidation(purpose: string | undefined): string | undefin
 function ContextCreateIdentityScreen({
 	draft,
 	onDraftChange,
+	onBack,
 	onContinue,
 }: ContextCreateIdentityScreenProps) {
 	const purposeError = contextPurposeValidation(draft.purpose);
@@ -184,22 +171,20 @@ function ContextCreateIdentityScreen({
 				</div>
 			</fieldset>
 
-			<div
-				aria-label="Context preview"
-				className="rounded-lg border border-border bg-muted/30 p-4"
-			>
-				<p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-					Preview
-				</p>
-				<p className="mt-1 font-semibold">{draft.name || "Untitled context"}</p>
-				{draft.purpose?.trim() ? (
-					<p className="mt-1 text-sm text-muted-foreground">{draft.purpose}</p>
-				) : null}
-			</div>
+			<ContextPreview draft={draft} />
 
-			<Button type="button" disabled={!canContinue} onClick={onContinue}>
-				Continue
-			</Button>
+			<div className="flex items-center justify-between gap-3">
+				{onBack ? (
+					<Button type="button" variant="outline" onClick={onBack}>
+						Back
+					</Button>
+				) : (
+					<span />
+				)}
+				<Button type="button" disabled={!canContinue} onClick={onContinue}>
+					Continue
+				</Button>
+			</div>
 		</section>
 	);
 }
@@ -207,8 +192,6 @@ function ContextCreateIdentityScreen({
 export type { ContextCreateIdentityScreenProps };
 export {
 	ContextCreateIdentityScreen,
-	contextAccentOptions,
-	contextIconOptions,
 	contextPurposeMaxLength,
 	contextPurposeValidation,
 };

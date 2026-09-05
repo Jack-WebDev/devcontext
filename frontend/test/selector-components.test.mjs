@@ -97,15 +97,18 @@ import {
 import { createContextAndRefresh } from "../.tmp-test/src/components/contexts/context-creation.js";
 import {
 	ContextCreateIdentityScreen,
-	contextAccentOptions,
-	contextIconOptions,
 	contextPurposeMaxLength,
 	contextPurposeValidation,
 } from "../.tmp-test/src/components/contexts/ContextCreateIdentityScreen.js";
+import { ContextPreview } from "../.tmp-test/src/components/contexts/ContextPreview.js";
 import {
 	contextIdentityTemplates,
 	draftFromContextIdentityTemplate,
 } from "../.tmp-test/src/components/contexts/context-identity-templates.js";
+import {
+	contextAccentOptions,
+	contextIconOptions,
+} from "../.tmp-test/src/components/contexts/context-identity-options.js";
 import {
 	beginContextCreation,
 	completeContextCreation,
@@ -3151,7 +3154,12 @@ test("context creation returns failures without refreshing", async () => {
 });
 
 test("context creation flow preserves its draft across forward and back steps", () => {
-	let flow = initialContextCreateFlow({ name: "Personal" });
+	let flow = initialContextCreateFlow({
+		name: "Personal",
+		purpose: "Personal projects",
+		icon: "heart",
+		accent: "sage",
+	});
 	flow = updateContextCreateDraft(flow, {
 		description: "Personal repositories and experiments",
 		enabledProviderIds: ["codex"],
@@ -3163,7 +3171,10 @@ test("context creation flow preserves its draft across forward and back steps", 
 	assert.equal(flow.status, "projects");
 	assert.deepEqual(flow.draft, {
 		name: "Personal",
+		purpose: "Personal projects",
 		description: "Personal repositories and experiments",
+		icon: "heart",
+		accent: "sage",
 		enabledProviderIds: ["codex"],
 	});
 });
@@ -3214,6 +3225,24 @@ test("context identity screen asks one question before continuing", () => {
 	assert.ok(named.includes("Description"));
 	assert.ok(named.includes("Choose an icon"));
 	assert.ok(named.includes("Choose an accent"));
+});
+
+test("context preview reflects the complete identity draft", () => {
+	const html = renderToStaticMarkup(
+		createElement(ContextPreview, {
+			draft: {
+				name: "Client Aurora",
+				purpose: "Aurora product work",
+				description: "Repositories and tools for the Aurora engagement.",
+				icon: "building",
+				accent: "amber",
+			},
+		}),
+	);
+
+	assert.match(html, /Context preview: Client Aurora, Building, Amber/);
+	assert.ok(html.includes("Aurora product work"));
+	assert.ok(html.includes("Aurora engagement"));
 });
 
 test("identity templates update an editable request without exposing an ID", () => {
