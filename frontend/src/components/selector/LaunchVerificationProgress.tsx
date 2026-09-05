@@ -9,6 +9,8 @@ import { Card } from "../ui/card.js";
 interface LaunchVerificationProgressProps {
 	projectName: string;
 	contextName: string;
+	heading?: string;
+	description?: string;
 	groups?: PreflightGroup[];
 	steps?: LaunchVerificationStep[];
 }
@@ -16,6 +18,8 @@ interface LaunchVerificationProgressProps {
 function LaunchVerificationProgress({
 	projectName,
 	contextName,
+	heading = "Launch verification",
+	description = `Launching ${projectName} as ${contextName}...`,
 	groups = [],
 	steps = [],
 }: LaunchVerificationProgressProps) {
@@ -29,11 +33,9 @@ function LaunchVerificationProgress({
 			role="status"
 		>
 			<h3 id="launch-verification-title" className="font-medium">
-				Launch verification
+				{heading}
 			</h3>
-			<p className="mt-1 text-muted-foreground">
-				Launching {projectName} as {contextName}...
-			</p>
+			<p className="mt-1 text-muted-foreground">{description}</p>
 			{groups.length > 0 ? (
 				<PreflightGroups groups={groups} />
 			) : steps.length === 0 ? (

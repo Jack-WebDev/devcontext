@@ -34,6 +34,7 @@ import {
 import { GuiErrorNotice } from "./GuiErrorNotice";
 import { LaunchFailureView } from "./LaunchFailureView";
 import { LaunchVerificationProgress } from "./LaunchVerificationProgress";
+import { PreflightReviewView } from "./PreflightReviewView";
 import {
 	createLaunchRequestGuard,
 	launchSelectedContext,
@@ -44,6 +45,7 @@ import {
 	shouldCloseSelectorAfterLaunch,
 } from "./launch-success-close-behavior";
 import {
+	type LaunchAttempt,
 	type LauncherSelection,
 	type LauncherState,
 	launcherSelection,
@@ -144,23 +146,29 @@ function SelectorView({
 		launcherState.status === "context_mismatch" ||
 		launcherState.status === "identity_mismatch";
 	const danglingBindingDialogOpen = launcherState.status === "dangling_binding";
+	const preflightReviewOpen = launcherState.status === "preflight_review";
 	const selectedContext = launchState.contexts.find(
 		(context) => context.id === selectedContextId,
 	);
 	const launchPending = launcherStateIsPending(launcherState);
 	const cancellationPending =
 		launchPending || onboardingPendingContextId !== undefined;
-	const launchBlocked = selectedContextConfidenceBlocked(selectedContext);
+	const preflightReady =
+		launcherState.status === "launching" &&
+		launcherState.groups !== undefined &&
+		launcherState.groups.every((group) => group.status === "ready");
 	const singleHealthyContext = singleHealthyLaunchContext(launchState);
 	const showSingleContextConfirmation =
 		singleHealthyContext !== undefined && !showContextChoices;
 	const keyboardLaunchAvailable = canLaunchSelectedContextFromKeyboard({
 		selectedContextId,
-		launchPending: cancellationPending || launchBlocked,
-		mismatchDialogOpen: mismatchDialogOpen || danglingBindingDialogOpen,
+		launchPending: cancellationPending,
+		mismatchDialogOpen:
+			mismatchDialogOpen || danglingBindingDialogOpen || preflightReviewOpen,
 		dialogOpen:
 			mismatchDialogOpen ||
 			danglingBindingDialogOpen ||
+			preflightReviewOpen ||
 			launcherState.status === "existing_workspace",
 	});
 
@@ -233,7 +241,11 @@ function SelectorView({
 		if (
 			contextPosition !== undefined &&
 			!cancellationPending &&
-			!(mismatchDialogOpen || launcherState.status === "existing_workspace")
+			!(
+				mismatchDialogOpen ||
+				preflightReviewOpen ||
+				launcherState.status === "existing_workspace"
+			)
 		) {
 			const context = launchState.contexts[contextPosition];
 			if (context !== undefined) {
@@ -253,7 +265,9 @@ function SelectorView({
 			launchPending: cancellationPending,
 			mismatchDialogOpen,
 			dialogOpen:
-				mismatchDialogOpen || launcherState.status === "existing_workspace",
+				mismatchDialogOpen ||
+				preflightReviewOpen ||
+				launcherState.status === "existing_workspace",
 		});
 		if (action === "none") {
 			return;
@@ -278,6 +292,7 @@ function SelectorView({
 		contextId = selectedContextId,
 		allowExistingEnvironmentLaunch = false,
 		confirmIdentityMismatch = false,
+		skipPreflightReview = false,
 	}: LaunchAttemptOptions = {}) {
 		if (launcherState.status === "dangling_binding") {
 			return;
@@ -289,9 +304,16 @@ function SelectorView({
 		const contextToLaunch = launchState.contexts.find(
 			(context) => context.id === contextId,
 		);
-		if (selectedContextConfidenceBlocked(contextToLaunch)) {
+		if (contextToLaunch === undefined) {
+			setLauncherState(selectingLauncherState(currentSelection));
 			return;
 		}
+		const attempt: LaunchAttempt = {
+			confirmContextMismatch,
+			contextId,
+			allowExistingEnvironmentLaunch,
+			confirmIdentityMismatch,
+		};
 		if (
 			!confirmIdentityMismatch &&
 			hasAccountIdentityMismatch(contextToLaunch)
@@ -323,12 +345,25 @@ function SelectorView({
 					confirmContextMismatch,
 					allowExistingEnvironmentLaunch,
 					onPreflightComplete: (preflight) => {
+						if (
+							!skipPreflightReview &&
+							preflight.groups.some((group) => group.status !== "ready")
+						) {
+							setLauncherState({
+								status: "preflight_review",
+								selection: currentSelection,
+								preflight,
+								attempt,
+							});
+							return false;
+						}
 						setLauncherState({
 							status: "launching",
 							selection: currentSelection,
 							groups: preflight.groups,
 							steps: preflight.verificationSteps,
 						});
+						return true;
 					},
 					bindProject: onBindProject,
 					preflightLaunchProject: onPreflightLaunchProject,
@@ -341,6 +376,8 @@ function SelectorView({
 						selection: currentSelection,
 						conflict: result.runningEnvironmentConflict,
 					});
+				} else if (result && "preflightReview" in result) {
+					return;
 				} else if (result?.ok) {
 					if ("project" in result.data && "context" in result.data) {
 						onCodingToolLaunched?.(result.data);
@@ -627,6 +664,12 @@ function SelectorView({
 									<LaunchVerificationProgress
 										projectName={launchState.project.name}
 										contextName={selectedContext?.name ?? "selected context"}
+										heading={preflightReady ? "Ready to launch" : undefined}
+										description={
+											preflightReady
+												? `${launchState.project.name} will open as ${selectedContext?.name ?? "the selected context"}. All required checks are ready.`
+												: undefined
+										}
 										groups={
 											launcherState.status === "launching"
 												? launcherState.groups
@@ -639,6 +682,30 @@ function SelectorView({
 										}
 									/>
 								</div>
+							) : null}
+
+							{launcherState.status === "preflight_review" ? (
+								<PreflightReviewView
+									projectName={launcherState.preflight.project.name}
+									contextName={launcherState.preflight.context.name}
+									preflight={launcherState.preflight}
+									onFixFirst={() =>
+										setLauncherState(
+											selectingLauncherState(launcherState.selection),
+										)
+									}
+									onLaunchWithoutIt={
+										launcherState.preflight.groups.some(
+											(group) => group.blocking,
+										)
+											? undefined
+											: () =>
+													void handleLaunch({
+														...launcherState.attempt,
+														skipPreflightReview: true,
+													})
+									}
+								/>
 							) : null}
 
 							{launcherState.status === "failure" ? (
@@ -767,8 +834,8 @@ function SelectorView({
 							<SelectorActions
 								launchDisabled={
 									selectedContextId === undefined ||
-									launchBlocked ||
-									danglingBindingDialogOpen
+									danglingBindingDialogOpen ||
+									preflightReviewOpen
 								}
 								launchPending={launchPending}
 								projectName={launchState.project.name}
@@ -787,17 +854,8 @@ function SelectorView({
 	);
 }
 
-interface LaunchAttemptOptions {
-	confirmContextMismatch?: boolean;
-	contextId?: string;
-	allowExistingEnvironmentLaunch?: boolean;
-	confirmIdentityMismatch?: boolean;
-}
-
-function selectedContextConfidenceBlocked(
-	context: ContextState | undefined,
-): boolean {
-	return context?.confidence?.status === "blocked";
+interface LaunchAttemptOptions extends Partial<LaunchAttempt> {
+	skipPreflightReview?: boolean;
 }
 
 function initialLauncherSelection(launchState: LaunchState): LauncherSelection {

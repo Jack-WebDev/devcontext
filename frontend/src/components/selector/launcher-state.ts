@@ -10,6 +10,13 @@ interface LauncherSelection {
 	rememberProject: boolean;
 }
 
+interface LaunchAttempt {
+	confirmContextMismatch: boolean;
+	contextId?: string;
+	allowExistingEnvironmentLaunch: boolean;
+	confirmIdentityMismatch: boolean;
+}
+
 type LauncherState =
 	| { status: "resolving" }
 	| { status: "selecting"; selection: LauncherSelection }
@@ -24,6 +31,12 @@ type LauncherState =
 			error: DisplayError;
 	  }
 	| { status: "preflighting"; selection: LauncherSelection }
+	| {
+			status: "preflight_review";
+			selection: LauncherSelection;
+			preflight: PreflightLaunchProjectResult;
+			attempt: LaunchAttempt;
+	  }
 	| {
 			status: "launching";
 			selection: LauncherSelection;
@@ -74,5 +87,5 @@ function launcherStateIsPending(state: LauncherState): boolean {
 	);
 }
 
-export type { LauncherSelection, LauncherState };
+export type { LaunchAttempt, LauncherSelection, LauncherState };
 export { launcherSelection, launcherStateIsPending, selectingLauncherState };

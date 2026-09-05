@@ -79,6 +79,7 @@ import {
 	LaunchVerificationProgress,
 	verificationStepPresentation,
 } from "../.tmp-test/src/components/selector/LaunchVerificationProgress.js";
+import { PreflightReviewView } from "../.tmp-test/src/components/selector/PreflightReviewView.js";
 import {
 	createLaunchRequestGuard,
 	launchSelectedContext,
@@ -245,6 +246,15 @@ test("launcher state keeps progress and dialogs mutually exclusive", () => {
 			status: "identity_mismatch",
 			selection,
 			contextId: "company",
+		}),
+		false,
+	);
+	assert.equal(
+		launcherStateIsPending({
+			status: "preflight_review",
+			selection,
+			preflight: {},
+			attempt: {},
 		}),
 		false,
 	);
@@ -2075,6 +2085,50 @@ test("launch verification progress renders a pending shell, groups, and backend 
 	);
 });
 
+test("preflight review permits continuation only for non-blocking checks", () => {
+	const preflight = {
+		...preflightLaunchProjectResult().data,
+		groups: [
+			{
+				id: "project",
+				label: "Project",
+				status: "needs_attention",
+				blocking: false,
+				message: "Review the project binding.",
+				checks: [],
+			},
+		],
+	};
+	const review = renderToStaticMarkup(
+		PreflightReviewView({
+			projectName: "api",
+			contextName: "Company",
+			preflight,
+			onFixFirst: () => {},
+			onLaunchWithoutIt: () => {},
+		}),
+	);
+	const blocked = renderToStaticMarkup(
+		PreflightReviewView({
+			projectName: "api",
+			contextName: "Company",
+			preflight: {
+				...preflight,
+				groups: [{ ...preflight.groups[0], blocking: true, status: "blocked" }],
+			},
+			onFixFirst: () => {},
+		}),
+	);
+
+	assert.ok(review.includes("Ready to launch"));
+	assert.ok(review.includes("api will open as Company"));
+	assert.ok(review.includes("Fix first"));
+	assert.ok(review.includes("Launch without it"));
+	assert.ok(blocked.includes("Launch is blocked"));
+	assert.ok(blocked.includes("Fix first"));
+	assert.ok(!blocked.includes("Launch without it"));
+});
+
 test("selector actions block unsafe launches and explain the blocking checks", () => {
 	const html = renderToStaticMarkup(
 		SelectorActions({
@@ -2309,11 +2363,11 @@ test("selector critical path renders selected context and submits remembered lau
 
 	assert.deepEqual(result, launchProjectResult());
 	assert.deepEqual(calls, [
-		["bindProject", { projectPath: "/work/api", contextId: "company" }],
 		[
 			"preflightLaunchProject",
 			{ projectPath: "/work/api", contextId: "company" },
 		],
+		["bindProject", { projectPath: "/work/api", contextId: "company" }],
 		["launchProject", { projectPath: "/work/api", contextId: "company" }],
 	]);
 });
@@ -2408,7 +2462,7 @@ test("launch action exposes preflight verification steps before starting the cod
 	]);
 });
 
-test("launch action binds before launch when remember is on", async () => {
+test("launch action preflights before binding when remember is on", async () => {
 	const calls = [];
 	const result = await launchSelectedContext({
 		projectPath: "/work/api",
@@ -2430,12 +2484,57 @@ test("launch action binds before launch when remember is on", async () => {
 
 	assert.deepEqual(result, launchProjectResult());
 	assert.deepEqual(calls, [
-		["bindProject", { projectPath: "/work/api", contextId: "company" }],
 		[
 			"preflightLaunchProject",
 			{ projectPath: "/work/api", contextId: "company" },
 		],
+		["bindProject", { projectPath: "/work/api", contextId: "company" }],
 		["launchProject", { projectPath: "/work/api", contextId: "company" }],
+	]);
+});
+
+test("launch action pauses before binding when preflight needs review", async () => {
+	const calls = [];
+	const preflight = {
+		...preflightLaunchProjectResult().data,
+		groups: [
+			{
+				id: "tools",
+				label: "Tools",
+				status: "needs_attention",
+				blocking: false,
+				message: "Provider setup needs review.",
+				checks: [],
+			},
+		],
+	};
+	const result = await launchSelectedContext({
+		projectPath: "/work/api",
+		selectedContextId: "company",
+		bindingContextId: "company",
+		bindProject(request) {
+			calls.push(["bindProject", request]);
+			return Promise.resolve(projectBindingResult());
+		},
+		preflightLaunchProject(request) {
+			calls.push(["preflightLaunchProject", request]);
+			return Promise.resolve({ ok: true, data: preflight });
+		},
+		onPreflightComplete() {
+			return false;
+		},
+		launchProject(request) {
+			calls.push(["launchProject", request]);
+			return Promise.resolve(launchProjectResult());
+		},
+	});
+
+	assert.deepEqual(result, { preflightReview: preflight });
+	assert.deepEqual(calls, [
+		[
+			"preflightLaunchProject",
+			{ projectPath: "/work/api", contextId: "company" },
+		],
 	]);
 });
 
@@ -2501,6 +2600,10 @@ test("launch action returns binding errors without launching", async () => {
 		),
 	);
 	assert.deepEqual(calls, [
+		[
+			"preflightLaunchProject",
+			{ projectPath: "/work/api", contextId: "company" },
+		],
 		["bindProject", { projectPath: "/work/api", contextId: "company" }],
 	]);
 });

@@ -15,7 +15,9 @@ interface LaunchSelectorDependencies {
 	bindingContextId?: string;
 	confirmContextMismatch?: boolean;
 	allowExistingEnvironmentLaunch?: boolean;
-	onPreflightComplete?: (result: PreflightLaunchProjectResult) => void;
+	onPreflightComplete?: (
+		result: PreflightLaunchProjectResult,
+	) => boolean | undefined | Promise<boolean | undefined>;
 	bindProject: (
 		request: BindProjectRequest,
 	) => Promise<ApiResult<ProjectBindingState>>;
@@ -32,6 +34,7 @@ type LaunchSelectorResult =
 	| ApiResult<PreflightLaunchProjectResult>
 	| ApiResult<ProjectBindingState>
 	| { runningEnvironmentConflict: RunningEnvironmentConflict }
+	| { preflightReview: PreflightLaunchProjectResult }
 	| undefined;
 
 interface LaunchRequestGuard {
@@ -64,18 +67,11 @@ async function launchSelectedContext(
 	if (contextId === undefined) {
 		return undefined;
 	}
-
-	if (dependencies.bindingContextId !== undefined) {
-		if (dependencies.bindingContextId !== contextId) {
-			throw new Error("Binding context must match the selected launch context.");
-		}
-		const binding = await dependencies.bindProject({
-			projectPath: dependencies.projectPath,
-			contextId: dependencies.bindingContextId,
-		});
-		if (!binding.ok) {
-			return binding;
-		}
+	if (
+		dependencies.bindingContextId !== undefined &&
+		dependencies.bindingContextId !== contextId
+	) {
+		throw new Error("Binding context must match the selected launch context.");
 	}
 
 	const launchRequest = {
@@ -100,7 +96,20 @@ async function launchSelectedContext(
 		};
 	}
 
-	dependencies.onPreflightComplete?.(preflight.data);
+	const shouldLaunch = await dependencies.onPreflightComplete?.(preflight.data);
+	if (shouldLaunch === false) {
+		return { preflightReview: preflight.data };
+	}
+
+	if (dependencies.bindingContextId !== undefined) {
+		const binding = await dependencies.bindProject({
+			projectPath: dependencies.projectPath,
+			contextId: dependencies.bindingContextId,
+		});
+		if (!binding.ok) {
+			return binding;
+		}
+	}
 
 	return dependencies.launchProject({
 		...launchRequest,
