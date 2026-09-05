@@ -39,6 +39,7 @@ import {
 	appRouteFromHash,
 	contextDetailHash,
 	contextDetailRouteFromHash,
+	type ContextDetailDestination,
 } from "./components/shell/routes";
 import { AppStatusBar } from "./components/status/AppStatusBar";
 import {
@@ -212,7 +213,7 @@ function ManagementApp() {
 
 	function navigateToContextDetail(
 		contextId: string,
-		destination: "overview" | "name-purpose" | "appearance" = "overview",
+		destination: ContextDetailDestination = "overview",
 	) {
 		const route = { contextId, destination };
 		setContextDetailRoute(route);
@@ -592,6 +593,10 @@ function ManagementApp() {
 						load={(contextId) => devContextApi.getContextDetails({ contextId })}
 						updateDetails={devContextApi.updateContextDetails}
 						updateAppearance={devContextApi.updateContextAppearance}
+						updateDevelopmentTools={devContextApi.updateContextDevelopmentTools}
+						getProjects={devContextApi.getProjects}
+						unbindProject={devContextApi.unbindProject}
+						onOpenProjects={() => handleNavigate("projects")}
 						onContextUpdated={refreshContexts}
 					/>
 				) : (

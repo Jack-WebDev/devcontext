@@ -426,6 +426,12 @@ export namespace application {
 	        this.accent = source["accent"];
 	    }
 	}
+	export class UpdateContextDevelopmentToolsRequest {
+		contextId: string;
+		enabledDevelopmentToolIds: string[];
+		static createFrom(source: any = {}) { return new UpdateContextDevelopmentToolsRequest(source); }
+		constructor(source: any = {}) { if ('string' === typeof source) source = JSON.parse(source); this.contextId = source["contextId"]; this.enabledDevelopmentToolIds = source["enabledDevelopmentToolIds"]; }
+	}
 	export class UpdateContextDetailsRequest {
 	    contextId: string;
 	    name: string;
@@ -495,4 +501,3 @@ export namespace wailsapp {
 	}
 
 }
-

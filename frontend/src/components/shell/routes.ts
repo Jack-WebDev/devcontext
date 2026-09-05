@@ -13,7 +13,13 @@ interface AppRouteDefinition {
 	label: string;
 }
 
-type ContextDetailDestination = "overview" | "name-purpose" | "appearance";
+type ContextDetailDestination =
+	| "overview"
+	| "name-purpose"
+	| "appearance"
+	| "linked-projects"
+	| "development-tools"
+	| "launch-preferences";
 
 interface ContextDetailRoute {
 	contextId: string;
@@ -52,7 +58,10 @@ function contextDetailRouteFromHash(
 	if (
 		destination !== "overview" &&
 		destination !== "name-purpose" &&
-		destination !== "appearance"
+		destination !== "appearance" &&
+		destination !== "linked-projects" &&
+		destination !== "development-tools" &&
+		destination !== "launch-preferences"
 	) {
 		return undefined;
 	}

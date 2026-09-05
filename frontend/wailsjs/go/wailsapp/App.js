@@ -122,6 +122,10 @@ export function UpdateContextAppearance(arg1) {
   return window['go']['wailsapp']['App']['UpdateContextAppearance'](arg1);
 }
 
+export function UpdateContextDevelopmentTools(arg1) {
+  return window['go']['wailsapp']['App']['UpdateContextDevelopmentTools'](arg1);
+}
+
 export function UpdateContextDetails(arg1) {
   return window['go']['wailsapp']['App']['UpdateContextDetails'](arg1);
 }

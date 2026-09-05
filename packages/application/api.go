@@ -126,6 +126,13 @@ type UpdateContextAppearanceRequest struct {
 	Accent    string `json:"accent,omitempty"`
 }
 
+// UpdateContextDevelopmentToolsRequest replaces the context-owned development
+// tool selection. Exactly one coding tool must remain selected.
+type UpdateContextDevelopmentToolsRequest struct {
+	ContextID                 string   `json:"contextId"`
+	EnabledDevelopmentToolIDs []string `json:"enabledDevelopmentToolIds"`
+}
+
 type ArchiveContextRequest struct {
 	ContextID string `json:"contextId"`
 }

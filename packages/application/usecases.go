@@ -170,6 +170,14 @@ func (s *Service) UpdateContextAppearance(request UpdateContextAppearanceRequest
 	return state, nil
 }
 
+func (s *Service) UpdateContextDevelopmentTools(request UpdateContextDevelopmentToolsRequest) (ContextState, *Error) {
+	state, err := s.updateContextDevelopmentTools(request)
+	if err != nil {
+		return ContextState{}, NewError(err)
+	}
+	return state, nil
+}
+
 func (s *Service) ArchiveContext(request ArchiveContextRequest) (ContextState, *Error) {
 	state, err := s.archiveContext(request)
 	if err != nil {
@@ -567,6 +575,54 @@ func (s *Service) updateContextAppearance(request UpdateContextAppearanceRequest
 	ctx.Metadata = cloneMetadata(ctx.Metadata)
 	setContextMetadata(ctx.Metadata, "icon", icon)
 	setContextMetadata(ctx.Metadata, "accent", accent)
+	if err := s.dependencies.Contexts.Write(ctx); err != nil {
+		return ContextState{}, err
+	}
+	s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{Name: devlog.EventContextUpdated, Timestamp: s.now(), ContextID: ctx.ID.String(), ToolID: string(ctx.Tool.DefaultTool)}))
+	return s.contextState(ctx), nil
+}
+
+func (s *Service) updateContextDevelopmentTools(request UpdateContextDevelopmentToolsRequest) (ContextState, error) {
+	contextID, err := devcontext.NewID(request.ContextID)
+	if err != nil {
+		return ContextState{}, err
+	}
+	selection := CreateContextRequest{EnabledDevelopmentToolIDs: request.EnabledDevelopmentToolIDs}
+	if err := s.applyDevelopmentToolSelections(&selection); err != nil {
+		return ContextState{}, err
+	}
+	if selection.ToolID == "" {
+		return ContextState{}, fmt.Errorf("select one coding tool")
+	}
+	ctx, err := s.dependencies.Contexts.Get(contextID)
+	if err != nil {
+		return ContextState{}, err
+	}
+	toolID := codingtool.ID(selection.ToolID)
+	if _, ok := s.dependencies.ToolRegistry.Get(toolID); !ok {
+		return ContextState{}, fmt.Errorf("unknown coding tool %q", toolID)
+	}
+	if ctx.Tool.Tools == nil {
+		ctx.Tool.Tools = map[codingtool.ID]codingtool.Config{}
+	}
+	if _, ok := ctx.Tool.Tools[toolID]; !ok {
+		ctx.Tool.Tools[toolID] = codingtool.Config{}
+	}
+	ctx.Tool.DefaultTool = toolID
+	providers := make(provider.Configs, len(selection.EnabledProviderIDs))
+	for _, rawID := range selection.EnabledProviderIDs {
+		id := provider.ID(rawID)
+		if _, ok := s.dependencies.ProviderRegistry.Get(id); !ok {
+			return ContextState{}, fmt.Errorf("unknown provider %q", id)
+		}
+		config, exists := ctx.Providers[id]
+		if !exists {
+			config = provider.Config{}
+		}
+		config.Enabled = true
+		providers[id] = config
+	}
+	ctx.Providers = providers
 	if err := s.dependencies.Contexts.Write(ctx); err != nil {
 		return ContextState{}, err
 	}

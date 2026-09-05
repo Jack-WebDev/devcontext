@@ -294,15 +294,17 @@ type fakeService struct {
 	contexts    application.ContextListState
 	contextsErr *application.Error
 
-	contextDetailsRequest          application.GetContextDetailsRequest
-	contextDetails                 application.ContextDetailsState
-	contextDetailsErr              *application.Error
-	updateContextDetailsRequest    application.UpdateContextDetailsRequest
-	updateContextDetailsResult     application.ContextState
-	updateContextDetailsErr        *application.Error
-	updateContextAppearanceRequest application.UpdateContextAppearanceRequest
-	updateContextAppearanceResult  application.ContextState
-	updateContextAppearanceErr     *application.Error
+	contextDetailsRequest               application.GetContextDetailsRequest
+	contextDetails                      application.ContextDetailsState
+	contextDetailsErr                   *application.Error
+	updateContextDetailsRequest         application.UpdateContextDetailsRequest
+	updateContextDetailsResult          application.ContextState
+	updateContextDetailsErr             *application.Error
+	updateContextAppearanceRequest      application.UpdateContextAppearanceRequest
+	updateContextAppearanceResult       application.ContextState
+	updateContextAppearanceErr          *application.Error
+	updateContextDevelopmentToolsResult application.ContextState
+	updateContextDevelopmentToolsErr    *application.Error
 
 	trustCenter    application.TrustCenterState
 	trustCenterErr *application.Error
@@ -408,6 +410,10 @@ func (s *fakeService) UpdateContextDetails(request application.UpdateContextDeta
 func (s *fakeService) UpdateContextAppearance(request application.UpdateContextAppearanceRequest) (application.ContextState, *application.Error) {
 	s.updateContextAppearanceRequest = request
 	return s.updateContextAppearanceResult, s.updateContextAppearanceErr
+}
+
+func (s *fakeService) UpdateContextDevelopmentTools(application.UpdateContextDevelopmentToolsRequest) (application.ContextState, *application.Error) {
+	return s.updateContextDevelopmentToolsResult, s.updateContextDevelopmentToolsErr
 }
 
 func (s *fakeService) ArchiveContext(application.ArchiveContextRequest) (application.ContextState, *application.Error) {

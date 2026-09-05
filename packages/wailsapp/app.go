@@ -16,6 +16,7 @@ type service interface {
 	GetContextDetails(application.GetContextDetailsRequest) (application.ContextDetailsState, *application.Error)
 	UpdateContextDetails(application.UpdateContextDetailsRequest) (application.ContextState, *application.Error)
 	UpdateContextAppearance(application.UpdateContextAppearanceRequest) (application.ContextState, *application.Error)
+	UpdateContextDevelopmentTools(application.UpdateContextDevelopmentToolsRequest) (application.ContextState, *application.Error)
 	ArchiveContext(application.ArchiveContextRequest) (application.ContextState, *application.Error)
 	RestoreContext(application.RestoreContextRequest) (application.ContextState, *application.Error)
 	PreviewDeleteContext(application.DeleteContextPreviewRequest) (application.DeleteContextPreview, *application.Error)
@@ -164,6 +165,14 @@ func (a *App) UpdateContextDetails(request application.UpdateContextDetailsReque
 // UpdateContextAppearance updates only a context's icon and accent metadata.
 func (a *App) UpdateContextAppearance(request application.UpdateContextAppearanceRequest) any {
 	context, err := a.service.UpdateContextAppearance(request)
+	if err != nil {
+		return err
+	}
+	return context
+}
+
+func (a *App) UpdateContextDevelopmentTools(request application.UpdateContextDevelopmentToolsRequest) any {
+	context, err := a.service.UpdateContextDevelopmentTools(request)
 	if err != nil {
 		return err
 	}

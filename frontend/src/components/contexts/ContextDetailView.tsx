@@ -5,6 +5,10 @@ import type {
 	ApiResult,
 	ContextDetailsState,
 	ContextState,
+	DevelopmentToolIntegration,
+	ProjectListItem,
+	UpdateContextDevelopmentToolsRequest,
+	UnbindProjectRequest,
 	UpdateContextAppearanceRequest,
 	UpdateContextDetailsRequest,
 } from "../../lib/devctx-api";
@@ -16,8 +20,7 @@ import {
 	contextIconOption,
 	contextIconOptions,
 } from "./context-identity-options.js";
-
-type ContextDetailDestination = "overview" | "name-purpose" | "appearance";
+import type { ContextDetailDestination } from "../shell/routes.js";
 
 interface ContextDetailViewProps {
 	contextId: string;
@@ -31,6 +34,12 @@ interface ContextDetailViewProps {
 	updateAppearance: (
 		request: UpdateContextAppearanceRequest,
 	) => Promise<ApiResult<ContextState>>;
+	updateDevelopmentTools: (
+		request: UpdateContextDevelopmentToolsRequest,
+	) => Promise<ApiResult<ContextState>>;
+	getProjects: () => Promise<ApiResult<{ projects: ProjectListItem[] }>>;
+	unbindProject: (request: UnbindProjectRequest) => Promise<ApiResult<unknown>>;
+	onOpenProjects: () => void;
 	onContextUpdated: () => Promise<void>;
 }
 
@@ -45,6 +54,10 @@ function ContextDetailView({
 	load,
 	updateDetails,
 	updateAppearance,
+	updateDevelopmentTools,
+	getProjects,
+	unbindProject,
+	onOpenProjects,
 	onContextUpdated,
 }: ContextDetailViewProps) {
 	const [result, setResult] = useState<ApiResult<ContextDetailsState>>();
@@ -135,6 +148,58 @@ function ContextDetailView({
 					}}
 				/>
 			) : null}
+			{destination === "linked-projects" ? (
+				<ContextLinkedProjects
+					contextId={contextId}
+					getProjects={getProjects}
+					onRemove={async (projectPath) => {
+						const removed = await unbindProject({ projectPath });
+						if (removed.ok) await onContextUpdated();
+						return removed;
+					}}
+					onOpenProjects={onOpenProjects}
+				/>
+			) : null}
+			{destination === "development-tools" ? (
+				<ContextDevelopmentToolsEditor
+					context={context}
+					onCancel={() => onNavigate("overview")}
+					onSave={async (enabledDevelopmentToolIds) => {
+						const saved = await updateDevelopmentTools({
+							contextId,
+							enabledDevelopmentToolIds,
+						});
+						if (saved.ok) {
+							applyUpdatedContext(saved.data);
+							await onContextUpdated();
+						}
+						return saved;
+					}}
+				/>
+			) : null}
+			{destination === "launch-preferences" ? (
+				<ContextLaunchPreferences
+					context={context}
+					onCancel={() => onNavigate("overview")}
+					onSave={async (toolId) => {
+						const enabledDevelopmentToolIds = [
+							toolId,
+							...(context.developmentTools
+								?.filter((item) => item.category !== "coding" && item.enabled)
+								.map((item) => item.id) ?? []),
+						];
+						const saved = await updateDevelopmentTools({
+							contextId,
+							enabledDevelopmentToolIds,
+						});
+						if (saved.ok) {
+							applyUpdatedContext(saved.data);
+							await onContextUpdated();
+						}
+						return saved;
+					}}
+				/>
+			) : null}
 		</section>
 	);
 }
@@ -153,6 +218,24 @@ function ContextDetailOverview({
 				description="Set the name and description people see for this development identity."
 				action="Edit name & purpose"
 				onClick={() => onNavigate("name-purpose")}
+			/>
+			<DestinationCard
+				title="Linked projects"
+				description="Review the projects that normally open with this context."
+				action="Manage linked projects"
+				onClick={() => onNavigate("linked-projects")}
+			/>
+			<DestinationCard
+				title="Development tools"
+				description="Manage the integrations that belong to this context."
+				action="Manage development tools"
+				onClick={() => onNavigate("development-tools")}
+			/>
+			<DestinationCard
+				title="Launch preferences"
+				description="Choose the coding tool this context uses for launches."
+				action="Edit launch preferences"
+				onClick={() => onNavigate("launch-preferences")}
 			/>
 			<DestinationCard
 				title="Appearance"
@@ -418,6 +501,311 @@ function ContextAppearanceEditor({
 				</Button>
 			</div>
 		</form>
+	);
+}
+
+function ContextLinkedProjects({
+	contextId,
+	getProjects,
+	onRemove,
+	onOpenProjects,
+}: {
+	contextId: string;
+	getProjects: () => Promise<ApiResult<{ projects: ProjectListItem[] }>>;
+	onRemove: (path: string) => Promise<ApiResult<unknown>>;
+	onOpenProjects: () => void;
+}) {
+	const [projects, setProjects] = useState<ProjectListItem[]>();
+	const [error, setError] = useState<string>();
+	useEffect(() => {
+		void getProjects().then((result) =>
+			result.ok
+				? setProjects(
+						result.data.projects.filter(
+							(project) => project.contextId === contextId,
+						),
+					)
+				: setError(result.error.message),
+		);
+	}, [contextId, getProjects]);
+	async function remove(path: string) {
+		const result = await onRemove(path);
+		if (!result.ok) {
+			setError(result.error.message);
+			return;
+		}
+		setProjects((current) =>
+			current?.filter((project) => project.project.path !== path),
+		);
+	}
+	return (
+		<section
+			className="max-w-3xl space-y-5"
+			aria-labelledby="linked-projects-heading"
+		>
+			<div>
+				<h3 id="linked-projects-heading" className="text-section-title">
+					Linked projects
+				</h3>
+				<p className="mt-1 text-body text-secondary">
+					These projects remember this context. Move and reveal actions are
+					available from the Projects area.
+				</p>
+			</div>
+			{error ? (
+				<p role="alert" className="text-sm text-destructive">
+					{error}
+				</p>
+			) : null}
+			{projects === undefined ? (
+				<p className="text-body text-secondary">Loading linked projects…</p>
+			) : projects.length === 0 ? (
+				<Card as="section" hierarchy="secondary" className="py-0">
+					<CardContent className="inset-group text-body text-secondary">
+						No projects are linked to this context.
+					</CardContent>
+				</Card>
+			) : (
+				<div className="space-y-3">
+					{projects.map((project) => (
+						<Card
+							key={project.project.path}
+							as="article"
+							hierarchy="secondary"
+							className="py-0"
+						>
+							<CardContent className="inset-group">
+								<h4 className="font-medium">{project.project.name}</h4>
+								<p className="mt-1 break-all font-mono text-sm text-muted-foreground">
+									{project.project.path}
+								</p>
+								<div className="mt-4 flex flex-wrap gap-2">
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={onOpenProjects}
+									>
+										Open
+									</Button>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={onOpenProjects}
+									>
+										Move
+									</Button>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={onOpenProjects}
+									>
+										Reveal
+									</Button>
+									<Button
+										type="button"
+										variant="destructive"
+										size="sm"
+										onClick={() => void remove(project.project.path)}
+									>
+										Remove binding
+									</Button>
+								</div>
+							</CardContent>
+						</Card>
+					))}
+				</div>
+			)}
+		</section>
+	);
+}
+
+function ContextDevelopmentToolsEditor({
+	context,
+	onCancel,
+	onSave,
+}: {
+	context: ContextState;
+	onCancel: () => void;
+	onSave: (ids: string[]) => Promise<ApiResult<ContextState>>;
+}) {
+	const [selected, setSelected] = useState(
+		() =>
+			context.developmentTools
+				?.filter((item) => item.enabled)
+				.map((item) => item.id) ?? [context.tool.id],
+	);
+	const [pending, setPending] = useState(false);
+	const [error, setError] = useState<string>();
+	function toggle(integration: DevelopmentToolIntegration) {
+		setSelected((current) =>
+			integration.category === "coding"
+				? [
+						...current.filter(
+							(id) =>
+								context.developmentTools?.find((item) => item.id === id)
+									?.category !== "coding",
+						),
+						integration.id,
+					]
+				: current.includes(integration.id)
+					? current.filter((id) => id !== integration.id)
+					: [...current, integration.id],
+		);
+	}
+	async function submit() {
+		if (
+			!selected.some(
+				(id) =>
+					context.developmentTools?.find((item) => item.id === id)?.category ===
+					"coding",
+			)
+		)
+			return;
+		setPending(true);
+		const result = await onSave(selected);
+		setPending(false);
+		if (!result.ok) {
+			setError(result.error.message);
+			return;
+		}
+		onCancel();
+	}
+	return (
+		<section
+			className="max-w-3xl space-y-5"
+			aria-labelledby="development-tools-heading"
+		>
+			<div>
+				<h3 id="development-tools-heading" className="text-section-title">
+					Development tools
+				</h3>
+				<p className="mt-1 text-body text-secondary">
+					Choose the integrations owned by this context.
+				</p>
+			</div>
+			<div className="space-y-3">
+				{(context.developmentTools ?? []).map((integration) => (
+					<Card
+						key={integration.id}
+						as="article"
+						hierarchy="secondary"
+						className="py-0"
+					>
+						<CardContent className="inset-group">
+							<div className="flex items-start justify-between gap-3">
+								<div>
+									<h4 className="font-medium">{integration.name}</h4>
+									<p className="mt-1 text-sm text-muted-foreground">
+										{integration.message}
+									</p>
+								</div>
+								<Button
+									type="button"
+									variant={
+										selected.includes(integration.id) ? "outline" : "default"
+									}
+									size="sm"
+									onClick={() => toggle(integration)}
+								>
+									{selected.includes(integration.id)
+										? "Disable"
+										: integration.category === "coding"
+											? "Use for launch"
+											: "Enable"}
+								</Button>
+							</div>
+							{integration.recoveryHint ? (
+								<p className="mt-2 text-sm text-muted-foreground">
+									{integration.recoveryHint}
+								</p>
+							) : null}
+						</CardContent>
+					</Card>
+				))}
+			</div>
+			{error ? (
+				<p role="alert" className="text-sm text-destructive">
+					{error}
+				</p>
+			) : null}
+			<div className="flex justify-end gap-3">
+				<Button type="button" variant="outline" onClick={onCancel}>
+					Cancel
+				</Button>
+				<Button type="button" disabled={pending} onClick={() => void submit()}>
+					{pending ? "Saving..." : "Save development tools"}
+				</Button>
+			</div>
+		</section>
+	);
+}
+
+function ContextLaunchPreferences({
+	context,
+	onCancel,
+	onSave,
+}: {
+	context: ContextState;
+	onCancel: () => void;
+	onSave: (toolId: string) => Promise<ApiResult<ContextState>>;
+}) {
+	const [toolId, setToolId] = useState(context.tool.id);
+	const [pending, setPending] = useState(false);
+	const [error, setError] = useState<string>();
+	async function submit() {
+		setPending(true);
+		const result = await onSave(toolId);
+		setPending(false);
+		if (!result.ok) {
+			setError(result.error.message);
+			return;
+		}
+		onCancel();
+	}
+	return (
+		<section
+			className="max-w-2xl space-y-5"
+			aria-labelledby="launch-preferences-heading"
+		>
+			<div>
+				<h3 id="launch-preferences-heading" className="text-section-title">
+					Launch preferences
+				</h3>
+				<p className="mt-1 text-body text-secondary">
+					Choose the coding tool used when this context launches a project.
+				</p>
+			</div>
+			<fieldset className="space-y-2">
+				<legend className="text-sm font-medium">Coding tool</legend>
+				{context.availableTools.map((tool) => (
+					<Button
+						key={tool.id}
+						type="button"
+						variant={toolId === tool.id ? "default" : "outline"}
+						className="mr-2"
+						onClick={() => setToolId(tool.id)}
+					>
+						{tool.name}
+					</Button>
+				))}
+			</fieldset>
+			{error ? (
+				<p role="alert" className="text-sm text-destructive">
+					{error}
+				</p>
+			) : null}
+			<div className="flex justify-end gap-3">
+				<Button type="button" variant="outline" onClick={onCancel}>
+					Cancel
+				</Button>
+				<Button type="button" disabled={pending} onClick={() => void submit()}>
+					{pending ? "Saving..." : "Save launch preference"}
+				</Button>
+			</div>
+		</section>
 	);
 }
 
