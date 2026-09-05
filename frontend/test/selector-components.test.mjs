@@ -103,9 +103,11 @@ import {
 import {
 	ContextCreateProjectsScreen,
 	addProjectToDraft,
+	boundProjectFor,
 	projectPathsFromDrop,
 	recentProjectChoices,
 } from "../.tmp-test/src/components/contexts/ContextCreateProjectsScreen.js";
+import { ProjectBindingConflictDialog } from "../.tmp-test/src/components/contexts/ProjectBindingConflictDialog.js";
 import { ContextPreview } from "../.tmp-test/src/components/contexts/ContextPreview.js";
 import {
 	contextIdentityTemplates,
@@ -3216,6 +3218,18 @@ test("context creation projects screen keeps validated folders as pending cards"
 		}),
 		["/work/api", "/work/web"],
 	);
+	assert.deepEqual(
+		boundProjectFor(project, [
+			{
+				project,
+				contextId: "company",
+				contextName: "Company",
+				running: false,
+			},
+		]),
+		{ project, boundContextName: "Company" },
+	);
+	assert.equal(boundProjectFor(project, []), undefined);
 
 	const html = renderToStaticMarkup(
 		createElement(ContextCreateProjectsScreen, {
@@ -3234,6 +3248,30 @@ test("context creation projects screen keeps validated folders as pending cards"
 	assert.match(html, /Recent projects/);
 	assert.match(html, /\/work\/web/);
 	assert.match(html, /Nothing is changed until you create the context/);
+
+	const skipped = renderToStaticMarkup(
+		createElement(ContextCreateProjectsScreen, {
+			projects: [],
+			onProjectsChange() {},
+			onContinue() {},
+		}),
+	);
+	assert.match(skipped, /Skip for now/);
+	assert.match(skipped, /add project associations later/);
+
+	const conflict = renderToStaticMarkup(
+		createElement(ProjectBindingConflictDialog, {
+			projectName: "api",
+			boundContextName: "Company",
+			onCancel() {},
+			onKeepExisting() {},
+			onMoveToNewContext() {},
+		}),
+	);
+	assert.match(conflict, /This project already belongs to Company/);
+	assert.match(conflict, /Keep existing/);
+	assert.match(conflict, /Move to new context/);
+	assert.match(conflict, /Cancel/);
 });
 
 test("context creation flow permits creation only from review", () => {

@@ -3,10 +3,13 @@ import { useEffect, useState, type DragEvent } from "react";
 import {
 	devContextApi,
 	type ApiResult,
+	type ProjectListItem,
 	type ProjectState,
+	type ProjectsState,
 	type RecentProjectsState,
 } from "../../lib/devctx-api.js";
 import { Button } from "../ui/button.js";
+import { ProjectBindingConflictDialog } from "./ProjectBindingConflictDialog.js";
 
 interface ContextCreateProjectsScreenProps {
 	projects: ProjectState[];
@@ -18,12 +21,18 @@ interface ContextCreateProjectsScreenProps {
 		projectPath: string;
 	}) => Promise<ApiResult<ProjectState>>;
 	getRecentProjects?: () => Promise<ApiResult<RecentProjectsState>>;
+	getProjects?: () => Promise<ApiResult<ProjectsState>>;
 	initialRecentProjects?: ProjectState[];
 }
 
 interface ProjectDropData {
 	files: Iterable<unknown>;
 	getData(format: string): string;
+}
+
+interface ProjectBindingConflict {
+	project: ProjectState;
+	boundContextName: string;
 }
 
 function addProjectToDraft(
@@ -73,6 +82,20 @@ function projectPathsFromDrop(data: ProjectDropData): string[] {
 		});
 }
 
+function boundProjectFor(
+	project: ProjectState,
+	knownProjects: ProjectListItem[],
+): ProjectBindingConflict | undefined {
+	const knownProject = knownProjects.find(
+		(candidate) => candidate.project.path === project.path,
+	);
+	if (!knownProject?.contextId) return undefined;
+	return {
+		project,
+		boundContextName: knownProject.contextName ?? knownProject.contextId,
+	};
+}
+
 function ContextCreateProjectsScreen({
 	projects,
 	onProjectsChange,
@@ -81,12 +104,18 @@ function ContextCreateProjectsScreen({
 	chooseProjectDirectory = devContextApi.chooseProjectDirectory,
 	validateProjectDirectory = devContextApi.validateProjectDirectory,
 	getRecentProjects = devContextApi.getRecentProjects,
+	getProjects = devContextApi.getProjects,
 	initialRecentProjects = [],
 }: ContextCreateProjectsScreenProps) {
 	const [addingProject, setAddingProject] = useState(false);
 	const [error, setError] = useState<string>();
 	const [recentProjects, setRecentProjects] = useState(initialRecentProjects);
 	const [dropActive, setDropActive] = useState(false);
+	const [bindingConflict, setBindingConflict] =
+		useState<ProjectBindingConflict>();
+	const [remainingBindingConflicts, setRemainingBindingConflicts] = useState<
+		ProjectBindingConflict[]
+	>([]);
 
 	useEffect(() => {
 		let active = true;
@@ -109,16 +138,37 @@ function ContextCreateProjectsScreen({
 		setAddingProject(true);
 		setError(undefined);
 		try {
+			const knownProjectsResult = await getProjects();
+			if (!knownProjectsResult.ok) {
+				setError(knownProjectsResult.error.message);
+				return;
+			}
 			let nextProjects = projects;
+			const processedPaths = new Set(projects.map((project) => project.path));
+			const conflicts: ProjectBindingConflict[] = [];
 			for (const path of paths) {
 				const validated = await validateProjectDirectory({ projectPath: path });
 				if (!validated.ok) {
 					setError(validated.error.message);
 					continue;
 				}
+				if (processedPaths.has(validated.data.path)) {
+					continue;
+				}
+				processedPaths.add(validated.data.path);
+				const conflict = boundProjectFor(
+					validated.data,
+					knownProjectsResult.data.projects,
+				);
+				if (conflict) {
+					conflicts.push(conflict);
+					continue;
+				}
 				nextProjects = addProjectToDraft(nextProjects, validated.data);
 			}
 			if (nextProjects !== projects) onProjectsChange(nextProjects);
+			setBindingConflict(conflicts[0]);
+			setRemainingBindingConflicts(conflicts.slice(1));
 		} finally {
 			setAddingProject(false);
 		}
@@ -149,6 +199,22 @@ function ContextCreateProjectsScreen({
 		recentProjects,
 		projects,
 	);
+
+	function moveConflictingProject() {
+		if (!bindingConflict) return;
+		onProjectsChange(addProjectToDraft(projects, bindingConflict.project));
+		advanceBindingConflict();
+	}
+
+	function advanceBindingConflict() {
+		setBindingConflict(remainingBindingConflicts[0]);
+		setRemainingBindingConflicts((conflicts) => conflicts.slice(1));
+	}
+
+	function cancelBindingConflicts() {
+		setBindingConflict(undefined);
+		setRemainingBindingConflicts([]);
+	}
 
 	return (
 		<section
@@ -267,9 +333,23 @@ function ContextCreateProjectsScreen({
 					<span />
 				)}
 				<Button type="button" onClick={onContinue}>
-					Continue
+					{projects.length === 0 ? "Skip for now" : "Continue"}
 				</Button>
 			</div>
+			{projects.length === 0 ? (
+				<p className="text-right text-xs text-muted-foreground">
+					You can add project associations later.
+				</p>
+			) : null}
+			{bindingConflict ? (
+				<ProjectBindingConflictDialog
+					projectName={bindingConflict.project.name}
+					boundContextName={bindingConflict.boundContextName}
+					onCancel={cancelBindingConflicts}
+					onKeepExisting={advanceBindingConflict}
+					onMoveToNewContext={moveConflictingProject}
+				/>
+			) : null}
 		</section>
 	);
 }
@@ -279,5 +359,6 @@ export {
 	ContextCreateProjectsScreen,
 	addProjectToDraft,
 	projectPathsFromDrop,
+	boundProjectFor,
 	recentProjectChoices,
 };

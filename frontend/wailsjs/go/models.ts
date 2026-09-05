@@ -14,18 +14,6 @@ export namespace application {
 	        this.contextId = source["contextId"];
 	    }
 	}
-	export class ValidateProjectDirectoryRequest {
-	    projectPath: string;
-
-	    static createFrom(source: any = {}) {
-	        return new ValidateProjectDirectoryRequest(source);
-	    }
-
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.projectPath = source["projectPath"];
-	    }
-	}
 	export class ContextTransferTool {
 	    id: string;
 	    options?: Record<string, string>;
@@ -386,6 +374,18 @@ export namespace application {
 	        this.launchVerification = source["launchVerification"];
 	        this.rememberProjects = source["rememberProjects"];
 	        this.trayEnabled = source["trayEnabled"];
+	    }
+	}
+	export class ValidateProjectDirectoryRequest {
+	    projectPath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ValidateProjectDirectoryRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectPath = source["projectPath"];
 	    }
 	}
 
