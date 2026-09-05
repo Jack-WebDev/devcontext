@@ -581,6 +581,8 @@ export interface RunningEnvironmentLaunchState {
 export interface ProviderCredentialSession {
 	providerId: string;
 	name: string;
+	/** Omitted by older hosts; detected sessions are assignable by default. */
+	discovered?: boolean;
 	metadataAvailable: boolean;
 	fields: ProviderMetadataField[];
 }
@@ -1862,6 +1864,9 @@ function normalizeProviderCredentialSession(
 	return {
 		providerId: stringValue(object.providerId),
 		name: stringValue(object.name),
+		...(object.discovered === undefined
+			? {}
+			: { discovered: booleanValue(object.discovered) }),
 		metadataAvailable: booleanValue(object.metadataAvailable),
 		fields: arrayValue(object.fields).map(normalizeProviderMetadataField),
 	};

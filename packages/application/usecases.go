@@ -1430,6 +1430,7 @@ func (s *Service) providerCredentialSessionStates() ([]ProviderCredentialSession
 		state := ProviderCredentialSessionState{
 			ProviderID:        string(integration.ID()),
 			Name:              integration.DisplayName(),
+			Discovered:        true,
 			MetadataAvailable: session.MetadataAvailable,
 			Fields:            providerMetadataFields(session.Fields),
 		}

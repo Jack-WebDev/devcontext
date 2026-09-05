@@ -812,7 +812,7 @@ func TestGetLaunchStateDetectsProviderCredentialSessionsForContextCreation(t *te
 		t.Fatalf("provider credential sessions = %#v, want one Claude session", state.ProviderCredentialSessions)
 	}
 	session := state.ProviderCredentialSessions[0]
-	if session.ProviderID != "claude" || session.Name != "Claude" || !session.MetadataAvailable {
+	if session.ProviderID != "claude" || session.Name != "Claude" || !session.Discovered || !session.MetadataAvailable {
 		t.Fatalf("provider credential session = %#v, want available Claude session", session)
 	}
 	if metadataValueForTest(session.Fields, "Subscription") != "Pro" ||

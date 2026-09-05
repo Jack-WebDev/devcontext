@@ -58,6 +58,7 @@ import {
 import { ProjectIdentity } from "./ProjectIdentity";
 import {
 	ProviderCredentialClassification,
+	type ProviderSessionAssignment,
 	type ProviderSessionAssignments,
 } from "./ProviderCredentialClassification.js";
 import {
@@ -145,8 +146,7 @@ function SelectorView({
 		(context) => context.id === selectedContextId,
 	);
 	const launchPending = launcherStateIsPending(launcherState);
-	const cancellationPending =
-		launchPending || contextCreation.pending;
+	const cancellationPending = launchPending || contextCreation.pending;
 	const singleHealthyContext = singleHealthyLaunchContext(launchState);
 	const showSingleContextConfirmation =
 		singleHealthyContext !== undefined && !showContextChoices;
@@ -431,7 +431,10 @@ function SelectorView({
 	}
 
 	async function handleBindingReplacement() {
-		if (launcherState.status !== "binding_replacement" || launcherState.pending) {
+		if (
+			launcherState.status !== "binding_replacement" ||
+			launcherState.pending
+		) {
 			return;
 		}
 
@@ -442,7 +445,11 @@ function SelectorView({
 				contextId: launcherState.replacementContextId,
 			});
 			if (!result.ok) {
-				setLauncherState({ ...launcherState, pending: false, error: result.error });
+				setLauncherState({
+					...launcherState,
+					pending: false,
+					error: result.error,
+				});
 				return;
 			}
 			await finishSuccessfulLaunch(launcherState.selection);
@@ -466,7 +473,11 @@ function SelectorView({
 				projectPath: launchState.project.path,
 			});
 			if (!result.ok) {
-				setLauncherState({ ...launcherState, pending: false, error: result.error });
+				setLauncherState({
+					...launcherState,
+					pending: false,
+					error: result.error,
+				});
 				return;
 			}
 			setLauncherState(selectingLauncherState(launcherState.selection));
@@ -496,11 +507,11 @@ function SelectorView({
 
 	function handleClassifyProviderSession(
 		providerId: string,
-		contextId: "personal" | "company",
+		assignment: ProviderSessionAssignment,
 	) {
 		setProviderSessionAssignments((current) => ({
 			...current,
-			[providerId]: contextId,
+			[providerId]: assignment,
 		}));
 	}
 
@@ -534,9 +545,7 @@ function SelectorView({
 						: undefined
 				}
 				steps={
-					launcherState.status === "launching"
-						? launcherState.steps
-						: undefined
+					launcherState.status === "launching" ? launcherState.steps : undefined
 				}
 			/>
 		);
@@ -560,12 +569,14 @@ function SelectorView({
 						pendingContextId={contextCreation.pendingRequest?.contextId}
 						error={contextCreation.error}
 						onClassifyProviderSession={handleClassifyProviderSession}
-							onCreatePersonal={
-								onCreateContext ? () => handleCreateContext("personal") : undefined
-							}
-							onCreateCompany={
-								onCreateContext ? () => handleCreateContext("company") : undefined
-							}
+						onCreatePersonal={
+							onCreateContext
+								? () => handleCreateContext("personal")
+								: undefined
+						}
+						onCreateCompany={
+							onCreateContext ? () => handleCreateContext("company") : undefined
+						}
 						replay={showOnboardingReplay && !launchState.firstRun}
 						onContinue={
 							showOnboardingReplay && !launchState.firstRun
@@ -615,10 +626,14 @@ function SelectorView({
 								error={contextCreation.error}
 								onClassifyProviderSession={handleClassifyProviderSession}
 								onCreatePersonal={
-									onCreateContext ? () => handleCreateContext("personal") : undefined
+									onCreateContext
+										? () => handleCreateContext("personal")
+										: undefined
 								}
 								onCreateCompany={
-									onCreateContext ? () => handleCreateContext("company") : undefined
+									onCreateContext
+										? () => handleCreateContext("company")
+										: undefined
 								}
 							/>
 						</>
@@ -865,7 +880,8 @@ function unexpectedBindingRemovalError(error: unknown): DisplayError {
 	return {
 		code: "unexpected_error",
 		message,
-		recovery: "Try again or choose a context for this launch without removing it.",
+		recovery:
+			"Try again or choose a context for this launch without removing it.",
 	};
 }
 
@@ -886,7 +902,7 @@ function MissingDefaultContextActions({
 	error?: DisplayError;
 	onClassifyProviderSession: (
 		providerId: string,
-		contextId: "personal" | "company",
+		assignment: ProviderSessionAssignment,
 	) => void;
 	onCreatePersonal?: () => void;
 	onCreateCompany?: () => void;
@@ -960,7 +976,7 @@ function MissingDefaultContextActions({
 					sessions={providerCredentialSessions}
 					assignments={providerSessionAssignments}
 					disabled={pending}
-					onClassify={onClassifyProviderSession}
+					onAssign={onClassifyProviderSession}
 				/>
 				{pendingContextId ? (
 					<p className="mt-3 text-sm text-muted-foreground" role="status">

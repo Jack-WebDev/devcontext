@@ -821,8 +821,11 @@ type RunningEnvironmentsState struct {
 // ProviderCredentialSessionState describes a detected global provider session
 // using only non-secret metadata that helps the user classify the session.
 type ProviderCredentialSessionState struct {
-	ProviderID        string                  `json:"providerId"`
-	Name              string                  `json:"name"`
+	ProviderID string `json:"providerId"`
+	Name       string `json:"name"`
+	// Discovered confirms that this session was found by the registered
+	// integration. The frontend must not offer assignment for unverified data.
+	Discovered        bool                    `json:"discovered"`
 	MetadataAvailable bool                    `json:"metadataAvailable"`
 	Fields            []ProviderMetadataField `json:"fields,omitempty"`
 }

@@ -100,7 +100,10 @@ import {
 	contextPurposeMaxLength,
 	contextPurposeValidation,
 } from "../.tmp-test/src/components/contexts/ContextCreateIdentityScreen.js";
-import { ContextCreateDevelopmentToolsScreen } from "../.tmp-test/src/components/contexts/ContextCreateDevelopmentToolsScreen.js";
+import {
+	ContextCreateDevelopmentToolsScreen,
+	DevelopmentToolSetupScreen,
+} from "../.tmp-test/src/components/contexts/ContextCreateDevelopmentToolsScreen.js";
 import {
 	ContextCreateProjectsScreen,
 	addProjectToDraft,
@@ -705,7 +708,7 @@ test("first-run welcome requires detected provider sessions to be classified bef
 		}),
 	);
 
-	assert.ok(unassigned.includes("Classify detected provider sessions"));
+	assert.ok(unassigned.includes("Assign detected sessions"));
 	assert.ok(unassigned.includes("Email:"));
 	assert.ok(unassigned.includes("user@company.com"));
 	assert.ok(unassigned.includes("Plan:"));
@@ -725,7 +728,7 @@ test("provider credential classification renders only safe metadata fields", () 
 		ProviderCredentialClassification({
 			sessions: [...providerCredentialSessionsFixture()],
 			assignments: { codex: "personal" },
-			onClassify: () => {},
+			onAssign: () => {},
 		}),
 	);
 
@@ -751,7 +754,7 @@ test("provider credential classification renders a future provider without a pro
 				},
 			],
 			assignments: { future: "company" },
-			onClassify: () => {},
+			onAssign: () => {},
 		}),
 	);
 
@@ -759,6 +762,36 @@ test("provider credential classification renders a future provider without a pro
 	assert.ok(html.includes("Workspace:"));
 	assert.ok(html.includes("Example"));
 	assert.ok(html.includes("Current global Future Provider session"));
+});
+
+test("session assignment supports dynamic contexts and leaves Not sure unassigned", () => {
+	const html = renderToStaticMarkup(
+		ProviderCredentialClassification({
+			sessions: [
+				{
+					providerId: "future",
+					name: "Future Provider",
+					discovered: true,
+					metadataAvailable: true,
+					fields: [],
+				},
+				{
+					providerId: "unverified",
+					name: "Unverified Provider",
+					discovered: false,
+					metadataAvailable: false,
+					fields: [],
+				},
+			],
+			assignments: { future: "not_sure" },
+			assignmentOptions: [{ id: "client", name: "Client work" }],
+			onAssign: () => {},
+		}),
+	);
+	assert.match(html, /Use with Client work/);
+	assert.match(html, /Not sure/);
+	assert.match(html, /Not sure — unassigned/);
+	assert.match(html, /could not be verified, so it cannot be assigned/);
 });
 
 test("first-run welcome shows pending and error states", () => {
@@ -3355,6 +3388,26 @@ test("context creation frames tool setup as development tools with generic categ
 		"unavailable",
 		"error",
 	]);
+});
+
+test("development-tool setup keeps technical details behind a disclosure", () => {
+	const html = renderToStaticMarkup(
+		createElement(DevelopmentToolSetupScreen, {
+			integration: {
+				id: "future-adapter",
+				name: "Future Adapter",
+				category: "other",
+				status: "not_configured",
+				message: "Configure this integration.",
+				enabled: true,
+			},
+			onBack() {},
+			onSkip() {},
+		}),
+	);
+	assert.match(html, /Advanced details/);
+	assert.match(html, /future-adapter/);
+	assert.match(html, /Version, storage, and diagnostic data/);
 });
 
 test("context identity screen asks one question before continuing", () => {

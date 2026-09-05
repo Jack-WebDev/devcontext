@@ -157,6 +157,7 @@ export namespace application {
 	    icon?: string;
 	    accent?: string;
 	    enabledProviderIds?: string[];
+	    enabledDevelopmentToolIds?: string[];
 	    toolId?: string;
 	    importProviderIds?: string[];
 	
@@ -174,6 +175,7 @@ export namespace application {
 	        this.icon = source["icon"];
 	        this.accent = source["accent"];
 	        this.enabledProviderIds = source["enabledProviderIds"];
+	        this.enabledDevelopmentToolIds = source["enabledDevelopmentToolIds"];
 	        this.toolId = source["toolId"];
 	        this.importProviderIds = source["importProviderIds"];
 	    }
@@ -409,3 +411,4 @@ export namespace wailsapp {
 	}
 
 }
+

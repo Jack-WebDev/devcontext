@@ -8,6 +8,7 @@ import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import {
 	ProviderCredentialClassification,
+	type ProviderSessionAssignment,
 	type ProviderSessionAssignments,
 } from "./ProviderCredentialClassification.js";
 
@@ -19,7 +20,7 @@ interface FirstRunWelcomeProps {
 	onCreateCompany?: () => void;
 	onClassifyProviderSession?: (
 		providerId: string,
-		contextId: "personal" | "company",
+		assignment: ProviderSessionAssignment,
 	) => void;
 	pendingContextId?: string;
 	error?: DisplayError;
@@ -43,7 +44,7 @@ function FirstRunWelcome({
 	const canClassify =
 		providerCredentialSessions.length === 0 ||
 		onClassifyProviderSession !== undefined;
-	const handleClassifyProviderSession = onClassifyProviderSession ?? (() => {});
+	const handleAssignProviderSession = onClassifyProviderSession ?? (() => {});
 	const classificationComplete = providerCredentialSessions.every(
 		(session) => providerSessionAssignments[session.providerId] !== undefined,
 	);
@@ -84,7 +85,7 @@ function FirstRunWelcome({
 						sessions={providerCredentialSessions}
 						assignments={providerSessionAssignments}
 						disabled={pending}
-						onClassify={handleClassifyProviderSession}
+						onAssign={handleAssignProviderSession}
 					/>
 
 					<div className="grid gap-4 sm:grid-cols-2">

@@ -228,6 +228,29 @@ function DevelopmentToolSetupScreen({
 				This integration will remain enabled for this context. You can finish
 				its setup now or continue creating the context and return later.
 			</p>
+			<details className="rounded-lg border p-4 text-sm">
+				<summary className="cursor-pointer font-medium">
+					Advanced details
+				</summary>
+				<dl className="mt-3 space-y-2 text-muted-foreground">
+					<div className="flex justify-between gap-4">
+						<dt>Adapter</dt>
+						<dd className="font-mono text-foreground">{integration.id}</dd>
+					</div>
+					<div className="flex justify-between gap-4">
+						<dt>Category</dt>
+						<dd className="text-foreground">{integration.category}</dd>
+					</div>
+					<div className="flex justify-between gap-4">
+						<dt>Readiness</dt>
+						<dd className="text-foreground">{presentation.label}</dd>
+					</div>
+				</dl>
+				<p className="mt-3 text-muted-foreground">
+					Version, storage, and diagnostic data are shown here only when an
+					integration safely provides them.
+				</p>
+			</details>
 			<div className="flex items-center justify-between gap-3">
 				<Button type="button" variant="outline" onClick={onBack}>
 					Back to development tools
@@ -241,4 +264,4 @@ function DevelopmentToolSetupScreen({
 }
 
 export type { ContextCreateDevelopmentToolsScreenProps };
-export { ContextCreateDevelopmentToolsScreen };
+export { ContextCreateDevelopmentToolsScreen, DevelopmentToolSetupScreen };
