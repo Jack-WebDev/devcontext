@@ -1,15 +1,49 @@
+import { EllipsisIcon } from "lucide-react";
 import type { ContextListItem } from "../../lib/devctx-api";
+import {
+	ContextAccentIndicator,
+	contextAccentFromMetadata,
+} from "../context-accent/ContextAccent.js";
 import { StatusIndicator } from "../status/StatusIndicator.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "../ui/dropdown-menu.js";
+import { contextIconOption } from "./context-identity-options.js";
+
+type ContextListAction =
+	| "open"
+	| "edit"
+	| "duplicate"
+	| "export"
+	| "archive"
+	| "delete";
+
+type ContextHealth =
+	| "healthy"
+	| "needs_attention"
+	| "setup_incomplete"
+	| "unavailable"
+	| "archived";
 
 interface ContextsViewProps {
 	contexts: ContextListItem[];
 	onSelect?: (id: string) => void;
 	onNew?: () => void;
+	onAction?: (id: string, action: ContextListAction) => void;
 }
 
-function ContextsView({ contexts, onSelect, onNew }: ContextsViewProps) {
+function ContextsView({
+	contexts,
+	onSelect,
+	onNew,
+	onAction,
+}: ContextsViewProps) {
 	return (
 		<section
 			aria-labelledby="contexts-heading"
@@ -41,6 +75,7 @@ function ContextsView({ contexts, onSelect, onNew }: ContextsViewProps) {
 							key={item.context.id}
 							item={item}
 							onSelect={onSelect}
+							onAction={onAction}
 						/>
 					))}
 				</div>
@@ -52,11 +87,16 @@ function ContextsView({ contexts, onSelect, onNew }: ContextsViewProps) {
 function ContextListCard({
 	item,
 	onSelect,
+	onAction,
 }: {
 	item: ContextListItem;
 	onSelect?: (id: string) => void;
+	onAction?: (id: string, action: ContextListAction) => void;
 }) {
 	const { context } = item;
+	const accent = contextAccentFromMetadata(context.metadata?.accent);
+	const icon = context.metadata?.icon;
+	const health = contextHealth(context);
 	return (
 		<Card
 			as="article"
@@ -64,12 +104,13 @@ function ContextListCard({
 			className="py-0"
 			aria-labelledby={`context-${context.id}-heading`}
 		>
-			<CardContent className="inset-group space-y-4">
-				<div className="flex items-start justify-between gap-3">
-					<div className="min-w-0">
+			<CardContent className="inset-group space-y-5">
+				<div className="flex items-start gap-4">
+					<ContextIdentityMark accent={accent} icon={icon} />
+					<div className="min-w-0 flex-1">
 						<h3
 							id={`context-${context.id}-heading`}
-							className="truncate text-lg font-semibold"
+							className="truncate text-section-title"
 							title={context.name}
 						>
 							{context.name}
@@ -85,21 +126,34 @@ function ContextListCard({
 							</p>
 						) : null}
 					</div>
-					<StatusIndicator status={context.confidence?.status ?? "blocked"} />
+					{onAction ? (
+						<ContextActionsMenu
+							context={context}
+							onAction={(action) => onAction(context.id, action)}
+						/>
+					) : null}
 				</div>
 
-				<dl className="grid gap-3 border-t border-border pt-4 text-sm sm:grid-cols-2">
-					<ContextListDetail label="Coding tool" value={context.tool.name} />
+				<div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-border py-3">
+					<div>
+						<p className="text-label text-muted-foreground">Health</p>
+						<StatusIndicator status={health.status}>
+							{health.label}
+						</StatusIndicator>
+					</div>
 					<ContextListDetail
-						label="Projects"
+						label="Linked projects"
 						value={projectCountLabel(item.projectCount)}
 					/>
-					<ContextListDetail label="Providers" value={providerSummary(item)} />
 					<ContextListDetail
 						label="Last used"
 						value={formatContextTime(item.lastUsedAt)}
 					/>
-				</dl>
+				</div>
+
+				<p className="text-caption text-muted-foreground">
+					Integrations: {integrationSummary(item)}
+				</p>
 				{onSelect ? (
 					<Button
 						type="button"
@@ -115,22 +169,122 @@ function ContextListCard({
 	);
 }
 
+function ContextActionsMenu({
+	context,
+	onAction,
+}: {
+	context: ContextListItem["context"];
+	onAction: (action: ContextListAction) => void;
+}) {
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon-sm"
+						aria-label={`Actions for ${context.name}`}
+					/>
+				}
+			>
+				<EllipsisIcon />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end">
+				<DropdownMenuItem onClick={() => onAction("open")}>
+					Open
+				</DropdownMenuItem>
+				<DropdownMenuItem onClick={() => onAction("edit")}>
+					Edit
+				</DropdownMenuItem>
+				<DropdownMenuItem onClick={() => onAction("duplicate")}>
+					Duplicate
+				</DropdownMenuItem>
+				<DropdownMenuItem onClick={() => onAction("export")}>
+					Export
+				</DropdownMenuItem>
+				{context.archivedAt ? null : (
+					<DropdownMenuItem onClick={() => onAction("archive")}>
+						Archive
+					</DropdownMenuItem>
+				)}
+				<DropdownMenuSeparator />
+				<DropdownMenuItem
+					variant="destructive"
+					onClick={() => onAction("delete")}
+				>
+					Delete
+				</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+function ContextIdentityMark({
+	accent,
+	icon,
+}: {
+	accent: ReturnType<typeof contextAccentFromMetadata>;
+	icon?: string;
+}) {
+	return (
+		<span
+			className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-lg text-foreground"
+			aria-hidden="true"
+		>
+			<ContextAccentIndicator
+				accent={accent}
+				className="mr-1 size-2 rounded-full"
+			/>
+			{contextIconOption(icon)?.symbol ?? "○"}
+		</span>
+	);
+}
+
 function ContextListDetail({ label, value }: { label: string; value: string }) {
 	return (
 		<div className="min-w-0">
-			<dt className="text-muted-foreground">{label}</dt>
-			<dd className="mt-1 truncate font-medium" title={value}>
+			<p className="text-label text-muted-foreground">{label}</p>
+			<p className="mt-1 truncate text-status" title={value}>
 				{value}
-			</dd>
+			</p>
 		</div>
 	);
 }
 
-function providerSummary(item: ContextListItem): string {
-	if (item.enabledProviders.length === 0) {
-		return "No providers enabled";
+function integrationSummary(item: ContextListItem): string {
+	const providerCount = item.enabledProviders.length;
+	const providers = `${providerCount} ${providerCount === 1 ? "provider" : "providers"}`;
+	return `${item.context.tool.name} · ${providers} enabled`;
+}
+
+function contextHealth(context: ContextListItem["context"]): {
+	label: string;
+	status: "ready" | "needs_attention" | "not_configured" | "blocked";
+	type: ContextHealth;
+} {
+	if (context.archivedAt) {
+		return { type: "archived", label: "Archived", status: "not_configured" };
 	}
-	return item.enabledProviders.map((provider) => provider.name).join(", ");
+	if (context.confidence === undefined) {
+		return {
+			type: "setup_incomplete",
+			label: "Setup incomplete",
+			status: "not_configured",
+		};
+	}
+	switch (context.confidence.status) {
+		case "ready":
+			return { type: "healthy", label: "Healthy", status: "ready" };
+		case "needs_attention":
+			return {
+				type: "needs_attention",
+				label: "Needs attention",
+				status: "needs_attention",
+			};
+		case "blocked":
+			return { type: "unavailable", label: "Unavailable", status: "blocked" };
+	}
 }
 
 function projectCountLabel(count: number): string {
@@ -145,4 +299,11 @@ function formatContextTime(value: string | undefined): string {
 	return Number.isNaN(time.getTime()) ? "Unavailable" : time.toLocaleString();
 }
 
-export { ContextsView, formatContextTime, projectCountLabel, providerSummary };
+export type { ContextHealth, ContextListAction };
+export {
+	ContextsView,
+	contextHealth,
+	formatContextTime,
+	integrationSummary,
+	projectCountLabel,
+};

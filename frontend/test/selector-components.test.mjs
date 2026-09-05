@@ -18,8 +18,10 @@ import {
 } from "../.tmp-test/src/components/context-accent/ContextAccent.js";
 import {
 	ContextsView,
-	providerSummary,
+	contextHealth,
+	integrationSummary,
 } from "../.tmp-test/src/components/contexts/ContextsView.js";
+import { deleteImpact } from "../.tmp-test/src/components/contexts/ContextDeleteDialog.js";
 import { parseContextMetadataExport } from "../.tmp-test/src/components/contexts/context-transfer.js";
 import { renderDiagnostics } from "../.tmp-test/src/components/diagnostics/DiagnosticsView.js";
 import {
@@ -1506,10 +1508,63 @@ test("Contexts screen lists backend-owned identity summaries and reserves creati
 	assert.ok(html.includes("Work identity"));
 	assert.ok(html.includes("Future Tool"));
 	assert.ok(html.includes("2 projects"));
-	assert.ok(html.includes("Provider"));
+	assert.ok(html.includes("Health"));
+	assert.ok(html.includes("Linked projects"));
+	assert.ok(html.includes("Last used"));
+	assert.ok(html.includes("Integrations: Future Tool · 1 provider enabled"));
 	assert.equal(
-		providerSummary({ ...context, enabledProviders: [] }),
-		"No providers enabled",
+		integrationSummary({ ...context, enabledProviders: [] }),
+		"Future Tool · 0 providers enabled",
+	);
+});
+
+test("context health uses required readiness and preserves optional integration failures", () => {
+	const context = {
+		...contextFixture("company", "Company", []),
+		confidence: {
+			contextId: "company",
+			status: "ready",
+			checks: [],
+		},
+	};
+	assert.deepEqual(contextHealth(context), {
+		type: "healthy",
+		label: "Healthy",
+		status: "ready",
+	});
+	assert.deepEqual(
+		contextHealth({ ...context, confidence: undefined }),
+		{
+			type: "setup_incomplete",
+			label: "Setup incomplete",
+			status: "not_configured",
+		},
+	);
+	assert.deepEqual(
+		contextHealth({
+			...context,
+			archivedAt: "2026-09-01T00:00:00Z",
+			confidence: { ...context.confidence, status: "blocked" },
+		}),
+		{ type: "archived", label: "Archived", status: "not_configured" },
+	);
+	assert.deepEqual(
+		contextHealth({
+			...context,
+			confidence: { ...context.confidence, status: "blocked" },
+		}),
+		{ type: "unavailable", label: "Unavailable", status: "blocked" },
+	);
+});
+
+test("delete impact describes bindings without implying project folders are deleted", () => {
+	assert.equal(
+		deleteImpact({
+			context: contextFixture("company", "Company", []),
+			projectBindings: [],
+			deletesIsolatedState: true,
+		}),
+		"No project bindings will be removed.",
 	);
 });
 
