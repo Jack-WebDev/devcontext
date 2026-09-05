@@ -302,9 +302,35 @@ export interface PreflightLaunchProjectResult {
 	project: ProjectState;
 	context: ContextState;
 	confidence: LaunchConfidenceState;
+	groups: PreflightGroup[];
 	verificationSteps?: LaunchVerificationStep[];
 	warnings: ResolutionWarning[];
 	runningEnvironmentConflict?: RunningEnvironmentConflict;
+}
+
+export type PreflightGroupId =
+	| "project"
+	| "context"
+	| "isolation"
+	| "tools"
+	| "workspace";
+
+export interface PreflightGroup {
+	id: PreflightGroupId;
+	label: string;
+	status: LaunchConfidenceStatus;
+	blocking: boolean;
+	message: string;
+	checks: PreflightCheck[];
+}
+
+export interface PreflightCheck {
+	id: string;
+	label: string;
+	status: LaunchConfidenceStatus;
+	blocking: boolean;
+	message: string;
+	actionHint?: string;
 }
 export interface RunningEnvironmentConflict {
 	kind: "same_context" | "different_context";
@@ -1231,6 +1257,7 @@ function normalizePreflightLaunchProjectResult(
 	value: unknown,
 ): PreflightLaunchProjectResult {
 	const object = objectValue(value);
+	const groups = arrayValue(object.groups).map(normalizePreflightGroup);
 	const verificationSteps = arrayValue(object.verificationSteps).map(
 		normalizeLaunchVerificationStep,
 	);
@@ -1241,11 +1268,49 @@ function normalizePreflightLaunchProjectResult(
 		project: normalizeProjectState(object.project),
 		context: normalizeContextState(object.context),
 		confidence: requiredLaunchConfidenceState(object.confidence),
+		groups,
 		...(verificationSteps.length === 0 ? {} : { verificationSteps }),
 		warnings: arrayValue(object.warnings).map(normalizeResolutionWarning),
 		...(runningEnvironmentConflict === undefined
 			? {}
 			: { runningEnvironmentConflict }),
+	};
+}
+
+function normalizePreflightGroup(value: unknown): PreflightGroup {
+	const object = objectValue(value);
+	return {
+		id: normalizePreflightGroupId(object.id),
+		label: stringValue(object.label),
+		status: normalizeLaunchConfidenceStatus(object.status),
+		blocking: booleanValue(object.blocking),
+		message: stringValue(object.message),
+		checks: arrayValue(object.checks).map(normalizePreflightCheck),
+	};
+}
+
+function normalizePreflightGroupId(value: unknown): PreflightGroupId {
+	switch (value) {
+		case "project":
+		case "context":
+		case "isolation":
+		case "tools":
+		case "workspace":
+			return value;
+		default:
+			throw new Error("Invalid Dev Context response.");
+	}
+}
+
+function normalizePreflightCheck(value: unknown): PreflightCheck {
+	const object = objectValue(value);
+	return {
+		id: stringValue(object.id),
+		label: stringValue(object.label),
+		status: normalizeLaunchConfidenceStatus(object.status),
+		blocking: booleanValue(object.blocking),
+		message: stringValue(object.message),
+		actionHint: optionalString(object.actionHint),
 	};
 }
 

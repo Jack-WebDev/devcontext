@@ -326,6 +326,7 @@ function SelectorView({
 						setLauncherState({
 							status: "launching",
 							selection: currentSelection,
+							groups: preflight.groups,
 							steps: preflight.verificationSteps,
 						});
 					},
@@ -626,6 +627,11 @@ function SelectorView({
 									<LaunchVerificationProgress
 										projectName={launchState.project.name}
 										contextName={selectedContext?.name ?? "selected context"}
+										groups={
+											launcherState.status === "launching"
+												? launcherState.groups
+												: undefined
+										}
 										steps={
 											launcherState.status === "launching"
 												? launcherState.steps

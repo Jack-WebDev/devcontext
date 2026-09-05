@@ -626,6 +626,57 @@ func TestPreflightLaunchProjectReturnsReadinessWithoutStartingProcess(t *testing
 	}
 }
 
+func TestPreflightGroupsApplyProductGroupingAndBlockingPolicy(t *testing.T) {
+	groups := preflightGroups(
+		ContextState{
+			Name: "Company",
+			Tool: ToolState{ID: "fake", Name: "Fake Tool"},
+			Confidence: LaunchConfidenceState{Checks: []LaunchConfidenceCheck{
+				{Component: LaunchConfidenceCheckIdentity, Severity: LaunchConfidenceNeedsAttention, Label: "Account identity", Message: "Provider accounts differ."},
+				{Component: LaunchConfidenceCheckIsolation, Severity: LaunchConfidenceReady, Label: "Context storage", Message: "Context storage is ready."},
+				{Component: LaunchConfidenceCheckProvider, ProviderID: "codex", Severity: LaunchConfidenceNeedsAttention, Label: "Codex", Message: "Codex needs setup."},
+				{Component: LaunchConfidenceCheckTool, ToolID: "fake", Severity: LaunchConfidenceBlocked, Label: "Fake Tool", Message: "Fake Tool is unavailable."},
+			}},
+		},
+		[]ResolutionWarning{{Code: "context_mismatch", Message: "Selected context differs from the remembered context."}},
+		&RunningEnvironmentConflict{Kind: "different_context"},
+	)
+
+	if len(groups) != 5 {
+		t.Fatalf("group count = %d, want 5", len(groups))
+	}
+	byID := make(map[PreflightGroupID]PreflightGroup, len(groups))
+	for _, group := range groups {
+		byID[group.ID] = group
+	}
+	for _, id := range []PreflightGroupID{
+		PreflightGroupProject,
+		PreflightGroupContext,
+		PreflightGroupIsolation,
+		PreflightGroupTools,
+		PreflightGroupWorkspace,
+	} {
+		if _, ok := byID[id]; !ok {
+			t.Fatalf("missing %q group", id)
+		}
+	}
+	if group := byID[PreflightGroupProject]; group.Status != LaunchConfidenceNeedsAttention || group.Blocking {
+		t.Fatalf("project group = %#v, want non-blocking warning", group)
+	}
+	if group := byID[PreflightGroupContext]; group.Status != LaunchConfidenceNeedsAttention || group.Blocking {
+		t.Fatalf("context group = %#v, want non-blocking identity warning", group)
+	}
+	if group := byID[PreflightGroupIsolation]; group.Status != LaunchConfidenceReady || group.Blocking {
+		t.Fatalf("isolation group = %#v, want ready", group)
+	}
+	if group := byID[PreflightGroupTools]; group.Status != LaunchConfidenceBlocked || !group.Blocking || group.Message != "Fake Tool is unavailable." {
+		t.Fatalf("tools group = %#v, want blocking tool failure", group)
+	}
+	if group := byID[PreflightGroupWorkspace]; group.Status != LaunchConfidenceNeedsAttention || group.Blocking {
+		t.Fatalf("workspace group = %#v, want non-blocking conflict", group)
+	}
+}
+
 func TestPreflightLaunchProjectRequiresMismatchConfirmation(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.writeContext(t, fixture.context("personal", "Personal"))

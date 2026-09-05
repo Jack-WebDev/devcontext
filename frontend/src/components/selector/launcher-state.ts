@@ -27,6 +27,7 @@ type LauncherState =
 	| {
 			status: "launching";
 			selection: LauncherSelection;
+			groups?: PreflightLaunchProjectResult["groups"];
 			steps?: PreflightLaunchProjectResult["verificationSteps"];
 	  }
 	| {

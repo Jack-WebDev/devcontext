@@ -607,6 +607,24 @@ test("adapter normalizes successful Wails calls", async () => {
 					status: "ready",
 					checks: [],
 				},
+				groups: [
+					{
+						id: "project",
+						label: "Project",
+						status: "ready",
+						blocking: false,
+						message: "Project folder is ready.",
+						checks: [
+							{
+								id: "project_directory",
+								label: "Project folder",
+								status: "ready",
+								blocking: false,
+								message: "Project folder is ready.",
+							},
+						],
+					},
+				],
 				verificationSteps: [
 					{
 						id: "prepare_environment",
@@ -824,6 +842,25 @@ test("adapter normalizes successful Wails calls", async () => {
 					status: "ready",
 					checks: [],
 				},
+				groups: [
+					{
+						id: "project",
+						label: "Project",
+						status: "ready",
+						blocking: false,
+						message: "Project folder is ready.",
+						checks: [
+							{
+								id: "project_directory",
+								label: "Project folder",
+								status: "ready",
+								blocking: false,
+								message: "Project folder is ready.",
+								actionHint: undefined,
+							},
+						],
+					},
+				],
 				verificationSteps: [
 					{
 						id: "prepare_environment",

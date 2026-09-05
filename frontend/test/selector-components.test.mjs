@@ -1981,7 +1981,7 @@ test("launch labels name the selected context and pending project", () => {
 	);
 });
 
-test("launch verification progress renders a pending shell and backend stages", () => {
+test("launch verification progress renders a pending shell, groups, and backend stages", () => {
 	const pending = renderToStaticMarkup(
 		LaunchVerificationProgress({
 			projectName: "devctx",
@@ -2014,6 +2014,47 @@ test("launch verification progress renders a pending shell and backend stages", 
 			],
 		}),
 	);
+	const grouped = renderToStaticMarkup(
+		LaunchVerificationProgress({
+			projectName: "devctx",
+			contextName: "Company",
+			groups: [
+				{
+					id: "project",
+					label: "Project",
+					status: "ready",
+					blocking: false,
+					message: "Project folder is ready.",
+					checks: [
+						{
+							id: "project_directory",
+							label: "Project folder",
+							status: "ready",
+							blocking: false,
+							message: "Project folder is ready.",
+						},
+					],
+				},
+				{
+					id: "tools",
+					label: "Tools",
+					status: "blocked",
+					blocking: true,
+					message: "VS Code is unavailable.",
+					checks: [
+						{
+							id: "tool_0",
+							label: "VS Code",
+							status: "blocked",
+							blocking: true,
+							message: "VS Code is unavailable.",
+							actionHint: "Install VS Code.",
+						},
+					],
+				},
+			],
+		}),
+	);
 
 	assert.match(pending, /role="status"/);
 	assert.ok(pending.includes("Launching devctx as Company..."));
@@ -2021,6 +2062,11 @@ test("launch verification progress renders a pending shell and backend stages", 
 	assert.ok(staged.includes("Prepare isolated environment"));
 	assert.ok(staged.includes("Needs attention"));
 	assert.ok(staged.includes("Pending"));
+	assert.ok(grouped.includes("Project folder is ready."));
+	assert.ok(grouped.includes("VS Code is unavailable."));
+	assert.ok(grouped.includes("Fix required"));
+	assert.ok(grouped.includes("Show details"));
+	assert.doesNotMatch(grouped, /<details[^>]* open=""/);
 	assert.deepEqual(
 		["ready", "needs_attention", "blocked", "pending"].map(
 			(status) => verificationStepPresentation(status).label,

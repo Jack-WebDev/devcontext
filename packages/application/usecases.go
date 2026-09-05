@@ -1036,14 +1036,154 @@ func (s *Service) preflightLaunchProject(request PreflightLaunchProjectRequest) 
 	if err != nil {
 		return PreflightLaunchProjectResult{}, err
 	}
+	warnings := warningStates(resolution.Warnings)
 	return PreflightLaunchProjectResult{
 		Project:                    projectState(projectPath),
 		Context:                    contextState,
 		Confidence:                 contextState.Confidence,
+		Groups:                     preflightGroups(contextState, warnings, runningConflict),
 		VerificationSteps:          launchVerificationSteps(contextState),
-		Warnings:                   warningStates(resolution.Warnings),
+		Warnings:                   warnings,
 		RunningEnvironmentConflict: runningConflict,
 	}, nil
+}
+
+// preflightGroups maps implementation-level readiness signals to the five
+// product areas rendered by the launcher. The blocking policy is deliberately
+// owned here so every frontend uses the same safe continuation rule.
+func preflightGroups(context ContextState, warnings []ResolutionWarning, conflict *RunningEnvironmentConflict) []PreflightGroup {
+	return []PreflightGroup{
+		newPreflightGroup(
+			PreflightGroupProject,
+			"Project",
+			projectPreflightChecks(warnings),
+		),
+		newPreflightGroup(
+			PreflightGroupContext,
+			"Context",
+			contextPreflightChecks(context),
+		),
+		newPreflightGroup(
+			PreflightGroupIsolation,
+			"Isolation",
+			confidencePreflightChecks(
+				"isolation",
+				checksForComponent(
+					context.Confidence.Checks,
+					LaunchConfidenceCheckIsolation,
+				),
+			),
+		),
+		newPreflightGroup(PreflightGroupTools, "Tools", toolPreflightChecks(context)),
+		newPreflightGroup(
+			PreflightGroupWorkspace,
+			"Workspace",
+			workspacePreflightChecks(conflict),
+		),
+	}
+}
+
+func projectPreflightChecks(warnings []ResolutionWarning) []PreflightCheck {
+	checks := []PreflightCheck{
+		newPreflightCheck("project_directory", "Project folder", LaunchConfidenceReady, "Project folder is ready.", ""),
+	}
+	for index, warning := range warnings {
+		checks = append(checks, newPreflightCheck(
+			fmt.Sprintf("project_%s_%d", warning.Code, index),
+			"Project binding",
+			LaunchConfidenceNeedsAttention,
+			warning.Message,
+			"Review the context selected for this project.",
+		))
+	}
+	return checks
+}
+
+func contextPreflightChecks(context ContextState) []PreflightCheck {
+	checks := []PreflightCheck{
+		newPreflightCheck("context_selection", "Selected context", LaunchConfidenceReady, context.Name+" is ready to use.", ""),
+	}
+	for index, check := range checksForComponent(context.Confidence.Checks, LaunchConfidenceCheckIdentity) {
+		checks = append(checks, confidencePreflightCheck(fmt.Sprintf("identity_%d", index), check))
+	}
+	return checks
+}
+
+func toolPreflightChecks(context ContextState) []PreflightCheck {
+	checks := confidencePreflightChecks("provider", checksForComponent(context.Confidence.Checks, LaunchConfidenceCheckProvider))
+	return append(checks, confidencePreflightChecks("tool", checksForComponent(context.Confidence.Checks, LaunchConfidenceCheckTool))...)
+}
+
+func workspacePreflightChecks(conflict *RunningEnvironmentConflict) []PreflightCheck {
+	if conflict == nil {
+		return []PreflightCheck{
+			newPreflightCheck("workspace_availability", "Active workspaces", LaunchConfidenceReady, "No active workspace is using this project.", ""),
+		}
+	}
+
+	message := "This project already has an active workspace."
+	if conflict.Kind == "different_context" {
+		message = "This project is already open in another context."
+	}
+	return []PreflightCheck{
+		newPreflightCheck("workspace_conflict", "Active workspace", LaunchConfidenceNeedsAttention, message, "Review the existing workspace before continuing."),
+	}
+}
+
+func confidencePreflightChecks(prefix string, confidenceChecks []LaunchConfidenceCheck) []PreflightCheck {
+	checks := make([]PreflightCheck, 0, len(confidenceChecks))
+	for index, check := range confidenceChecks {
+		checks = append(checks, confidencePreflightCheck(fmt.Sprintf("%s_%d", prefix, index), check))
+	}
+	return checks
+}
+
+func confidencePreflightCheck(id string, check LaunchConfidenceCheck) PreflightCheck {
+	return newPreflightCheck(id, check.Label, check.Severity, check.Message, check.ActionHint)
+}
+
+func newPreflightCheck(id string, label string, status LaunchConfidenceStatus, message string, actionHint string) PreflightCheck {
+	return PreflightCheck{
+		ID:         id,
+		Label:      label,
+		Status:     status,
+		Blocking:   preflightStatusBlocksLaunch(status),
+		Message:    message,
+		ActionHint: actionHint,
+	}
+}
+
+// preflightStatusBlocksLaunch is the single severity policy for preflight
+// evidence. Blocked checks require remediation; needs-attention checks can
+// continue only through an explicit UI decision in a later phase.
+func preflightStatusBlocksLaunch(status LaunchConfidenceStatus) bool {
+	return status == LaunchConfidenceBlocked
+}
+
+func newPreflightGroup(id PreflightGroupID, label string, checks []PreflightCheck) PreflightGroup {
+	status := LaunchConfidenceReady
+	message := label + " is ready."
+	blocking := false
+	for _, check := range checks {
+		if check.Status == LaunchConfidenceBlocked {
+			status = LaunchConfidenceBlocked
+			message = check.Message
+			blocking = true
+			break
+		}
+		if check.Status == LaunchConfidenceNeedsAttention && status == LaunchConfidenceReady {
+			status = LaunchConfidenceNeedsAttention
+			message = check.Message
+		}
+	}
+	return PreflightGroup{
+		ID:       id,
+		Label:    label,
+		Status:   status,
+		Blocking: blocking,
+		Message:  message,
+		Checks:   checks,
+	}
 }
 
 func launchVerificationSteps(context ContextState) []LaunchVerificationStep {

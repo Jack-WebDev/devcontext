@@ -384,9 +384,45 @@ type PreflightLaunchProjectResult struct {
 	Project                    ProjectState                `json:"project"`
 	Context                    ContextState                `json:"context"`
 	Confidence                 LaunchConfidenceState       `json:"confidence"`
+	Groups                     []PreflightGroup            `json:"groups"`
 	VerificationSteps          []LaunchVerificationStep    `json:"verificationSteps,omitempty"`
 	Warnings                   []ResolutionWarning         `json:"warnings,omitempty"`
 	RunningEnvironmentConflict *RunningEnvironmentConflict `json:"runningEnvironmentConflict,omitempty"`
+}
+
+// PreflightGroupID identifies one product-level area checked before launch.
+type PreflightGroupID string
+
+const (
+	PreflightGroupProject   PreflightGroupID = "project"
+	PreflightGroupContext   PreflightGroupID = "context"
+	PreflightGroupIsolation PreflightGroupID = "isolation"
+	PreflightGroupTools     PreflightGroupID = "tools"
+	PreflightGroupWorkspace PreflightGroupID = "workspace"
+)
+
+// PreflightGroup is an aggregate preflight result for one product concept.
+// Checks contain presentation-safe evidence for an optional detail disclosure.
+type PreflightGroup struct {
+	ID       PreflightGroupID       `json:"id"`
+	Label    string                 `json:"label"`
+	Status   LaunchConfidenceStatus `json:"status"`
+	Blocking bool                   `json:"blocking"`
+	Message  string                 `json:"message"`
+	Checks   []PreflightCheck       `json:"checks"`
+}
+
+// PreflightCheck is one presentation-safe piece of evidence within a group.
+// Blocking is the application-owned launch policy for this check: blocking
+// checks cannot continue without remediation, while needs-attention checks
+// require a deliberate choice in the UI.
+type PreflightCheck struct {
+	ID         string                 `json:"id"`
+	Label      string                 `json:"label"`
+	Status     LaunchConfidenceStatus `json:"status"`
+	Blocking   bool                   `json:"blocking"`
+	Message    string                 `json:"message"`
+	ActionHint string                 `json:"actionHint,omitempty"`
 }
 
 // RunningEnvironmentConflict identifies an active environment for the same project.
