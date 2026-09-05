@@ -60,7 +60,7 @@ function ContextCreateReviewScreen({
 			</ReviewSection>
 
 			<ReviewSection title="Development tools" onEdit={() => onEdit("tools")}>
-				{tools.length === 0 ? <p className="text-sm text-muted-foreground">No development tools selected. You can configure them later.</p> : (
+				{tools.length === 0 ? <p className="text-sm text-muted-foreground">No development tools selected. Dev Context will use the available default launch tool; you can configure more tools later.</p> : (
 					<ul className="space-y-1 text-sm">{tools.map((tool) => <li key={tool.id}>{tool.name} <span className="text-muted-foreground">({tool.category})</span></li>)}</ul>
 				)}
 			</ReviewSection>
