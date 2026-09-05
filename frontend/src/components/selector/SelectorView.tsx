@@ -696,6 +696,12 @@ function SelectorView({
 											selectingLauncherState(launcherState.selection),
 										)
 									}
+									onUseRememberedContext={() => {
+										const mismatch = launcherState.error.contextMismatch;
+										if (mismatch !== undefined) {
+											void handleLaunch({ contextId: mismatch.boundContextId });
+										}
+									}}
 									onOpenAnyway={() => {
 										const mismatch = launcherState.error.contextMismatch;
 										if (mismatch !== undefined) {

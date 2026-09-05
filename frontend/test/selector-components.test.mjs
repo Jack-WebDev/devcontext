@@ -50,7 +50,10 @@ import { AccountIdentityMismatchDialog } from "../.tmp-test/src/components/selec
 import { hasAccountIdentityMismatch } from "../.tmp-test/src/components/selector/account-identity-mismatch.js";
 import { bindingReplacementForLaunch } from "../.tmp-test/src/components/selector/binding-replacement.js";
 import { ContextCard } from "../.tmp-test/src/components/selector/ContextCard.js";
-import { ContextMismatchDialog } from "../.tmp-test/src/components/selector/ContextMismatchDialog.js";
+import {
+	ContextMismatchDialog,
+	mismatchDialogKeyboardAction,
+} from "../.tmp-test/src/components/selector/ContextMismatchDialog.js";
 import { DanglingBindingDialog } from "../.tmp-test/src/components/selector/DanglingBindingDialog.js";
 import { cancelSelector } from "../.tmp-test/src/components/selector/cancel-action.js";
 import { missingDefaultContextIds } from "../.tmp-test/src/components/selector/default-context-actions.js";
@@ -2530,7 +2533,7 @@ test("launch action resubmits explicit context mismatch confirmation", async () 
 	]);
 });
 
-test("context mismatch dialog shows risk details and deliberate actions", () => {
+test("context mismatch dialog explains and prioritizes the remembered context", () => {
 	const html = renderToStaticMarkup(
 		ContextMismatchDialog({
 			mismatch: {
@@ -2544,19 +2547,42 @@ test("context mismatch dialog shows risk details and deliberate actions", () => 
 			],
 			launchPending: false,
 			onCancel: () => {},
+			onUseRememberedContext: () => {},
 			onOpenAnyway: () => {},
 		}),
 	);
 
 	assert.match(html, /role="dialog"/);
-	assert.ok(html.includes("Context mismatch"));
+	assert.ok(html.includes("This project normally opens in Company"));
 	assert.ok(html.includes("/work/api"));
 	assert.ok(html.includes("Company"));
 	assert.ok(html.includes("Personal"));
-	assert.ok(html.includes("expose project files"));
+	assert.ok(html.includes("signed-in accounts, tools, and environment"));
+	assert.ok(
+		html.includes(
+			"will not change which context this project normally opens in",
+		),
+	);
+	assert.match(html, /aria-label="Context comparison"/);
+	assert.ok(html.includes("Normal choice"));
+	assert.ok(html.includes("Open only if intended"));
 	assert.ok(html.includes("Cancel"));
-	assert.ok(html.includes("Open Anyway"));
+	assert.ok(html.includes("Open Personal anyway"));
+	assert.ok(html.includes("Use remembered context"));
+	assert.match(html, /autofocus=""/);
+	assert.ok(
+		html.indexOf("Open Personal anyway") <
+			html.indexOf("Use remembered context"),
+	);
+	assert.match(html, /bg-destructive/);
+	assert.match(html, /bg-primary/);
 	assert.match(html, /focus-visible:ring-2/);
+});
+
+test("context mismatch keyboard behavior only cancels with Escape", () => {
+	assert.equal(mismatchDialogKeyboardAction("Escape", false), "cancel");
+	assert.equal(mismatchDialogKeyboardAction("Enter", false), "none");
+	assert.equal(mismatchDialogKeyboardAction("Escape", true), "none");
 });
 
 test("context mismatch open anyway pending state disables actions", () => {
@@ -2570,6 +2596,7 @@ test("context mismatch open anyway pending state disables actions", () => {
 			contexts: [],
 			launchPending: true,
 			onCancel: () => {},
+			onUseRememberedContext: () => {},
 			onOpenAnyway: () => {},
 		}),
 	);
@@ -2625,12 +2652,14 @@ test("context mismatch cancel exits without launch side effects", () => {
 		],
 		launchPending: false,
 		onCancel: () => calls.push("cancel"),
+		onUseRememberedContext: () => calls.push("useRememberedContext"),
 		onOpenAnyway: () => calls.push("launchProject"),
 	};
 	const html = renderToStaticMarkup(ContextMismatchDialog(props));
 
 	assert.ok(html.includes("Cancel"));
-	assert.ok(html.includes("Open Anyway"));
+	assert.ok(html.includes("Open Personal anyway"));
+	assert.ok(html.includes("Use remembered context"));
 	props.onCancel();
 	assert.deepEqual(calls, ["cancel"]);
 });
