@@ -19,7 +19,10 @@ type ContextDetailDestination =
 	| "appearance"
 	| "linked-projects"
 	| "development-tools"
-	| "launch-preferences";
+	| "launch-preferences"
+	| "environment"
+	| "activity"
+	| "advanced";
 
 interface ContextDetailRoute {
 	contextId: string;
@@ -61,7 +64,10 @@ function contextDetailRouteFromHash(
 		destination !== "appearance" &&
 		destination !== "linked-projects" &&
 		destination !== "development-tools" &&
-		destination !== "launch-preferences"
+		destination !== "launch-preferences" &&
+		destination !== "environment" &&
+		destination !== "activity" &&
+		destination !== "advanced"
 	) {
 		return undefined;
 	}

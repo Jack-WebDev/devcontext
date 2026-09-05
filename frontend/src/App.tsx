@@ -597,6 +597,8 @@ function ManagementApp() {
 						getProjects={devContextApi.getProjects}
 						unbindProject={devContextApi.unbindProject}
 						onOpenProjects={() => handleNavigate("projects")}
+						getHistory={devContextApi.getHistory}
+						getDiagnostics={devContextApi.getDiagnostics}
 						onContextUpdated={refreshContexts}
 					/>
 				) : (

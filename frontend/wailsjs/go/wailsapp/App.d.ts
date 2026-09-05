@@ -63,9 +63,9 @@ export function UnbindProject(arg1:application.UnbindProjectRequest):Promise<any
 
 export function UpdateContextAppearance(arg1:application.UpdateContextAppearanceRequest):Promise<any>;
 
-export function UpdateContextDevelopmentTools(arg1:application.UpdateContextDevelopmentToolsRequest):Promise<any>;
-
 export function UpdateContextDetails(arg1:application.UpdateContextDetailsRequest):Promise<any>;
+
+export function UpdateContextDevelopmentTools(arg1:application.UpdateContextDevelopmentToolsRequest):Promise<any>;
 
 export function UpdateSettings(arg1:application.UpdateSettingsRequest):Promise<any>;
 

@@ -6,6 +6,8 @@ import type {
 	ContextDetailsState,
 	ContextState,
 	DevelopmentToolIntegration,
+	DiagnosticGroup,
+	HistoryEntry,
 	ProjectListItem,
 	UpdateContextDevelopmentToolsRequest,
 	UnbindProjectRequest,
@@ -40,6 +42,10 @@ interface ContextDetailViewProps {
 	getProjects: () => Promise<ApiResult<{ projects: ProjectListItem[] }>>;
 	unbindProject: (request: UnbindProjectRequest) => Promise<ApiResult<unknown>>;
 	onOpenProjects: () => void;
+	getHistory: () => Promise<ApiResult<{ entries: HistoryEntry[] }>>;
+	getDiagnostics: (request: {
+		contextId: string;
+	}) => Promise<ApiResult<{ groups: DiagnosticGroup[] }>>;
 	onContextUpdated: () => Promise<void>;
 }
 
@@ -58,6 +64,8 @@ function ContextDetailView({
 	getProjects,
 	unbindProject,
 	onOpenProjects,
+	getHistory,
+	getDiagnostics,
 	onContextUpdated,
 }: ContextDetailViewProps) {
 	const [result, setResult] = useState<ApiResult<ContextDetailsState>>();
@@ -200,6 +208,17 @@ function ContextDetailView({
 					}}
 				/>
 			) : null}
+			{destination === "environment" ? <ContextEnvironment /> : null}
+			{destination === "activity" ? (
+				<ContextActivity contextId={contextId} getHistory={getHistory} />
+			) : null}
+			{destination === "advanced" ? (
+				<ContextAdvanced
+					contextId={contextId}
+					location={result.data.location}
+					getDiagnostics={getDiagnostics}
+				/>
+			) : null}
 		</section>
 	);
 }
@@ -242,6 +261,24 @@ function ContextDetailOverview({
 				description="Choose an icon and accent that help distinguish this context."
 				action="Edit appearance"
 				onClick={() => onNavigate("appearance")}
+			/>
+			<DestinationCard
+				title="Environment"
+				description="Review the safe configuration that shapes this context’s launches."
+				action="View environment"
+				onClick={() => onNavigate("environment")}
+			/>
+			<DestinationCard
+				title="Activity"
+				description="Review recent launches and changes for this context."
+				action="View activity"
+				onClick={() => onNavigate("activity")}
+			/>
+			<DestinationCard
+				title="Advanced"
+				description="Open diagnostics and implementation details when you need them."
+				action="Open advanced"
+				onClick={() => onNavigate("advanced")}
 			/>
 			<Card as="section" hierarchy="secondary" className="py-0 lg:col-span-2">
 				<CardContent className="inset-group">
@@ -805,6 +842,184 @@ function ContextLaunchPreferences({
 					{pending ? "Saving..." : "Save launch preference"}
 				</Button>
 			</div>
+		</section>
+	);
+}
+
+function ContextEnvironment() {
+	return (
+		<section
+			className="max-w-2xl space-y-4"
+			aria-labelledby="context-environment-heading"
+		>
+			<div>
+				<h3 id="context-environment-heading" className="text-section-title">
+					Environment
+				</h3>
+				<p className="mt-1 text-body text-secondary">
+					This context’s environment is assembled from its selected tool and
+					enabled integrations at launch.
+				</p>
+			</div>
+			<Card as="section" hierarchy="secondary" className="py-0">
+				<CardContent className="inset-group">
+					<h4 className="font-medium">No custom environment values</h4>
+					<p className="mt-2 text-body text-secondary">
+						Dev Context does not store user-defined environment values for
+						contexts yet. This keeps credentials and private values out of
+						context configuration.
+					</p>
+				</CardContent>
+			</Card>
+		</section>
+	);
+}
+
+function ContextActivity({
+	contextId,
+	getHistory,
+}: {
+	contextId: string;
+	getHistory: () => Promise<ApiResult<{ entries: HistoryEntry[] }>>;
+}) {
+	const [entries, setEntries] = useState<HistoryEntry[]>();
+	const [error, setError] = useState<string>();
+	useEffect(() => {
+		void getHistory().then((result) =>
+			result.ok
+				? setEntries(
+						result.data.entries.filter(
+							(entry) => entry.contextId === contextId,
+						),
+					)
+				: setError(result.error.message),
+		);
+	}, [contextId, getHistory]);
+	return (
+		<section
+			className="max-w-3xl space-y-4"
+			aria-labelledby="context-activity-heading"
+		>
+			<div>
+				<h3 id="context-activity-heading" className="text-section-title">
+					Activity
+				</h3>
+				<p className="mt-1 text-body text-secondary">
+					Recent local launches and changes for this context.
+				</p>
+			</div>
+			{error ? (
+				<p role="alert" className="text-sm text-destructive">
+					{error}
+				</p>
+			) : null}
+			{entries === undefined ? (
+				<p className="text-body text-secondary">Loading activity…</p>
+			) : entries.length === 0 ? (
+				<Card as="section" hierarchy="secondary" className="py-0">
+					<CardContent className="inset-group text-body text-secondary">
+						No activity has been recorded for this context yet.
+					</CardContent>
+				</Card>
+			) : (
+				<Card as="section" hierarchy="secondary" className="py-0">
+					<CardContent className="divide-y divide-border p-0">
+						{entries.map((entry, index) => (
+							<article key={`${entry.timestamp}-${index}`} className="p-4">
+								<p className="font-medium">{entry.message}</p>
+								<p className="mt-1 text-sm text-muted-foreground">
+									{new Date(entry.timestamp).toLocaleString()}
+								</p>
+								{entry.projectPath ? (
+									<p className="mt-1 break-all font-mono text-xs text-muted-foreground">
+										{entry.projectPath}
+									</p>
+								) : null}
+							</article>
+						))}
+					</CardContent>
+				</Card>
+			)}
+		</section>
+	);
+}
+
+function ContextAdvanced({
+	contextId,
+	location,
+	getDiagnostics,
+}: {
+	contextId: string;
+	location: string;
+	getDiagnostics: (request: {
+		contextId: string;
+	}) => Promise<ApiResult<{ groups: DiagnosticGroup[] }>>;
+}) {
+	const [groups, setGroups] = useState<DiagnosticGroup[]>();
+	const [error, setError] = useState<string>();
+	useEffect(() => {
+		void getDiagnostics({ contextId }).then((result) =>
+			result.ok
+				? setGroups(result.data.groups)
+				: setError(result.error.message),
+		);
+	}, [contextId, getDiagnostics]);
+	return (
+		<section
+			className="max-w-3xl space-y-4"
+			aria-labelledby="context-advanced-heading"
+		>
+			<div>
+				<h3 id="context-advanced-heading" className="text-section-title">
+					Advanced
+				</h3>
+				<p className="mt-1 text-body text-secondary">
+					Implementation details and safe diagnostics for troubleshooting.
+				</p>
+			</div>
+			<Card as="section" hierarchy="secondary" className="py-0">
+				<CardContent className="inset-group">
+					<dl className="space-y-3 text-sm">
+						<div>
+							<dt className="text-muted-foreground">Context ID</dt>
+							<dd className="mt-1 break-all font-mono">{contextId}</dd>
+						</div>
+						<div>
+							<dt className="text-muted-foreground">Local location</dt>
+							<dd className="mt-1 break-all font-mono">{location}</dd>
+						</div>
+					</dl>
+				</CardContent>
+			</Card>
+			{error ? (
+				<p role="alert" className="text-sm text-destructive">
+					{error}
+				</p>
+			) : null}
+			{groups === undefined ? (
+				<p className="text-body text-secondary">Loading diagnostics…</p>
+			) : (
+				groups.map((group) => (
+					<Card
+						key={group.id}
+						as="section"
+						hierarchy="secondary"
+						className="py-0"
+					>
+						<CardContent className="inset-group">
+							<h4 className="font-medium">{group.label}</h4>
+							<ul className="mt-3 space-y-2 text-sm">
+								{group.checks.map((check) => (
+									<li key={check.id}>
+										<span className="font-medium">{check.label}</span>
+										<p className="text-muted-foreground">{check.message}</p>
+									</li>
+								))}
+							</ul>
+						</CardContent>
+					</Card>
+				))
+			)}
 		</section>
 	);
 }
