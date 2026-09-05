@@ -20,6 +20,7 @@ import {
 	CreateContextDialog,
 } from "./components/contexts/ContextManagement";
 import { ContextDeleteDialog } from "./components/contexts/ContextDeleteDialog";
+import { ContextDetailView } from "./components/contexts/ContextDetailView";
 import type { ContextListAction } from "./components/contexts/ContextsView";
 import { DiagnosticsView } from "./components/diagnostics/DiagnosticsView";
 import { RecentProjectConfirmationDialog } from "./components/home/RecentProjectConfirmationDialog";
@@ -36,6 +37,8 @@ import {
 	appRouteDefinition,
 	appRouteDefinitions,
 	appRouteFromHash,
+	contextDetailHash,
+	contextDetailRouteFromHash,
 } from "./components/shell/routes";
 import { AppStatusBar } from "./components/status/AppStatusBar";
 import {
@@ -135,7 +138,11 @@ function ManagementApp() {
 		useState(false);
 	const [runningEnvironmentLaunchError, setRunningEnvironmentLaunchError] =
 		useState<DisplayError>();
-	const [contextDetailsID, setContextDetailsID] = useState<string>();
+	const [contextDetailRoute, setContextDetailRoute] = useState(() =>
+		contextDetailRouteFromHash(window.location.hash),
+	);
+	const [contextManagementDrawerID, setContextManagementDrawerID] =
+		useState<string>();
 	const [contextToDelete, setContextToDelete] = useState<{
 		id: string;
 		name: string;
@@ -171,6 +178,7 @@ function ManagementApp() {
 	useEffect(() => {
 		function syncRouteFromHash() {
 			setActiveRoute(appRouteFromHash(window.location.hash));
+			setContextDetailRoute(contextDetailRouteFromHash(window.location.hash));
 		}
 
 		window.addEventListener("hashchange", syncRouteFromHash);
@@ -197,7 +205,18 @@ function ManagementApp() {
 		}
 		if (route !== activeRoute) {
 			window.location.hash = route;
+		} else if (route === "contexts" && contextDetailRoute) {
+			window.location.hash = route;
 		}
+	}
+
+	function navigateToContextDetail(
+		contextId: string,
+		destination: "overview" | "name-purpose" | "appearance" = "overview",
+	) {
+		const route = { contextId, destination };
+		setContextDetailRoute(route);
+		window.location.hash = contextDetailHash(route);
 	}
 
 	async function handleCommandPaletteLaunch(contextId: string) {
@@ -290,7 +309,14 @@ function ManagementApp() {
 			if (context) setContextToDelete({ id: context.id, name: context.name });
 			return;
 		}
-		setContextDetailsID(contextId);
+		if (action === "duplicate" || action === "export") {
+			setContextManagementDrawerID(contextId);
+			return;
+		}
+		navigateToContextDetail(
+			contextId,
+			action === "edit" ? "name-purpose" : "overview",
+		);
 	}
 
 	async function handleSettingsChange(next: SettingsState) {
@@ -555,81 +581,94 @@ function ManagementApp() {
 					) : null}
 				</section>
 			) : activeRoute === "contexts" ? (
-				<>
-					<ContextsContent
-						contexts={contexts}
-						onSelect={setContextDetailsID}
-						onNew={() => setCreatingContext(true)}
-						onAction={handleContextAction}
+				contextDetailRoute ? (
+					<ContextDetailView
+						contextId={contextDetailRoute.contextId}
+						destination={contextDetailRoute.destination}
+						onBack={() => handleNavigate("contexts")}
+						onNavigate={(destination) =>
+							navigateToContextDetail(contextDetailRoute.contextId, destination)
+						}
+						load={(contextId) => devContextApi.getContextDetails({ contextId })}
+						updateDetails={devContextApi.updateContextDetails}
+						updateAppearance={devContextApi.updateContextAppearance}
+						onContextUpdated={refreshContexts}
 					/>
-					{contextToDelete ? (
-						<ContextDeleteDialog
-							contextId={contextToDelete.id}
-							contextName={contextToDelete.name}
-							onClose={() => setContextToDelete(undefined)}
-							preview={(contextId) =>
-								devContextApi.previewDeleteContext({ contextId })
-							}
-							deleteContext={(contextId) =>
-								devContextApi.deleteContext({
-									contextId,
-									confirmDelete: true,
-								})
-							}
-							onDeleted={() => {
-								setContextToDelete(undefined);
-								void refreshContexts();
-							}}
+				) : (
+					<>
+						<ContextsContent
+							contexts={contexts}
+							onSelect={(contextId) => navigateToContextDetail(contextId)}
+							onNew={() => setCreatingContext(true)}
+							onAction={handleContextAction}
 						/>
-					) : null}
-					{contextDetailsID ? (
-						<ContextDetailsDrawer
-							contextId={contextDetailsID}
-							onClose={() => setContextDetailsID(undefined)}
-							load={(contextId) =>
-								devContextApi.getContextDetails({ contextId })
-							}
-							duplicate={async (request) => {
-								const result = await devContextApi.duplicateContext(request);
-								if (result.ok) {
-									await refreshContexts();
+						{contextToDelete ? (
+							<ContextDeleteDialog
+								contextId={contextToDelete.id}
+								contextName={contextToDelete.name}
+								onClose={() => setContextToDelete(undefined)}
+								preview={(contextId) =>
+									devContextApi.previewDeleteContext({ contextId })
 								}
-								return result;
-							}}
-							exportMetadata={devContextApi.exportContextMetadata}
-							importMetadata={handleImportContextMetadata}
-						/>
-					) : null}
-					{creatingContext && contexts.status === "loaded" ? (
-						<CreateContextDialog
-							contexts={contexts.data}
-							onClose={() => setCreatingContext(false)}
-							create={async (request) => {
-								const result = await devContextApi.createContext(request);
-								if (result.ok) {
-									await refreshContexts();
+								deleteContext={(contextId) =>
+									devContextApi.deleteContext({
+										contextId,
+										confirmDelete: true,
+									})
 								}
-								return result;
-							}}
-							bindProject={async (request) => {
-								const result = await devContextApi.bindProject(request);
-								if (result.ok) await refreshProjects();
-								return result;
-							}}
-							verifyContext={(context) =>
-								devContextApi.getContextDetails({ contextId: context.id })
-							}
-							onOpenProject={() => {
-								setCreatingContext(false);
-								setActiveRoute("projects");
-							}}
-							onViewContext={(contextId) => {
-								setCreatingContext(false);
-								setContextDetailsID(contextId);
-							}}
-						/>
-					) : null}
-				</>
+								onDeleted={() => {
+									setContextToDelete(undefined);
+									void refreshContexts();
+								}}
+							/>
+						) : null}
+						{contextManagementDrawerID ? (
+							<ContextDetailsDrawer
+								contextId={contextManagementDrawerID}
+								onClose={() => setContextManagementDrawerID(undefined)}
+								load={(contextId) =>
+									devContextApi.getContextDetails({ contextId })
+								}
+								duplicate={async (request) => {
+									const result = await devContextApi.duplicateContext(request);
+									if (result.ok) await refreshContexts();
+									return result;
+								}}
+								exportMetadata={devContextApi.exportContextMetadata}
+								importMetadata={handleImportContextMetadata}
+							/>
+						) : null}
+						{creatingContext && contexts.status === "loaded" ? (
+							<CreateContextDialog
+								contexts={contexts.data}
+								onClose={() => setCreatingContext(false)}
+								create={async (request) => {
+									const result = await devContextApi.createContext(request);
+									if (result.ok) {
+										await refreshContexts();
+									}
+									return result;
+								}}
+								bindProject={async (request) => {
+									const result = await devContextApi.bindProject(request);
+									if (result.ok) await refreshProjects();
+									return result;
+								}}
+								verifyContext={(context) =>
+									devContextApi.getContextDetails({ contextId: context.id })
+								}
+								onOpenProject={() => {
+									setCreatingContext(false);
+									setActiveRoute("projects");
+								}}
+								onViewContext={(contextId) => {
+									setCreatingContext(false);
+									navigateToContextDetail(contextId);
+								}}
+							/>
+						) : null}
+					</>
+				)
 			) : activeRoute === "projects" ? (
 				<>
 					<ProjectsContent
