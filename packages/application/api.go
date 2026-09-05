@@ -109,6 +109,46 @@ type GetContextDetailsRequest struct {
 	ContextID string `json:"contextId"`
 }
 
+// UpdateContextDetailsRequest changes only the human-readable identity fields.
+// The internal ID, tool configuration, providers, and project bindings remain
+// owned by their respective contracts.
+type UpdateContextDetailsRequest struct {
+	ContextID   string `json:"contextId"`
+	Name        string `json:"name"`
+	Purpose     string `json:"purpose,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+// UpdateContextAppearanceRequest changes only presentation metadata.
+type UpdateContextAppearanceRequest struct {
+	ContextID string `json:"contextId"`
+	Icon      string `json:"icon,omitempty"`
+	Accent    string `json:"accent,omitempty"`
+}
+
+type ArchiveContextRequest struct {
+	ContextID string `json:"contextId"`
+}
+type RestoreContextRequest struct {
+	ContextID string `json:"contextId"`
+}
+type DeleteContextPreviewRequest struct {
+	ContextID string `json:"contextId"`
+}
+type DeleteContextRequest struct {
+	ContextID     string `json:"contextId"`
+	ConfirmDelete bool   `json:"confirmDelete"`
+}
+type DeleteContextPreview struct {
+	Context              ContextState   `json:"context"`
+	ProjectBindings      []ProjectState `json:"projectBindings"`
+	DeletesIsolatedState bool           `json:"deletesIsolatedState"`
+}
+type DeleteContextResult struct {
+	ContextID              string         `json:"contextId"`
+	RemovedProjectBindings []ProjectState `json:"removedProjectBindings"`
+}
+
 // ContextDetailsState contains the backend-owned data for one context's
 // detail view. It extends the list summary with its storage location and
 // creation time.
@@ -246,6 +286,7 @@ type ContextState struct {
 	DevelopmentTools []DevelopmentToolIntegration `json:"developmentTools"`
 	Confidence       LaunchConfidenceState        `json:"confidence"`
 	Metadata         map[string]string            `json:"metadata,omitempty"`
+	ArchivedAt       *time.Time                   `json:"archivedAt,omitempty"`
 }
 
 // DevelopmentToolIntegration is a generic, presentation-safe development

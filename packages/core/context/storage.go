@@ -21,6 +21,9 @@ var (
 
 	// ErrContextAlreadyExists identifies a context creation conflict.
 	ErrContextAlreadyExists = errors.New("context already exists")
+
+	// ErrContextArchived identifies a context retired from routine launches.
+	ErrContextArchived = errors.New("context is archived")
 )
 
 // Repository stores contexts below a contexts directory.
@@ -53,6 +56,25 @@ func (r Repository) Write(ctx Context) error {
 		return err
 	}
 	return WriteContextFile(r.contextConfigPath(ctx.ID), ctx)
+}
+
+// Delete removes only the Dev Context-owned directory for one context. It
+// never touches project folders, which are stored independently.
+func (r Repository) Delete(contextID ID) error {
+	if contextID.String() == "" {
+		return fmt.Errorf("%w: cannot be empty", ErrInvalidID)
+	}
+	path := filepath.Join(r.contextsDir, contextID.String())
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return r.missingContextError(contextID)
+		}
+		return fmt.Errorf("stat context directory %q: %w", path, err)
+	}
+	if err := os.RemoveAll(path); err != nil {
+		return fmt.Errorf("delete context directory %q: %w", path, err)
+	}
+	return nil
 }
 
 // List returns all valid contexts in deterministic ID order.

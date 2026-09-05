@@ -50,6 +50,8 @@ func historyEventMessage(event devlog.Event) string {
 		return "Launch configuration needs attention."
 	case devlog.EventContextCreated:
 		return "Context created."
+	case devlog.EventContextUpdated:
+		return "Context updated."
 	case devlog.EventProviderConnected:
 		return "Provider connected."
 	case devlog.EventProviderReset:

@@ -24,12 +24,13 @@ var (
 )
 
 type contextTOML struct {
-	ID        *string                 `toml:"id"`
-	Name      *string                 `toml:"name"`
-	CreatedAt *time.Time              `toml:"created_at"`
-	Tool      launchTargetTOML        `toml:"launch_target"`
-	Providers map[string]providerTOML `toml:"providers"`
-	Metadata  map[string]string       `toml:"metadata"`
+	ID         *string                 `toml:"id"`
+	Name       *string                 `toml:"name"`
+	CreatedAt  *time.Time              `toml:"created_at"`
+	ArchivedAt *time.Time              `toml:"archived_at"`
+	Tool       launchTargetTOML        `toml:"launch_target"`
+	Providers  map[string]providerTOML `toml:"providers"`
+	Metadata   map[string]string       `toml:"metadata"`
 }
 
 type launchTargetTOML struct {
@@ -79,6 +80,9 @@ func EncodeContextTOML(ctx Context) ([]byte, error) {
 	writeStringValue(&builder, "id", ctx.ID.String())
 	writeStringValue(&builder, "name", ctx.Name)
 	writeTimeValue(&builder, "created_at", ctx.CreatedAt)
+	if ctx.ArchivedAt != nil {
+		writeTimeValue(&builder, "archived_at", ctx.ArchivedAt.UTC())
+	}
 
 	builder.WriteString("\n[launch_target]\n")
 	writeStringValue(&builder, "default_tool", string(ctx.Tool.DefaultTool))
@@ -169,14 +173,19 @@ func contextFromTOML(raw contextTOML, expectedID ID) (Context, error) {
 		return Context{}, err
 	}
 
-	return Context{
+	ctx := Context{
 		ID:        id,
 		Name:      *raw.Name,
 		Tool:      toolConfig,
 		Providers: providerConfigs,
 		Metadata:  metadata,
 		CreatedAt: raw.CreatedAt.UTC(),
-	}, nil
+	}
+	if raw.ArchivedAt != nil {
+		archivedAt := raw.ArchivedAt.UTC()
+		ctx.ArchivedAt = &archivedAt
+	}
+	return ctx, nil
 }
 
 func launchTargetFromTOML(raw launchTargetTOML) (codingtool.LaunchTarget, error) {

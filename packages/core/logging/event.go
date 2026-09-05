@@ -24,6 +24,10 @@ const (
 	EventLaunchProviderMissing EventName = "launch_provider_missing"
 	EventLaunchProcessFailure  EventName = "launch_process_failure"
 	EventContextCreated        EventName = "context_created"
+	EventContextUpdated        EventName = "context_updated"
+	EventContextArchived       EventName = "context_archived"
+	EventContextRestored       EventName = "context_restored"
+	EventContextDeleted        EventName = "context_deleted"
 	EventProviderConnected     EventName = "provider_connected"
 	EventProviderReset         EventName = "provider_reset"
 	EventRepairCompleted       EventName = "repair_completed"
@@ -101,7 +105,7 @@ func CategoryForError(err error) ErrorCategory {
 		return ErrorCategoryConfiguration
 	case errors.Is(err, filesystem.ErrStoragePermissionDenied):
 		return ErrorCategoryPermission
-	case errors.Is(err, devcontext.ErrInvalidID), errors.Is(err, devcontext.ErrContextNotFound),
+	case errors.Is(err, devcontext.ErrInvalidID), errors.Is(err, devcontext.ErrContextNotFound), errors.Is(err, devcontext.ErrContextArchived),
 		errors.Is(err, devcontext.ErrUnreadableContextConfig), errors.Is(err, devcontext.ErrInvalidContextConfig),
 		errors.Is(err, devcontext.ErrContextIDMismatch), errors.Is(err, filesystem.ErrContextStorageIncomplete),
 		errors.Is(err, launcher.ErrLaunchSelectionRequired):

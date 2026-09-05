@@ -3,6 +3,7 @@ package application
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -252,6 +253,125 @@ func TestGetContextDetailsReturnsConfiguredContextMetadata(t *testing.T) {
 	}
 	if len(details.EnabledProviders) != 1 || details.EnabledProviders[0].ID != "fake" {
 		t.Fatalf("enabled providers = %#v", details.EnabledProviders)
+	}
+}
+
+func TestUpdateContextDetailsPreservesContextConfigurationAndBindings(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	logger := &applicationRecordingLogger{}
+	fixture.logger = logger
+	ctx := fixture.context("personal", "Personal")
+	ctx.Metadata = devcontext.Metadata{"accent": "sage", "purpose": "Old"}
+	fixture.writeContext(t, ctx)
+	fixture.writeBindings(t, project.Binding{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "one")), ContextID: ctx.ID, CreatedAt: fixture.now})
+
+	service := fixture.service()
+	updated, appErr := service.UpdateContextDetails(UpdateContextDetailsRequest{ContextID: "personal", Name: "Personal work", Purpose: "Work projects", Description: "Private repositories"})
+	if appErr != nil {
+		t.Fatalf("update context details: %v", appErr)
+	}
+	if updated.ID != "personal" || updated.Name != "Personal work" || updated.Purpose != "Work projects" || updated.Description != "Private repositories" || updated.Metadata["accent"] != "sage" {
+		t.Fatalf("updated state = %#v", updated)
+	}
+	stored, err := service.dependencies.Contexts.Get(ctx.ID)
+	if err != nil {
+		t.Fatalf("get stored context: %v", err)
+	}
+	if stored.Tool.DefaultTool != ctx.Tool.DefaultTool || stored.Metadata["accent"] != "sage" {
+		t.Fatalf("stored configuration changed unexpectedly: %#v", stored)
+	}
+	bindings, err := service.dependencies.Projects.List()
+	if err != nil || len(bindings) != 1 || bindings[0].ContextID != ctx.ID {
+		t.Fatalf("bindings changed unexpectedly: %#v, %v", bindings, err)
+	}
+	if got := applicationEventNames(logger.events); !reflect.DeepEqual(got, []devlog.EventName{devlog.EventContextUpdated}) {
+		t.Fatalf("history events = %#v", got)
+	}
+}
+
+func TestUpdateContextAppearanceOnlyChangesAppearanceMetadata(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	ctx := fixture.context("personal", "Personal")
+	ctx.Metadata = devcontext.Metadata{"purpose": "Personal projects", "icon": "heart", "accent": "sage"}
+	fixture.writeContext(t, ctx)
+
+	updated, appErr := fixture.service().UpdateContextAppearance(UpdateContextAppearanceRequest{ContextID: "personal", Icon: "building", Accent: "amber"})
+	if appErr != nil {
+		t.Fatalf("update context appearance: %v", appErr)
+	}
+	if updated.ID != "personal" || updated.Name != "Personal" || updated.Metadata["purpose"] != "Personal projects" || updated.Metadata["icon"] != "building" || updated.Metadata["accent"] != "amber" {
+		t.Fatalf("updated appearance = %#v", updated)
+	}
+	if _, appErr := fixture.service().UpdateContextDetails(UpdateContextDetailsRequest{ContextID: "personal", Name: "", Purpose: "x"}); appErr == nil {
+		t.Fatal("expected empty name to be rejected")
+	}
+}
+
+func TestContextLifecycleArchivesRestoresAndDeletesOnlyOwnedState(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	ctx := fixture.context("personal", "Personal")
+	fixture.writeContext(t, ctx)
+	fixture.writeBindings(t, project.Binding{ProjectPath: project.Path(fixture.projectDir), ContextID: ctx.ID, CreatedAt: fixture.now})
+	service := fixture.service()
+
+	archived, appErr := service.ArchiveContext(ArchiveContextRequest{ContextID: ctx.ID.String()})
+	if appErr != nil || archived.ArchivedAt == nil {
+		t.Fatalf("archive context = %#v, %v", archived, appErr)
+	}
+	launchState, appErr := service.GetLaunchState(GetLaunchStateRequest{ProjectPath: fixture.projectDir})
+	if appErr != nil || len(launchState.Contexts) != 0 || !launchState.SelectionRequired {
+		t.Fatalf("archived launch state = %#v, %v", launchState, appErr)
+	}
+	preview, appErr := service.PreviewDeleteContext(DeleteContextPreviewRequest{ContextID: ctx.ID.String()})
+	if appErr != nil || len(preview.ProjectBindings) != 1 || !preview.DeletesIsolatedState {
+		t.Fatalf("delete preview = %#v, %v", preview, appErr)
+	}
+	if _, appErr := service.DeleteContext(DeleteContextRequest{ContextID: ctx.ID.String()}); appErr == nil {
+		t.Fatal("unconfirmed deletion succeeded")
+	}
+	if _, appErr := service.RestoreContext(RestoreContextRequest{ContextID: ctx.ID.String()}); appErr != nil {
+		t.Fatalf("restore context: %v", appErr)
+	}
+	if _, appErr := service.ArchiveContext(ArchiveContextRequest{ContextID: ctx.ID.String()}); appErr != nil {
+		t.Fatalf("archive context again: %v", appErr)
+	}
+	if _, appErr := service.DeleteContext(DeleteContextRequest{ContextID: ctx.ID.String(), ConfirmDelete: true}); appErr != nil {
+		t.Fatalf("delete context: %v", appErr)
+	}
+	if _, err := devcontext.NewRepository(fixture.contextsDir).Get(ctx.ID); !errors.Is(err, devcontext.ErrContextNotFound) {
+		t.Fatalf("deleted context lookup error = %v", err)
+	}
+	if _, err := os.Stat(fixture.projectDir); err != nil {
+		t.Fatalf("project folder was affected: %v", err)
+	}
+	bindings, err := project.ReadProjectBindingsFile(fixture.bindingsPath)
+	if err != nil || len(bindings) != 0 {
+		t.Fatalf("remaining bindings = %#v, %v", bindings, err)
+	}
+}
+
+func TestDeleteContextBlocksAnActiveWorkspace(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	ctx := fixture.context("personal", "Personal")
+	fixture.writeContext(t, ctx)
+	service := fixture.service()
+	if _, appErr := service.ArchiveContext(ArchiveContextRequest{ContextID: ctx.ID.String()}); appErr != nil {
+		t.Fatalf("archive context: %v", appErr)
+	}
+	repository := coreRunning.NewRepository(fixture.runningPath)
+	if _, err := repository.Record(coreRunning.Environment{
+		Project:   coreRunning.ProjectIdentity{Path: project.Path(fixture.projectDir), Name: "current"},
+		Context:   coreRunning.ContextIdentity{ID: ctx.ID, Name: ctx.Name},
+		Tool:      coreRunning.ToolIdentity{ID: fixture.editor.ID(), Name: "Fake Tool"},
+		StartedAt: fixture.now,
+		Process:   coreRunning.Process{State: coreRunning.ProcessStateRunning},
+		Session:   coreRunning.Session{State: coreRunning.SessionStateActive},
+		Launch:    coreRunning.LaunchIdentity{Source: launcher.InvocationSourceGUI, ResolutionSource: launcher.ResolutionSourceExplicit},
+	}); err != nil {
+		t.Fatalf("record active workspace: %v", err)
+	}
+	if _, appErr := service.DeleteContext(DeleteContextRequest{ContextID: ctx.ID.String(), ConfirmDelete: true}); appErr == nil {
+		t.Fatal("deleted context with active workspace")
 	}
 }
 

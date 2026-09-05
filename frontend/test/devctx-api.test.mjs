@@ -504,6 +504,25 @@ test("adapter normalizes context details", async () => {
 	});
 });
 
+test("adapter updates context details and appearance through scoped contracts", async () => {
+	const calls = [];
+	const context = {
+		id: "personal", name: "Personal work", tool: toolFixture(),
+		availableTools: [toolOptionFixture()], providers: [],
+		confidence: { contextId: "personal", status: "ready", checks: [] },
+	};
+	const api = createDevContextApi({
+		async updateContextDetails(request) { calls.push(["details", request]); return context; },
+		async updateContextAppearance(request) { calls.push(["appearance", request]); return { ...context, metadata: { icon: "building", accent: "amber" } }; },
+	});
+	assert.equal((await api.updateContextDetails({ contextId: "personal", name: "Personal work", purpose: "Work" })).ok, true);
+	assert.equal((await api.updateContextAppearance({ contextId: "personal", icon: "building", accent: "amber" })).ok, true);
+	assert.deepEqual(calls, [
+		["details", { contextId: "personal", name: "Personal work", purpose: "Work" }],
+		["appearance", { contextId: "personal", icon: "building", accent: "amber" }],
+	]);
+});
+
 test("adapter normalizes successful Wails calls", async () => {
 	const calls = [];
 	const api = createDevContextApi({

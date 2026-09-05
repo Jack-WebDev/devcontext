@@ -220,6 +220,34 @@ export namespace application {
 	        this.contextId = source["contextId"];
 	    }
 	}
+	export class UpdateContextDetailsRequest {
+		contextId: string;
+		name: string;
+		purpose?: string;
+		description?: string;
+
+		static createFrom(source: any = {}) { return new UpdateContextDetailsRequest(source); }
+		constructor(source: any = {}) {
+			if ('string' === typeof source) source = JSON.parse(source);
+			this.contextId = source["contextId"];
+			this.name = source["name"];
+			this.purpose = source["purpose"];
+			this.description = source["description"];
+		}
+	}
+	export class UpdateContextAppearanceRequest {
+		contextId: string;
+		icon?: string;
+		accent?: string;
+
+		static createFrom(source: any = {}) { return new UpdateContextAppearanceRequest(source); }
+		constructor(source: any = {}) {
+			if ('string' === typeof source) source = JSON.parse(source);
+			this.contextId = source["contextId"];
+			this.icon = source["icon"];
+			this.accent = source["accent"];
+		}
+	}
 	export class GetDiagnosticsRequest {
 	    contextId?: string;
 	
@@ -411,4 +439,3 @@ export namespace wailsapp {
 	}
 
 }
-
