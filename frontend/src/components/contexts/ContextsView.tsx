@@ -1,3 +1,4 @@
+import { EllipsisIcon } from "lucide-react";
 import type { ContextListItem } from "../../lib/devctx-api";
 import {
 	ContextAccentIndicator,
@@ -6,15 +7,43 @@ import {
 import { StatusIndicator } from "../status/StatusIndicator.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "../ui/dropdown-menu.js";
 import { contextIconOption } from "./context-identity-options.js";
+
+type ContextListAction =
+	| "open"
+	| "edit"
+	| "duplicate"
+	| "export"
+	| "archive"
+	| "delete";
+
+type ContextHealth =
+	| "healthy"
+	| "needs_attention"
+	| "setup_incomplete"
+	| "unavailable"
+	| "archived";
 
 interface ContextsViewProps {
 	contexts: ContextListItem[];
 	onSelect?: (id: string) => void;
 	onNew?: () => void;
+	onAction?: (id: string, action: ContextListAction) => void;
 }
 
-function ContextsView({ contexts, onSelect, onNew }: ContextsViewProps) {
+function ContextsView({
+	contexts,
+	onSelect,
+	onNew,
+	onAction,
+}: ContextsViewProps) {
 	return (
 		<section
 			aria-labelledby="contexts-heading"
@@ -46,6 +75,7 @@ function ContextsView({ contexts, onSelect, onNew }: ContextsViewProps) {
 							key={item.context.id}
 							item={item}
 							onSelect={onSelect}
+							onAction={onAction}
 						/>
 					))}
 				</div>
@@ -57,13 +87,16 @@ function ContextsView({ contexts, onSelect, onNew }: ContextsViewProps) {
 function ContextListCard({
 	item,
 	onSelect,
+	onAction,
 }: {
 	item: ContextListItem;
 	onSelect?: (id: string) => void;
+	onAction?: (id: string, action: ContextListAction) => void;
 }) {
 	const { context } = item;
 	const accent = contextAccentFromMetadata(context.metadata?.accent);
 	const icon = context.metadata?.icon;
+	const health = contextHealth(context);
 	return (
 		<Card
 			as="article"
@@ -93,12 +126,20 @@ function ContextListCard({
 							</p>
 						) : null}
 					</div>
+					{onAction ? (
+						<ContextActionsMenu
+							context={context}
+							onAction={(action) => onAction(context.id, action)}
+						/>
+					) : null}
 				</div>
 
 				<div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-border py-3">
 					<div>
 						<p className="text-label text-muted-foreground">Health</p>
-						<StatusIndicator status={context.confidence?.status ?? "blocked"} />
+						<StatusIndicator status={health.status}>
+							{health.label}
+						</StatusIndicator>
 					</div>
 					<ContextListDetail
 						label="Linked projects"
@@ -125,6 +166,57 @@ function ContextListCard({
 				) : null}
 			</CardContent>
 		</Card>
+	);
+}
+
+function ContextActionsMenu({
+	context,
+	onAction,
+}: {
+	context: ContextListItem["context"];
+	onAction: (action: ContextListAction) => void;
+}) {
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon-sm"
+						aria-label={`Actions for ${context.name}`}
+					/>
+				}
+			>
+				<EllipsisIcon />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end">
+				<DropdownMenuItem onClick={() => onAction("open")}>
+					Open
+				</DropdownMenuItem>
+				<DropdownMenuItem onClick={() => onAction("edit")}>
+					Edit
+				</DropdownMenuItem>
+				<DropdownMenuItem onClick={() => onAction("duplicate")}>
+					Duplicate
+				</DropdownMenuItem>
+				<DropdownMenuItem onClick={() => onAction("export")}>
+					Export
+				</DropdownMenuItem>
+				{context.archivedAt ? null : (
+					<DropdownMenuItem onClick={() => onAction("archive")}>
+						Archive
+					</DropdownMenuItem>
+				)}
+				<DropdownMenuSeparator />
+				<DropdownMenuItem
+					variant="destructive"
+					onClick={() => onAction("delete")}
+				>
+					Delete
+				</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }
 
@@ -166,6 +258,35 @@ function integrationSummary(item: ContextListItem): string {
 	return `${item.context.tool.name} · ${providers} enabled`;
 }
 
+function contextHealth(context: ContextListItem["context"]): {
+	label: string;
+	status: "ready" | "needs_attention" | "not_configured" | "blocked";
+	type: ContextHealth;
+} {
+	if (context.archivedAt) {
+		return { type: "archived", label: "Archived", status: "not_configured" };
+	}
+	if (context.confidence === undefined) {
+		return {
+			type: "setup_incomplete",
+			label: "Setup incomplete",
+			status: "not_configured",
+		};
+	}
+	switch (context.confidence.status) {
+		case "ready":
+			return { type: "healthy", label: "Healthy", status: "ready" };
+		case "needs_attention":
+			return {
+				type: "needs_attention",
+				label: "Needs attention",
+				status: "needs_attention",
+			};
+		case "blocked":
+			return { type: "unavailable", label: "Unavailable", status: "blocked" };
+	}
+}
+
 function projectCountLabel(count: number): string {
 	return `${count} ${count === 1 ? "project" : "projects"}`;
 }
@@ -178,8 +299,10 @@ function formatContextTime(value: string | undefined): string {
 	return Number.isNaN(time.getTime()) ? "Unavailable" : time.toLocaleString();
 }
 
+export type { ContextHealth, ContextListAction };
 export {
 	ContextsView,
+	contextHealth,
 	formatContextTime,
 	integrationSummary,
 	projectCountLabel,

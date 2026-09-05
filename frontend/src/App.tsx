@@ -19,6 +19,8 @@ import {
 	ContextDetailsDrawer,
 	CreateContextDialog,
 } from "./components/contexts/ContextManagement";
+import { ContextDeleteDialog } from "./components/contexts/ContextDeleteDialog";
+import type { ContextListAction } from "./components/contexts/ContextsView";
 import { DiagnosticsView } from "./components/diagnostics/DiagnosticsView";
 import { RecentProjectConfirmationDialog } from "./components/home/RecentProjectConfirmationDialog";
 import { notifyCodingToolLaunched } from "./components/notifications/notifications";
@@ -124,8 +126,7 @@ function ManagementApp() {
 		refreshRunningEnvironments,
 		setSettings,
 	} = useAppData(activeRoute);
-	const isFirstRun =
-		contexts.status === "loaded" && contexts.data.length === 0;
+	const isFirstRun = contexts.status === "loaded" && contexts.data.length === 0;
 	const [settingsPending, setSettingsPending] = useState(false);
 	const [onboardingReplayVisible, setOnboardingReplayVisible] = useState(false);
 	const [pendingRunningEnvironmentLaunch, setPendingRunningEnvironmentLaunch] =
@@ -135,6 +136,10 @@ function ManagementApp() {
 	const [runningEnvironmentLaunchError, setRunningEnvironmentLaunchError] =
 		useState<DisplayError>();
 	const [contextDetailsID, setContextDetailsID] = useState<string>();
+	const [contextToDelete, setContextToDelete] = useState<{
+		id: string;
+		name: string;
+	}>();
 	const [creatingContext, setCreatingContext] = useState(false);
 	const [homeLaunchPending, setHomeLaunchPending] = useState(false);
 	const [homeLaunchError, setHomeLaunchError] = useState<
@@ -264,6 +269,28 @@ function ManagementApp() {
 			await refreshContexts();
 		}
 		return result;
+	}
+
+	async function handleContextAction(
+		contextId: string,
+		action: ContextListAction,
+	) {
+		if (action === "archive") {
+			const archived = await devContextApi.archiveContext({ contextId });
+			if (archived.ok) {
+				await refreshContexts();
+			}
+			return;
+		}
+		if (action === "delete") {
+			const context =
+				contexts.status === "loaded"
+					? contexts.data.find((item) => item.context.id === contextId)?.context
+					: undefined;
+			if (context) setContextToDelete({ id: context.id, name: context.name });
+			return;
+		}
+		setContextDetailsID(contextId);
 	}
 
 	async function handleSettingsChange(next: SettingsState) {
@@ -533,7 +560,28 @@ function ManagementApp() {
 						contexts={contexts}
 						onSelect={setContextDetailsID}
 						onNew={() => setCreatingContext(true)}
+						onAction={handleContextAction}
 					/>
+					{contextToDelete ? (
+						<ContextDeleteDialog
+							contextId={contextToDelete.id}
+							contextName={contextToDelete.name}
+							onClose={() => setContextToDelete(undefined)}
+							preview={(contextId) =>
+								devContextApi.previewDeleteContext({ contextId })
+							}
+							deleteContext={(contextId) =>
+								devContextApi.deleteContext({
+									contextId,
+									confirmDelete: true,
+								})
+							}
+							onDeleted={() => {
+								setContextToDelete(undefined);
+								void refreshContexts();
+							}}
+						/>
+					) : null}
 					{contextDetailsID ? (
 						<ContextDetailsDrawer
 							contextId={contextDetailsID}

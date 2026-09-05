@@ -14,6 +14,7 @@ import type {
 	SettingsState,
 	TrustCenterState,
 } from "../../lib/devctx-api";
+import type { ContextListAction } from "../contexts/ContextsView";
 import { devContextApi } from "../../lib/devctx-api";
 import { devContextWindow } from "../../lib/devctx-window";
 import { ContextsView } from "../contexts/ContextsView";
@@ -68,17 +69,24 @@ export function ContextsContent({
 	contexts,
 	onSelect,
 	onNew,
+	onAction,
 }: {
 	contexts: LoadState<ContextListItem[]>;
 	onSelect: (id: string) => void;
 	onNew: () => void;
+	onAction?: (id: string, action: ContextListAction) => void;
 }) {
 	if (contexts.status === "loading")
 		return <LoadingMessage>Loading contexts...</LoadingMessage>;
 	if (contexts.status === "error")
 		return <GuiErrorNotice error={contexts.error} />;
 	return (
-		<ContextsView contexts={contexts.data} onSelect={onSelect} onNew={onNew} />
+		<ContextsView
+			contexts={contexts.data}
+			onSelect={onSelect}
+			onNew={onNew}
+			onAction={onAction}
+		/>
 	);
 }
 

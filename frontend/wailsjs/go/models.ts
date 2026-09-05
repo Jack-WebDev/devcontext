@@ -1,5 +1,17 @@
 export namespace application {
 	
+	export class ArchiveContextRequest {
+	    contextId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ArchiveContextRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contextId = source["contextId"];
+	    }
+	}
 	export class BindProjectRequest {
 	    projectPath?: string;
 	    contextId: string;
@@ -180,6 +192,32 @@ export namespace application {
 	        this.importProviderIds = source["importProviderIds"];
 	    }
 	}
+	export class DeleteContextPreviewRequest {
+	    contextId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteContextPreviewRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contextId = source["contextId"];
+	    }
+	}
+	export class DeleteContextRequest {
+	    contextId: string;
+	    confirmDelete: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteContextRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contextId = source["contextId"];
+	        this.confirmDelete = source["confirmDelete"];
+	    }
+	}
 	export class DuplicateContextRequest {
 	    sourceContextId: string;
 	    contextId: string;
@@ -219,34 +257,6 @@ export namespace application {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.contextId = source["contextId"];
 	    }
-	}
-	export class UpdateContextDetailsRequest {
-		contextId: string;
-		name: string;
-		purpose?: string;
-		description?: string;
-
-		static createFrom(source: any = {}) { return new UpdateContextDetailsRequest(source); }
-		constructor(source: any = {}) {
-			if ('string' === typeof source) source = JSON.parse(source);
-			this.contextId = source["contextId"];
-			this.name = source["name"];
-			this.purpose = source["purpose"];
-			this.description = source["description"];
-		}
-	}
-	export class UpdateContextAppearanceRequest {
-		contextId: string;
-		icon?: string;
-		accent?: string;
-
-		static createFrom(source: any = {}) { return new UpdateContextAppearanceRequest(source); }
-		constructor(source: any = {}) {
-			if ('string' === typeof source) source = JSON.parse(source);
-			this.contextId = source["contextId"];
-			this.icon = source["icon"];
-			this.accent = source["accent"];
-		}
 	}
 	export class GetDiagnosticsRequest {
 	    contextId?: string;
@@ -360,6 +370,18 @@ export namespace application {
 	        this.confirmContextMismatch = source["confirmContextMismatch"];
 	    }
 	}
+	export class RestoreContextRequest {
+	    contextId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RestoreContextRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contextId = source["contextId"];
+	    }
+	}
 	export class RunRepairActionRequest {
 	    contextId: string;
 	    actionId: string;
@@ -386,6 +408,40 @@ export namespace application {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.projectPath = source["projectPath"];
+	    }
+	}
+	export class UpdateContextAppearanceRequest {
+	    contextId: string;
+	    icon?: string;
+	    accent?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateContextAppearanceRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contextId = source["contextId"];
+	        this.icon = source["icon"];
+	        this.accent = source["accent"];
+	    }
+	}
+	export class UpdateContextDetailsRequest {
+	    contextId: string;
+	    name: string;
+	    purpose?: string;
+	    description?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateContextDetailsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contextId = source["contextId"];
+	        this.name = source["name"];
+	        this.purpose = source["purpose"];
+	        this.description = source["description"];
 	    }
 	}
 	export class UpdateSettingsRequest {
@@ -439,3 +495,4 @@ export namespace wailsapp {
 	}
 
 }
+
