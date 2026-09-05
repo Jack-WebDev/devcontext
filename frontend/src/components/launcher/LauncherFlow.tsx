@@ -11,14 +11,12 @@ import { devContextWindow } from "../../lib/devctx-window.js";
 import { notifyCodingToolLaunched } from "../notifications/notifications.js";
 import { GuiErrorNotice } from "../selector/GuiErrorNotice.js";
 import { createContextAndRefresh } from "../contexts/context-creation.js";
+import { CreateContextDialog } from "../contexts/ContextManagement.js";
 import { SelectorView } from "../selector/SelectorView.js";
 import { LauncherSurface } from "./LauncherSurface.js";
 import { ProjectNotFoundView } from "./ProjectNotFoundView.js";
 import { ProjectResolvingView } from "./ProjectResolvingView.js";
-import {
-	type LoadState,
-	loadStateFromResult,
-} from "../app/load-state.js";
+import { type LoadState, loadStateFromResult } from "../app/load-state.js";
 
 interface LauncherFlowProps {
 	projectPath: string;
@@ -41,6 +39,7 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 		status: "loading",
 	});
 	const [choosingFolder, setChoosingFolder] = useState(false);
+	const [creatingFirstContext, setCreatingFirstContext] = useState(false);
 	const resolving =
 		launchState.projectPath !== activeProjectPath ||
 		launchState.status === "loading";
@@ -53,14 +52,16 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 	useEffect(() => {
 		let active = true;
 		setLaunchState({ projectPath: activeProjectPath, status: "loading" });
-		void devContextApi.getLaunchState({ projectPath: activeProjectPath }).then((result) => {
-			if (active) {
-				setLaunchState({
-					projectPath: activeProjectPath,
-					...loadStateFromResult(result),
-				});
-			}
-		});
+		void devContextApi
+			.getLaunchState({ projectPath: activeProjectPath })
+			.then((result) => {
+				if (active) {
+					setLaunchState({
+						projectPath: activeProjectPath,
+						...loadStateFromResult(result),
+					});
+				}
+			});
 		return () => {
 			active = false;
 		};
@@ -125,6 +126,7 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 					onLaunchProject={devContextApi.launchProject}
 					onCancel={devContextWindow.closeSelector}
 					onCreateContext={createContext}
+					onStartContextCreation={() => setCreatingFirstContext(true)}
 					onCodingToolLaunched={(result) =>
 						notifyCodingToolLaunched({
 							projectName: result.project.name,
@@ -134,6 +136,44 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 					}
 				/>
 			)}
+			{creatingFirstContext && launchState.status === "loaded" ? (
+				<CreateContextDialog
+					contexts={[]}
+					initialProjects={[launchState.data.project]}
+					projectName={launchState.data.project.name}
+					onClose={() => setCreatingFirstContext(false)}
+					create={devContextApi.createContext}
+					bindProject={devContextApi.bindProject}
+					verifyContext={async (context) => {
+						const result = await devContextApi.getLaunchState({
+							projectPath: activeProjectPath,
+						});
+						if (result.ok) {
+							setLaunchState({
+								projectPath: activeProjectPath,
+								status: "loaded",
+								data: result.data,
+							});
+							if (
+								!result.data.contexts.some(
+									(candidate) => candidate.id === context.id,
+								)
+							) {
+								return {
+									ok: false,
+									error: {
+										code: "internal_error",
+										message: "The new context could not be verified.",
+										recovery: "Try creating the context again.",
+									},
+								};
+							}
+						}
+						return result;
+					}}
+					onOpenProject={() => setCreatingFirstContext(false)}
+				/>
+			) : null}
 		</LauncherSurface>
 	);
 }

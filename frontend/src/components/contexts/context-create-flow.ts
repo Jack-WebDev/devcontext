@@ -60,6 +60,15 @@ function previousContextCreateStep(
 	return previous === undefined ? state : { ...state, status: previous };
 }
 
+// Review is a waypoint, not a second draft. Returning to a source step keeps
+// every other choice intact and lets that step update the same draft.
+function editContextCreateSection(
+	state: ContextCreateFlowState,
+	section: Exclude<ContextCreateStep, "review">,
+): ContextCreateFlowState {
+	return state.status === "review" ? { ...state, status: section } : state;
+}
+
 function beginContextCreation(
 	state: ContextCreateFlowState,
 ): ContextCreateFlowState {
@@ -88,6 +97,7 @@ export type { ContextCreateFlowState, ContextCreateFlowStatus, ContextCreateStep
 export {
 	beginContextCreation,
 	completeContextCreation,
+	editContextCreateSection,
 	initialContextCreateFlow,
 	nextContextCreateStep,
 	previousContextCreateStep,

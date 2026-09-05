@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type {
 	ApiResult,
 	ContextListItem,
-	ContextTemplateState,
+	ContextState,
 	CreateContextRequest,
 	CreateContextResult,
+	DevelopmentToolIntegration,
+	ProjectState,
 } from "../../lib/devctx-api";
-import { Button } from "../ui/button.js";
 import {
 	Sheet,
 	SheetContent,
@@ -14,85 +15,141 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "../ui/sheet.js";
-import { ContextField } from "./ContextField";
-import { useContextCreation } from "./context-creation";
-import { developmentToolCategories } from "./development-tool-categories";
+import {
+	ContextCreationProgress,
+	ContextCreateSuccessScreen,
+	type CreationStep,
+} from "./ContextCreateCompletion";
+import {
+	editContextCreateSection,
+	initialContextCreateFlow,
+	nextContextCreateStep,
+	previousContextCreateStep,
+	updateContextCreateDraft,
+	updateContextCreateProjects,
+} from "./context-create-flow";
+import { ContextCreateDevelopmentToolsScreen } from "./ContextCreateDevelopmentToolsScreen";
+import { ContextCreateIdentityScreen } from "./ContextCreateIdentityScreen";
+import { ContextCreateProjectsScreen } from "./ContextCreateProjectsScreen";
+import { ContextCreateReviewScreen } from "./ContextCreateReviewScreen";
 
 export { ContextDetailsDrawer } from "./ContextDetailsDrawer";
 
-type CustomContextRequest = CreateContextRequest & {
-	name: string;
-	description: string;
-	icon: string;
-	accent: string;
-	toolId: string;
-	enabledProviderIds: string[];
-};
+const initialSteps: CreationStep[] = [
+	{ id: "create", label: "Create context", status: "pending" },
+	{
+		id: "initialize",
+		label: "Initialize isolated tool storage",
+		status: "pending",
+	},
+	{ id: "bind", label: "Save project associations", status: "pending" },
+	{ id: "verify", label: "Verify context readiness", status: "pending" },
+];
 
 export function CreateContextDialog({
 	contexts,
 	onClose,
 	create,
-	loadTemplates,
+	bindProject,
+	verifyContext,
+	initialProjects = [],
+	projectName,
+	onOpenProject,
+	onViewContext,
 }: {
 	contexts: ContextListItem[];
 	onClose: () => void;
 	create: (
 		request: CreateContextRequest,
 	) => Promise<ApiResult<CreateContextResult>>;
-	loadTemplates: () => Promise<
-		ApiResult<{ templates: ContextTemplateState[] }>
-	>;
+	bindProject?: (request: {
+		projectPath: string;
+		contextId: string;
+	}) => Promise<ApiResult<unknown>>;
+	verifyContext?: (context: ContextState) => Promise<ApiResult<unknown>>;
+	initialProjects?: ProjectState[];
+	projectName?: string;
+	onOpenProject?: () => void;
+	onViewContext?: (contextId: string) => void;
 }) {
-	const [name, setName] = useState("");
-	const [description, setDescription] = useState("");
-	const [icon, setIcon] = useState("");
-	const [accent, setAccent] = useState("custom");
-	const [toolId, setToolID] = useState(contexts[0]?.context.tool.id ?? "");
-	const [providers, setProviders] = useState<string[]>([]);
-	const [templates, setTemplates] = useState<ContextTemplateState[]>([]);
-	const [templateID, setTemplateID] = useState("custom");
-	const contextCreation = useContextCreation(create);
-	const options = contexts[0]?.context.availableTools ?? [];
-	const providerOptions = contexts
-		.flatMap((c) => c.context.providers)
-		.filter((p, i, all) => all.findIndex((x) => x.id === p.id) === i);
-	const codingCategory = developmentToolCategories.find(
-		(category) => category.id === "coding",
-	);
-	const aiCategory = developmentToolCategories.find(
-		(category) => category.id === "ai",
-	);
-	useEffect(() => {
-		void loadTemplates().then((result) => {
-			if (result.ok) setTemplates(result.data.templates);
-		});
-	}, [loadTemplates]);
-	function selectTemplate(id: string) {
-		setTemplateID(id);
-		const template = templates.find((item) => item.id === id);
-		if (!template) return;
-		setName(template.name);
-		setDescription(template.description);
-		setIcon(template.icon ?? "");
-		setAccent(template.accent);
+	const [flow, setFlow] = useState(() => ({
+		...initialContextCreateFlow(),
+		projects: initialProjects,
+	}));
+	const [steps, setSteps] = useState(initialSteps);
+	const [error, setError] = useState<string>();
+	const [created, setCreated] = useState<ContextState>();
+	const integrations = uniqueIntegrations(contexts);
+
+	function updateStep(
+		id: CreationStep["id"],
+		status: CreationStep["status"],
+		detail?: string,
+	) {
+		setSteps((current) =>
+			current.map((step) =>
+				step.id === id ? { ...step, status, detail } : step,
+			),
+		);
 	}
+
 	async function submit() {
-		const request: CustomContextRequest = {
-			templateId: templateID,
-			name,
-			description,
-			icon,
-			accent,
-			toolId,
-			enabledProviderIds: providers,
-			enabledDevelopmentToolIds: [toolId, ...providers].filter(Boolean),
-		};
-		const result = await contextCreation.create(request);
-		if (result === undefined || !result.ok) {
+		setFlow((current) => ({ ...current, status: "creating" }));
+		setError(undefined);
+		setSteps(initialSteps);
+		let context = created;
+		if (!context) {
+			updateStep("create", "running");
+			const createdResult = await create(flow.draft);
+			if (!createdResult.ok) {
+				updateStep("create", "failed");
+				setError(createdResult.error.message);
+				return;
+			}
+			context = createdResult.data.context;
+			setCreated(context);
+			updateStep("create", "complete");
+			// Storage initialization happens inside the successful create use case.
+			updateStep("initialize", "complete");
+		} else {
+			updateStep("create", "complete");
+			updateStep("initialize", "complete");
+		}
+		if (flow.projects.length === 0 || !bindProject) {
+			updateStep("bind", "skipped", "No project associations selected.");
+		} else {
+			updateStep("bind", "running");
+			for (const project of flow.projects) {
+				const bound = await bindProject({
+					projectPath: project.path,
+					contextId: context.id,
+				});
+				if (!bound.ok) {
+					updateStep("bind", "failed");
+					setError(bound.error.message);
+					return;
+				}
+			}
+			updateStep("bind", "complete");
+		}
+		updateStep("verify", "running");
+		const verified = verifyContext
+			? await verifyContext(context)
+			: { ok: true as const, data: undefined };
+		if (!verified.ok) {
+			updateStep("verify", "failed");
+			setError(verified.error.message);
 			return;
 		}
-		onClose();
+		updateStep("verify", "complete");
+		setFlow((current) => ({ ...current, status: "success" }));
+	}
+
+	function createAnother() {
+		setCreated(undefined);
+		setError(undefined);
+		setSteps(initialSteps);
+		setFlow(initialContextCreateFlow());
 	}
 	return (
 		<Sheet open onOpenChange={(open) => !open && onClose()}>
@@ -103,93 +160,91 @@ export function CreateContextDialog({
 						Create an isolated development identity.
 					</SheetDescription>
 				</SheetHeader>
-				<div className="space-y-4 px-8 pb-8">
-					<label className="block text-sm">
-						Start from a template
-						<select
-							className="mt-1 w-full border p-2"
-							value={templateID}
-							onChange={(e) => selectTemplate(e.target.value)}
-						>
-							{templates.map((template) => (
-								<option key={template.id} value={template.id}>
-									{template.name}
-								</option>
-							))}
-						</select>
-					</label>
-					<ContextField label="Name" value={name} onChange={setName} />
-					<ContextField
-						label="Description"
-						value={description}
-						onChange={setDescription}
-					/>
-					<ContextField label="Icon" value={icon} onChange={setIcon} />
-					<label className="block text-sm">
-						Accent
-						<select
-							className="mt-1 w-full border p-2"
-							value={accent}
-							onChange={(e) => setAccent(e.target.value)}
-						>
-							{["sage", "slate-blue", "amber", "custom"].map((value) => (
-								<option key={value}>{value}</option>
-							))}
-						</select>
-					</label>
-					<h3 className="text-sm font-medium">Development tools</h3>
-					{options.length > 0 ? (
-						<label className="block text-sm">
-							{codingCategory?.name ?? "Coding"}
-							<select
-								className="mt-1 w-full border p-2"
-								value={toolId}
-								onChange={(e) => setToolID(e.target.value)}
-							>
-								{options.map((tool) => (
-									<option key={tool.id} value={tool.id}>
-										{tool.name}
-									</option>
-								))}
-							</select>
-						</label>
-					) : (
-						<p className="text-sm text-muted-foreground">
-							No development tools detected. You can create this context now and
-							configure development tools later.
-						</p>
-					)}
-					<fieldset>
-						<legend className="text-sm">{aiCategory?.name ?? "AI"}</legend>
-						{providerOptions.map((provider) => (
-							<label key={provider.id} className="block">
-								<input
-									type="checkbox"
-									checked={providers.includes(provider.id)}
-									onChange={() =>
-										setProviders((current) =>
-											current.includes(provider.id)
-												? current.filter((id) => id !== provider.id)
-												: [...current, provider.id],
-										)
-									}
-								/>{" "}
-								{provider.name}
-							</label>
-						))}
-					</fieldset>
-					{contextCreation.error ? (
-						<p className="text-destructive">{contextCreation.error.message}</p>
+				<div className="max-h-[calc(100vh-10rem)] overflow-y-auto px-8 pb-8">
+					{flow.status === "identity" ? (
+						<ContextCreateIdentityScreen
+							draft={flow.draft}
+							onDraftChange={(draft) =>
+								setFlow((current) => updateContextCreateDraft(current, draft))
+							}
+							onContinue={() => setFlow(nextContextCreateStep)}
+						/>
 					) : null}
-					<Button
-						type="button"
-						disabled={contextCreation.pending || !name}
-						onClick={() => void submit()}
-					>
-						{contextCreation.pending ? "Creating..." : "Create context"}
-					</Button>
+					{flow.status === "projects" ? (
+						<ContextCreateProjectsScreen
+							projects={flow.projects}
+							onProjectsChange={(projects) =>
+								setFlow((current) =>
+									updateContextCreateProjects(current, projects),
+								)
+							}
+							onBack={() => setFlow(previousContextCreateStep)}
+							onContinue={() => setFlow(nextContextCreateStep)}
+						/>
+					) : null}
+					{flow.status === "tools" ? (
+						<ContextCreateDevelopmentToolsScreen
+							integrations={integrations}
+							enabledIntegrationIds={flow.draft.enabledDevelopmentToolIds}
+							onEnabledIntegrationIdsChange={(ids) =>
+								setFlow((current) =>
+									updateContextCreateDraft(current, {
+										enabledDevelopmentToolIds: ids,
+									}),
+								)
+							}
+							onBack={() => setFlow(previousContextCreateStep)}
+							onContinue={() => setFlow(nextContextCreateStep)}
+						/>
+					) : null}
+					{flow.status === "review" ? (
+						<ContextCreateReviewScreen
+							draft={flow.draft}
+							projects={flow.projects}
+							integrations={integrations}
+							onEdit={(section) =>
+								setFlow((current) => editContextCreateSection(current, section))
+							}
+							onCreate={() => void submit()}
+						/>
+					) : null}
+					{flow.status === "creating" ? (
+						<ContextCreationProgress
+							steps={steps}
+							error={error}
+							onRetry={() => void submit()}
+							onBack={
+								created
+									? undefined
+									: () =>
+											setFlow((current) => ({ ...current, status: "review" }))
+							}
+						/>
+					) : null}
+					{flow.status === "success" && created ? (
+						<ContextCreateSuccessScreen
+							context={created}
+							projectName={projectName}
+							onOpenProject={onOpenProject}
+							onViewContext={() => onViewContext?.(created.id)}
+							onCreateAnother={createAnother}
+						/>
+					) : null}
 				</div>
 			</SheetContent>
 		</Sheet>
+	);
+}
+
+function uniqueIntegrations(
+	contexts: ContextListItem[],
+): DevelopmentToolIntegration[] {
+	const integrations = contexts.flatMap(
+		(item) => item.context.developmentTools ?? [],
+	);
+	return integrations.filter(
+		(integration, index) =>
+			integrations.findIndex((candidate) => candidate.id === integration.id) ===
+			index,
 	);
 }

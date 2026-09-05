@@ -105,6 +105,7 @@ interface SelectorViewProps {
 	showLaunchVerification?: boolean;
 	showOnboardingReplay?: boolean;
 	onDismissOnboardingReplay?: () => void;
+	onStartContextCreation?: () => void;
 }
 
 function SelectorView({
@@ -121,6 +122,7 @@ function SelectorView({
 	showLaunchVerification = true,
 	showOnboardingReplay = false,
 	onDismissOnboardingReplay,
+	onStartContextCreation,
 }: SelectorViewProps) {
 	const [launcherState, setLauncherState] = useState<LauncherState>(() =>
 		initialLauncherState(launchState),
@@ -558,7 +560,11 @@ function SelectorView({
 			onKeyDown={handleSelectorKeyDown}
 		>
 			{showWelcome ? (
-				<WelcomeView onCreateFirstContext={() => setShowFirstRunSetup(true)} />
+				<WelcomeView
+					onCreateFirstContext={
+						onStartContextCreation ?? (() => setShowFirstRunSetup(true))
+					}
+				/>
 			) : shouldRenderFirstRunWelcome(launchState) || showOnboardingReplay ? (
 				<>
 					<ProjectIdentity project={launchState.project} />

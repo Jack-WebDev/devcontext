@@ -560,11 +560,25 @@ function ManagementApp() {
 								const result = await devContextApi.createContext(request);
 								if (result.ok) {
 									await refreshContexts();
-									setCreatingContext(false);
 								}
 								return result;
 							}}
-							loadTemplates={() => devContextApi.getContextTemplates()}
+							bindProject={async (request) => {
+								const result = await devContextApi.bindProject(request);
+								if (result.ok) await refreshProjects();
+								return result;
+							}}
+							verifyContext={(context) =>
+								devContextApi.getContextDetails({ contextId: context.id })
+							}
+							onOpenProject={() => {
+								setCreatingContext(false);
+								setActiveRoute("projects");
+							}}
+							onViewContext={(contextId) => {
+								setCreatingContext(false);
+								setContextDetailsID(contextId);
+							}}
 						/>
 					) : null}
 				</>

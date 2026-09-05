@@ -114,6 +114,15 @@ import {
 import { ProjectBindingConflictDialog } from "../.tmp-test/src/components/contexts/ProjectBindingConflictDialog.js";
 import { ContextPreview } from "../.tmp-test/src/components/contexts/ContextPreview.js";
 import {
+	ContextCreateReviewScreen,
+	selectedIntegrations,
+} from "../.tmp-test/src/components/contexts/ContextCreateReviewScreen.js";
+import {
+	ContextCreationProgress,
+	ContextCreateSuccessScreen,
+	creationStepLabel,
+} from "../.tmp-test/src/components/contexts/ContextCreateCompletion.js";
+import {
 	contextIdentityTemplates,
 	draftFromContextIdentityTemplate,
 } from "../.tmp-test/src/components/contexts/context-identity-templates.js";
@@ -126,6 +135,7 @@ import { developmentToolStatusPresentation } from "../.tmp-test/src/components/c
 import {
 	beginContextCreation,
 	completeContextCreation,
+	editContextCreateSection,
 	initialContextCreateFlow,
 	nextContextCreateStep,
 	previousContextCreateStep,
@@ -3325,6 +3335,102 @@ test("context creation flow permits creation only from review", () => {
 	flow = beginContextCreation(flow);
 	flow = completeContextCreation(flow);
 	assert.equal(flow.status, "success");
+});
+
+test("context review summarizes the draft and edits preserve other choices", () => {
+	const integrations = [
+		{
+			id: "vscode",
+			name: "VS Code",
+			category: "coding",
+			status: "connected",
+			message: "Ready",
+			enabled: true,
+		},
+		{
+			id: "github",
+			name: "GitHub",
+			category: "source-hosting",
+			status: "connected",
+			message: "Ready",
+			enabled: true,
+		},
+	];
+	const draft = {
+		name: "Client Aurora",
+		purpose: "Aurora work",
+		description: "Client repositories",
+		icon: "building",
+		accent: "amber",
+		enabledDevelopmentToolIds: ["vscode", "github"],
+	};
+	assert.deepEqual(
+		selectedIntegrations(draft, integrations).map((tool) => tool.id),
+		["vscode", "github"],
+	);
+	const html = renderToStaticMarkup(
+		createElement(ContextCreateReviewScreen, {
+			draft,
+			projects: [{ name: "api", path: "/work/api" }],
+			integrations,
+			onEdit() {},
+			onCreate() {},
+		}),
+	);
+	assert.match(html, /Review your context/);
+	assert.match(html, /Client Aurora/);
+	assert.match(html, /\/work\/api/);
+	assert.match(html, /VS Code/);
+	assert.match(html, /Isolation and launch behavior/);
+	assert.equal((html.match(/>Edit</g) ?? []).length, 3);
+
+	let flow = initialContextCreateFlow(draft);
+	flow = updateContextCreateProjects(flow, [
+		{ name: "api", path: "/work/api" },
+	]);
+	flow = nextContextCreateStep(
+		nextContextCreateStep(nextContextCreateStep(flow)),
+	);
+	flow = editContextCreateSection(flow, "projects");
+	assert.equal(flow.status, "projects");
+	assert.deepEqual(flow.draft, draft);
+	assert.deepEqual(flow.projects, [{ name: "api", path: "/work/api" }]);
+	flow = nextContextCreateStep(flow);
+	flow = nextContextCreateStep(flow);
+	assert.equal(flow.status, "review");
+});
+
+test("context creation progress and success present completed local work", () => {
+	const steps = [
+		{ id: "create", label: "Create context", status: "complete" },
+		{ id: "bind", label: "Save project associations", status: "complete" },
+		{
+			id: "initialize",
+			label: "Initialize isolated tool storage",
+			status: "complete",
+		},
+		{ id: "verify", label: "Verify context readiness", status: "running" },
+	];
+	const progress = renderToStaticMarkup(
+		createElement(ContextCreationProgress, { steps }),
+	);
+	assert.match(progress, /Setting up your context/);
+	assert.match(progress, /Save project associations/);
+	assert.match(progress, /In progress/);
+	assert.equal(creationStepLabel("skipped"), "Not needed");
+	const success = renderToStaticMarkup(
+		createElement(ContextCreateSuccessScreen, {
+			context: contextFixture("personal", "Personal"),
+			projectName: "api",
+			onOpenProject() {},
+			onViewContext() {},
+			onCreateAnother() {},
+		}),
+	);
+	assert.match(success, /Personal is ready/);
+	assert.match(success, /Open api/);
+	assert.match(success, /View Context/);
+	assert.match(success, /Create Another Context/);
 });
 
 test("context creation frames tool setup as development tools with generic categories", () => {
