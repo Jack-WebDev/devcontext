@@ -100,6 +100,14 @@ import {
 	contextPurposeMaxLength,
 	contextPurposeValidation,
 } from "../.tmp-test/src/components/contexts/ContextCreateIdentityScreen.js";
+import {
+	ContextCreateProjectsScreen,
+	addProjectToDraft,
+	boundProjectFor,
+	projectPathsFromDrop,
+	recentProjectChoices,
+} from "../.tmp-test/src/components/contexts/ContextCreateProjectsScreen.js";
+import { ProjectBindingConflictDialog } from "../.tmp-test/src/components/contexts/ProjectBindingConflictDialog.js";
 import { ContextPreview } from "../.tmp-test/src/components/contexts/ContextPreview.js";
 import {
 	contextIdentityTemplates,
@@ -117,6 +125,7 @@ import {
 	previousContextCreateStep,
 	returnToContextCreateReview,
 	updateContextCreateDraft,
+	updateContextCreateProjects,
 } from "../.tmp-test/src/components/contexts/context-create-flow.js";
 import { ProjectIdentity } from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import { ProviderCredentialClassification } from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
@@ -647,7 +656,9 @@ test("welcome screen explains contexts and their local separation", () => {
 	assert.ok(html.includes("Personal work, Work, a Client, or Open Source"));
 	assert.ok(html.includes("What stays separate"));
 	assert.ok(html.includes("Projects open with the context you choose"));
-	assert.ok(html.includes("Account sessions and tool data use separate local storage"));
+	assert.ok(
+		html.includes("Account sessions and tool data use separate local storage"),
+	);
 	assert.ok(html.includes("Tool settings and launch environment"));
 	assert.ok(html.includes("without changing another context"));
 	assert.doesNotMatch(html, /Classify detected provider sessions/);
@@ -2961,7 +2972,10 @@ test("launch progress is a focused surface without launcher controls", () => {
 	assert.ok(html.includes("Opening api"));
 	assert.ok(html.includes("Using Company"));
 	assert.ok(html.includes("Start VS Code"));
-	assert.doesNotMatch(html, /Launch Company|Choose another|Remember this project/);
+	assert.doesNotMatch(
+		html,
+		/Launch Company|Choose another|Remember this project/,
+	);
 });
 
 test("launch failure view keeps recovery actions available without exposing technical details", () => {
@@ -3119,10 +3133,7 @@ test("context creation refreshes launch state after success", async () => {
 		},
 		launchState: refreshedState,
 	});
-	assert.deepEqual(calls, [
-		["createContext", request],
-		["getLaunchState"],
-	]);
+	assert.deepEqual(calls, [["createContext", request], ["getLaunchState"]]);
 });
 
 test("context creation returns failures without refreshing", async () => {
@@ -3164,6 +3175,9 @@ test("context creation flow preserves its draft across forward and back steps", 
 		description: "Personal repositories and experiments",
 		enabledProviderIds: ["codex"],
 	});
+	flow = updateContextCreateProjects(flow, [
+		{ name: "web", path: "/work/web" },
+	]);
 	flow = nextContextCreateStep(flow);
 	flow = nextContextCreateStep(flow);
 	flow = previousContextCreateStep(flow);
@@ -3177,6 +3191,87 @@ test("context creation flow preserves its draft across forward and back steps", 
 		accent: "sage",
 		enabledProviderIds: ["codex"],
 	});
+	assert.deepEqual(flow.projects, [{ name: "web", path: "/work/web" }]);
+});
+
+test("context creation projects screen keeps validated folders as pending cards", () => {
+	const project = { name: "api", path: "/work/api" };
+	const web = { name: "web", path: "/work/web" };
+	assert.deepEqual(addProjectToDraft([], project), [project]);
+	assert.deepEqual(addProjectToDraft([project], project), [project]);
+	assert.deepEqual(recentProjectChoices([project, web, web], [project]), [web]);
+	assert.deepEqual(
+		projectPathsFromDrop({
+			files: [{ path: "/work/api" }],
+			getData() {
+				return "";
+			},
+		}),
+		["/work/api"],
+	);
+	assert.deepEqual(
+		projectPathsFromDrop({
+			files: [],
+			getData() {
+				return "# ignored\nfile:///work/api\nfile:///work/web";
+			},
+		}),
+		["/work/api", "/work/web"],
+	);
+	assert.deepEqual(
+		boundProjectFor(project, [
+			{
+				project,
+				contextId: "company",
+				contextName: "Company",
+				running: false,
+			},
+		]),
+		{ project, boundContextName: "Company" },
+	);
+	assert.equal(boundProjectFor(project, []), undefined);
+
+	const html = renderToStaticMarkup(
+		createElement(ContextCreateProjectsScreen, {
+			projects: [project],
+			initialRecentProjects: [web],
+			onProjectsChange() {},
+			onBack() {},
+			onContinue() {},
+		}),
+	);
+	assert.match(html, /Which projects normally belong to this context/);
+	assert.match(html, /Pending projects/);
+	assert.match(html, /\/work\/api/);
+	assert.match(html, /Choose folder/);
+	assert.match(html, /drop local project folders here/i);
+	assert.match(html, /Recent projects/);
+	assert.match(html, /\/work\/web/);
+	assert.match(html, /Nothing is changed until you create the context/);
+
+	const skipped = renderToStaticMarkup(
+		createElement(ContextCreateProjectsScreen, {
+			projects: [],
+			onProjectsChange() {},
+			onContinue() {},
+		}),
+	);
+	assert.match(skipped, /Skip for now/);
+	assert.match(skipped, /add project associations later/);
+
+	const conflict = renderToStaticMarkup(
+		createElement(ProjectBindingConflictDialog, {
+			projectName: "api",
+			boundContextName: "Company",
+			onCancel() {},
+			onKeepExisting() {},
+			onMoveToNewContext() {},
+		}),
+	);
+	assert.match(conflict, /This project already belongs to Company/);
+	assert.match(conflict, /Keep existing/);
+	assert.match(conflict, /Move to new context/);
+	assert.match(conflict, /Cancel/);
 });
 
 test("context creation flow permits creation only from review", () => {
@@ -3212,7 +3307,9 @@ test("context identity screen asks one question before continuing", () => {
 		}),
 	);
 
-	assert.ok(blank.includes("What kind of development identity are you creating?"));
+	assert.ok(
+		blank.includes("What kind of development identity are you creating?"),
+	);
 	assert.ok(blank.includes("Context name"));
 	assert.ok(blank.includes("Continue"));
 	assert.match(blank, /disabled=""/);
@@ -3247,7 +3344,13 @@ test("context preview reflects the complete identity draft", () => {
 
 test("identity templates update an editable request without exposing an ID", () => {
 	const ids = contextIdentityTemplates.map((template) => template.id);
-	assert.deepEqual(ids, ["personal", "work", "client", "open-source", "custom"]);
+	assert.deepEqual(ids, [
+		"personal",
+		"work",
+		"client",
+		"open-source",
+		"custom",
+	]);
 
 	const draft = draftFromContextIdentityTemplate(contextIdentityTemplates[1]);
 	assert.deepEqual(draft, {

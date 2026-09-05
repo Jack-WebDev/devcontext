@@ -105,3 +105,7 @@ export function UnbindProject(arg1) {
 export function UpdateSettings(arg1) {
   return window['go']['wailsapp']['App']['UpdateSettings'](arg1);
 }
+
+export function ValidateProjectDirectory(arg1) {
+  return window['go']['wailsapp']['App']['ValidateProjectDirectory'](arg1);
+}
