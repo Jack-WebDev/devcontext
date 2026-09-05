@@ -109,6 +109,23 @@ type GetContextDetailsRequest struct {
 	ContextID string `json:"contextId"`
 }
 
+// UpdateContextDetailsRequest changes only the human-readable identity fields.
+// The internal ID, tool configuration, providers, and project bindings remain
+// owned by their respective contracts.
+type UpdateContextDetailsRequest struct {
+	ContextID   string `json:"contextId"`
+	Name        string `json:"name"`
+	Purpose     string `json:"purpose,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+// UpdateContextAppearanceRequest changes only presentation metadata.
+type UpdateContextAppearanceRequest struct {
+	ContextID string `json:"contextId"`
+	Icon      string `json:"icon,omitempty"`
+	Accent    string `json:"accent,omitempty"`
+}
+
 // ContextDetailsState contains the backend-owned data for one context's
 // detail view. It extends the list summary with its storage location and
 // creation time.

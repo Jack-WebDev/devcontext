@@ -106,6 +106,14 @@ export function UpdateSettings(arg1) {
   return window['go']['wailsapp']['App']['UpdateSettings'](arg1);
 }
 
+export function UpdateContextDetails(arg1) {
+  return window['go']['wailsapp']['App']['UpdateContextDetails'](arg1);
+}
+
+export function UpdateContextAppearance(arg1) {
+  return window['go']['wailsapp']['App']['UpdateContextAppearance'](arg1);
+}
+
 export function ValidateProjectDirectory(arg1) {
   return window['go']['wailsapp']['App']['ValidateProjectDirectory'](arg1);
 }

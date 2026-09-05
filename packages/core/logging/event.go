@@ -24,6 +24,7 @@ const (
 	EventLaunchProviderMissing EventName = "launch_provider_missing"
 	EventLaunchProcessFailure  EventName = "launch_process_failure"
 	EventContextCreated        EventName = "context_created"
+	EventContextUpdated        EventName = "context_updated"
 	EventProviderConnected     EventName = "provider_connected"
 	EventProviderReset         EventName = "provider_reset"
 	EventRepairCompleted       EventName = "repair_completed"

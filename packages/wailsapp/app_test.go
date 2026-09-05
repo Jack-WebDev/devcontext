@@ -114,6 +114,20 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	if service.contextDetailsRequest != detailsRequest {
 		t.Fatalf("context details request = %#v, want %#v", service.contextDetailsRequest, detailsRequest)
 	}
+	updateDetailsRequest := application.UpdateContextDetailsRequest{ContextID: "personal", Name: "Personal work", Purpose: "Work"}
+	if updated := app.UpdateContextDetails(updateDetailsRequest); !reflect.DeepEqual(updated, service.updateContextDetailsResult) {
+		t.Fatalf("updated context details = %#v, want %#v", updated, service.updateContextDetailsResult)
+	}
+	if service.updateContextDetailsRequest != updateDetailsRequest {
+		t.Fatalf("update details request = %#v, want %#v", service.updateContextDetailsRequest, updateDetailsRequest)
+	}
+	updateAppearanceRequest := application.UpdateContextAppearanceRequest{ContextID: "personal", Icon: "building", Accent: "amber"}
+	if updated := app.UpdateContextAppearance(updateAppearanceRequest); !reflect.DeepEqual(updated, service.updateContextAppearanceResult) {
+		t.Fatalf("updated context appearance = %#v, want %#v", updated, service.updateContextAppearanceResult)
+	}
+	if service.updateContextAppearanceRequest != updateAppearanceRequest {
+		t.Fatalf("update appearance request = %#v, want %#v", service.updateContextAppearanceRequest, updateAppearanceRequest)
+	}
 	if trustCenter := app.GetTrustCenter(); !reflect.DeepEqual(trustCenter, service.trustCenter) {
 		t.Fatalf("trust center = %#v, want %#v", trustCenter, service.trustCenter)
 	}
@@ -280,9 +294,15 @@ type fakeService struct {
 	contexts    application.ContextListState
 	contextsErr *application.Error
 
-	contextDetailsRequest application.GetContextDetailsRequest
-	contextDetails        application.ContextDetailsState
-	contextDetailsErr     *application.Error
+	contextDetailsRequest          application.GetContextDetailsRequest
+	contextDetails                 application.ContextDetailsState
+	contextDetailsErr              *application.Error
+	updateContextDetailsRequest    application.UpdateContextDetailsRequest
+	updateContextDetailsResult     application.ContextState
+	updateContextDetailsErr        *application.Error
+	updateContextAppearanceRequest application.UpdateContextAppearanceRequest
+	updateContextAppearanceResult  application.ContextState
+	updateContextAppearanceErr     *application.Error
 
 	trustCenter    application.TrustCenterState
 	trustCenterErr *application.Error
@@ -378,6 +398,16 @@ func (s *fakeService) GetContexts() (application.ContextListState, *application.
 func (s *fakeService) GetContextDetails(request application.GetContextDetailsRequest) (application.ContextDetailsState, *application.Error) {
 	s.contextDetailsRequest = request
 	return s.contextDetails, s.contextDetailsErr
+}
+
+func (s *fakeService) UpdateContextDetails(request application.UpdateContextDetailsRequest) (application.ContextState, *application.Error) {
+	s.updateContextDetailsRequest = request
+	return s.updateContextDetailsResult, s.updateContextDetailsErr
+}
+
+func (s *fakeService) UpdateContextAppearance(request application.UpdateContextAppearanceRequest) (application.ContextState, *application.Error) {
+	s.updateContextAppearanceRequest = request
+	return s.updateContextAppearanceResult, s.updateContextAppearanceErr
 }
 
 func (s *fakeService) GetTrustCenter() (application.TrustCenterState, *application.Error) {

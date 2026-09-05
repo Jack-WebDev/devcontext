@@ -151,6 +151,25 @@ func (s *Service) GetContextDetails(request GetContextDetailsRequest) (ContextDe
 	return details, nil
 }
 
+// UpdateContextDetails changes the context's display identity without
+// affecting its internal ID, integrations, or project bindings.
+func (s *Service) UpdateContextDetails(request UpdateContextDetailsRequest) (ContextState, *Error) {
+	state, err := s.updateContextDetails(request)
+	if err != nil {
+		return ContextState{}, NewError(err)
+	}
+	return state, nil
+}
+
+// UpdateContextAppearance changes only presentation metadata on a context.
+func (s *Service) UpdateContextAppearance(request UpdateContextAppearanceRequest) (ContextState, *Error) {
+	state, err := s.updateContextAppearance(request)
+	if err != nil {
+		return ContextState{}, NewError(err)
+	}
+	return state, nil
+}
+
 // GetTrustCenter returns factual local protection, project mapping, and
 // coding-tool integration-boundary data for the Trust Center.
 func (s *Service) GetTrustCenter() (TrustCenterState, *Error) {
@@ -472,6 +491,66 @@ func (s *Service) getContextDetails(request GetContextDetailsRequest) (ContextDe
 		details.LastUsedAt = &lastUsed
 	}
 	return details, nil
+}
+
+func (s *Service) updateContextDetails(request UpdateContextDetailsRequest) (ContextState, error) {
+	contextID, err := devcontext.NewID(request.ContextID)
+	if err != nil {
+		return ContextState{}, err
+	}
+	name := strings.TrimSpace(request.Name)
+	if name == "" {
+		return ContextState{}, fmt.Errorf("context name is required")
+	}
+	purpose := strings.TrimSpace(request.Purpose)
+	if len([]rune(purpose)) > 120 {
+		return ContextState{}, fmt.Errorf("context purpose must be 120 characters or fewer")
+	}
+	description := strings.TrimSpace(request.Description)
+	if len([]rune(description)) > 500 {
+		return ContextState{}, fmt.Errorf("context description must be 500 characters or fewer")
+	}
+	ctx, err := s.dependencies.Contexts.Get(contextID)
+	if err != nil {
+		return ContextState{}, err
+	}
+	ctx.Name = name
+	ctx.Metadata = cloneMetadata(ctx.Metadata)
+	setContextMetadata(ctx.Metadata, "purpose", purpose)
+	setContextMetadata(ctx.Metadata, "description", description)
+	if err := s.dependencies.Contexts.Write(ctx); err != nil {
+		return ContextState{}, err
+	}
+	s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{Name: devlog.EventContextUpdated, Timestamp: s.now(), ContextID: ctx.ID.String(), ToolID: string(ctx.Tool.DefaultTool)}))
+	return s.contextState(ctx), nil
+}
+
+func (s *Service) updateContextAppearance(request UpdateContextAppearanceRequest) (ContextState, error) {
+	contextID, err := devcontext.NewID(request.ContextID)
+	if err != nil {
+		return ContextState{}, err
+	}
+	icon, accent := strings.TrimSpace(request.Icon), strings.TrimSpace(request.Accent)
+	ctx, err := s.dependencies.Contexts.Get(contextID)
+	if err != nil {
+		return ContextState{}, err
+	}
+	ctx.Metadata = cloneMetadata(ctx.Metadata)
+	setContextMetadata(ctx.Metadata, "icon", icon)
+	setContextMetadata(ctx.Metadata, "accent", accent)
+	if err := s.dependencies.Contexts.Write(ctx); err != nil {
+		return ContextState{}, err
+	}
+	s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{Name: devlog.EventContextUpdated, Timestamp: s.now(), ContextID: ctx.ID.String(), ToolID: string(ctx.Tool.DefaultTool)}))
+	return s.contextState(ctx), nil
+}
+
+func setContextMetadata(metadata devcontext.Metadata, key, value string) {
+	if value == "" {
+		delete(metadata, key)
+		return
+	}
+	metadata[key] = value
 }
 
 type contextUsage struct {

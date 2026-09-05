@@ -14,6 +14,8 @@ type service interface {
 	GetRecentProjects() (application.RecentProjectsState, *application.Error)
 	GetContexts() (application.ContextListState, *application.Error)
 	GetContextDetails(application.GetContextDetailsRequest) (application.ContextDetailsState, *application.Error)
+	UpdateContextDetails(application.UpdateContextDetailsRequest) (application.ContextState, *application.Error)
+	UpdateContextAppearance(application.UpdateContextAppearanceRequest) (application.ContextState, *application.Error)
 	GetTrustCenter() (application.TrustCenterState, *application.Error)
 	PreflightLaunchProject(application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error)
 	LaunchProject(application.LaunchProjectRequest) (application.LaunchProjectResult, *application.Error)
@@ -144,6 +146,24 @@ func (a *App) GetContextDetails(request application.GetContextDetailsRequest) an
 		return err
 	}
 	return details
+}
+
+// UpdateContextDetails updates only a context's display identity.
+func (a *App) UpdateContextDetails(request application.UpdateContextDetailsRequest) any {
+	context, err := a.service.UpdateContextDetails(request)
+	if err != nil {
+		return err
+	}
+	return context
+}
+
+// UpdateContextAppearance updates only a context's icon and accent metadata.
+func (a *App) UpdateContextAppearance(request application.UpdateContextAppearanceRequest) any {
+	context, err := a.service.UpdateContextAppearance(request)
+	if err != nil {
+		return err
+	}
+	return context
 }
 
 // GetTrustCenter returns factual local protection and integration-boundary

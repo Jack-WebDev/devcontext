@@ -99,6 +99,17 @@ export interface ContextListItem {
 export interface GetContextDetailsRequest {
 	contextId: string;
 }
+export interface UpdateContextDetailsRequest {
+	contextId: string;
+	name: string;
+	purpose?: string;
+	description?: string;
+}
+export interface UpdateContextAppearanceRequest {
+	contextId: string;
+	icon?: string;
+	accent?: string;
+}
 
 export interface ContextDetailsState {
 	context: ContextState;
@@ -604,6 +615,12 @@ export interface DevContextApi {
 	getContextDetails(
 		request: GetContextDetailsRequest,
 	): Promise<ApiResult<ContextDetailsState>>;
+	updateContextDetails(
+		request: UpdateContextDetailsRequest,
+	): Promise<ApiResult<ContextState>>;
+	updateContextAppearance(
+		request: UpdateContextAppearanceRequest,
+	): Promise<ApiResult<ContextState>>;
 	getTrustCenter(): Promise<ApiResult<TrustCenterState>>;
 	preflightLaunchProject(
 		request: PreflightLaunchProjectRequest,
@@ -659,6 +676,8 @@ export interface WailsBindings {
 	getRecentProjects(): Promise<unknown>;
 	getContexts(): Promise<unknown>;
 	getContextDetails(request: GetContextDetailsRequest): Promise<unknown>;
+	updateContextDetails(request: UpdateContextDetailsRequest): Promise<unknown>;
+	updateContextAppearance(request: UpdateContextAppearanceRequest): Promise<unknown>;
 	getTrustCenter(): Promise<unknown>;
 	preflightLaunchProject(
 		request: PreflightLaunchProjectRequest,
@@ -735,6 +754,18 @@ export function createDevContextApi(
 			return callBinding(
 				() => bindings.getContextDetails(request),
 				normalizeContextDetailsState,
+			);
+		},
+		updateContextDetails(request) {
+			return callBinding(
+				() => bindings.updateContextDetails(request),
+				normalizeContextState,
+			);
+		},
+		updateContextAppearance(request) {
+			return callBinding(
+				() => bindings.updateContextAppearance(request),
+				normalizeContextState,
 			);
 		},
 		getTrustCenter() {
@@ -883,6 +914,14 @@ const generatedBindings: WailsBindings = {
 	async getContextDetails(request) {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
 		return bindings.GetContextDetails(request);
+	},
+	async updateContextDetails(request) {
+		const bindings = await import("../../wailsjs/go/wailsapp/App");
+		return bindings.UpdateContextDetails(request);
+	},
+	async updateContextAppearance(request) {
+		const bindings = await import("../../wailsjs/go/wailsapp/App");
+		return bindings.UpdateContextAppearance(request);
 	},
 	async getTrustCenter() {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");

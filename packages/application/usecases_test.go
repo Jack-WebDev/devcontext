@@ -255,6 +255,57 @@ func TestGetContextDetailsReturnsConfiguredContextMetadata(t *testing.T) {
 	}
 }
 
+func TestUpdateContextDetailsPreservesContextConfigurationAndBindings(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	logger := &applicationRecordingLogger{}
+	fixture.logger = logger
+	ctx := fixture.context("personal", "Personal")
+	ctx.Metadata = devcontext.Metadata{"accent": "sage", "purpose": "Old"}
+	fixture.writeContext(t, ctx)
+	fixture.writeBindings(t, project.Binding{ProjectPath: project.Path(filepath.Join(fixture.root, "projects", "one")), ContextID: ctx.ID, CreatedAt: fixture.now})
+
+	service := fixture.service()
+	updated, appErr := service.UpdateContextDetails(UpdateContextDetailsRequest{ContextID: "personal", Name: "Personal work", Purpose: "Work projects", Description: "Private repositories"})
+	if appErr != nil {
+		t.Fatalf("update context details: %v", appErr)
+	}
+	if updated.ID != "personal" || updated.Name != "Personal work" || updated.Purpose != "Work projects" || updated.Description != "Private repositories" || updated.Metadata["accent"] != "sage" {
+		t.Fatalf("updated state = %#v", updated)
+	}
+	stored, err := service.dependencies.Contexts.Get(ctx.ID)
+	if err != nil {
+		t.Fatalf("get stored context: %v", err)
+	}
+	if stored.Tool.DefaultTool != ctx.Tool.DefaultTool || stored.Metadata["accent"] != "sage" {
+		t.Fatalf("stored configuration changed unexpectedly: %#v", stored)
+	}
+	bindings, err := service.dependencies.Projects.List()
+	if err != nil || len(bindings) != 1 || bindings[0].ContextID != ctx.ID {
+		t.Fatalf("bindings changed unexpectedly: %#v, %v", bindings, err)
+	}
+	if got := applicationEventNames(logger.events); !reflect.DeepEqual(got, []devlog.EventName{devlog.EventContextUpdated}) {
+		t.Fatalf("history events = %#v", got)
+	}
+}
+
+func TestUpdateContextAppearanceOnlyChangesAppearanceMetadata(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	ctx := fixture.context("personal", "Personal")
+	ctx.Metadata = devcontext.Metadata{"purpose": "Personal projects", "icon": "heart", "accent": "sage"}
+	fixture.writeContext(t, ctx)
+
+	updated, appErr := fixture.service().UpdateContextAppearance(UpdateContextAppearanceRequest{ContextID: "personal", Icon: "building", Accent: "amber"})
+	if appErr != nil {
+		t.Fatalf("update context appearance: %v", appErr)
+	}
+	if updated.ID != "personal" || updated.Name != "Personal" || updated.Metadata["purpose"] != "Personal projects" || updated.Metadata["icon"] != "building" || updated.Metadata["accent"] != "amber" {
+		t.Fatalf("updated appearance = %#v", updated)
+	}
+	if _, appErr := fixture.service().UpdateContextDetails(UpdateContextDetailsRequest{ContextID: "personal", Name: "", Purpose: "x"}); appErr == nil {
+		t.Fatal("expected empty name to be rejected")
+	}
+}
+
 func TestGetTrustCenterReportsActualLocalBoundaries(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	ctx := fixture.context("personal", "Personal")
