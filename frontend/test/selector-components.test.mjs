@@ -2530,7 +2530,7 @@ test("launch action resubmits explicit context mismatch confirmation", async () 
 	]);
 });
 
-test("context mismatch dialog shows risk details and deliberate actions", () => {
+test("context mismatch dialog prioritizes the remembered context over the override", () => {
 	const html = renderToStaticMarkup(
 		ContextMismatchDialog({
 			mismatch: {
@@ -2544,6 +2544,7 @@ test("context mismatch dialog shows risk details and deliberate actions", () => 
 			],
 			launchPending: false,
 			onCancel: () => {},
+			onUseRememberedContext: () => {},
 			onOpenAnyway: () => {},
 		}),
 	);
@@ -2556,6 +2557,11 @@ test("context mismatch dialog shows risk details and deliberate actions", () => 
 	assert.ok(html.includes("expose project files"));
 	assert.ok(html.includes("Cancel"));
 	assert.ok(html.includes("Open Anyway"));
+	assert.ok(html.includes("Use remembered context"));
+	assert.match(html, /autofocus=""/);
+	assert.ok(html.indexOf("Open Anyway") < html.indexOf("Use remembered context"));
+	assert.match(html, /bg-destructive/);
+	assert.match(html, /bg-primary/);
 	assert.match(html, /focus-visible:ring-2/);
 });
 
@@ -2570,6 +2576,7 @@ test("context mismatch open anyway pending state disables actions", () => {
 			contexts: [],
 			launchPending: true,
 			onCancel: () => {},
+			onUseRememberedContext: () => {},
 			onOpenAnyway: () => {},
 		}),
 	);
@@ -2625,12 +2632,14 @@ test("context mismatch cancel exits without launch side effects", () => {
 		],
 		launchPending: false,
 		onCancel: () => calls.push("cancel"),
+		onUseRememberedContext: () => calls.push("useRememberedContext"),
 		onOpenAnyway: () => calls.push("launchProject"),
 	};
 	const html = renderToStaticMarkup(ContextMismatchDialog(props));
 
 	assert.ok(html.includes("Cancel"));
 	assert.ok(html.includes("Open Anyway"));
+	assert.ok(html.includes("Use remembered context"));
 	props.onCancel();
 	assert.deepEqual(calls, ["cancel"]);
 });

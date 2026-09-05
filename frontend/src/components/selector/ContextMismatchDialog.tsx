@@ -7,6 +7,7 @@ interface ContextMismatchDialogProps {
 	contexts: ContextState[];
 	launchPending: boolean;
 	onCancel: () => void;
+	onUseRememberedContext: () => void;
 	onOpenAnyway: () => void;
 }
 
@@ -15,6 +16,7 @@ function ContextMismatchDialog({
 	contexts,
 	launchPending,
 	onCancel,
+	onUseRememberedContext,
 	onOpenAnyway,
 }: ContextMismatchDialogProps) {
 	return (
@@ -52,7 +54,7 @@ function ContextMismatchDialog({
 					/>
 				</dl>
 
-				<div className="flex justify-end gap-3">
+				<div className="flex flex-wrap justify-end gap-3">
 					<Button
 						type="button"
 						variant="outline"
@@ -67,7 +69,15 @@ function ContextMismatchDialog({
 						disabled={launchPending}
 						onClick={onOpenAnyway}
 					>
-						{launchPending ? "Opening..." : "Open Anyway"}
+						Open Anyway
+					</Button>
+					<Button
+						type="button"
+						autoFocus
+						disabled={launchPending}
+						onClick={onUseRememberedContext}
+					>
+						{launchPending ? "Opening..." : "Use remembered context"}
 					</Button>
 				</div>
 			</CardContent>
