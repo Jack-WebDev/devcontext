@@ -22,6 +22,7 @@
 		"src/components/notifications/*.ts",
 		"src/components/home/*.tsx",
 		"src/components/contexts/*.tsx",
+		"src/components/contexts/*.ts",
 		"src/components/projects/*.tsx",
 		"src/components/diagnostics/*.tsx",
 		"src/components/history/*.tsx",

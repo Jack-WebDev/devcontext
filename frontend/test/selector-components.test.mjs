@@ -95,6 +95,15 @@ import {
 	shouldCloseSelectorAfterLaunch,
 } from "../.tmp-test/src/components/selector/launch-success-close-behavior.js";
 import { createContextAndRefresh } from "../.tmp-test/src/components/contexts/context-creation.js";
+import {
+	beginContextCreation,
+	completeContextCreation,
+	initialContextCreateFlow,
+	nextContextCreateStep,
+	previousContextCreateStep,
+	returnToContextCreateReview,
+	updateContextCreateDraft,
+} from "../.tmp-test/src/components/contexts/context-create-flow.js";
 import { ProjectIdentity } from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import { ProviderCredentialClassification } from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
 import {
@@ -3128,6 +3137,41 @@ test("context creation returns failures without refreshing", async () => {
 		error: error.error,
 	});
 	assert.deepEqual(calls, [["createContext", request]]);
+});
+
+test("context creation flow preserves its draft across forward and back steps", () => {
+	let flow = initialContextCreateFlow({ name: "Personal" });
+	flow = updateContextCreateDraft(flow, {
+		description: "Personal repositories and experiments",
+		enabledProviderIds: ["codex"],
+	});
+	flow = nextContextCreateStep(flow);
+	flow = nextContextCreateStep(flow);
+	flow = previousContextCreateStep(flow);
+
+	assert.equal(flow.status, "projects");
+	assert.deepEqual(flow.draft, {
+		name: "Personal",
+		description: "Personal repositories and experiments",
+		enabledProviderIds: ["codex"],
+	});
+});
+
+test("context creation flow permits creation only from review", () => {
+	let flow = initialContextCreateFlow();
+	assert.equal(beginContextCreation(flow), flow);
+
+	flow = nextContextCreateStep(flow);
+	flow = nextContextCreateStep(flow);
+	flow = nextContextCreateStep(flow);
+	flow = beginContextCreation(flow);
+	assert.equal(flow.status, "creating");
+
+	flow = returnToContextCreateReview(flow);
+	assert.equal(flow.status, "review");
+	flow = beginContextCreation(flow);
+	flow = completeContextCreation(flow);
+	assert.equal(flow.status, "success");
 });
 
 function contextFixture(id, name, providers = []) {
