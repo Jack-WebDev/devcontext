@@ -18,7 +18,7 @@ import {
 } from "../.tmp-test/src/components/context-accent/ContextAccent.js";
 import {
 	ContextsView,
-	providerSummary,
+	integrationSummary,
 } from "../.tmp-test/src/components/contexts/ContextsView.js";
 import { parseContextMetadataExport } from "../.tmp-test/src/components/contexts/context-transfer.js";
 import { renderDiagnostics } from "../.tmp-test/src/components/diagnostics/DiagnosticsView.js";
@@ -1506,10 +1506,13 @@ test("Contexts screen lists backend-owned identity summaries and reserves creati
 	assert.ok(html.includes("Work identity"));
 	assert.ok(html.includes("Future Tool"));
 	assert.ok(html.includes("2 projects"));
-	assert.ok(html.includes("Provider"));
+	assert.ok(html.includes("Health"));
+	assert.ok(html.includes("Linked projects"));
+	assert.ok(html.includes("Last used"));
+	assert.ok(html.includes("Integrations: Future Tool · 1 provider enabled"));
 	assert.equal(
-		providerSummary({ ...context, enabledProviders: [] }),
-		"No providers enabled",
+		integrationSummary({ ...context, enabledProviders: [] }),
+		"Future Tool · 0 providers enabled",
 	);
 });
 
