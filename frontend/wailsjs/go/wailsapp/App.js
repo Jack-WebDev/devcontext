@@ -6,6 +6,10 @@ export function BindProject(arg1) {
   return window['go']['wailsapp']['App']['BindProject'](arg1);
 }
 
+export function ArchiveContext(arg1) {
+  return window['go']['wailsapp']['App']['ArchiveContext'](arg1);
+}
+
 export function ChooseProjectDirectory() {
   return window['go']['wailsapp']['App']['ChooseProjectDirectory']();
 }
@@ -16,6 +20,10 @@ export function CreateContext(arg1) {
 
 export function DuplicateContext(arg1) {
   return window['go']['wailsapp']['App']['DuplicateContext'](arg1);
+}
+
+export function DeleteContext(arg1) {
+  return window['go']['wailsapp']['App']['DeleteContext'](arg1);
 }
 
 export function ExportContextMetadata(arg1) {
@@ -92,6 +100,14 @@ export function LaunchProject(arg1) {
 
 export function PreflightLaunchProject(arg1) {
   return window['go']['wailsapp']['App']['PreflightLaunchProject'](arg1);
+}
+
+export function PreviewDeleteContext(arg1) {
+  return window['go']['wailsapp']['App']['PreviewDeleteContext'](arg1);
+}
+
+export function RestoreContext(arg1) {
+  return window['go']['wailsapp']['App']['RestoreContext'](arg1);
 }
 
 export function RunRepairAction(arg1) {

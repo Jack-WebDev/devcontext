@@ -170,6 +170,35 @@ func (s *Service) UpdateContextAppearance(request UpdateContextAppearanceRequest
 	return state, nil
 }
 
+func (s *Service) ArchiveContext(request ArchiveContextRequest) (ContextState, *Error) {
+	state, err := s.archiveContext(request)
+	if err != nil {
+		return ContextState{}, NewError(err)
+	}
+	return state, nil
+}
+func (s *Service) RestoreContext(request RestoreContextRequest) (ContextState, *Error) {
+	state, err := s.restoreContext(request)
+	if err != nil {
+		return ContextState{}, NewError(err)
+	}
+	return state, nil
+}
+func (s *Service) PreviewDeleteContext(request DeleteContextPreviewRequest) (DeleteContextPreview, *Error) {
+	preview, err := s.previewDeleteContext(request)
+	if err != nil {
+		return DeleteContextPreview{}, NewError(err)
+	}
+	return preview, nil
+}
+func (s *Service) DeleteContext(request DeleteContextRequest) (DeleteContextResult, *Error) {
+	result, err := s.deleteContext(request)
+	if err != nil {
+		return DeleteContextResult{}, NewError(err)
+	}
+	return result, nil
+}
+
 // GetTrustCenter returns factual local protection, project mapping, and
 // coding-tool integration-boundary data for the Trust Center.
 func (s *Service) GetTrustCenter() (TrustCenterState, *Error) {
@@ -362,7 +391,7 @@ func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, er
 
 	return LaunchState{
 		Project:                    projectState(projectPath),
-		Contexts:                   s.contextStates(contexts),
+		Contexts:                   s.contextStates(activeContexts(contexts)),
 		Binding:                    bindingState(lookup),
 		Confidence:                 s.launchConfidenceState(resolution.Context),
 		SelectedContextID:          selectedContextID(resolution),
@@ -543,6 +572,98 @@ func (s *Service) updateContextAppearance(request UpdateContextAppearanceRequest
 	}
 	s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{Name: devlog.EventContextUpdated, Timestamp: s.now(), ContextID: ctx.ID.String(), ToolID: string(ctx.Tool.DefaultTool)}))
 	return s.contextState(ctx), nil
+}
+
+func (s *Service) archiveContext(request ArchiveContextRequest) (ContextState, error) {
+	ctx, err := s.contextForLifecycle(request.ContextID)
+	if err != nil {
+		return ContextState{}, err
+	}
+	if !ctx.IsArchived() {
+		archivedAt := s.now().UTC()
+		ctx.ArchivedAt = &archivedAt
+		if err := s.dependencies.Contexts.Write(ctx); err != nil {
+			return ContextState{}, err
+		}
+		s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{Name: devlog.EventContextArchived, Timestamp: s.now(), ContextID: ctx.ID.String(), ToolID: string(ctx.Tool.DefaultTool)}))
+	}
+	return s.contextState(ctx), nil
+}
+
+func (s *Service) restoreContext(request RestoreContextRequest) (ContextState, error) {
+	ctx, err := s.contextForLifecycle(request.ContextID)
+	if err != nil {
+		return ContextState{}, err
+	}
+	if ctx.IsArchived() {
+		ctx.ArchivedAt = nil
+		if err := s.dependencies.Contexts.Write(ctx); err != nil {
+			return ContextState{}, err
+		}
+		s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{Name: devlog.EventContextRestored, Timestamp: s.now(), ContextID: ctx.ID.String(), ToolID: string(ctx.Tool.DefaultTool)}))
+	}
+	return s.contextState(ctx), nil
+}
+
+func (s *Service) previewDeleteContext(request DeleteContextPreviewRequest) (DeleteContextPreview, error) {
+	ctx, err := s.contextForLifecycle(request.ContextID)
+	if err != nil {
+		return DeleteContextPreview{}, err
+	}
+	bindings, err := s.dependencies.Projects.List()
+	if err != nil {
+		return DeleteContextPreview{}, err
+	}
+	projects := make([]ProjectState, 0)
+	for _, binding := range bindings {
+		if binding.ContextID == ctx.ID {
+			projects = append(projects, projectState(binding.ProjectPath))
+		}
+	}
+	return DeleteContextPreview{Context: s.contextState(ctx), ProjectBindings: projects, DeletesIsolatedState: true}, nil
+}
+
+func (s *Service) deleteContext(request DeleteContextRequest) (DeleteContextResult, error) {
+	if !request.ConfirmDelete {
+		return DeleteContextResult{}, fmt.Errorf("deleting a context requires confirmation")
+	}
+	ctx, err := s.contextForLifecycle(request.ContextID)
+	if err != nil {
+		return DeleteContextResult{}, err
+	}
+	if !ctx.IsArchived() {
+		return DeleteContextResult{}, fmt.Errorf("archive the context before deleting it")
+	}
+	running, err := s.dependencies.RunningEnvironments.RefreshProcessStates(s.dependencies.ProcessInspector)
+	if err != nil {
+		return DeleteContextResult{}, err
+	}
+	for _, environment := range running.Environments {
+		if environment.Context.ID == ctx.ID && (environment.Process.State == coreRunning.ProcessStateRunning || environment.Session.State == coreRunning.SessionStateActive) {
+			return DeleteContextResult{}, fmt.Errorf("context %q has an active workspace; stop it before deleting the context", ctx.Name)
+		}
+	}
+	removed, err := s.dependencies.Projects.UnbindContext(ctx.ID)
+	if err != nil {
+		return DeleteContextResult{}, err
+	}
+	if err := s.dependencies.Contexts.Delete(ctx.ID); err != nil {
+		return DeleteContextResult{}, err
+	}
+	projects := make([]ProjectState, len(removed))
+	for i, binding := range removed {
+		projects[i] = projectState(binding.ProjectPath)
+	}
+	s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{Name: devlog.EventContextDeleted, Timestamp: s.now(), ContextID: ctx.ID.String(), ToolID: string(ctx.Tool.DefaultTool)}))
+	return DeleteContextResult{ContextID: ctx.ID.String(), RemovedProjectBindings: projects}, nil
+}
+
+func (s *Service) contextForLifecycle(id string) (devcontext.Context, error) {
+	contextID, err := devcontext.NewID(id)
+	if err != nil {
+		return devcontext.Context{}, err
+	}
+	return s.dependencies.Contexts.Get(contextID)
 }
 
 func setContextMetadata(metadata devcontext.Metadata, key, value string) {
@@ -1454,6 +1575,16 @@ func (s *Service) contextStates(contexts []devcontext.Context) []ContextState {
 	return states
 }
 
+func activeContexts(contexts []devcontext.Context) []devcontext.Context {
+	active := make([]devcontext.Context, 0, len(contexts))
+	for _, ctx := range contexts {
+		if !ctx.IsArchived() {
+			active = append(active, ctx)
+		}
+	}
+	return active
+}
+
 func (s *Service) contextState(ctx devcontext.Context) ContextState {
 	providerEntries := s.providerStateEntries(ctx)
 	confidence := s.launchConfidenceStateForContext(ctx, providerEntries)
@@ -1474,6 +1605,7 @@ func (s *Service) contextState(ctx devcontext.Context) ContextState {
 		),
 		Confidence: confidence,
 		Metadata:   cloneMetadata(ctx.Metadata),
+		ArchivedAt: ctx.ArchivedAt,
 	}
 }
 

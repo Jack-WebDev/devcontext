@@ -17,8 +17,12 @@ type Context struct {
 	// Name is the user-facing display name.
 	Name string
 
-	Tool      codingtool.LaunchTarget
-	Providers provider.Configs
-	Metadata  Metadata
-	CreatedAt time.Time
+	Tool       codingtool.LaunchTarget
+	Providers  provider.Configs
+	Metadata   Metadata
+	CreatedAt  time.Time
+	ArchivedAt *time.Time
 }
+
+// IsArchived reports whether this context is retired from routine use.
+func (c Context) IsArchived() bool { return c.ArchivedAt != nil }

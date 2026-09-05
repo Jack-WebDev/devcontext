@@ -5,11 +5,15 @@ import {wailsapp} from '../models';
 
 export function BindProject(arg1:application.BindProjectRequest):Promise<any>;
 
+export function ArchiveContext(arg1:any):Promise<any>;
+
 export function ChooseProjectDirectory():Promise<any>;
 
 export function CreateContext(arg1:application.CreateContextRequest):Promise<any>;
 
 export function DuplicateContext(arg1:application.DuplicateContextRequest):Promise<any>;
+
+export function DeleteContext(arg1:any):Promise<any>;
 
 export function ExportContextMetadata(arg1:application.ExportContextMetadataRequest):Promise<any>;
 
@@ -48,6 +52,10 @@ export function ImportContextMetadata(arg1:application.ImportContextMetadataRequ
 export function LaunchProject(arg1:application.LaunchProjectRequest):Promise<any>;
 
 export function PreflightLaunchProject(arg1:application.PreflightLaunchProjectRequest):Promise<any>;
+
+export function PreviewDeleteContext(arg1:any):Promise<any>;
+
+export function RestoreContext(arg1:any):Promise<any>;
 
 export function RunRepairAction(arg1:application.RunRepairActionRequest):Promise<any>;
 

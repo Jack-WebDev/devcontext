@@ -126,6 +126,29 @@ type UpdateContextAppearanceRequest struct {
 	Accent    string `json:"accent,omitempty"`
 }
 
+type ArchiveContextRequest struct {
+	ContextID string `json:"contextId"`
+}
+type RestoreContextRequest struct {
+	ContextID string `json:"contextId"`
+}
+type DeleteContextPreviewRequest struct {
+	ContextID string `json:"contextId"`
+}
+type DeleteContextRequest struct {
+	ContextID     string `json:"contextId"`
+	ConfirmDelete bool   `json:"confirmDelete"`
+}
+type DeleteContextPreview struct {
+	Context              ContextState   `json:"context"`
+	ProjectBindings      []ProjectState `json:"projectBindings"`
+	DeletesIsolatedState bool           `json:"deletesIsolatedState"`
+}
+type DeleteContextResult struct {
+	ContextID              string         `json:"contextId"`
+	RemovedProjectBindings []ProjectState `json:"removedProjectBindings"`
+}
+
 // ContextDetailsState contains the backend-owned data for one context's
 // detail view. It extends the list summary with its storage location and
 // creation time.
@@ -263,6 +286,7 @@ type ContextState struct {
 	DevelopmentTools []DevelopmentToolIntegration `json:"developmentTools"`
 	Confidence       LaunchConfidenceState        `json:"confidence"`
 	Metadata         map[string]string            `json:"metadata,omitempty"`
+	ArchivedAt       *time.Time                   `json:"archivedAt,omitempty"`
 }
 
 // DevelopmentToolIntegration is a generic, presentation-safe development

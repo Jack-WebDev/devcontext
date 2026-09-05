@@ -179,3 +179,28 @@ func (r Repository) Unbind(projectPath string, baseDir Path) (UnbindResult, erro
 	}
 	return result, nil
 }
+
+// UnbindContext removes every project binding for a context in one atomic
+// project-bindings write and returns the affected bindings.
+func (r Repository) UnbindContext(contextID devcontext.ID) ([]Binding, error) {
+	bindings, err := r.List()
+	if err != nil {
+		return nil, err
+	}
+	remaining := make([]Binding, 0, len(bindings))
+	removed := make([]Binding, 0)
+	for _, binding := range bindings {
+		if binding.ContextID == contextID {
+			removed = append(removed, binding)
+			continue
+		}
+		remaining = append(remaining, binding)
+	}
+	if len(removed) == 0 {
+		return removed, nil
+	}
+	if err := WriteProjectBindingsFile(r.path, remaining); err != nil {
+		return nil, err
+	}
+	return removed, nil
+}

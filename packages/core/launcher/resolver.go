@@ -38,6 +38,9 @@ func (r Resolver) resolveExplicitContext(request LaunchRequest) (ResolutionResul
 	if err != nil {
 		return ResolutionResult{}, err
 	}
+	if ctx.IsArchived() {
+		return ResolutionResult{}, fmt.Errorf("%w: %s", devcontext.ErrContextArchived, ctx.ID.String())
+	}
 
 	lookup, err := r.Projects.LookupWithContextValidation(string(request.ProjectPath), request.ProjectPath, r.Contexts)
 	if err != nil {
@@ -67,6 +70,9 @@ func (r Resolver) resolveProjectBindingOrSelection(request LaunchRequest) (Resol
 		if err != nil {
 			return ResolutionResult{}, fmt.Errorf("load bound context %q: %w", lookup.Binding.ContextID.String(), err)
 		}
+		if ctx.IsArchived() {
+			return r.selectionRequired(nil)
+		}
 		return ResolutionResult{
 			Context: &ctx,
 			Source:  ResolutionSourceProjectBinding,
@@ -74,16 +80,26 @@ func (r Resolver) resolveProjectBindingOrSelection(request LaunchRequest) (Resol
 	}
 
 	warnings := danglingBindingWarnings(lookup)
+	return r.selectionRequired(warnings)
+}
+
+func (r Resolver) selectionRequired(warnings []ResolutionWarning) (ResolutionResult, error) {
 	contexts, err := r.Contexts.List()
 	if err != nil {
 		return ResolutionResult{}, err
 	}
 
+	available := make([]devcontext.Context, 0, len(contexts))
+	for _, ctx := range contexts {
+		if !ctx.IsArchived() {
+			available = append(available, ctx)
+		}
+	}
 	return ResolutionResult{
 		Source:            ResolutionSourceUserSelection,
 		Warnings:          warnings,
 		SelectionRequired: true,
-		AvailableContexts: contexts,
+		AvailableContexts: available,
 	}, nil
 }
 

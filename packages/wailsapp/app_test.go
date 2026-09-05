@@ -410,6 +410,19 @@ func (s *fakeService) UpdateContextAppearance(request application.UpdateContextA
 	return s.updateContextAppearanceResult, s.updateContextAppearanceErr
 }
 
+func (s *fakeService) ArchiveContext(application.ArchiveContextRequest) (application.ContextState, *application.Error) {
+	return application.ContextState{}, nil
+}
+func (s *fakeService) RestoreContext(application.RestoreContextRequest) (application.ContextState, *application.Error) {
+	return application.ContextState{}, nil
+}
+func (s *fakeService) PreviewDeleteContext(application.DeleteContextPreviewRequest) (application.DeleteContextPreview, *application.Error) {
+	return application.DeleteContextPreview{}, nil
+}
+func (s *fakeService) DeleteContext(application.DeleteContextRequest) (application.DeleteContextResult, *application.Error) {
+	return application.DeleteContextResult{}, nil
+}
+
 func (s *fakeService) GetTrustCenter() (application.TrustCenterState, *application.Error) {
 	return s.trustCenter, s.trustCenterErr
 }

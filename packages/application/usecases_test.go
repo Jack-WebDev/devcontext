@@ -3,6 +3,7 @@ package application
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -303,6 +304,74 @@ func TestUpdateContextAppearanceOnlyChangesAppearanceMetadata(t *testing.T) {
 	}
 	if _, appErr := fixture.service().UpdateContextDetails(UpdateContextDetailsRequest{ContextID: "personal", Name: "", Purpose: "x"}); appErr == nil {
 		t.Fatal("expected empty name to be rejected")
+	}
+}
+
+func TestContextLifecycleArchivesRestoresAndDeletesOnlyOwnedState(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	ctx := fixture.context("personal", "Personal")
+	fixture.writeContext(t, ctx)
+	fixture.writeBindings(t, project.Binding{ProjectPath: project.Path(fixture.projectDir), ContextID: ctx.ID, CreatedAt: fixture.now})
+	service := fixture.service()
+
+	archived, appErr := service.ArchiveContext(ArchiveContextRequest{ContextID: ctx.ID.String()})
+	if appErr != nil || archived.ArchivedAt == nil {
+		t.Fatalf("archive context = %#v, %v", archived, appErr)
+	}
+	launchState, appErr := service.GetLaunchState(GetLaunchStateRequest{ProjectPath: fixture.projectDir})
+	if appErr != nil || len(launchState.Contexts) != 0 || !launchState.SelectionRequired {
+		t.Fatalf("archived launch state = %#v, %v", launchState, appErr)
+	}
+	preview, appErr := service.PreviewDeleteContext(DeleteContextPreviewRequest{ContextID: ctx.ID.String()})
+	if appErr != nil || len(preview.ProjectBindings) != 1 || !preview.DeletesIsolatedState {
+		t.Fatalf("delete preview = %#v, %v", preview, appErr)
+	}
+	if _, appErr := service.DeleteContext(DeleteContextRequest{ContextID: ctx.ID.String()}); appErr == nil {
+		t.Fatal("unconfirmed deletion succeeded")
+	}
+	if _, appErr := service.RestoreContext(RestoreContextRequest{ContextID: ctx.ID.String()}); appErr != nil {
+		t.Fatalf("restore context: %v", appErr)
+	}
+	if _, appErr := service.ArchiveContext(ArchiveContextRequest{ContextID: ctx.ID.String()}); appErr != nil {
+		t.Fatalf("archive context again: %v", appErr)
+	}
+	if _, appErr := service.DeleteContext(DeleteContextRequest{ContextID: ctx.ID.String(), ConfirmDelete: true}); appErr != nil {
+		t.Fatalf("delete context: %v", appErr)
+	}
+	if _, err := devcontext.NewRepository(fixture.contextsDir).Get(ctx.ID); !errors.Is(err, devcontext.ErrContextNotFound) {
+		t.Fatalf("deleted context lookup error = %v", err)
+	}
+	if _, err := os.Stat(fixture.projectDir); err != nil {
+		t.Fatalf("project folder was affected: %v", err)
+	}
+	bindings, err := project.ReadProjectBindingsFile(fixture.bindingsPath)
+	if err != nil || len(bindings) != 0 {
+		t.Fatalf("remaining bindings = %#v, %v", bindings, err)
+	}
+}
+
+func TestDeleteContextBlocksAnActiveWorkspace(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	ctx := fixture.context("personal", "Personal")
+	fixture.writeContext(t, ctx)
+	service := fixture.service()
+	if _, appErr := service.ArchiveContext(ArchiveContextRequest{ContextID: ctx.ID.String()}); appErr != nil {
+		t.Fatalf("archive context: %v", appErr)
+	}
+	repository := coreRunning.NewRepository(fixture.runningPath)
+	if _, err := repository.Record(coreRunning.Environment{
+		Project:   coreRunning.ProjectIdentity{Path: project.Path(fixture.projectDir), Name: "current"},
+		Context:   coreRunning.ContextIdentity{ID: ctx.ID, Name: ctx.Name},
+		Tool:      coreRunning.ToolIdentity{ID: fixture.editor.ID(), Name: "Fake Tool"},
+		StartedAt: fixture.now,
+		Process:   coreRunning.Process{State: coreRunning.ProcessStateRunning},
+		Session:   coreRunning.Session{State: coreRunning.SessionStateActive},
+		Launch:    coreRunning.LaunchIdentity{Source: launcher.InvocationSourceGUI, ResolutionSource: launcher.ResolutionSourceExplicit},
+	}); err != nil {
+		t.Fatalf("record active workspace: %v", err)
+	}
+	if _, appErr := service.DeleteContext(DeleteContextRequest{ContextID: ctx.ID.String(), ConfirmDelete: true}); appErr == nil {
+		t.Fatal("deleted context with active workspace")
 	}
 }
 

@@ -110,6 +110,12 @@ export interface UpdateContextAppearanceRequest {
 	icon?: string;
 	accent?: string;
 }
+export interface ArchiveContextRequest { contextId: string; }
+export interface RestoreContextRequest { contextId: string; }
+export interface DeleteContextPreviewRequest { contextId: string; }
+export interface DeleteContextRequest { contextId: string; confirmDelete?: boolean; }
+export interface DeleteContextPreview { context: ContextState; projectBindings: ProjectState[]; deletesIsolatedState: boolean; }
+export interface DeleteContextResult { contextId: string; removedProjectBindings: ProjectState[]; }
 
 export interface ContextDetailsState {
 	context: ContextState;
@@ -206,6 +212,7 @@ export interface ContextState {
 	developmentTools?: DevelopmentToolIntegration[];
 	confidence?: LaunchConfidenceState;
 	metadata?: Record<string, string>;
+	archivedAt?: string;
 }
 
 export type DevelopmentToolCategory =
@@ -621,6 +628,10 @@ export interface DevContextApi {
 	updateContextAppearance(
 		request: UpdateContextAppearanceRequest,
 	): Promise<ApiResult<ContextState>>;
+	archiveContext(request: ArchiveContextRequest): Promise<ApiResult<ContextState>>;
+	restoreContext(request: RestoreContextRequest): Promise<ApiResult<ContextState>>;
+	previewDeleteContext(request: DeleteContextPreviewRequest): Promise<ApiResult<DeleteContextPreview>>;
+	deleteContext(request: DeleteContextRequest): Promise<ApiResult<DeleteContextResult>>;
 	getTrustCenter(): Promise<ApiResult<TrustCenterState>>;
 	preflightLaunchProject(
 		request: PreflightLaunchProjectRequest,
@@ -678,6 +689,10 @@ export interface WailsBindings {
 	getContextDetails(request: GetContextDetailsRequest): Promise<unknown>;
 	updateContextDetails(request: UpdateContextDetailsRequest): Promise<unknown>;
 	updateContextAppearance(request: UpdateContextAppearanceRequest): Promise<unknown>;
+	archiveContext(request: ArchiveContextRequest): Promise<unknown>;
+	restoreContext(request: RestoreContextRequest): Promise<unknown>;
+	previewDeleteContext(request: DeleteContextPreviewRequest): Promise<unknown>;
+	deleteContext(request: DeleteContextRequest): Promise<unknown>;
 	getTrustCenter(): Promise<unknown>;
 	preflightLaunchProject(
 		request: PreflightLaunchProjectRequest,
@@ -768,6 +783,10 @@ export function createDevContextApi(
 				normalizeContextState,
 			);
 		},
+		archiveContext(request) { return callBinding(() => bindings.archiveContext(request), normalizeContextState); },
+		restoreContext(request) { return callBinding(() => bindings.restoreContext(request), normalizeContextState); },
+		previewDeleteContext(request) { return callBinding(() => bindings.previewDeleteContext(request), normalizeDeleteContextPreview); },
+		deleteContext(request) { return callBinding(() => bindings.deleteContext({ ...request, confirmDelete: request.confirmDelete ?? false }), normalizeDeleteContextResult); },
 		getTrustCenter() {
 			return callBinding(
 				() => bindings.getTrustCenter(),
@@ -923,6 +942,10 @@ const generatedBindings: WailsBindings = {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
 		return bindings.UpdateContextAppearance(request);
 	},
+	async archiveContext(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.ArchiveContext(request); },
+	async restoreContext(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.RestoreContext(request); },
+	async previewDeleteContext(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.PreviewDeleteContext(request); },
+	async deleteContext(request) { const bindings = await import("../../wailsjs/go/wailsapp/App"); return bindings.DeleteContext({ ...request, confirmDelete: request.confirmDelete ?? false }); },
 	async getTrustCenter() {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
 		return bindings.GetTrustCenter();
@@ -1743,7 +1766,18 @@ function normalizeContextState(value: unknown): ContextState {
 				}),
 		confidence: normalizeLaunchConfidenceState(object.confidence),
 		metadata: optionalStringRecord(object.metadata),
+		...(optionalString(object.archivedAt) === undefined ? {} : { archivedAt: optionalString(object.archivedAt) }),
 	};
+}
+
+function normalizeDeleteContextPreview(value: unknown): DeleteContextPreview {
+	const object = objectValue(value);
+	return { context: normalizeContextState(object.context), projectBindings: arrayValue(object.projectBindings).map(normalizeProjectState), deletesIsolatedState: booleanValue(object.deletesIsolatedState) };
+}
+
+function normalizeDeleteContextResult(value: unknown): DeleteContextResult {
+	const object = objectValue(value);
+	return { contextId: stringValue(object.contextId), removedProjectBindings: arrayValue(object.removedProjectBindings).map(normalizeProjectState) };
 }
 
 function normalizeDevelopmentToolIntegration(
