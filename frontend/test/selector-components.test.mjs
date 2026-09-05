@@ -613,14 +613,23 @@ test("first-run welcome explains local identity boundaries and setup choices", (
 	assert.doesNotMatch(html, /disabled=""/);
 });
 
-test("welcome screen has one context-creation action and no provider setup", () => {
+test("welcome screen explains contexts and their local separation", () => {
 	const html = renderToStaticMarkup(
 		createElement(WelcomeView, { onCreateFirstContext() {} }),
 	);
 
 	assert.ok(html.includes("Welcome to Dev Context"));
 	assert.ok(html.includes("Create Your First Context"));
-	assert.doesNotMatch(html, /provider|Personal|Company/i);
+	assert.ok(html.includes("development identity, not a provider profile"));
+	assert.ok(html.includes("Personal work, Work, a Client, or Open Source"));
+	assert.ok(html.includes("What stays separate"));
+	assert.ok(html.includes("Projects open with the context you choose"));
+	assert.ok(html.includes("Account sessions and tool data use separate local storage"));
+	assert.ok(html.includes("Tool settings and launch environment"));
+	assert.ok(html.includes("without changing another context"));
+	assert.doesNotMatch(html, /Classify detected provider sessions/);
+	assert.doesNotMatch(html, /Create Personal/);
+	assert.doesNotMatch(html, /Create Company/);
 });
 
 test("first-run welcome disables setup actions until handlers are wired", () => {
