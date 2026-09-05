@@ -97,6 +97,10 @@ import {
 import { createContextAndRefresh } from "../.tmp-test/src/components/contexts/context-creation.js";
 import { ContextCreateIdentityScreen } from "../.tmp-test/src/components/contexts/ContextCreateIdentityScreen.js";
 import {
+	contextIdentityTemplates,
+	draftFromContextIdentityTemplate,
+} from "../.tmp-test/src/components/contexts/context-identity-templates.js";
+import {
 	beginContextCreation,
 	completeContextCreation,
 	initialContextCreateFlow,
@@ -3178,15 +3182,15 @@ test("context creation flow permits creation only from review", () => {
 test("context identity screen asks one question before continuing", () => {
 	const blank = renderToStaticMarkup(
 		createElement(ContextCreateIdentityScreen, {
-			name: "",
-			onNameChange() {},
+			draft: {},
+			onDraftChange() {},
 			onContinue() {},
 		}),
 	);
 	const named = renderToStaticMarkup(
 		createElement(ContextCreateIdentityScreen, {
-			name: "Personal",
-			onNameChange() {},
+			draft: draftFromContextIdentityTemplate(contextIdentityTemplates[0]),
+			onDraftChange() {},
 			onContinue() {},
 		}),
 	);
@@ -3195,10 +3199,26 @@ test("context identity screen asks one question before continuing", () => {
 	assert.ok(blank.includes("Context name"));
 	assert.ok(blank.includes("Continue"));
 	assert.match(blank, /disabled=""/);
-	assert.doesNotMatch(blank, /Start from a template/);
 	assert.doesNotMatch(blank, /Enabled providers/);
 	assert.doesNotMatch(blank, /Coding tool/);
 	assert.doesNotMatch(named, /disabled=""/);
+	assert.ok(named.includes("Preview"));
+	assert.ok(named.includes("Personal"));
+});
+
+test("identity templates update an editable request without exposing an ID", () => {
+	const ids = contextIdentityTemplates.map((template) => template.id);
+	assert.deepEqual(ids, ["personal", "work", "client", "open-source", "custom"]);
+
+	const draft = draftFromContextIdentityTemplate(contextIdentityTemplates[1]);
+	assert.deepEqual(draft, {
+		templateId: "company",
+		name: "Work",
+		description: "Development work for your employer.",
+		icon: "building",
+		accent: "slate-blue",
+	});
+	assert.equal("contextId" in draft, false);
 });
 
 function contextFixture(id, name, providers = []) {
