@@ -13,6 +13,22 @@ interface AppRouteDefinition {
 	label: string;
 }
 
+type ContextDetailDestination =
+	| "overview"
+	| "name-purpose"
+	| "appearance"
+	| "linked-projects"
+	| "development-tools"
+	| "launch-preferences"
+	| "environment"
+	| "activity"
+	| "advanced";
+
+interface ContextDetailRoute {
+	contextId: string;
+	destination: ContextDetailDestination;
+}
+
 const appRoutes: AppRouteDefinition[] = [
 	{ id: "home", label: "Home" },
 	{ id: "contexts", label: "Contexts" },
@@ -30,9 +46,40 @@ const appRouteDefinitions: AppRouteDefinition[] = [
 
 function appRouteFromHash(hash: string): AppRoute {
 	const route = hash.replace(/^#/, "");
+	if (contextDetailRouteFromHash(hash)) return "contexts";
 	return appRouteDefinitions.some((definition) => definition.id === route)
 		? (route as AppRoute)
 		: "home";
+}
+
+function contextDetailRouteFromHash(
+	hash: string,
+): ContextDetailRoute | undefined {
+	const parts = hash.replace(/^#/, "").split("/");
+	if (parts[0] !== "contexts" || !parts[1]) return undefined;
+	const destination = parts[2] || "overview";
+	if (
+		destination !== "overview" &&
+		destination !== "name-purpose" &&
+		destination !== "appearance" &&
+		destination !== "linked-projects" &&
+		destination !== "development-tools" &&
+		destination !== "launch-preferences" &&
+		destination !== "environment" &&
+		destination !== "activity" &&
+		destination !== "advanced"
+	) {
+		return undefined;
+	}
+	try {
+		return { contextId: decodeURIComponent(parts[1]), destination };
+	} catch {
+		return undefined;
+	}
+}
+
+function contextDetailHash(route: ContextDetailRoute): string {
+	return `contexts/${encodeURIComponent(route.contextId)}/${route.destination}`;
 }
 
 function appRouteDefinition(route: AppRoute): AppRouteDefinition {
@@ -42,5 +89,17 @@ function appRouteDefinition(route: AppRoute): AppRouteDefinition {
 	);
 }
 
-export type { AppRoute, AppRouteDefinition };
-export { appRouteDefinition, appRouteDefinitions, appRouteFromHash, appRoutes };
+export type {
+	AppRoute,
+	AppRouteDefinition,
+	ContextDetailDestination,
+	ContextDetailRoute,
+};
+export {
+	appRouteDefinition,
+	appRouteDefinitions,
+	appRouteFromHash,
+	appRoutes,
+	contextDetailHash,
+	contextDetailRouteFromHash,
+};

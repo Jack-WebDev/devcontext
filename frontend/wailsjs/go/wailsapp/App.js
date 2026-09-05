@@ -126,6 +126,10 @@ export function UpdateContextDetails(arg1) {
   return window['go']['wailsapp']['App']['UpdateContextDetails'](arg1);
 }
 
+export function UpdateContextDevelopmentTools(arg1) {
+  return window['go']['wailsapp']['App']['UpdateContextDevelopmentTools'](arg1);
+}
+
 export function UpdateSettings(arg1) {
   return window['go']['wailsapp']['App']['UpdateSettings'](arg1);
 }

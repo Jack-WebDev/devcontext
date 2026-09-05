@@ -65,6 +65,8 @@ export function UpdateContextAppearance(arg1:application.UpdateContextAppearance
 
 export function UpdateContextDetails(arg1:application.UpdateContextDetailsRequest):Promise<any>;
 
+export function UpdateContextDevelopmentTools(arg1:application.UpdateContextDevelopmentToolsRequest):Promise<any>;
+
 export function UpdateSettings(arg1:application.UpdateSettingsRequest):Promise<any>;
 
 export function ValidateProjectDirectory(arg1:application.ValidateProjectDirectoryRequest):Promise<any>;

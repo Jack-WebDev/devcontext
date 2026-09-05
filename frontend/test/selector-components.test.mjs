@@ -22,6 +22,10 @@ import {
 	integrationSummary,
 } from "../.tmp-test/src/components/contexts/ContextsView.js";
 import { deleteImpact } from "../.tmp-test/src/components/contexts/ContextDeleteDialog.js";
+import {
+	ContextAppearanceEditor,
+	ContextNamePurposeEditor,
+} from "../.tmp-test/src/components/contexts/ContextDetailView.js";
 import { parseContextMetadataExport } from "../.tmp-test/src/components/contexts/context-transfer.js";
 import { renderDiagnostics } from "../.tmp-test/src/components/diagnostics/DiagnosticsView.js";
 import {
@@ -183,6 +187,8 @@ import { AppShell } from "../.tmp-test/src/components/shell/AppShell.js";
 import {
 	appRouteFromHash,
 	appRoutes,
+	contextDetailHash,
+	contextDetailRouteFromHash,
 } from "../.tmp-test/src/components/shell/routes.js";
 import {
 	StatusIndicator,
@@ -1204,6 +1210,18 @@ test("app shell exposes stable navigation, current project state, and a responsi
 		],
 	);
 	assert.equal(appRouteFromHash("#projects"), "projects");
+	assert.equal(appRouteFromHash("#contexts/company/appearance"), "contexts");
+	assert.deepEqual(
+		contextDetailRouteFromHash("#contexts/company/name-purpose"),
+		{
+			contextId: "company",
+			destination: "name-purpose",
+		},
+	);
+	assert.equal(
+		contextDetailHash({ contextId: "Client A", destination: "appearance" }),
+		"contexts/Client%20A/appearance",
+	);
 	assert.equal(appRouteFromHash("#unknown"), "home");
 });
 
@@ -1532,14 +1550,11 @@ test("context health uses required readiness and preserves optional integration 
 		label: "Healthy",
 		status: "ready",
 	});
-	assert.deepEqual(
-		contextHealth({ ...context, confidence: undefined }),
-		{
-			type: "setup_incomplete",
-			label: "Setup incomplete",
-			status: "not_configured",
-		},
-	);
+	assert.deepEqual(contextHealth({ ...context, confidence: undefined }), {
+		type: "setup_incomplete",
+		label: "Setup incomplete",
+		status: "not_configured",
+	});
 	assert.deepEqual(
 		contextHealth({
 			...context,
@@ -1555,6 +1570,38 @@ test("context health uses required readiness and preserves optional integration 
 		}),
 		{ type: "unavailable", label: "Unavailable", status: "blocked" },
 	);
+});
+
+test("context detail editors keep identity and appearance changes scoped", () => {
+	const context = {
+		...contextFixture("company", "Company", []),
+		purpose: "Work projects",
+		description: "Client delivery work",
+		metadata: { icon: "building", accent: "amber" },
+	};
+	const noop = async () => ({ ok: true, data: context });
+	const identity = renderToStaticMarkup(
+		createElement(ContextNamePurposeEditor, {
+			context,
+			onCancel: () => {},
+			onSave: noop,
+		}),
+	);
+	const appearance = renderToStaticMarkup(
+		createElement(ContextAppearanceEditor, {
+			context,
+			onCancel: () => {},
+			onSave: noop,
+		}),
+	);
+
+	assert.match(identity, /Name &amp; purpose/);
+	assert.match(identity, /ID and configuration stay unchanged/);
+	assert.match(identity, /Work projects/);
+	assert.match(identity, /Save changes/);
+	assert.match(appearance, /Choose a visual identity without changing/);
+	assert.match(appearance, /Appearance preview for Company/);
+	assert.match(appearance, /Save appearance/);
 });
 
 test("delete impact describes bindings without implying project folders are deleted", () => {
