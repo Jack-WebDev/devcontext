@@ -1,8 +1,8 @@
 export namespace application {
-
+	
 	export class ArchiveContextRequest {
 	    contextId: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ArchiveContextRequest(source);
 	    }
@@ -410,6 +410,19 @@ export namespace application {
 	        this.projectPath = source["projectPath"];
 	    }
 	}
+
+	export class ForgetProjectRequest {
+		projectPath: string;
+
+		static createFrom(source: any = {}) {
+			return new ForgetProjectRequest(source);
+		}
+
+		constructor(source: any = {}) {
+			if (typeof source === 'string') source = JSON.parse(source);
+			this.projectPath = source["projectPath"];
+		}
+	}
 	export class UpdateContextAppearanceRequest {
 	    contextId: string;
 	    icon?: string;
@@ -447,11 +460,11 @@ export namespace application {
 	export class UpdateContextDevelopmentToolsRequest {
 	    contextId: string;
 	    enabledDevelopmentToolIds: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new UpdateContextDevelopmentToolsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.contextId = source["contextId"];
@@ -488,6 +501,7 @@ export namespace application {
 	        this.projectPath = source["projectPath"];
 	    }
 	}
+
 }
 
 export namespace wailsapp {

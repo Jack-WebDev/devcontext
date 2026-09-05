@@ -30,6 +30,10 @@ export function ExportContextMetadata(arg1) {
   return window['go']['wailsapp']['App']['ExportContextMetadata'](arg1);
 }
 
+export function ForgetProject(arg1) {
+  return window['go']['wailsapp']['App']['ForgetProject'](arg1);
+}
+
 export function GetApplicationMode() {
   return window['go']['wailsapp']['App']['GetApplicationMode']();
 }

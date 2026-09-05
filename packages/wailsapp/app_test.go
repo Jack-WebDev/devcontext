@@ -324,9 +324,11 @@ type fakeService struct {
 	bindResult  application.ProjectBindingState
 	bindErr     *application.Error
 
-	unbindRequest application.UnbindProjectRequest
-	unbindResult  application.ProjectBindingState
-	unbindErr     *application.Error
+	unbindRequest        application.UnbindProjectRequest
+	unbindResult         application.ProjectBindingState
+	unbindErr            *application.Error
+	forgetProjectRequest application.ForgetProjectRequest
+	forgetProjectErr     *application.Error
 
 	createContextRequest application.CreateContextRequest
 	createContextResult  application.CreateContextResult
@@ -478,6 +480,11 @@ func (s *fakeService) BindProject(request application.BindProjectRequest) (appli
 func (s *fakeService) UnbindProject(request application.UnbindProjectRequest) (application.ProjectBindingState, *application.Error) {
 	s.unbindRequest = request
 	return s.unbindResult, s.unbindErr
+}
+
+func (s *fakeService) ForgetProject(request application.ForgetProjectRequest) *application.Error {
+	s.forgetProjectRequest = request
+	return s.forgetProjectErr
 }
 
 func (s *fakeService) CreateContext(request application.CreateContextRequest) (application.CreateContextResult, *application.Error) {

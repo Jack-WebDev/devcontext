@@ -96,16 +96,16 @@ export function ProjectsContent({
 	errorProjectPath,
 	launchError,
 	onLaunch,
-	onChangeContext,
 	onOpenFolder,
+	onOpenDetail,
 }: {
 	projects: LoadState<ProjectsState>;
 	launchingProjectPath?: string;
 	errorProjectPath?: string;
 	launchError?: DisplayError;
 	onLaunch: (project: ProjectListItem) => void;
-	onChangeContext?: (project: ProjectListItem) => void;
 	onOpenFolder: (project: ProjectListItem) => void;
+	onOpenDetail: (project: ProjectListItem) => void;
 }) {
 	if (projects.status === "loading")
 		return <LoadingMessage>Loading projects...</LoadingMessage>;
@@ -118,8 +118,8 @@ export function ProjectsContent({
 			errorProjectPath={errorProjectPath}
 			launchError={launchError?.message}
 			onLaunch={onLaunch}
-			onChangeContext={onChangeContext}
 			onOpenFolder={onOpenFolder}
+			onOpenDetail={onOpenDetail}
 		/>
 	);
 }

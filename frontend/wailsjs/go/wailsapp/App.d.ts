@@ -17,6 +17,8 @@ export function DuplicateContext(arg1:application.DuplicateContextRequest):Promi
 
 export function ExportContextMetadata(arg1:application.ExportContextMetadataRequest):Promise<any>;
 
+export function ForgetProject(arg1:application.ForgetProjectRequest):Promise<any>;
+
 export function GetApplicationMode():Promise<wailsapp.ApplicationMode>;
 
 export function GetContextDetails(arg1:application.GetContextDetailsRequest):Promise<any>;

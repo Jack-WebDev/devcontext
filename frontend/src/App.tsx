@@ -26,6 +26,8 @@ import { DiagnosticsView } from "./components/diagnostics/DiagnosticsView";
 import { RecentProjectConfirmationDialog } from "./components/home/RecentProjectConfirmationDialog";
 import { notifyCodingToolLaunched } from "./components/notifications/notifications";
 import { ProjectContextChangeDialog } from "./components/projects/ProjectContextChangeDialog";
+import { ProjectBindingRemovalDialog } from "./components/projects/ProjectBindingRemovalDialog";
+import { ProjectDetailView } from "./components/projects/ProjectDetailView";
 import { RunningEnvironmentConflictDialog } from "./components/running/RunningEnvironmentConflictDialog";
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
 import { createContextAndRefresh } from "./components/contexts/context-creation";
@@ -40,6 +42,8 @@ import {
 	contextDetailHash,
 	contextDetailRouteFromHash,
 	type ContextDetailDestination,
+	projectDetailHash,
+	projectDetailRouteFromHash,
 } from "./components/shell/routes";
 import { AppStatusBar } from "./components/status/AppStatusBar";
 import {
@@ -142,6 +146,9 @@ function ManagementApp() {
 	const [contextDetailRoute, setContextDetailRoute] = useState(() =>
 		contextDetailRouteFromHash(window.location.hash),
 	);
+	const [projectDetailRoute, setProjectDetailRoute] = useState(() =>
+		projectDetailRouteFromHash(window.location.hash),
+	);
 	const [contextManagementDrawerID, setContextManagementDrawerID] =
 		useState<string>();
 	const [contextToDelete, setContextToDelete] = useState<{
@@ -170,6 +177,12 @@ function ManagementApp() {
 		useState(false);
 	const [projectContextChangeError, setProjectContextChangeError] =
 		useState<DisplayError>();
+	const [projectBindingRemoval, setProjectBindingRemoval] =
+		useState<ProjectListItem>();
+	const [projectBindingRemovalPending, setProjectBindingRemovalPending] =
+		useState(false);
+	const [projectBindingRemovalError, setProjectBindingRemovalError] =
+		useState<DisplayError>();
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 	const [commandPaletteLaunchPending, setCommandPaletteLaunchPending] =
 		useState(false);
@@ -180,6 +193,7 @@ function ManagementApp() {
 		function syncRouteFromHash() {
 			setActiveRoute(appRouteFromHash(window.location.hash));
 			setContextDetailRoute(contextDetailRouteFromHash(window.location.hash));
+			setProjectDetailRoute(projectDetailRouteFromHash(window.location.hash));
 		}
 
 		window.addEventListener("hashchange", syncRouteFromHash);
@@ -206,7 +220,10 @@ function ManagementApp() {
 		}
 		if (route !== activeRoute) {
 			window.location.hash = route;
-		} else if (route === "contexts" && contextDetailRoute) {
+		} else if (
+			(route === "contexts" && contextDetailRoute) ||
+			(route === "projects" && projectDetailRoute)
+		) {
 			window.location.hash = route;
 		}
 	}
@@ -218,6 +235,12 @@ function ManagementApp() {
 		const route = { contextId, destination };
 		setContextDetailRoute(route);
 		window.location.hash = contextDetailHash(route);
+	}
+
+	function navigateToProjectDetail(project: ProjectListItem) {
+		const route = { projectPath: project.project.path };
+		setProjectDetailRoute(route);
+		window.location.hash = projectDetailHash(route);
 	}
 
 	async function handleCommandPaletteLaunch(contextId: string) {
@@ -490,6 +513,76 @@ function ManagementApp() {
 		}
 	}
 
+	function handleProjectBindingRemoval(project: ProjectListItem) {
+		setProjectBindingRemoval(project);
+		setProjectBindingRemovalError(undefined);
+	}
+
+	async function handleProjectBindingRemovalConfirm() {
+		if (projectBindingRemoval === undefined || projectBindingRemovalPending) {
+			return;
+		}
+
+		setProjectBindingRemovalPending(true);
+		setProjectBindingRemovalError(undefined);
+		try {
+			const result = await devContextApi.unbindProject({
+				projectPath: projectBindingRemoval.project.path,
+			});
+			if (!result.ok) {
+				setProjectBindingRemovalError(result.error);
+				return;
+			}
+			setProjectBindingRemoval(undefined);
+			await Promise.all([
+				refreshProjects(),
+				refreshHomeDashboard(),
+				refreshContexts(),
+			]);
+		} finally {
+			setProjectBindingRemovalPending(false);
+		}
+	}
+
+	async function handleProjectForget(project: ProjectListItem) {
+		if (!window.confirm(`Forget ${project.project.name} from Dev Context? Project files and folders are never deleted.`)) {
+			return;
+		}
+		const result = await devContextApi.forgetProject({
+			projectPath: project.project.path,
+		});
+		if (!result.ok) {
+			setProjectLaunchError(result.error);
+			setProjectErrorPath(project.project.path);
+			return;
+		}
+		await Promise.all([refreshProjects(), refreshHomeDashboard(), refreshRecentProjects(), refreshContexts()]);
+		handleNavigate("projects");
+	}
+
+	async function handleProjectLocate(project: ProjectListItem) {
+		if (project.contextId === undefined) return;
+		const selected = await devContextApi.chooseProjectDirectory();
+		if (!selected.ok || selected.data === undefined || selected.data === project.project.path) return;
+		const bound = await devContextApi.bindProject({
+			projectPath: selected.data,
+			contextId: project.contextId,
+		});
+		if (!bound.ok) {
+			setProjectLaunchError(bound.error);
+			setProjectErrorPath(project.project.path);
+			return;
+		}
+		const forgotten = await devContextApi.forgetProject({ projectPath: project.project.path });
+		if (!forgotten.ok) {
+			setProjectLaunchError(forgotten.error);
+			setProjectErrorPath(project.project.path);
+			return;
+		}
+		await Promise.all([refreshProjects(), refreshHomeDashboard(), refreshRecentProjects(), refreshContexts()]);
+		window.location.hash = projectDetailHash({ projectPath: selected.data });
+	}
+
 	function handleProjectOpenFolder(project: ProjectListItem) {
 		window.open(
 			new URL(project.project.path, "file://").href,
@@ -678,19 +771,41 @@ function ManagementApp() {
 				)
 			) : activeRoute === "projects" ? (
 				<>
-					<ProjectsContent
-						projects={projects}
-						launchingProjectPath={projectLaunchPath}
-						errorProjectPath={projectErrorPath}
-						launchError={projectLaunchError}
-						onLaunch={handleProjectLaunch}
-						onChangeContext={
-							contexts.status === "loaded"
-								? handleProjectChangeContext
-								: undefined
-						}
-						onOpenFolder={handleProjectOpenFolder}
-					/>
+					{projectDetailRoute ? (
+						projects.status === "loading" ? (
+							<p className="text-sm text-muted-foreground">Loading project...</p>
+						) : projects.status === "error" ? (
+							<GuiErrorNotice error={projects.error} />
+						) : (
+							<ProjectDetailView
+								project={projects.data.projects.find(
+									(project) =>
+										project.project.path === projectDetailRoute.projectPath,
+								)}
+								onBack={() => handleNavigate("projects")}
+								onLaunch={handleProjectLaunch}
+								onOpenFolder={handleProjectOpenFolder}
+								onChangeContext={
+									contexts.status === "loaded"
+										? handleProjectChangeContext
+										: undefined
+								}
+								onRemoveBinding={handleProjectBindingRemoval}
+								onForget={handleProjectForget}
+								onLocate={handleProjectLocate}
+							/>
+						)
+					) : (
+						<ProjectsContent
+							projects={projects}
+							launchingProjectPath={projectLaunchPath}
+							errorProjectPath={projectErrorPath}
+							launchError={projectLaunchError}
+							onLaunch={handleProjectLaunch}
+							onOpenFolder={handleProjectOpenFolder}
+							onOpenDetail={navigateToProjectDetail}
+						/>
+					)}
 					{projectContextChange && contexts.status === "loaded" ? (
 						<ProjectContextChangeDialog
 							project={projectContextChange}
@@ -704,6 +819,18 @@ function ManagementApp() {
 							onConfirm={(contextId) =>
 								void handleProjectContextChange(contextId)
 							}
+						/>
+					) : null}
+					{projectBindingRemoval ? (
+						<ProjectBindingRemovalDialog
+							project={projectBindingRemoval}
+							pending={projectBindingRemovalPending}
+							error={projectBindingRemovalError}
+							onCancel={() =>
+								!projectBindingRemovalPending &&
+								setProjectBindingRemoval(undefined)
+							}
+							onConfirm={() => void handleProjectBindingRemovalConfirm()}
 						/>
 					) : null}
 				</>

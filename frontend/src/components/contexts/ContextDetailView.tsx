@@ -16,6 +16,7 @@ import type {
 } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
+import { ProjectBindingRemovalDialog } from "../projects/ProjectBindingRemovalDialog.js";
 import {
 	contextAccentOption,
 	contextAccentOptions,
@@ -554,6 +555,8 @@ function ContextLinkedProjects({
 }) {
 	const [projects, setProjects] = useState<ProjectListItem[]>();
 	const [error, setError] = useState<string>();
+	const [projectToRemove, setProjectToRemove] = useState<ProjectListItem>();
+	const [removingPath, setRemovingPath] = useState<string>();
 	useEffect(() => {
 		void getProjects().then((result) =>
 			result.ok
@@ -565,15 +568,21 @@ function ContextLinkedProjects({
 				: setError(result.error.message),
 		);
 	}, [contextId, getProjects]);
-	async function remove(path: string) {
-		const result = await onRemove(path);
-		if (!result.ok) {
-			setError(result.error.message);
-			return;
+	async function remove(path: string): Promise<boolean> {
+		setRemovingPath(path);
+		try {
+			const result = await onRemove(path);
+			if (!result.ok) {
+				setError(result.error.message);
+				return false;
+			}
+			setProjects((current) =>
+				current?.filter((project) => project.project.path !== path),
+			);
+			return true;
+		} finally {
+			setRemovingPath(undefined);
 		}
-		setProjects((current) =>
-			current?.filter((project) => project.project.path !== path),
-		);
 	}
 	return (
 		<section
@@ -645,7 +654,7 @@ function ContextLinkedProjects({
 										type="button"
 										variant="destructive"
 										size="sm"
-										onClick={() => void remove(project.project.path)}
+										onClick={() => setProjectToRemove(project)}
 									>
 										Remove binding
 									</Button>
@@ -655,6 +664,20 @@ function ContextLinkedProjects({
 					))}
 				</div>
 			)}
+			{projectToRemove ? (
+				<ProjectBindingRemovalDialog
+					project={projectToRemove}
+					pending={removingPath === projectToRemove.project.path}
+					onCancel={() =>
+						removingPath === undefined && setProjectToRemove(undefined)
+					}
+					onConfirm={() =>
+						void remove(projectToRemove.project.path).then((removed) => {
+							if (removed) setProjectToRemove(undefined);
+						})
+					}
+				/>
+			) : null}
 		</section>
 	);
 }

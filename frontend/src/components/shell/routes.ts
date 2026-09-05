@@ -29,6 +29,10 @@ interface ContextDetailRoute {
 	destination: ContextDetailDestination;
 }
 
+interface ProjectDetailRoute {
+	projectPath: string;
+}
+
 const appRoutes: AppRouteDefinition[] = [
 	{ id: "home", label: "Home" },
 	{ id: "contexts", label: "Contexts" },
@@ -47,9 +51,26 @@ const appRouteDefinitions: AppRouteDefinition[] = [
 function appRouteFromHash(hash: string): AppRoute {
 	const route = hash.replace(/^#/, "");
 	if (contextDetailRouteFromHash(hash)) return "contexts";
+	if (projectDetailRouteFromHash(hash)) return "projects";
 	return appRouteDefinitions.some((definition) => definition.id === route)
 		? (route as AppRoute)
 		: "home";
+}
+
+function projectDetailRouteFromHash(
+	hash: string,
+): ProjectDetailRoute | undefined {
+	const parts = hash.replace(/^#/, "").split("/");
+	if (parts[0] !== "projects" || !parts[1] || parts[2]) return undefined;
+	try {
+		return { projectPath: decodeURIComponent(parts[1]) };
+	} catch {
+		return undefined;
+	}
+}
+
+function projectDetailHash(route: ProjectDetailRoute): string {
+	return `projects/${encodeURIComponent(route.projectPath)}`;
 }
 
 function contextDetailRouteFromHash(
@@ -94,6 +115,7 @@ export type {
 	AppRouteDefinition,
 	ContextDetailDestination,
 	ContextDetailRoute,
+	ProjectDetailRoute,
 };
 export {
 	appRouteDefinition,
@@ -102,4 +124,6 @@ export {
 	appRoutes,
 	contextDetailHash,
 	contextDetailRouteFromHash,
+	projectDetailHash,
+	projectDetailRouteFromHash,
 };

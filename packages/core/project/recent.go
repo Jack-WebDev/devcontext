@@ -90,6 +90,21 @@ func (r RecentRepository) Record(projectPath Path, contextID devcontext.ID, laun
 	return WriteRecentProjectsFile(r.path, projects)
 }
 
+// Remove deletes Dev Context's recent-launch record for one project.
+func (r RecentRepository) Remove(projectPath Path) error {
+	projects, err := r.List()
+	if err != nil {
+		return err
+	}
+	remaining := projects[:0]
+	for _, recent := range projects {
+		if recent.ProjectPath != projectPath {
+			remaining = append(remaining, recent)
+		}
+	}
+	return WriteRecentProjectsFile(r.path, remaining)
+}
+
 type recentProjectsDocument struct {
 	Projects []recentProjectTOML `toml:"projects"`
 }
