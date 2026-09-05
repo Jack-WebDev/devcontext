@@ -16,6 +16,7 @@ import {
 } from "../ui/sheet.js";
 import { ContextField } from "./ContextField";
 import { useContextCreation } from "./context-creation";
+import { developmentToolCategories } from "./development-tool-categories";
 
 export { ContextDetailsDrawer } from "./ContextDetailsDrawer";
 
@@ -56,6 +57,12 @@ export function CreateContextDialog({
 	const providerOptions = contexts
 		.flatMap((c) => c.context.providers)
 		.filter((p, i, all) => all.findIndex((x) => x.id === p.id) === i);
+	const codingCategory = developmentToolCategories.find(
+		(category) => category.id === "coding",
+	);
+	const aiCategory = developmentToolCategories.find(
+		(category) => category.id === "ai",
+	);
 	useEffect(() => {
 		void loadTemplates().then((result) => {
 			if (result.ok) setTemplates(result.data.templates);
@@ -129,9 +136,10 @@ export function CreateContextDialog({
 							))}
 						</select>
 					</label>
+					<h3 className="text-sm font-medium">Development tools</h3>
 					{options.length > 0 ? (
 						<label className="block text-sm">
-							Coding tool
+							{codingCategory?.name ?? "Coding"}
 							<select
 								className="mt-1 w-full border p-2"
 								value={toolId}
@@ -146,12 +154,12 @@ export function CreateContextDialog({
 						</label>
 					) : (
 						<p className="text-sm text-muted-foreground">
-							No coding tools detected. You can create this context now and
-							configure a coding tool later.
+							No development tools detected. You can create this context now and
+							configure development tools later.
 						</p>
 					)}
 					<fieldset>
-						<legend className="text-sm">Providers</legend>
+						<legend className="text-sm">{aiCategory?.name ?? "AI"}</legend>
 						{providerOptions.map((provider) => (
 							<label key={provider.id} className="block">
 								<input

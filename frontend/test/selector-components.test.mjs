@@ -100,6 +100,7 @@ import {
 	contextPurposeMaxLength,
 	contextPurposeValidation,
 } from "../.tmp-test/src/components/contexts/ContextCreateIdentityScreen.js";
+import { ContextCreateDevelopmentToolsScreen } from "../.tmp-test/src/components/contexts/ContextCreateDevelopmentToolsScreen.js";
 import {
 	ContextCreateProjectsScreen,
 	addProjectToDraft,
@@ -117,6 +118,7 @@ import {
 	contextAccentOptions,
 	contextIconOptions,
 } from "../.tmp-test/src/components/contexts/context-identity-options.js";
+import { developmentToolCategories } from "../.tmp-test/src/components/contexts/development-tool-categories.js";
 import {
 	beginContextCreation,
 	completeContextCreation,
@@ -3289,6 +3291,34 @@ test("context creation flow permits creation only from review", () => {
 	flow = beginContextCreation(flow);
 	flow = completeContextCreation(flow);
 	assert.equal(flow.status, "success");
+});
+
+test("context creation frames tool setup as development tools with generic categories", () => {
+	assert.deepEqual(
+		developmentToolCategories.map((category) => category.id),
+		[
+			"coding",
+			"ai",
+			"version-control",
+			"source-hosting",
+			"cloud-registries",
+			"other",
+		],
+	);
+
+	const html = renderToStaticMarkup(
+		createElement(ContextCreateDevelopmentToolsScreen, {
+			onBack() {},
+			onContinue() {},
+		}),
+	);
+	assert.match(html, /Development tools/);
+	assert.match(html, /Development tool categories/);
+	assert.match(html, /Version control/);
+	assert.match(html, /Source hosting/);
+	assert.match(html, /Cloud &amp; registries/);
+	assert.match(html, /Continue/);
+	assert.doesNotMatch(html, /Provider/);
 });
 
 test("context identity screen asks one question before continuing", () => {
