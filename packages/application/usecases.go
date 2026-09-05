@@ -970,7 +970,7 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 
 	if err := s.processLauncher().Launch(processRequestFromLaunchPlan(plan, s.dependencies.DetachMode)); err != nil {
 		s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchProcessFailure, plan, err, s.now()))
-		return LaunchProjectResult{}, err
+		return LaunchProjectResult{}, newLaunchFailureError(err, plan.Executable, plan.Environment, s.now())
 	}
 
 	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchSucceeded, plan, nil, s.now()))

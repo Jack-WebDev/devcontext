@@ -2928,14 +2928,20 @@ test("launch failure view keeps recovery actions available without exposing tech
 		"Check the editor command, project path, and permissions, then retry.",
 	).error;
 	const html = renderToStaticMarkup(
-		LaunchFailureView({ error, onRetry: () => {}, onCancel: () => {} }),
+		LaunchFailureView({
+			error,
+			onRetry: () => {},
+			onRunDiagnostics: () => {},
+			onChooseAnotherContext: () => {},
+			onCancel: () => {},
+		}),
 	);
 
 	assert.match(html, /role="alert"/);
 	assert.ok(html.includes("Dev Context is still open"));
 	assert.ok(html.includes("Retry"));
 	assert.ok(html.includes("Run diagnostics"));
-	assert.ok(html.includes("Open configuration"));
+	assert.ok(html.includes("Choose another context"));
 	assert.ok(html.includes("Cancel"));
 	assert.doesNotMatch(html, /Technical details/);
 });
@@ -2947,13 +2953,27 @@ test("launch failure view hides technical details until requested", () => {
 			"Unable to launch editor.",
 			"Check the editor command, then retry.",
 		).error,
-		technicalDetails: "starting tool in /work/api failed: permission denied",
+		launchFailureDetails: {
+			executable: "/usr/bin/code",
+			exitCode: 1,
+			timestamp: "2026-09-05T10:30:00Z",
+			logs: "starting tool in /work/api failed: permission denied",
+		},
 	};
 	const html = renderToStaticMarkup(
-		LaunchFailureView({ error, onRetry: () => {}, onCancel: () => {} }),
+		LaunchFailureView({
+			error,
+			onRetry: () => {},
+			onChooseAnotherContext: () => {},
+			onCancel: () => {},
+		}),
 	);
 
 	assert.ok(html.includes("Technical details"));
+	assert.ok(html.includes("Executable"));
+	assert.ok(html.includes("Exit code"));
+	assert.ok(html.includes("Timestamp"));
+	assert.ok(html.includes("/usr/bin/code"));
 	assert.ok(html.includes("/work/api"));
 	assert.match(html, /<details/);
 	assert.doesNotMatch(html, /<details(?:\s[^>]*)?\sopen(?:=|\s|>)/);

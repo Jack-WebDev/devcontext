@@ -707,6 +707,11 @@ function SelectorView({
 									error={launcherState.error}
 									onRetry={() => void handleLaunch()}
 									onRunDiagnostics={onRunDiagnostics}
+									onChooseAnotherContext={() =>
+										setLauncherState(
+											selectingLauncherState(launcherState.selection),
+										)
+									}
 									onCancel={() =>
 										void cancelSelector({ closeSelector: onCancel })
 									}

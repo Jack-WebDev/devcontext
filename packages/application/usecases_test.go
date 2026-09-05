@@ -1746,7 +1746,7 @@ func TestLaunchProjectAcceptsConfirmedMismatch(t *testing.T) {
 func TestLaunchProjectReturnsPresentationSafeLaunchFailure(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.writeContext(t, fixture.context("personal", "Personal"))
-	fixture.process.err = launcher.ErrProcessStartFailed
+	fixture.process.err = fmt.Errorf("%w: API_TOKEN=launch-secret", launcher.ErrProcessStartFailed)
 
 	_, appErr := fixture.service().LaunchProject(LaunchProjectRequest{
 		ProjectPath: fixture.projectDir,
@@ -1757,6 +1757,18 @@ func TestLaunchProjectReturnsPresentationSafeLaunchFailure(t *testing.T) {
 	}
 	if appErr.Code != ErrorCodeLaunch {
 		t.Fatalf("error code = %q, want %q", appErr.Code, ErrorCodeLaunch)
+	}
+	if appErr.LaunchFailureDetails == nil {
+		t.Fatal("launch failure details = nil, want sanitized process diagnostics")
+	}
+	if appErr.LaunchFailureDetails.Executable != "/fixture/editor" || !appErr.LaunchFailureDetails.Timestamp.Equal(fixture.now) {
+		t.Fatalf("launch failure details = %#v, want executable and timestamp", appErr.LaunchFailureDetails)
+	}
+	if strings.Contains(appErr.LaunchFailureDetails.Logs, "launch-secret") {
+		t.Fatalf("launch logs expose a credential: %q", appErr.LaunchFailureDetails.Logs)
+	}
+	if appErr.LaunchFailureDetails.ExitCode != nil {
+		t.Fatalf("exit code = %#v, want none for a start failure", appErr.LaunchFailureDetails.ExitCode)
 	}
 	if len(fixture.process.requests) != 1 {
 		t.Fatalf("process request count = %d, want 1", len(fixture.process.requests))
