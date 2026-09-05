@@ -95,6 +95,7 @@ import {
 	shouldCloseSelectorAfterLaunch,
 } from "../.tmp-test/src/components/selector/launch-success-close-behavior.js";
 import { createContextAndRefresh } from "../.tmp-test/src/components/contexts/context-creation.js";
+import { ContextCreateIdentityScreen } from "../.tmp-test/src/components/contexts/ContextCreateIdentityScreen.js";
 import {
 	beginContextCreation,
 	completeContextCreation,
@@ -3172,6 +3173,32 @@ test("context creation flow permits creation only from review", () => {
 	flow = beginContextCreation(flow);
 	flow = completeContextCreation(flow);
 	assert.equal(flow.status, "success");
+});
+
+test("context identity screen asks one question before continuing", () => {
+	const blank = renderToStaticMarkup(
+		createElement(ContextCreateIdentityScreen, {
+			name: "",
+			onNameChange() {},
+			onContinue() {},
+		}),
+	);
+	const named = renderToStaticMarkup(
+		createElement(ContextCreateIdentityScreen, {
+			name: "Personal",
+			onNameChange() {},
+			onContinue() {},
+		}),
+	);
+
+	assert.ok(blank.includes("What kind of development identity are you creating?"));
+	assert.ok(blank.includes("Context name"));
+	assert.ok(blank.includes("Continue"));
+	assert.match(blank, /disabled=""/);
+	assert.doesNotMatch(blank, /Start from a template/);
+	assert.doesNotMatch(blank, /Enabled providers/);
+	assert.doesNotMatch(blank, /Coding tool/);
+	assert.doesNotMatch(named, /disabled=""/);
 });
 
 function contextFixture(id, name, providers = []) {
