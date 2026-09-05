@@ -1,3 +1,5 @@
+import type { KeyboardEvent } from "react";
+
 import type { ContextMismatch, ContextState } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
@@ -19,12 +21,29 @@ function ContextMismatchDialog({
 	onUseRememberedContext,
 	onOpenAnyway,
 }: ContextMismatchDialogProps) {
+	const rememberedContextName = contextName(contexts, mismatch.boundContextId);
+	const requestedContextName = contextName(
+		contexts,
+		mismatch.requestedContextId,
+	);
+
+	function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+		if (mismatchDialogKeyboardAction(event.key, launchPending) !== "cancel") {
+			return;
+		}
+
+		event.preventDefault();
+		event.stopPropagation();
+		onCancel();
+	}
+
 	return (
 		<Card
 			as="section"
 			aria-labelledby="context-mismatch-title"
 			aria-modal="true"
 			className="border border-destructive/30 py-0"
+			onKeyDown={handleKeyDown}
 			role="dialog"
 		>
 			<CardContent className="space-y-4 p-5">
@@ -33,26 +52,35 @@ function ContextMismatchDialog({
 						id="context-mismatch-title"
 						className="text-base font-semibold text-foreground"
 					>
-						Context mismatch
+						This project normally opens in {rememberedContextName}
 					</h3>
 					<p className="mt-1 text-muted-foreground">
-						This project is remembered for a different context. Opening anyway
-						can expose project files to the requested context's local tools and
-						credentials.
+						Dev Context remembers {rememberedContextName} for this project.
+						Opening it with {requestedContextName} instead can use that
+						context's signed-in accounts, tools, and environment. It will not
+						change which context this project normally opens in.
 					</p>
 				</div>
 
-				<dl className="grid gap-2 text-sm">
+				<div className="grid gap-2 text-sm">
 					<MismatchDetail label="Project" value={mismatch.projectPath} />
-					<MismatchDetail
-						label="Remembered context"
-						value={contextName(contexts, mismatch.boundContextId)}
-					/>
-					<MismatchDetail
-						label="Requested context"
-						value={contextName(contexts, mismatch.requestedContextId)}
-					/>
-				</dl>
+					<div
+						aria-label="Context comparison"
+						className="grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2"
+						role="group"
+					>
+						<ContextComparison
+							label="Remembered context"
+							name={rememberedContextName}
+							detail="Normal choice"
+						/>
+						<ContextComparison
+							label="Requested context"
+							name={requestedContextName}
+							detail="Open only if intended"
+						/>
+					</div>
+				</div>
 
 				<div className="flex flex-wrap justify-end gap-3">
 					<Button
@@ -69,7 +97,7 @@ function ContextMismatchDialog({
 						disabled={launchPending}
 						onClick={onOpenAnyway}
 					>
-						Open Anyway
+						Open {requestedContextName} anyway
 					</Button>
 					<Button
 						type="button"
@@ -85,15 +113,35 @@ function ContextMismatchDialog({
 	);
 }
 
+function ContextComparison({
+	label,
+	name,
+	detail,
+}: {
+	label: string;
+	name: string;
+	detail: string;
+}) {
+	return (
+		<div className="bg-card p-3">
+			<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+				{label}
+			</p>
+			<p className="mt-1 font-medium text-foreground">{name}</p>
+			<p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+		</div>
+	);
+}
+
 function MismatchDetail({ label, value }: { label: string; value: string }) {
 	return (
 		<div className="grid gap-1">
-			<dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+			<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
 				{label}
-			</dt>
-			<dd className="truncate font-mono text-sm text-foreground" title={value}>
+			</p>
+			<p className="truncate font-mono text-sm text-foreground" title={value}>
 				{value}
-			</dd>
+			</p>
 		</div>
 	);
 }
@@ -103,4 +151,13 @@ function contextName(contexts: ContextState[], contextId: string): string {
 	return context?.name ?? contextId;
 }
 
-export { ContextMismatchDialog, contextName };
+type MismatchDialogKeyboardAction = "cancel" | "none";
+
+function mismatchDialogKeyboardAction(
+	key: string,
+	launchPending: boolean,
+): MismatchDialogKeyboardAction {
+	return key === "Escape" && !launchPending ? "cancel" : "none";
+}
+
+export { ContextMismatchDialog, contextName, mismatchDialogKeyboardAction };
