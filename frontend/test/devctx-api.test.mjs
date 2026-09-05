@@ -80,6 +80,74 @@ test("adapter returns the selected project directory or a canceled selection", a
 	});
 });
 
+test("adapter normalizes generic development tool metadata and statuses", async () => {
+	const api = createDevContextApi({
+		async getContexts() {
+			return {
+				contexts: [
+					{
+						context: {
+							id: "personal",
+							name: "Personal",
+							tool: toolFixture(),
+							availableTools: [],
+							providers: [],
+							developmentTools: [
+								{
+									id: "editor",
+									name: "Editor",
+									category: "coding",
+									status: "available",
+									message: "Ready to use.",
+									enabled: true,
+								},
+								{
+									id: "unknown",
+									name: "Unknown",
+									category: "not-a-category",
+									status: "not-a-status",
+									message: "Unknown state.",
+									enabled: false,
+								},
+							],
+							confidence: {
+								contextId: "personal",
+								status: "ready",
+								checks: [],
+							},
+						},
+						enabledProviders: [],
+						projectCount: 0,
+					},
+				],
+			};
+		},
+	});
+
+	const result = await api.getContexts();
+	assert.equal(result.ok, true);
+	if (result.ok) {
+		assert.deepEqual(result.data.contexts[0].context.developmentTools, [
+			{
+				id: "editor",
+				name: "Editor",
+				category: "coding",
+				status: "available",
+				message: "Ready to use.",
+				enabled: true,
+			},
+			{
+				id: "unknown",
+				name: "Unknown",
+				category: "other",
+				status: "error",
+				message: "Unknown state.",
+				enabled: false,
+			},
+		]);
+	}
+});
+
 test("adapter normalizes the Home dashboard contract", async () => {
 	const api = createDevContextApi({
 		async getHomeDashboard(request) {

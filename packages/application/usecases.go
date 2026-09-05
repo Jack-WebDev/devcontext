@@ -651,6 +651,9 @@ func (s *Service) contextFromCreateRequest(contextID devcontext.ID, request Crea
 	if strings.TrimSpace(request.Name) == "" {
 		return devcontext.DefaultContextForIDWithRegistries(contextID, s.now(), s.dependencies.ProviderRegistry, s.dependencies.ToolRegistry)
 	}
+	if err := s.applyDevelopmentToolSelections(&request); err != nil {
+		return devcontext.Context{}, err
+	}
 	toolID := codingtool.ID(request.ToolID)
 	if toolID == "" {
 		toolID = s.dependencies.ToolRegistry.DefaultID()
@@ -673,6 +676,46 @@ func (s *Service) contextFromCreateRequest(contextID devcontext.ID, request Crea
 		}
 	}
 	return devcontext.Context{ID: contextID, Name: strings.TrimSpace(request.Name), Tool: codingtool.LaunchTarget{DefaultTool: toolID, Tools: map[codingtool.ID]codingtool.Config{toolID: {}}}, Providers: providers, Metadata: metadata, CreatedAt: s.now().UTC()}, nil
+}
+
+// applyDevelopmentToolSelections translates the creation flow's generic
+// registry IDs into the persisted tool and provider configuration. Registry
+// IDs must not be shared across the two integration types: accepting an
+// ambiguous ID could silently configure the wrong integration.
+func (s *Service) applyDevelopmentToolSelections(request *CreateContextRequest) error {
+	if len(request.EnabledDevelopmentToolIDs) == 0 {
+		return nil
+	}
+
+	providerIDs := make([]string, 0, len(request.EnabledDevelopmentToolIDs))
+	seen := make(map[string]struct{}, len(request.EnabledDevelopmentToolIDs))
+	for _, rawID := range request.EnabledDevelopmentToolIDs {
+		id := strings.TrimSpace(rawID)
+		if id == "" {
+			return fmt.Errorf("development tool selection has an empty ID")
+		}
+		if _, duplicate := seen[id]; duplicate {
+			continue
+		}
+		seen[id] = struct{}{}
+		_, isTool := s.dependencies.ToolRegistry.Get(codingtool.ID(id))
+		_, isProvider := s.dependencies.ProviderRegistry.Get(provider.ID(id))
+		switch {
+		case isTool && isProvider:
+			return fmt.Errorf("development tool ID %q is ambiguous", id)
+		case isTool:
+			if request.ToolID != "" && request.ToolID != id {
+				return fmt.Errorf("select only one coding tool")
+			}
+			request.ToolID = id
+		case isProvider:
+			providerIDs = append(providerIDs, id)
+		default:
+			return fmt.Errorf("unknown development tool %q", id)
+		}
+	}
+	request.EnabledProviderIDs = providerIDs
+	return nil
 }
 
 func (s *Service) duplicateContext(request DuplicateContextRequest) (DuplicateContextResult, error) {
@@ -1343,8 +1386,15 @@ func (s *Service) contextState(ctx devcontext.Context) ContextState {
 		Tool:           toolState(ctx.Tool.DefaultTool, confidence),
 		AvailableTools: toolOptions(s.dependencies.ToolRegistry),
 		Providers:      providerStatesFromEntries(providerEntries),
-		Confidence:     confidence,
-		Metadata:       cloneMetadata(ctx.Metadata),
+		DevelopmentTools: developmentToolIntegrations(
+			ctx,
+			providerEntries,
+			confidence,
+			s.dependencies.ToolRegistry,
+			s.dependencies.ProviderRegistry,
+		),
+		Confidence: confidence,
+		Metadata:   cloneMetadata(ctx.Metadata),
 	}
 }
 
@@ -1380,6 +1430,7 @@ func (s *Service) providerCredentialSessionStates() ([]ProviderCredentialSession
 		state := ProviderCredentialSessionState{
 			ProviderID:        string(integration.ID()),
 			Name:              integration.DisplayName(),
+			Discovered:        true,
 			MetadataAvailable: session.MetadataAvailable,
 			Fields:            providerMetadataFields(session.Fields),
 		}
@@ -1695,6 +1746,104 @@ func toolOptions(registry codingtool.Registry) []ToolOption {
 		options[i] = ToolOption{ID: string(tool.Integration.ID()), Name: tool.DisplayName}
 	}
 	return options
+}
+
+func developmentToolIntegrations(
+	ctx devcontext.Context,
+	providerEntries []providerStateEntry,
+	confidence LaunchConfidenceState,
+	toolRegistry codingtool.Registry,
+	providerRegistry provider.Registry,
+) []DevelopmentToolIntegration {
+	tools := toolRegistry.All()
+	integrations := make([]DevelopmentToolIntegration, 0, len(tools)+len(providerEntries))
+	for _, tool := range tools {
+		selected := tool.Integration.ID() == ctx.Tool.DefaultTool
+		status := DevelopmentToolAvailable
+		message := "Available to add to this context."
+		var recoveryHint string
+		if selected {
+			state := toolState(tool.Integration.ID(), confidence)
+			status = developmentToolStatusForTool(state.Status)
+			message = state.Message
+			recoveryHint = state.ActionHint
+		}
+		integrations = append(integrations, DevelopmentToolIntegration{
+			ID:           string(tool.Integration.ID()),
+			Name:         tool.DisplayName,
+			Category:     developmentToolCategory(tool.Category),
+			Status:       status,
+			Message:      message,
+			RecoveryHint: recoveryHint,
+			Enabled:      selected,
+		})
+	}
+
+	for _, entry := range providerEntries {
+		status, message, recoveryHint := developmentToolStatusForProvider(entry.state)
+		integrations = append(integrations, DevelopmentToolIntegration{
+			ID:           entry.state.ID,
+			Name:         entry.state.Name,
+			Category:     developmentToolCategory(providerRegistry.Category(entry.providerID)),
+			Status:       status,
+			Message:      message,
+			RecoveryHint: recoveryHint,
+			Enabled:      entry.state.Enabled,
+		})
+	}
+	return integrations
+}
+
+func developmentToolCategory(value string) DevelopmentToolCategory {
+	switch DevelopmentToolCategory(value) {
+	case DevelopmentToolCategoryCoding,
+		DevelopmentToolCategoryAI,
+		DevelopmentToolCategoryVersionControl,
+		DevelopmentToolCategorySourceHosting,
+		DevelopmentToolCategoryCloudRegistries:
+		return DevelopmentToolCategory(value)
+	default:
+		return DevelopmentToolCategoryOther
+	}
+}
+
+func developmentToolStatusForTool(status LaunchConfidenceStatus) DevelopmentToolStatus {
+	switch status {
+	case LaunchConfidenceReady:
+		return DevelopmentToolAvailable
+	case LaunchConfidenceNeedsAttention, LaunchConfidenceBlocked:
+		return DevelopmentToolUnavailable
+	default:
+		return DevelopmentToolError
+	}
+}
+
+func developmentToolStatusForProvider(state ProviderState) (DevelopmentToolStatus, string, string) {
+	if !state.Enabled {
+		return DevelopmentToolAvailable, "Available to add to this context.", ""
+	}
+	if state.SetupAction != nil {
+		switch state.SetupAction.State {
+		case ProviderSetupWaitingForSignIn:
+			return DevelopmentToolNeedsSignIn, state.SetupAction.Message, state.SetupAction.Label
+		case ProviderSetupVerified:
+			return DevelopmentToolConnected, state.SetupAction.Message, ""
+		case ProviderSetupOpenAndConfigure:
+			return DevelopmentToolNotConfigured, state.SetupAction.Message, state.SetupAction.Label
+		}
+	}
+	switch state.State {
+	case ProviderReadinessReady:
+		return DevelopmentToolConnected, state.Explanation, ""
+	case ProviderReadinessNotConfigured:
+		return DevelopmentToolNotConfigured, state.Explanation, state.ActionHint
+	case ProviderReadinessDirectoryMissing:
+		return DevelopmentToolError, state.Explanation, state.ActionHint
+	case ProviderReadinessUnavailable:
+		return DevelopmentToolUnavailable, state.Explanation, state.ActionHint
+	default:
+		return DevelopmentToolError, "Integration status could not be determined.", ""
+	}
 }
 
 func enabledProviderIntegrations(entries []providerStateEntry) []provider.Provider {

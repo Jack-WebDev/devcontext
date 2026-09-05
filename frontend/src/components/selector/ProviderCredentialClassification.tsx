@@ -3,23 +3,27 @@ import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 
-type ProviderSessionAssignments = Record<
-	string,
-	"personal" | "company" | undefined
->;
+type ProviderSessionAssignment = string | "not_sure" | undefined;
+type ProviderSessionAssignments = Record<string, ProviderSessionAssignment>;
+interface ProviderSessionAssignmentOption {
+	id: string;
+	name: string;
+}
 
 interface ProviderCredentialClassificationProps {
 	sessions: ProviderCredentialSession[];
 	assignments: ProviderSessionAssignments;
+	assignmentOptions?: ProviderSessionAssignmentOption[];
 	disabled?: boolean;
-	onClassify: (providerId: string, contextId: "personal" | "company") => void;
+	onAssign: (providerId: string, assignment: ProviderSessionAssignment) => void;
 }
 
 function ProviderCredentialClassification({
 	sessions,
 	assignments,
+	assignmentOptions = defaultAssignmentOptions,
 	disabled = false,
-	onClassify,
+	onAssign,
 }: ProviderCredentialClassificationProps) {
 	if (sessions.length === 0) {
 		return null;
@@ -28,15 +32,13 @@ function ProviderCredentialClassification({
 	return (
 		<section
 			className="space-y-3"
-			aria-label="Classify imported provider sessions"
+			aria-label="Assign detected integration sessions"
 		>
 			<div>
-				<h4 className="text-sm font-semibold">
-					Classify detected provider sessions
-				</h4>
+				<h4 className="text-sm font-semibold">Assign detected sessions</h4>
 				<p className="mt-1 text-sm text-muted-foreground">
-					Dev Context found currently signed-in local sessions. Review the
-					metadata and choose which context should receive each session.
+					Dev Context found signed-in local sessions. Assign a verified session
+					to the context that should use it, or leave it unassigned.
 				</p>
 			</div>
 			<div className="grid gap-3 sm:grid-cols-2">
@@ -45,8 +47,9 @@ function ProviderCredentialClassification({
 						key={session.providerId}
 						session={session}
 						assignment={assignments[session.providerId]}
+						assignmentOptions={assignmentOptions}
 						disabled={disabled}
-						onClassify={onClassify}
+						onAssign={onAssign}
 					/>
 				))}
 			</div>
@@ -57,13 +60,15 @@ function ProviderCredentialClassification({
 function ProviderCredentialSessionCard({
 	session,
 	assignment,
+	assignmentOptions,
 	disabled,
-	onClassify,
+	onAssign,
 }: {
 	session: ProviderCredentialSession;
-	assignment?: "personal" | "company";
+	assignment: ProviderSessionAssignment;
+	assignmentOptions: ProviderSessionAssignmentOption[];
 	disabled: boolean;
-	onClassify: (providerId: string, contextId: "personal" | "company") => void;
+	onAssign: (providerId: string, assignment: ProviderSessionAssignment) => void;
 }) {
 	return (
 		<Card as="article" size="sm" className="border border-border py-0">
@@ -80,33 +85,38 @@ function ProviderCredentialSessionCard({
 						variant={assignment === undefined ? "secondary" : "default"}
 						className="text-xs font-medium"
 					>
-						{assignment === undefined
-							? "Unassigned"
-							: assignment === "personal"
-								? "Will import to Personal"
-								: "Will import to Company"}
+						{assignmentLabel(assignment, assignmentOptions)}
 					</Badge>
 				</div>
-				<div className="mt-4 flex flex-wrap gap-2">
-					<Button
-						type="button"
-						variant={assignment === "personal" ? "default" : "outline"}
-						size="sm"
-						disabled={disabled}
-						onClick={() => onClassify(session.providerId, "personal")}
-					>
-						Import to Personal
-					</Button>
-					<Button
-						type="button"
-						variant={assignment === "company" ? "default" : "outline"}
-						size="sm"
-						disabled={disabled}
-						onClick={() => onClassify(session.providerId, "company")}
-					>
-						Import to Company
-					</Button>
-				</div>
+				{session.discovered !== false ? (
+					<div className="mt-4 flex flex-wrap gap-2">
+						{assignmentOptions.map((option) => (
+							<Button
+								key={option.id}
+								type="button"
+								variant={assignment === option.id ? "default" : "outline"}
+								size="sm"
+								disabled={disabled}
+								onClick={() => onAssign(session.providerId, option.id)}
+							>
+								Use with {option.name}
+							</Button>
+						))}
+						<Button
+							type="button"
+							variant={assignment === "not_sure" ? "default" : "outline"}
+							size="sm"
+							disabled={disabled}
+							onClick={() => onAssign(session.providerId, "not_sure")}
+						>
+							Not sure
+						</Button>
+					</div>
+				) : (
+					<p className="mt-4 text-sm text-muted-foreground">
+						This session could not be verified, so it cannot be assigned.
+					</p>
+				)}
 			</CardContent>
 		</Card>
 	);
@@ -157,6 +167,20 @@ function providerSessionSourceLabel(
 	return `Current global ${session.name} session`;
 }
 
+function assignmentLabel(
+	assignment: ProviderSessionAssignment,
+	options: ProviderSessionAssignmentOption[],
+): string {
+	if (assignment === undefined) return "Unassigned";
+	if (assignment === "not_sure") return "Not sure — unassigned";
+	return `Will use with ${options.find((option) => option.id === assignment)?.name ?? "selected context"}`;
+}
+
+const defaultAssignmentOptions: ProviderSessionAssignmentOption[] = [
+	{ id: "personal", name: "Personal" },
+	{ id: "company", name: "Company" },
+];
+
 function rowHasValue(row: {
 	label: string;
 	value?: string;
@@ -164,5 +188,9 @@ function rowHasValue(row: {
 	return row.value !== undefined && row.value !== "";
 }
 
-export type { ProviderSessionAssignments };
+export type {
+	ProviderSessionAssignment,
+	ProviderSessionAssignments,
+	ProviderSessionAssignmentOption,
+};
 export { ProviderCredentialClassification };

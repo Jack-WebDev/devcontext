@@ -236,16 +236,55 @@ type ValidateProjectDirectoryRequest struct {
 // ContextState is the presentation-safe identity and readiness summary for one
 // configured context.
 type ContextState struct {
-	ID             string                `json:"id"`
-	Name           string                `json:"name"`
-	Purpose        string                `json:"purpose,omitempty"`
-	Description    string                `json:"description,omitempty"`
-	Tool           ToolState             `json:"tool"`
-	AvailableTools []ToolOption          `json:"availableTools"`
-	Providers      []ProviderState       `json:"providers"`
-	Confidence     LaunchConfidenceState `json:"confidence"`
-	Metadata       map[string]string     `json:"metadata,omitempty"`
+	ID               string                       `json:"id"`
+	Name             string                       `json:"name"`
+	Purpose          string                       `json:"purpose,omitempty"`
+	Description      string                       `json:"description,omitempty"`
+	Tool             ToolState                    `json:"tool"`
+	AvailableTools   []ToolOption                 `json:"availableTools"`
+	Providers        []ProviderState              `json:"providers"`
+	DevelopmentTools []DevelopmentToolIntegration `json:"developmentTools"`
+	Confidence       LaunchConfidenceState        `json:"confidence"`
+	Metadata         map[string]string            `json:"metadata,omitempty"`
 }
+
+// DevelopmentToolIntegration is a generic, presentation-safe development
+// adapter. It lets UI surfaces render registered integrations by category
+// without knowing their provider or coding-tool implementation.
+type DevelopmentToolIntegration struct {
+	ID           string                  `json:"id"`
+	Name         string                  `json:"name"`
+	Category     DevelopmentToolCategory `json:"category"`
+	Status       DevelopmentToolStatus   `json:"status"`
+	Message      string                  `json:"message"`
+	RecoveryHint string                  `json:"recoveryHint,omitempty"`
+	Enabled      bool                    `json:"enabled"`
+}
+
+type DevelopmentToolCategory string
+
+const (
+	DevelopmentToolCategoryCoding          DevelopmentToolCategory = "coding"
+	DevelopmentToolCategoryAI              DevelopmentToolCategory = "ai"
+	DevelopmentToolCategoryVersionControl  DevelopmentToolCategory = "version-control"
+	DevelopmentToolCategorySourceHosting   DevelopmentToolCategory = "source-hosting"
+	DevelopmentToolCategoryCloudRegistries DevelopmentToolCategory = "cloud-registries"
+	DevelopmentToolCategoryOther           DevelopmentToolCategory = "other"
+)
+
+// DevelopmentToolStatus is the bounded, user-facing readiness vocabulary for
+// any registered development integration.
+type DevelopmentToolStatus string
+
+const (
+	DevelopmentToolAvailable     DevelopmentToolStatus = "available"
+	DevelopmentToolConnected     DevelopmentToolStatus = "connected"
+	DevelopmentToolNeedsSignIn   DevelopmentToolStatus = "needs_sign_in"
+	DevelopmentToolNotConfigured DevelopmentToolStatus = "not_configured"
+	DevelopmentToolNotFound      DevelopmentToolStatus = "not_found"
+	DevelopmentToolUnavailable   DevelopmentToolStatus = "unavailable"
+	DevelopmentToolError         DevelopmentToolStatus = "error"
+)
 
 // ToolState describes the coding tool selected by a context, including
 // presentation-safe readiness and recovery guidance.
@@ -500,8 +539,13 @@ type CreateContextRequest struct {
 	Icon               string   `json:"icon,omitempty"`
 	Accent             string   `json:"accent,omitempty"`
 	EnabledProviderIDs []string `json:"enabledProviderIds,omitempty"`
-	ToolID             string   `json:"toolId,omitempty"`
-	ImportProviderIDs  []string `json:"importProviderIds,omitempty"`
+	// EnabledDevelopmentToolIDs is the generic creation-flow representation of
+	// selected registered integrations. It supersedes the UI's need to split
+	// selections by adapter type; the legacy fields above remain supported for
+	// existing callers.
+	EnabledDevelopmentToolIDs []string `json:"enabledDevelopmentToolIds,omitempty"`
+	ToolID                    string   `json:"toolId,omitempty"`
+	ImportProviderIDs         []string `json:"importProviderIds,omitempty"`
 }
 
 // CreateContextResult describes a newly created context.
@@ -777,8 +821,11 @@ type RunningEnvironmentsState struct {
 // ProviderCredentialSessionState describes a detected global provider session
 // using only non-secret metadata that helps the user classify the session.
 type ProviderCredentialSessionState struct {
-	ProviderID        string                  `json:"providerId"`
-	Name              string                  `json:"name"`
+	ProviderID string `json:"providerId"`
+	Name       string `json:"name"`
+	// Discovered confirms that this session was found by the registered
+	// integration. The frontend must not offer assignment for unverified data.
+	Discovered        bool                    `json:"discovered"`
 	MetadataAvailable bool                    `json:"metadataAvailable"`
 	Fields            []ProviderMetadataField `json:"fields,omitempty"`
 }

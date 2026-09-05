@@ -6,8 +6,11 @@ import "fmt"
 // The name belongs in the registry so callers do not need integration-specific
 // display-name switches.
 type RegisteredTool struct {
-	Integration  CodingTool
-	DisplayName  string
+	Integration CodingTool
+	DisplayName string
+	// Category is presentation metadata used to group an integration without
+	// making a creation screen depend on its concrete implementation.
+	Category     string
 	Capabilities []Capability
 }
 
@@ -48,6 +51,9 @@ func NewRegistry(tools []RegisteredTool, defaultTool ID) (Registry, error) {
 		if tool.DisplayName == "" {
 			return Registry{}, fmt.Errorf("coding tool registry contains tool %q with empty display name", id)
 		}
+		if tool.Category == "" {
+			tool.Category = "other"
+		}
 		tool.Capabilities = append([]Capability(nil), tool.Capabilities...)
 		ordered = append(ordered, tool)
 		byID[id] = tool
@@ -70,7 +76,7 @@ func MustNewRegistry(tools []RegisteredTool, defaultTool ID) Registry {
 
 // BuiltInRegistry returns the currently available built-in coding tools.
 func BuiltInRegistry() Registry {
-	return MustNewRegistry([]RegisteredTool{{Integration: VSCodeEditor{}, DisplayName: "VS Code"}}, VSCodeID)
+	return MustNewRegistry([]RegisteredTool{{Integration: VSCodeEditor{}, DisplayName: "VS Code", Category: "coding"}}, VSCodeID)
 }
 
 // PlannedBuiltInToolIDs documents the stable registration order for built-in
