@@ -14,7 +14,7 @@ func DefaultGlobalConfig() GlobalConfig {
 		DefaultTool: codingtool.TypeVSCode,
 		UI: UISettings{
 			RememberWindowPosition: true,
-			CloseAfterLaunch:       false,
+			CloseAfterLaunch:       true,
 			LaunchVerification:     true,
 			RememberProjects:       true,
 			TrayEnabled:            false,

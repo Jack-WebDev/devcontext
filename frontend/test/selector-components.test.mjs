@@ -63,6 +63,7 @@ import {
 } from "../.tmp-test/src/components/selector/FirstRunWelcome.js";
 import { GuiErrorNotice } from "../.tmp-test/src/components/selector/GuiErrorNotice.js";
 import { LaunchFailureView } from "../.tmp-test/src/components/selector/LaunchFailureView.js";
+import { LaunchProgressView } from "../.tmp-test/src/components/selector/LaunchProgressView.js";
 import { LauncherSurface } from "../.tmp-test/src/components/launcher/LauncherSurface.js";
 import { ProjectResolvingView } from "../.tmp-test/src/components/launcher/ProjectResolvingView.js";
 import {
@@ -2890,10 +2891,34 @@ test("gui error notice renders failure and recovery guidance", () => {
 	}
 });
 
-test("launch success close behavior defaults to keeping the selector open", () => {
-	assert.equal(defaultLaunchSuccessCloseBehavior, "keep_open");
+test("launch success close behavior defaults to closing the selector", () => {
+	assert.equal(defaultLaunchSuccessCloseBehavior, "close_selector");
 	assert.equal(shouldCloseSelectorAfterLaunch("keep_open"), false);
 	assert.equal(shouldCloseSelectorAfterLaunch("close_selector"), true);
+});
+
+test("launch progress is a focused surface without launcher controls", () => {
+	const html = renderToStaticMarkup(
+		LaunchProgressView({
+			projectName: "api",
+			contextName: "Company",
+			showVerification: true,
+			steps: [
+				{
+					id: "start_tool",
+					label: "Start VS Code",
+					status: "pending",
+					message: "Starting VS Code.",
+				},
+			],
+		}),
+	);
+
+	assert.match(html, /aria-label="Launching project"/);
+	assert.ok(html.includes("Opening api"));
+	assert.ok(html.includes("Using Company"));
+	assert.ok(html.includes("Start VS Code"));
+	assert.doesNotMatch(html, /Launch Company|Choose another|Remember this project/);
 });
 
 test("launch failure view keeps recovery actions available without exposing technical details", () => {

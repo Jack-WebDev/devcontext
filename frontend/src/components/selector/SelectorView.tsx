@@ -33,7 +33,7 @@ import {
 } from "./FirstRunWelcome";
 import { GuiErrorNotice } from "./GuiErrorNotice";
 import { LaunchFailureView } from "./LaunchFailureView";
-import { LaunchVerificationProgress } from "./LaunchVerificationProgress";
+import { LaunchProgressView } from "./LaunchProgressView";
 import { PreflightReviewView } from "./PreflightReviewView";
 import {
 	createLaunchRequestGuard,
@@ -153,13 +153,12 @@ function SelectorView({
 	const launchPending = launcherStateIsPending(launcherState);
 	const cancellationPending =
 		launchPending || onboardingPendingContextId !== undefined;
-	const preflightReady =
-		launcherState.status === "launching" &&
-		launcherState.groups !== undefined &&
-		launcherState.groups.every((group) => group.status === "ready");
 	const singleHealthyContext = singleHealthyLaunchContext(launchState);
 	const showSingleContextConfirmation =
 		singleHealthyContext !== undefined && !showContextChoices;
+	const launchInProgress =
+		launcherState.status === "preflighting" ||
+		launcherState.status === "launching";
 	const keyboardLaunchAvailable = canLaunchSelectedContextFromKeyboard({
 		selectedContextId,
 		launchPending: cancellationPending,
@@ -539,6 +538,26 @@ function SelectorView({
 		}
 	}
 
+	if (launchInProgress) {
+		return (
+			<LaunchProgressView
+				projectName={launchState.project.name}
+				contextName={selectedContext?.name ?? "selected context"}
+				showVerification={showLaunchVerification}
+				groups={
+					launcherState.status === "launching"
+						? launcherState.groups
+						: undefined
+				}
+				steps={
+					launcherState.status === "launching"
+						? launcherState.steps
+						: undefined
+				}
+			/>
+		);
+	}
+
 	return (
 		<section
 			className="space-y-8"
@@ -659,31 +678,6 @@ function SelectorView({
 					}
 					launchActions={
 						<>
-							{launchPending && showLaunchVerification ? (
-								<div className="mb-3">
-									<LaunchVerificationProgress
-										projectName={launchState.project.name}
-										contextName={selectedContext?.name ?? "selected context"}
-										heading={preflightReady ? "Ready to launch" : undefined}
-										description={
-											preflightReady
-												? `${launchState.project.name} will open as ${selectedContext?.name ?? "the selected context"}. All required checks are ready.`
-												: undefined
-										}
-										groups={
-											launcherState.status === "launching"
-												? launcherState.groups
-												: undefined
-										}
-										steps={
-											launcherState.status === "launching"
-												? launcherState.steps
-												: undefined
-										}
-									/>
-								</div>
-							) : null}
-
 							{launcherState.status === "preflight_review" ? (
 								<PreflightReviewView
 									projectName={launcherState.preflight.project.name}
