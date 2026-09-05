@@ -2068,7 +2068,7 @@ test("launch verification progress renders a pending shell, groups, and backend 
 
 	assert.match(pending, /role="status"/);
 	assert.ok(pending.includes("Launching devctx as Company..."));
-	assert.ok(pending.includes("Preparing launch verification..."));
+	assert.ok(pending.includes("Preparing launch stages..."));
 	assert.ok(staged.includes("Prepare isolated environment"));
 	assert.ok(staged.includes("Needs attention"));
 	assert.ok(staged.includes("Pending"));

@@ -442,8 +442,9 @@ const (
 	LaunchVerificationStepBlocked        LaunchVerificationStepStatus = "blocked"
 )
 
-// LaunchVerificationStep describes one stage of a safe launch. It does not
-// expose runtime paths, commands, or environment variables.
+// LaunchVerificationStep describes a presentation-safe launch stage. A
+// preflight result contains only pending stages because the work begins later
+// in LaunchProject; it never represents work already completed by preflight.
 type LaunchVerificationStep struct {
 	ID      string                       `json:"id"`
 	Label   string                       `json:"label"`

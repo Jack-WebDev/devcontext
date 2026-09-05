@@ -40,7 +40,7 @@ function LaunchVerificationProgress({
 				<PreflightGroups groups={groups} />
 			) : steps.length === 0 ? (
 				<p className="mt-3 text-muted-foreground">
-					Preparing launch verification...
+					Preparing launch stages...
 				</p>
 			) : (
 				<ol className="mt-3 space-y-3 border-t border-border pt-3">
