@@ -98,6 +98,7 @@ export function ProjectsContent({
 	onLaunch,
 	onChangeContext,
 	onOpenFolder,
+	onOpenDetail,
 }: {
 	projects: LoadState<ProjectsState>;
 	launchingProjectPath?: string;
@@ -106,6 +107,7 @@ export function ProjectsContent({
 	onLaunch: (project: ProjectListItem) => void;
 	onChangeContext?: (project: ProjectListItem) => void;
 	onOpenFolder: (project: ProjectListItem) => void;
+	onOpenDetail: (project: ProjectListItem) => void;
 }) {
 	if (projects.status === "loading")
 		return <LoadingMessage>Loading projects...</LoadingMessage>;
@@ -120,6 +122,7 @@ export function ProjectsContent({
 			onLaunch={onLaunch}
 			onChangeContext={onChangeContext}
 			onOpenFolder={onOpenFolder}
+			onOpenDetail={onOpenDetail}
 		/>
 	);
 }

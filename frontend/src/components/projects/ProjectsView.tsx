@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ProjectListItem } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
@@ -10,8 +11,11 @@ interface ProjectsViewProps {
 	onLaunch?: (project: ProjectListItem) => void;
 	onChangeContext?: (project: ProjectListItem) => void;
 	onOpenFolder?: (project: ProjectListItem) => void;
+	onOpenDetail?: (project: ProjectListItem) => void;
 	onForget?: (project: ProjectListItem) => void;
 }
+
+type ProjectAssignmentFilter = "all" | "assigned" | "unassigned";
 
 function ProjectsView({
 	projects,
@@ -21,6 +25,7 @@ function ProjectsView({
 	onLaunch,
 	onChangeContext,
 	onOpenFolder,
+	onOpenDetail,
 	onForget,
 }: ProjectsViewProps) {
 	return (
@@ -35,35 +40,85 @@ function ProjectsView({
 				</p>
 			</div>
 
-			{projects.length === 0 ? (
+			<FilteredProjects
+				projects={projects}
+				launchingProjectPath={launchingProjectPath}
+				errorProjectPath={errorProjectPath}
+				launchError={launchError}
+				onLaunch={onLaunch}
+				onChangeContext={onChangeContext}
+				onOpenFolder={onOpenFolder}
+				onOpenDetail={onOpenDetail}
+				onForget={onForget}
+			/>
+		</section>
+	);
+}
+
+function FilteredProjects(props: ProjectsViewProps) {
+	const [assignmentFilter, setAssignmentFilter] =
+		useState<ProjectAssignmentFilter>("all");
+	const visibleProjects = filterProjects(props.projects, assignmentFilter);
+	const emptyMessage =
+		props.projects.length === 0
+			? "No projects have been launched yet. Projects appear here after a successful launch."
+			: assignmentFilter === "assigned"
+				? "No assigned projects yet."
+				: "No unassigned projects yet.";
+
+	return (
+		<>
+			{props.projects.length > 0 ? (
+				<fieldset className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+					<legend className="font-medium">Project assignment</legend>
+					{([
+						["all", "All projects"],
+						["assigned", "Assigned"],
+						["unassigned", "Unassigned"],
+					] as const).map(([value, label]) => (
+						<label key={value} className="flex items-center gap-2">
+							<input
+								type="radio"
+								name="project-assignment-filter"
+								value={value}
+								checked={assignmentFilter === value}
+								onChange={() => setAssignmentFilter(value)}
+							/>
+							{label}
+						</label>
+					))}
+				</fieldset>
+			) : null}
+
+			{visibleProjects.length === 0 ? (
 				<Card as="section" hierarchy="secondary" className="py-0">
 					<CardContent className="p-5 text-sm text-muted-foreground">
-						No projects have been launched yet. Projects appear here after a
-						successful launch.
+						{emptyMessage}
 					</CardContent>
 				</Card>
 			) : (
 				<div className="space-y-4">
-					{projects.map((project, index) => (
+					{visibleProjects.map((project, index) => (
 						<ProjectCard
 							key={project.project.path}
 							id={`project-${index}-heading`}
 							project={project}
-							launching={launchingProjectPath === project.project.path}
+							launching={props.launchingProjectPath === project.project.path}
 							launchError={
-								errorProjectPath === project.project.path
-									? launchError
+								props.errorProjectPath === project.project.path
+									? props.launchError
 									: undefined
 							}
-							onLaunch={onLaunch}
-							onChangeContext={onChangeContext}
-							onOpenFolder={onOpenFolder}
-							onForget={onForget}
+							onLaunch={props.onLaunch}
+							onChangeContext={props.onChangeContext}
+							onOpenFolder={props.onOpenFolder}
+							onOpenDetail={props.onOpenDetail}
+							onForget={props.onForget}
 						/>
 					))}
 				</div>
 			)}
-		</section>
+		</>
 	);
 }
 
@@ -75,6 +130,7 @@ function ProjectCard({
 	onLaunch,
 	onChangeContext,
 	onOpenFolder,
+	onOpenDetail,
 	onForget,
 }: {
 	id: string;
@@ -84,6 +140,7 @@ function ProjectCard({
 	onLaunch?: (project: ProjectListItem) => void;
 	onChangeContext?: (project: ProjectListItem) => void;
 	onOpenFolder?: (project: ProjectListItem) => void;
+	onOpenDetail?: (project: ProjectListItem) => void;
 	onForget?: (project: ProjectListItem) => void;
 }) {
 	const isAssigned = project.contextId !== undefined;
@@ -153,6 +210,15 @@ function ProjectCard({
 				<div className="flex flex-wrap gap-3">
 					<Button
 						type="button"
+						variant="outline"
+						size="sm"
+						disabled={onOpenDetail === undefined}
+						onClick={() => onOpenDetail?.(project)}
+					>
+						View details
+					</Button>
+					<Button
+						type="button"
 						size="sm"
 						disabled={!canLaunch || launching}
 						onClick={() => onLaunch?.(project)}
@@ -193,6 +259,15 @@ function ProjectCard({
 	);
 }
 
+function filterProjects(
+	projects: ProjectListItem[],
+	filter: ProjectAssignmentFilter,
+): ProjectListItem[] {
+	if (filter === "all") return projects;
+	const assigned = filter === "assigned";
+	return projects.filter((project) => (project.contextId !== undefined) === assigned);
+}
+
 function ProjectDetail({
 	label,
 	value,
@@ -227,5 +302,5 @@ function formatProjectTime(value: string | undefined): string {
 	return Number.isNaN(time.getTime()) ? "Unavailable" : time.toLocaleString();
 }
 
-export type { ProjectsViewProps };
-export { formatProjectTime, ProjectsView };
+export type { ProjectAssignmentFilter, ProjectsViewProps };
+export { filterProjects, formatProjectTime, ProjectsView };

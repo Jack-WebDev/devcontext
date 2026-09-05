@@ -26,6 +26,7 @@ import { DiagnosticsView } from "./components/diagnostics/DiagnosticsView";
 import { RecentProjectConfirmationDialog } from "./components/home/RecentProjectConfirmationDialog";
 import { notifyCodingToolLaunched } from "./components/notifications/notifications";
 import { ProjectContextChangeDialog } from "./components/projects/ProjectContextChangeDialog";
+import { ProjectDetailView } from "./components/projects/ProjectDetailView";
 import { RunningEnvironmentConflictDialog } from "./components/running/RunningEnvironmentConflictDialog";
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
 import { createContextAndRefresh } from "./components/contexts/context-creation";
@@ -40,6 +41,8 @@ import {
 	contextDetailHash,
 	contextDetailRouteFromHash,
 	type ContextDetailDestination,
+	projectDetailHash,
+	projectDetailRouteFromHash,
 } from "./components/shell/routes";
 import { AppStatusBar } from "./components/status/AppStatusBar";
 import {
@@ -142,6 +145,9 @@ function ManagementApp() {
 	const [contextDetailRoute, setContextDetailRoute] = useState(() =>
 		contextDetailRouteFromHash(window.location.hash),
 	);
+	const [projectDetailRoute, setProjectDetailRoute] = useState(() =>
+		projectDetailRouteFromHash(window.location.hash),
+	);
 	const [contextManagementDrawerID, setContextManagementDrawerID] =
 		useState<string>();
 	const [contextToDelete, setContextToDelete] = useState<{
@@ -180,6 +186,7 @@ function ManagementApp() {
 		function syncRouteFromHash() {
 			setActiveRoute(appRouteFromHash(window.location.hash));
 			setContextDetailRoute(contextDetailRouteFromHash(window.location.hash));
+			setProjectDetailRoute(projectDetailRouteFromHash(window.location.hash));
 		}
 
 		window.addEventListener("hashchange", syncRouteFromHash);
@@ -206,7 +213,10 @@ function ManagementApp() {
 		}
 		if (route !== activeRoute) {
 			window.location.hash = route;
-		} else if (route === "contexts" && contextDetailRoute) {
+		} else if (
+			(route === "contexts" && contextDetailRoute) ||
+			(route === "projects" && projectDetailRoute)
+		) {
 			window.location.hash = route;
 		}
 	}
@@ -218,6 +228,12 @@ function ManagementApp() {
 		const route = { contextId, destination };
 		setContextDetailRoute(route);
 		window.location.hash = contextDetailHash(route);
+	}
+
+	function navigateToProjectDetail(project: ProjectListItem) {
+		const route = { projectPath: project.project.path };
+		setProjectDetailRoute(route);
+		window.location.hash = projectDetailHash(route);
 	}
 
 	async function handleCommandPaletteLaunch(contextId: string) {
@@ -678,19 +694,38 @@ function ManagementApp() {
 				)
 			) : activeRoute === "projects" ? (
 				<>
-					<ProjectsContent
-						projects={projects}
-						launchingProjectPath={projectLaunchPath}
-						errorProjectPath={projectErrorPath}
-						launchError={projectLaunchError}
-						onLaunch={handleProjectLaunch}
-						onChangeContext={
-							contexts.status === "loaded"
-								? handleProjectChangeContext
-								: undefined
-						}
-						onOpenFolder={handleProjectOpenFolder}
-					/>
+					{projectDetailRoute ? (
+						projects.status === "loading" ? (
+							<p className="text-sm text-muted-foreground">Loading project...</p>
+						) : projects.status === "error" ? (
+							<GuiErrorNotice error={projects.error} />
+						) : (
+							<ProjectDetailView
+								project={projects.data.projects.find(
+									(project) =>
+										project.project.path === projectDetailRoute.projectPath,
+								)}
+								onBack={() => handleNavigate("projects")}
+								onLaunch={handleProjectLaunch}
+								onOpenFolder={handleProjectOpenFolder}
+							/>
+						)
+					) : (
+						<ProjectsContent
+							projects={projects}
+							launchingProjectPath={projectLaunchPath}
+							errorProjectPath={projectErrorPath}
+							launchError={projectLaunchError}
+							onLaunch={handleProjectLaunch}
+							onChangeContext={
+								contexts.status === "loaded"
+									? handleProjectChangeContext
+									: undefined
+							}
+							onOpenFolder={handleProjectOpenFolder}
+							onOpenDetail={navigateToProjectDetail}
+						/>
+					)}
 					{projectContextChange && contexts.status === "loaded" ? (
 						<ProjectContextChangeDialog
 							project={projectContextChange}

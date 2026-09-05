@@ -45,9 +45,11 @@ import {
 	safetyImplication,
 } from "../.tmp-test/src/components/projects/ProjectContextChangeDialog.js";
 import {
+	filterProjects,
 	formatProjectTime,
 	ProjectsView,
 } from "../.tmp-test/src/components/projects/ProjectsView.js";
+import { ProjectDetailView } from "../.tmp-test/src/components/projects/ProjectDetailView.js";
 import {
 	formatRunningTime,
 	RunningView,
@@ -189,6 +191,8 @@ import {
 	appRoutes,
 	contextDetailHash,
 	contextDetailRouteFromHash,
+	projectDetailHash,
+	projectDetailRouteFromHash,
 } from "../.tmp-test/src/components/shell/routes.js";
 import {
 	StatusIndicator,
@@ -1210,6 +1214,8 @@ test("app shell exposes stable navigation, current project state, and a responsi
 		],
 	);
 	assert.equal(appRouteFromHash("#projects"), "projects");
+	assert.equal(appRouteFromHash("#projects%2Fapi"), "home");
+	assert.equal(appRouteFromHash("#projects/%2Fwork%2Fapi"), "projects");
 	assert.equal(appRouteFromHash("#contexts/company/appearance"), "contexts");
 	assert.deepEqual(
 		contextDetailRouteFromHash("#contexts/company/name-purpose"),
@@ -1221,6 +1227,13 @@ test("app shell exposes stable navigation, current project state, and a responsi
 	assert.equal(
 		contextDetailHash({ contextId: "Client A", destination: "appearance" }),
 		"contexts/Client%20A/appearance",
+	);
+	assert.deepEqual(projectDetailRouteFromHash("#projects/%2Fwork%2Fapi"), {
+		projectPath: "/work/api",
+	});
+	assert.equal(
+		projectDetailHash({ projectPath: "/work/Client A" }),
+		"projects/%2Fwork%2FClient%20A",
 	);
 	assert.equal(appRouteFromHash("#unknown"), "home");
 });
@@ -1400,8 +1413,43 @@ test("Projects lists known projects with safe launch and management entry points
 	assert.ok(html.includes("Launch Company"));
 	assert.ok(html.includes("Change context"));
 	assert.ok(html.includes("Open folder"));
+	assert.ok(html.includes("View details"));
 	assert.doesNotMatch(html, /Forget project/);
 	assert.equal(formatProjectTime(undefined), "Never launched");
+});
+
+test("Projects filters only explicit context bindings and explains a project in detail", () => {
+	const projects = [
+		{
+			project: { name: "api", path: "/work/api" },
+			contextId: "company",
+			contextName: "Company",
+			lastLaunchedAt: "2026-08-28T10:30:00Z",
+			running: true,
+		},
+		{
+			project: { name: "notes", path: "/work/notes" },
+			contextName: "Stale display name",
+			running: false,
+		},
+	];
+
+	assert.deepEqual(filterProjects(projects, "assigned"), [projects[0]]);
+	assert.deepEqual(filterProjects(projects, "unassigned"), [projects[1]]);
+
+	const detailHtml = renderToStaticMarkup(
+		createElement(ProjectDetailView, {
+			project: projects[0],
+			onBack: () => {},
+			onLaunch: () => {},
+			onOpenFolder: () => {},
+		}),
+	);
+	assert.ok(detailHtml.includes("Normal context"));
+	assert.ok(detailHtml.includes("Launch behavior"));
+	assert.ok(detailHtml.includes("Workspace"));
+	assert.ok(detailHtml.includes("Activity"));
+	assert.ok(detailHtml.includes("Assigned — this is the context"));
 });
 
 test("Project context changes are explicit and show backend safety implications", () => {
