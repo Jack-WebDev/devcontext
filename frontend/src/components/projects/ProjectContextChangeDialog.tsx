@@ -48,11 +48,10 @@ function ProjectContextChangeDialog({
 						id="project-context-change-title"
 						className="text-base font-semibold"
 					>
-						Change project context
+						Move project to a context
 					</h3>
 					<p className="mt-1 text-sm text-muted-foreground">
-						This changes the development identity Dev Context remembers for{" "}
-						{project.project.name}.
+						Dev Context will remember the selected context for {project.project.name}.
 					</p>
 				</div>
 
@@ -68,7 +67,7 @@ function ProjectContextChangeDialog({
 					className="grid gap-2 text-sm font-medium"
 					htmlFor="project-context-select"
 				>
-					New context
+					Move to context
 					<select
 						id="project-context-select"
 						className="h-10 border border-input bg-background px-3 text-sm text-foreground"
@@ -109,7 +108,7 @@ function ProjectContextChangeDialog({
 					>
 						{pending
 							? "Saving context..."
-							: `Use ${selectedContext?.name ?? "context"}`}
+							: `Move to ${selectedContext?.name ?? "context"}`}
 					</Button>
 				</div>
 			</CardContent>

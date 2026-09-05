@@ -9,6 +9,8 @@ interface ProjectDetailViewProps {
 	onBack: () => void;
 	onLaunch?: (project: ProjectListItem) => void;
 	onOpenFolder?: (project: ProjectListItem) => void;
+	onChangeContext?: (project: ProjectListItem) => void;
+	onRemoveBinding?: (project: ProjectListItem) => void;
 }
 
 function ProjectDetailView({
@@ -16,6 +18,8 @@ function ProjectDetailView({
 	onBack,
 	onLaunch,
 	onOpenFolder,
+	onChangeContext,
+	onRemoveBinding,
 }: ProjectDetailViewProps) {
 	if (project === undefined) {
 		return (
@@ -117,6 +121,26 @@ function ProjectDetailView({
 				>
 					Open folder
 				</Button>
+				{isAssigned ? (
+					<>
+						<Button
+							type="button"
+							variant="outline"
+							disabled={onChangeContext === undefined}
+							onClick={() => onChangeContext?.(project)}
+						>
+							Change context
+						</Button>
+						<Button
+							type="button"
+							variant="destructive"
+							disabled={onRemoveBinding === undefined}
+							onClick={() => onRemoveBinding?.(project)}
+						>
+							Remove binding
+						</Button>
+					</>
+				) : null}
 			</div>
 		</section>
 	);

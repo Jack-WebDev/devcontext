@@ -9,7 +9,6 @@ interface ProjectsViewProps {
 	errorProjectPath?: string;
 	launchError?: string;
 	onLaunch?: (project: ProjectListItem) => void;
-	onChangeContext?: (project: ProjectListItem) => void;
 	onOpenFolder?: (project: ProjectListItem) => void;
 	onOpenDetail?: (project: ProjectListItem) => void;
 	onForget?: (project: ProjectListItem) => void;
@@ -23,7 +22,6 @@ function ProjectsView({
 	errorProjectPath,
 	launchError,
 	onLaunch,
-	onChangeContext,
 	onOpenFolder,
 	onOpenDetail,
 	onForget,
@@ -46,7 +44,6 @@ function ProjectsView({
 				errorProjectPath={errorProjectPath}
 				launchError={launchError}
 				onLaunch={onLaunch}
-				onChangeContext={onChangeContext}
 				onOpenFolder={onOpenFolder}
 				onOpenDetail={onOpenDetail}
 				onForget={onForget}
@@ -110,7 +107,6 @@ function FilteredProjects(props: ProjectsViewProps) {
 									: undefined
 							}
 							onLaunch={props.onLaunch}
-							onChangeContext={props.onChangeContext}
 							onOpenFolder={props.onOpenFolder}
 							onOpenDetail={props.onOpenDetail}
 							onForget={props.onForget}
@@ -128,7 +124,6 @@ function ProjectCard({
 	launching,
 	launchError,
 	onLaunch,
-	onChangeContext,
 	onOpenFolder,
 	onOpenDetail,
 	onForget,
@@ -138,7 +133,6 @@ function ProjectCard({
 	launching: boolean;
 	launchError?: string;
 	onLaunch?: (project: ProjectListItem) => void;
-	onChangeContext?: (project: ProjectListItem) => void;
 	onOpenFolder?: (project: ProjectListItem) => void;
 	onOpenDetail?: (project: ProjectListItem) => void;
 	onForget?: (project: ProjectListItem) => void;
@@ -224,15 +218,6 @@ function ProjectCard({
 						onClick={() => onLaunch?.(project)}
 					>
 						{launching ? `Launching ${contextName}...` : `Launch ${contextName}`}
-					</Button>
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						disabled={onChangeContext === undefined}
-						onClick={() => onChangeContext?.(project)}
-					>
-						Change context
 					</Button>
 					<Button
 						type="button"

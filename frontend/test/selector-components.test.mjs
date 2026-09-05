@@ -44,6 +44,7 @@ import {
 	ProjectContextChangeDialog,
 	safetyImplication,
 } from "../.tmp-test/src/components/projects/ProjectContextChangeDialog.js";
+import { ProjectBindingRemovalDialog } from "../.tmp-test/src/components/projects/ProjectBindingRemovalDialog.js";
 import {
 	filterProjects,
 	formatProjectTime,
@@ -1396,7 +1397,6 @@ test("Projects lists known projects with safe launch and management entry points
 				},
 			],
 			onLaunch: () => {},
-			onChangeContext: () => {},
 			onOpenFolder: () => {},
 		}),
 	);
@@ -1411,7 +1411,7 @@ test("Projects lists known projects with safe launch and management entry points
 	assert.ok(html.includes("Company"));
 	assert.ok(html.includes("Running"));
 	assert.ok(html.includes("Launch Company"));
-	assert.ok(html.includes("Change context"));
+	assert.doesNotMatch(html, /Change context/);
 	assert.ok(html.includes("Open folder"));
 	assert.ok(html.includes("View details"));
 	assert.doesNotMatch(html, /Forget project/);
@@ -1443,6 +1443,8 @@ test("Projects filters only explicit context bindings and explains a project in 
 			onBack: () => {},
 			onLaunch: () => {},
 			onOpenFolder: () => {},
+			onChangeContext: () => {},
+			onRemoveBinding: () => {},
 		}),
 	);
 	assert.ok(detailHtml.includes("Normal context"));
@@ -1450,6 +1452,8 @@ test("Projects filters only explicit context bindings and explains a project in 
 	assert.ok(detailHtml.includes("Workspace"));
 	assert.ok(detailHtml.includes("Activity"));
 	assert.ok(detailHtml.includes("Assigned — this is the context"));
+	assert.ok(detailHtml.includes("Change context"));
+	assert.ok(detailHtml.includes("Remove binding"));
 });
 
 test("Project context changes are explicit and show backend safety implications", () => {
@@ -1487,15 +1491,36 @@ test("Project context changes are explicit and show backend safety implications"
 	);
 
 	assert.match(html, /role="dialog"/);
-	assert.ok(html.includes("Change project context"));
+	assert.ok(html.includes("Move project to a context"));
 	assert.ok(html.includes("Current context"));
 	assert.ok(html.includes("Safety implications"));
 	assert.ok(html.includes("can launch, but its setup needs attention"));
-	assert.ok(html.includes("Use Personal"));
+	assert.ok(html.includes("Move to Personal"));
 	assert.equal(
 		safetyImplication("blocked", "Company"),
 		"Company is blocked and cannot launch until its required setup is resolved.",
 	);
+});
+
+test("Project binding removal states its limited impact before confirmation", () => {
+	const html = renderToStaticMarkup(
+		createElement(ProjectBindingRemovalDialog, {
+			project: {
+				project: { name: "api", path: "/work/api" },
+				contextId: "company",
+				contextName: "Company",
+				running: false,
+			},
+			pending: false,
+			onCancel: () => {},
+			onConfirm: () => {},
+		}),
+	);
+
+	assert.match(html, /role="dialog"/);
+	assert.ok(html.includes("Project files and folders are never deleted."));
+	assert.ok(html.includes("The next launch will ask you to choose a context."));
+	assert.ok(html.includes("Remove binding"));
 });
 
 test("Diagnostics groups backend checks and keeps paths in a disclosure", () => {

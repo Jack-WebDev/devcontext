@@ -96,7 +96,6 @@ export function ProjectsContent({
 	errorProjectPath,
 	launchError,
 	onLaunch,
-	onChangeContext,
 	onOpenFolder,
 	onOpenDetail,
 }: {
@@ -105,7 +104,6 @@ export function ProjectsContent({
 	errorProjectPath?: string;
 	launchError?: DisplayError;
 	onLaunch: (project: ProjectListItem) => void;
-	onChangeContext?: (project: ProjectListItem) => void;
 	onOpenFolder: (project: ProjectListItem) => void;
 	onOpenDetail: (project: ProjectListItem) => void;
 }) {
@@ -120,7 +118,6 @@ export function ProjectsContent({
 			errorProjectPath={errorProjectPath}
 			launchError={launchError?.message}
 			onLaunch={onLaunch}
-			onChangeContext={onChangeContext}
 			onOpenFolder={onOpenFolder}
 			onOpenDetail={onOpenDetail}
 		/>
