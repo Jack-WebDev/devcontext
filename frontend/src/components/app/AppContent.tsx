@@ -1,6 +1,7 @@
 import type {
 	ApiResult,
 	ContextListItem,
+	CreateContextRequest,
 	CreateContextResult,
 	DisplayError,
 	HistoryState,
@@ -165,8 +166,7 @@ export function SelectorContent({
 }: {
 	launchState: LoadState<LaunchState>;
 	onCreateContext: (
-		contextId: string,
-		importProviderIds?: string[],
+		request: CreateContextRequest,
 	) => Promise<ApiResult<CreateContextResult>>;
 	onRunDiagnostics: () => void;
 	settings?: SettingsState;
@@ -185,12 +185,7 @@ export function SelectorContent({
 			onPreflightLaunchProject={devContextApi.preflightLaunchProject}
 			onLaunchProject={devContextApi.launchProject}
 			onCancel={devContextWindow.closeSelector}
-			onCreatePersonalContext={(providerIds) =>
-				onCreateContext("personal", providerIds)
-			}
-			onCreateCompanyContext={(providerIds) =>
-				onCreateContext("company", providerIds)
-			}
+			onCreateContext={onCreateContext}
 			onRunDiagnostics={onRunDiagnostics}
 			onCodingToolLaunched={notifyLaunch}
 			launchSuccessCloseBehavior={

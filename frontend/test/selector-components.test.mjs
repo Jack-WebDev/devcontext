@@ -94,7 +94,7 @@ import {
 	defaultLaunchSuccessCloseBehavior,
 	shouldCloseSelectorAfterLaunch,
 } from "../.tmp-test/src/components/selector/launch-success-close-behavior.js";
-import { createOnboardingContextAndRefresh } from "../.tmp-test/src/components/selector/onboarding-action.js";
+import { createContextAndRefresh } from "../.tmp-test/src/components/contexts/context-creation.js";
 import { ProjectIdentity } from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import { ProviderCredentialClassification } from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
 import {
@@ -3057,18 +3057,22 @@ test("cancel closes the selector without launch or binding side effects", async 
 	assert.deepEqual(calls, ["closeSelector"]);
 });
 
-test("onboarding context creation refreshes launch state after success", async () => {
+test("context creation refreshes launch state after success", async () => {
 	const calls = [];
 	const refreshedState = launchStateFixture({
 		contexts: [contextFixture("personal", "Personal")],
 		firstRun: false,
 	});
 
-	const result = await createOnboardingContextAndRefresh({
+	const request = {
 		contextId: "personal",
+		name: "Personal",
 		importProviderIds: ["codex"],
-		createContext(contextId, importProviderIds) {
-			calls.push(["createContext", contextId, importProviderIds]);
+	};
+	const result = await createContextAndRefresh({
+		request,
+		createContext(receivedRequest) {
+			calls.push(["createContext", receivedRequest]);
 			return Promise.resolve({
 				ok: true,
 				data: {
@@ -3093,12 +3097,12 @@ test("onboarding context creation refreshes launch state after success", async (
 		launchState: refreshedState,
 	});
 	assert.deepEqual(calls, [
-		["createContext", "personal", ["codex"]],
+		["createContext", request],
 		["getLaunchState"],
 	]);
 });
 
-test("onboarding context creation returns failures without refreshing", async () => {
+test("context creation returns failures without refreshing", async () => {
 	const calls = [];
 	const error = apiError(
 		"validation_error",
@@ -3106,10 +3110,11 @@ test("onboarding context creation returns failures without refreshing", async ()
 		"Check the selected project and context, then retry.",
 	);
 
-	const result = await createOnboardingContextAndRefresh({
-		contextId: "company",
-		createContext(contextId, importProviderIds) {
-			calls.push(["createContext", contextId, importProviderIds]);
+	const request = { contextId: "company" };
+	const result = await createContextAndRefresh({
+		request,
+		createContext(receivedRequest) {
+			calls.push(["createContext", receivedRequest]);
 			return Promise.resolve(error);
 		},
 		getLaunchState() {
@@ -3122,7 +3127,7 @@ test("onboarding context creation returns failures without refreshing", async ()
 		ok: false,
 		error: error.error,
 	});
-	assert.deepEqual(calls, [["createContext", "company", []]]);
+	assert.deepEqual(calls, [["createContext", request]]);
 });
 
 function contextFixture(id, name, providers = []) {

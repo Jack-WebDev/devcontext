@@ -4,7 +4,6 @@ import type {
 	ApiResult,
 	BindProjectRequest,
 	ContextState,
-	CreateContextResult,
 	DisplayError,
 	LaunchProjectRequest,
 	LaunchProjectResult,
@@ -23,6 +22,10 @@ import { AccountIdentityMismatchDialog } from "./AccountIdentityMismatchDialog";
 import { hasAccountIdentityMismatch } from "./account-identity-mismatch";
 import { bindingReplacementForLaunch } from "./binding-replacement";
 import { ContextChoiceList } from "./ContextChoiceList";
+import {
+	type ContextCreationAction,
+	useContextCreation,
+} from "../contexts/context-creation";
 import { ContextMismatchDialog } from "./ContextMismatchDialog";
 import { DanglingBindingDialog } from "./DanglingBindingDialog";
 import { cancelSelector } from "./cancel-action";
@@ -95,12 +98,7 @@ interface SelectorViewProps {
 	) => Promise<ApiResult<LaunchProjectResult>>;
 	onCancel: () => Promise<void> | void;
 	launchSuccessCloseBehavior?: LaunchSuccessCloseBehavior;
-	onCreatePersonalContext?: (
-		importProviderIds: string[],
-	) => Promise<ApiResult<CreateContextResult>>;
-	onCreateCompanyContext?: (
-		importProviderIds: string[],
-	) => Promise<ApiResult<CreateContextResult>>;
+	onCreateContext?: ContextCreationAction;
 	onRunDiagnostics?: () => void;
 	onCodingToolLaunched?: (result: LaunchProjectResult) => void;
 	showLaunchVerification?: boolean;
@@ -116,8 +114,7 @@ function SelectorView({
 	onLaunchProject,
 	onCancel,
 	launchSuccessCloseBehavior = defaultLaunchSuccessCloseBehavior,
-	onCreatePersonalContext,
-	onCreateCompanyContext,
+	onCreateContext,
 	onRunDiagnostics,
 	onCodingToolLaunched,
 	showLaunchVerification = true,
@@ -127,12 +124,7 @@ function SelectorView({
 	const [launcherState, setLauncherState] = useState<LauncherState>(() =>
 		initialLauncherState(launchState),
 	);
-	const [onboardingPendingContextId, setOnboardingPendingContextId] = useState<
-		string | undefined
-	>(undefined);
-	const [onboardingError, setOnboardingError] = useState<
-		DisplayError | undefined
-	>(undefined);
+	const contextCreation = useContextCreation(onCreateContext);
 	const [providerSessionAssignments, setProviderSessionAssignments] =
 		useState<ProviderSessionAssignments>({});
 	const [showContextChoices, setShowContextChoices] = useState(false);
@@ -154,7 +146,7 @@ function SelectorView({
 	);
 	const launchPending = launcherStateIsPending(launcherState);
 	const cancellationPending =
-		launchPending || onboardingPendingContextId !== undefined;
+		launchPending || contextCreation.pending;
 	const singleHealthyContext = singleHealthyLaunchContext(launchState);
 	const showSingleContextConfirmation =
 		singleHealthyContext !== undefined && !showContextChoices;
@@ -179,8 +171,7 @@ function SelectorView({
 
 	useEffect(() => {
 		setLauncherState(initialLauncherState(launchState));
-		setOnboardingPendingContextId(undefined);
-		setOnboardingError(undefined);
+		contextCreation.reset();
 		setProviderSessionAssignments({});
 		setShowContextChoices(false);
 		setShowFirstRunSetup(false);
@@ -524,25 +515,11 @@ function SelectorView({
 			.map((session) => session.providerId);
 	}
 
-	async function handleCreateContext(
-		contextId: "personal" | "company",
-		createContext: (
-			importProviderIds: string[],
-		) => Promise<ApiResult<CreateContextResult>>,
-	) {
-		setOnboardingPendingContextId(contextId);
-		setOnboardingError(undefined);
-
-		try {
-			const result = await createContext(
-				importProviderIdsForContext(contextId),
-			);
-			if (!result.ok) {
-				setOnboardingError(result.error);
-			}
-		} finally {
-			setOnboardingPendingContextId(undefined);
-		}
+	function handleCreateContext(contextId: "personal" | "company") {
+		void contextCreation.create({
+			contextId,
+			importProviderIds: importProviderIdsForContext(contextId),
+		});
 	}
 
 	if (launchInProgress) {
@@ -580,24 +557,15 @@ function SelectorView({
 						launchState={launchState}
 						providerCredentialSessions={launchState.providerCredentialSessions}
 						providerSessionAssignments={providerSessionAssignments}
-						pendingContextId={onboardingPendingContextId}
-						error={onboardingError}
+						pendingContextId={contextCreation.pendingRequest?.contextId}
+						error={contextCreation.error}
 						onClassifyProviderSession={handleClassifyProviderSession}
-						onCreatePersonal={
-							onCreatePersonalContext
-								? () =>
-										void handleCreateContext(
-											"personal",
-											onCreatePersonalContext,
-										)
-								: undefined
-						}
-						onCreateCompany={
-							onCreateCompanyContext
-								? () =>
-										void handleCreateContext("company", onCreateCompanyContext)
-								: undefined
-						}
+							onCreatePersonal={
+								onCreateContext ? () => handleCreateContext("personal") : undefined
+							}
+							onCreateCompany={
+								onCreateContext ? () => handleCreateContext("company") : undefined
+							}
 						replay={showOnboardingReplay && !launchState.firstRun}
 						onContinue={
 							showOnboardingReplay && !launchState.firstRun
@@ -643,26 +611,14 @@ function SelectorView({
 									launchState.providerCredentialSessions
 								}
 								providerSessionAssignments={providerSessionAssignments}
-								pendingContextId={onboardingPendingContextId}
-								error={onboardingError}
+								pendingContextId={contextCreation.pendingRequest?.contextId}
+								error={contextCreation.error}
 								onClassifyProviderSession={handleClassifyProviderSession}
 								onCreatePersonal={
-									onCreatePersonalContext
-										? () =>
-												void handleCreateContext(
-													"personal",
-													onCreatePersonalContext,
-												)
-										: undefined
+									onCreateContext ? () => handleCreateContext("personal") : undefined
 								}
 								onCreateCompany={
-									onCreateCompanyContext
-										? () =>
-												void handleCreateContext(
-													"company",
-													onCreateCompanyContext,
-												)
-										: undefined
+									onCreateContext ? () => handleCreateContext("company") : undefined
 								}
 							/>
 						</>
