@@ -66,6 +66,7 @@ import { SelectorActions } from "./SelectorActions";
 import { SelectorConfidenceSummary } from "./SelectorConfidenceSummary";
 import { SelectorLayout } from "./SelectorLayout";
 import { SingleContextLaunchView } from "./SingleContextLaunchView";
+import { WelcomeView } from "./WelcomeView";
 import {
 	type ContextNavigationDirection,
 	initialRovingContextId,
@@ -135,6 +136,7 @@ function SelectorView({
 	const [providerSessionAssignments, setProviderSessionAssignments] =
 		useState<ProviderSessionAssignments>({});
 	const [showContextChoices, setShowContextChoices] = useState(false);
+	const [showFirstRunSetup, setShowFirstRunSetup] = useState(false);
 	const [contextSearch, setContextSearch] = useState("");
 	const contextButtonRefs = useRef(new Map<string, HTMLButtonElement>());
 	const launchGuard = useRef(createLaunchRequestGuard());
@@ -156,6 +158,10 @@ function SelectorView({
 	const singleHealthyContext = singleHealthyLaunchContext(launchState);
 	const showSingleContextConfirmation =
 		singleHealthyContext !== undefined && !showContextChoices;
+	const showWelcome =
+		shouldRenderFirstRunWelcome(launchState) &&
+		launchState.firstRun &&
+		!showFirstRunSetup;
 	const launchInProgress =
 		launcherState.status === "preflighting" ||
 		launcherState.status === "launching";
@@ -177,6 +183,7 @@ function SelectorView({
 		setOnboardingError(undefined);
 		setProviderSessionAssignments({});
 		setShowContextChoices(false);
+		setShowFirstRunSetup(false);
 		setContextSearch("");
 		launchGuard.current = createLaunchRequestGuard();
 	}, [launchState]);
@@ -564,7 +571,9 @@ function SelectorView({
 			aria-label="Project launch options"
 			onKeyDown={handleSelectorKeyDown}
 		>
-			{shouldRenderFirstRunWelcome(launchState) || showOnboardingReplay ? (
+			{showWelcome ? (
+				<WelcomeView onCreateFirstContext={() => setShowFirstRunSetup(true)} />
+			) : shouldRenderFirstRunWelcome(launchState) || showOnboardingReplay ? (
 				<>
 					<ProjectIdentity project={launchState.project} />
 					<FirstRunWelcome
