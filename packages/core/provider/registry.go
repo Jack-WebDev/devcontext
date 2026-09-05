@@ -10,15 +10,36 @@ import "fmt"
 type Registry struct {
 	providers         []Provider
 	providersByID     map[ID]Provider
+	categoriesByID    map[ID]string
 	defaultEnabledIDs map[ID]struct{}
+}
+
+// RegisteredProvider combines a provider implementation with the generic
+// presentation category used by context-creation surfaces.
+type RegisteredProvider struct {
+	Integration Provider
+	Category    string
 }
 
 // NewRegistry creates a provider registry from an ordered provider list.
 func NewRegistry(providers []Provider, defaultEnabledIDs ...ID) (Registry, error) {
+	registered := make([]RegisteredProvider, len(providers))
+	for i, integration := range providers {
+		registered[i] = RegisteredProvider{Integration: integration, Category: "ai"}
+	}
+	return NewRegistryWithPresentation(registered, defaultEnabledIDs...)
+}
+
+// NewRegistryWithPresentation creates a registry with explicit generic
+// categories. It is the extension point for adapters beyond today's AI
+// integrations.
+func NewRegistryWithPresentation(providers []RegisteredProvider, defaultEnabledIDs ...ID) (Registry, error) {
 	ordered := make([]Provider, 0, len(providers))
 	byID := make(map[ID]Provider, len(providers))
+	categories := make(map[ID]string, len(providers))
 
-	for i, integration := range providers {
+	for i, registered := range providers {
+		integration := registered.Integration
 		if integration == nil {
 			return Registry{}, fmt.Errorf("provider registry contains nil provider at index %d", i)
 		}
@@ -31,6 +52,11 @@ func NewRegistry(providers []Provider, defaultEnabledIDs ...ID) (Registry, error
 		}
 		ordered = append(ordered, integration)
 		byID[id] = integration
+		category := registered.Category
+		if category == "" {
+			category = "other"
+		}
+		categories[id] = category
 	}
 
 	defaults := make(map[ID]struct{}, len(defaultEnabledIDs))
@@ -47,6 +73,7 @@ func NewRegistry(providers []Provider, defaultEnabledIDs ...ID) (Registry, error
 	return Registry{
 		providers:         ordered,
 		providersByID:     byID,
+		categoriesByID:    categories,
 		defaultEnabledIDs: defaults,
 	}, nil
 }
@@ -76,7 +103,17 @@ func BuiltInRegistry() Registry {
 
 // IsZero reports whether the registry has not been initialized.
 func (r Registry) IsZero() bool {
-	return r.providers == nil && r.providersByID == nil && r.defaultEnabledIDs == nil
+	return r.providers == nil && r.providersByID == nil && r.categoriesByID == nil && r.defaultEnabledIDs == nil
+}
+
+// Category returns presentation metadata for a registered provider. Current
+// providers are AI integrations; future registry entries can extend this
+// metadata without changing context-creation UI code.
+func (r Registry) Category(id ID) string {
+	if category, ok := r.categoriesByID[id]; ok {
+		return category
+	}
+	return "other"
 }
 
 // All returns registered providers in stable presentation order.

@@ -119,6 +119,7 @@ import {
 	contextIconOptions,
 } from "../.tmp-test/src/components/contexts/context-identity-options.js";
 import { developmentToolCategories } from "../.tmp-test/src/components/contexts/development-tool-categories.js";
+import { developmentToolStatusPresentation } from "../.tmp-test/src/components/contexts/development-tool-status.js";
 import {
 	beginContextCreation,
 	completeContextCreation,
@@ -3308,6 +3309,25 @@ test("context creation frames tool setup as development tools with generic categ
 
 	const html = renderToStaticMarkup(
 		createElement(ContextCreateDevelopmentToolsScreen, {
+			integrations: [
+				{
+					id: "editor",
+					name: "Editor",
+					category: "coding",
+					status: "available",
+					message: "Ready to use.",
+					enabled: true,
+				},
+				{
+					id: "assistant",
+					name: "Assistant",
+					category: "ai",
+					status: "needs_sign_in",
+					message: "Sign-in is needed.",
+					recoveryHint: "Sign in to continue.",
+					enabled: true,
+				},
+			],
 			onBack() {},
 			onContinue() {},
 		}),
@@ -3317,8 +3337,22 @@ test("context creation frames tool setup as development tools with generic categ
 	assert.match(html, /Version control/);
 	assert.match(html, /Source hosting/);
 	assert.match(html, /Cloud &amp; registries/);
+	assert.match(html, /Editor/);
+	assert.match(html, /Assistant/);
+	assert.match(html, /Available/);
+	assert.match(html, /Needs sign-in/);
+	assert.match(html, /Sign in to continue/);
 	assert.match(html, /Continue/);
 	assert.doesNotMatch(html, /Provider/);
+	assert.deepEqual(Object.keys(developmentToolStatusPresentation), [
+		"available",
+		"connected",
+		"needs_sign_in",
+		"not_configured",
+		"not_found",
+		"unavailable",
+		"error",
+	]);
 });
 
 test("context identity screen asks one question before continuing", () => {

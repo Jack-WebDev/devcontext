@@ -1956,6 +1956,62 @@ func assertFirstRunState(t *testing.T, state LaunchState, projectDir string) {
 	}
 }
 
+func TestDevelopmentToolStatusProjectionUsesBoundedVocabulary(t *testing.T) {
+	tests := []struct {
+		name       string
+		state      ProviderState
+		wantStatus DevelopmentToolStatus
+	}{
+		{
+			name:       "disabled integration is available",
+			state:      ProviderState{Enabled: false},
+			wantStatus: DevelopmentToolAvailable,
+		},
+		{
+			name: "verified integration is connected",
+			state: ProviderState{Enabled: true, SetupAction: &ProviderSetupAction{
+				State: ProviderSetupVerified,
+			}},
+			wantStatus: DevelopmentToolConnected,
+		},
+		{
+			name: "waiting integration needs sign-in",
+			state: ProviderState{Enabled: true, SetupAction: &ProviderSetupAction{
+				State: ProviderSetupWaitingForSignIn,
+			}},
+			wantStatus: DevelopmentToolNeedsSignIn,
+		},
+		{
+			name:       "unconfigured integration exposes configuration status",
+			state:      ProviderState{Enabled: true, State: ProviderReadinessNotConfigured},
+			wantStatus: DevelopmentToolNotConfigured,
+		},
+		{
+			name:       "unavailable integration remains unavailable",
+			state:      ProviderState{Enabled: true, State: ProviderReadinessUnavailable},
+			wantStatus: DevelopmentToolUnavailable,
+		},
+		{
+			name:       "missing integration storage is an error",
+			state:      ProviderState{Enabled: true, State: ProviderReadinessDirectoryMissing},
+			wantStatus: DevelopmentToolError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, _, _ := developmentToolStatusForProvider(tt.state)
+			if got != tt.wantStatus {
+				t.Fatalf("status = %q, want %q", got, tt.wantStatus)
+			}
+		})
+	}
+
+	if got := developmentToolCategory("unsupported"); got != DevelopmentToolCategoryOther {
+		t.Fatalf("category = %q, want %q", got, DevelopmentToolCategoryOther)
+	}
+}
+
 type applicationFixture struct {
 	root               string
 	homeDir            string

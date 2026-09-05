@@ -1343,8 +1343,15 @@ func (s *Service) contextState(ctx devcontext.Context) ContextState {
 		Tool:           toolState(ctx.Tool.DefaultTool, confidence),
 		AvailableTools: toolOptions(s.dependencies.ToolRegistry),
 		Providers:      providerStatesFromEntries(providerEntries),
-		Confidence:     confidence,
-		Metadata:       cloneMetadata(ctx.Metadata),
+		DevelopmentTools: developmentToolIntegrations(
+			ctx,
+			providerEntries,
+			confidence,
+			s.dependencies.ToolRegistry,
+			s.dependencies.ProviderRegistry,
+		),
+		Confidence: confidence,
+		Metadata:   cloneMetadata(ctx.Metadata),
 	}
 }
 
@@ -1695,6 +1702,104 @@ func toolOptions(registry codingtool.Registry) []ToolOption {
 		options[i] = ToolOption{ID: string(tool.Integration.ID()), Name: tool.DisplayName}
 	}
 	return options
+}
+
+func developmentToolIntegrations(
+	ctx devcontext.Context,
+	providerEntries []providerStateEntry,
+	confidence LaunchConfidenceState,
+	toolRegistry codingtool.Registry,
+	providerRegistry provider.Registry,
+) []DevelopmentToolIntegration {
+	tools := toolRegistry.All()
+	integrations := make([]DevelopmentToolIntegration, 0, len(tools)+len(providerEntries))
+	for _, tool := range tools {
+		selected := tool.Integration.ID() == ctx.Tool.DefaultTool
+		status := DevelopmentToolAvailable
+		message := "Available to add to this context."
+		var recoveryHint string
+		if selected {
+			state := toolState(tool.Integration.ID(), confidence)
+			status = developmentToolStatusForTool(state.Status)
+			message = state.Message
+			recoveryHint = state.ActionHint
+		}
+		integrations = append(integrations, DevelopmentToolIntegration{
+			ID:           string(tool.Integration.ID()),
+			Name:         tool.DisplayName,
+			Category:     developmentToolCategory(tool.Category),
+			Status:       status,
+			Message:      message,
+			RecoveryHint: recoveryHint,
+			Enabled:      selected,
+		})
+	}
+
+	for _, entry := range providerEntries {
+		status, message, recoveryHint := developmentToolStatusForProvider(entry.state)
+		integrations = append(integrations, DevelopmentToolIntegration{
+			ID:           entry.state.ID,
+			Name:         entry.state.Name,
+			Category:     developmentToolCategory(providerRegistry.Category(entry.providerID)),
+			Status:       status,
+			Message:      message,
+			RecoveryHint: recoveryHint,
+			Enabled:      entry.state.Enabled,
+		})
+	}
+	return integrations
+}
+
+func developmentToolCategory(value string) DevelopmentToolCategory {
+	switch DevelopmentToolCategory(value) {
+	case DevelopmentToolCategoryCoding,
+		DevelopmentToolCategoryAI,
+		DevelopmentToolCategoryVersionControl,
+		DevelopmentToolCategorySourceHosting,
+		DevelopmentToolCategoryCloudRegistries:
+		return DevelopmentToolCategory(value)
+	default:
+		return DevelopmentToolCategoryOther
+	}
+}
+
+func developmentToolStatusForTool(status LaunchConfidenceStatus) DevelopmentToolStatus {
+	switch status {
+	case LaunchConfidenceReady:
+		return DevelopmentToolAvailable
+	case LaunchConfidenceNeedsAttention, LaunchConfidenceBlocked:
+		return DevelopmentToolUnavailable
+	default:
+		return DevelopmentToolError
+	}
+}
+
+func developmentToolStatusForProvider(state ProviderState) (DevelopmentToolStatus, string, string) {
+	if !state.Enabled {
+		return DevelopmentToolAvailable, "Available to add to this context.", ""
+	}
+	if state.SetupAction != nil {
+		switch state.SetupAction.State {
+		case ProviderSetupWaitingForSignIn:
+			return DevelopmentToolNeedsSignIn, state.SetupAction.Message, state.SetupAction.Label
+		case ProviderSetupVerified:
+			return DevelopmentToolConnected, state.SetupAction.Message, ""
+		case ProviderSetupOpenAndConfigure:
+			return DevelopmentToolNotConfigured, state.SetupAction.Message, state.SetupAction.Label
+		}
+	}
+	switch state.State {
+	case ProviderReadinessReady:
+		return DevelopmentToolConnected, state.Explanation, ""
+	case ProviderReadinessNotConfigured:
+		return DevelopmentToolNotConfigured, state.Explanation, state.ActionHint
+	case ProviderReadinessDirectoryMissing:
+		return DevelopmentToolError, state.Explanation, state.ActionHint
+	case ProviderReadinessUnavailable:
+		return DevelopmentToolUnavailable, state.Explanation, state.ActionHint
+	default:
+		return DevelopmentToolError, "Integration status could not be determined.", ""
+	}
 }
 
 func enabledProviderIntegrations(entries []providerStateEntry) []provider.Provider {

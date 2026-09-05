@@ -192,8 +192,36 @@ export interface ContextState {
 	tool: ToolState;
 	availableTools: ToolOption[];
 	providers: ProviderState[];
+	developmentTools?: DevelopmentToolIntegration[];
 	confidence?: LaunchConfidenceState;
 	metadata?: Record<string, string>;
+}
+
+export type DevelopmentToolCategory =
+	| "coding"
+	| "ai"
+	| "version-control"
+	| "source-hosting"
+	| "cloud-registries"
+	| "other";
+
+export type DevelopmentToolStatus =
+	| "available"
+	| "connected"
+	| "needs_sign_in"
+	| "not_configured"
+	| "not_found"
+	| "unavailable"
+	| "error";
+
+export interface DevelopmentToolIntegration {
+	id: string;
+	name: string;
+	category: DevelopmentToolCategory;
+	status: DevelopmentToolStatus;
+	message: string;
+	recoveryHint?: string;
+	enabled: boolean;
 }
 
 export interface ToolState {
@@ -620,7 +648,9 @@ export interface DevContextApi {
 export interface WailsBindings {
 	getApplicationMode(): Promise<unknown>;
 	chooseProjectDirectory(): Promise<unknown>;
-	validateProjectDirectory(request: ValidateProjectDirectoryRequest): Promise<unknown>;
+	validateProjectDirectory(
+		request: ValidateProjectDirectoryRequest,
+	): Promise<unknown>;
 	getLaunchState(request: GetLaunchStateRequest): Promise<unknown>;
 	getHomeDashboard(request: GetHomeDashboardRequest): Promise<unknown>;
 	getRecentProjects(): Promise<unknown>;
@@ -879,7 +909,10 @@ const generatedBindings: WailsBindings = {
 	},
 	async createContext(request) {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
-		return bindings.CreateContext({ ...request, contextId: request.contextId ?? "" });
+		return bindings.CreateContext({
+			...request,
+			contextId: request.contextId ?? "",
+		});
 	},
 	async getContextTemplates() {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
@@ -1659,9 +1692,63 @@ function normalizeContextState(value: unknown): ContextState {
 		tool: normalizeToolState(object.tool),
 		availableTools: arrayValue(object.availableTools).map(normalizeToolOption),
 		providers: arrayValue(object.providers).map(normalizeProviderState),
+		...(object.developmentTools === undefined
+			? {}
+			: {
+					developmentTools: arrayValue(object.developmentTools).map(
+						normalizeDevelopmentToolIntegration,
+					),
+				}),
 		confidence: normalizeLaunchConfidenceState(object.confidence),
 		metadata: optionalStringRecord(object.metadata),
 	};
+}
+
+function normalizeDevelopmentToolIntegration(
+	value: unknown,
+): DevelopmentToolIntegration {
+	const object = objectValue(value);
+	const recoveryHint = optionalString(object.recoveryHint);
+	return {
+		id: stringValue(object.id),
+		name: stringValue(object.name),
+		category: normalizeDevelopmentToolCategory(object.category),
+		status: normalizeDevelopmentToolStatus(object.status),
+		message: stringValue(object.message),
+		...(recoveryHint === undefined ? {} : { recoveryHint }),
+		enabled: booleanValue(object.enabled),
+	};
+}
+
+function normalizeDevelopmentToolCategory(
+	value: unknown,
+): DevelopmentToolCategory {
+	switch (value) {
+		case "coding":
+		case "ai":
+		case "version-control":
+		case "source-hosting":
+		case "cloud-registries":
+		case "other":
+			return value;
+		default:
+			return "other";
+	}
+}
+
+function normalizeDevelopmentToolStatus(value: unknown): DevelopmentToolStatus {
+	switch (value) {
+		case "available":
+		case "connected":
+		case "needs_sign_in":
+		case "not_configured":
+		case "not_found":
+		case "unavailable":
+		case "error":
+			return value;
+		default:
+			return "error";
+	}
 }
 
 function normalizeToolState(value: unknown): ToolState {
@@ -1844,7 +1931,9 @@ function normalizeLaunchFailureDetails(
 	};
 }
 
-function normalizeProjectPathIssue(value: unknown): ProjectPathIssue | undefined {
+function normalizeProjectPathIssue(
+	value: unknown,
+): ProjectPathIssue | undefined {
 	switch (value) {
 		case "not_found":
 		case "not_directory":

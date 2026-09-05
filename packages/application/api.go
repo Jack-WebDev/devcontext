@@ -236,16 +236,55 @@ type ValidateProjectDirectoryRequest struct {
 // ContextState is the presentation-safe identity and readiness summary for one
 // configured context.
 type ContextState struct {
-	ID             string                `json:"id"`
-	Name           string                `json:"name"`
-	Purpose        string                `json:"purpose,omitempty"`
-	Description    string                `json:"description,omitempty"`
-	Tool           ToolState             `json:"tool"`
-	AvailableTools []ToolOption          `json:"availableTools"`
-	Providers      []ProviderState       `json:"providers"`
-	Confidence     LaunchConfidenceState `json:"confidence"`
-	Metadata       map[string]string     `json:"metadata,omitempty"`
+	ID               string                       `json:"id"`
+	Name             string                       `json:"name"`
+	Purpose          string                       `json:"purpose,omitempty"`
+	Description      string                       `json:"description,omitempty"`
+	Tool             ToolState                    `json:"tool"`
+	AvailableTools   []ToolOption                 `json:"availableTools"`
+	Providers        []ProviderState              `json:"providers"`
+	DevelopmentTools []DevelopmentToolIntegration `json:"developmentTools"`
+	Confidence       LaunchConfidenceState        `json:"confidence"`
+	Metadata         map[string]string            `json:"metadata,omitempty"`
 }
+
+// DevelopmentToolIntegration is a generic, presentation-safe development
+// adapter. It lets UI surfaces render registered integrations by category
+// without knowing their provider or coding-tool implementation.
+type DevelopmentToolIntegration struct {
+	ID           string                  `json:"id"`
+	Name         string                  `json:"name"`
+	Category     DevelopmentToolCategory `json:"category"`
+	Status       DevelopmentToolStatus   `json:"status"`
+	Message      string                  `json:"message"`
+	RecoveryHint string                  `json:"recoveryHint,omitempty"`
+	Enabled      bool                    `json:"enabled"`
+}
+
+type DevelopmentToolCategory string
+
+const (
+	DevelopmentToolCategoryCoding          DevelopmentToolCategory = "coding"
+	DevelopmentToolCategoryAI              DevelopmentToolCategory = "ai"
+	DevelopmentToolCategoryVersionControl  DevelopmentToolCategory = "version-control"
+	DevelopmentToolCategorySourceHosting   DevelopmentToolCategory = "source-hosting"
+	DevelopmentToolCategoryCloudRegistries DevelopmentToolCategory = "cloud-registries"
+	DevelopmentToolCategoryOther           DevelopmentToolCategory = "other"
+)
+
+// DevelopmentToolStatus is the bounded, user-facing readiness vocabulary for
+// any registered development integration.
+type DevelopmentToolStatus string
+
+const (
+	DevelopmentToolAvailable     DevelopmentToolStatus = "available"
+	DevelopmentToolConnected     DevelopmentToolStatus = "connected"
+	DevelopmentToolNeedsSignIn   DevelopmentToolStatus = "needs_sign_in"
+	DevelopmentToolNotConfigured DevelopmentToolStatus = "not_configured"
+	DevelopmentToolNotFound      DevelopmentToolStatus = "not_found"
+	DevelopmentToolUnavailable   DevelopmentToolStatus = "unavailable"
+	DevelopmentToolError         DevelopmentToolStatus = "error"
+)
 
 // ToolState describes the coding tool selected by a context, including
 // presentation-safe readiness and recovery guidance.
