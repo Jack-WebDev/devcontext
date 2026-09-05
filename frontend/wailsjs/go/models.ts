@@ -410,6 +410,19 @@ export namespace application {
 	        this.projectPath = source["projectPath"];
 	    }
 	}
+
+	export class ForgetProjectRequest {
+		projectPath: string;
+
+		static createFrom(source: any = {}) {
+			return new ForgetProjectRequest(source);
+		}
+
+		constructor(source: any = {}) {
+			if (typeof source === 'string') source = JSON.parse(source);
+			this.projectPath = source["projectPath"];
+		}
+	}
 	export class UpdateContextAppearanceRequest {
 	    contextId: string;
 	    icon?: string;
@@ -509,4 +522,3 @@ export namespace wailsapp {
 	}
 
 }
-

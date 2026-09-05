@@ -255,6 +255,22 @@ func (s *Service) UnbindProject(request UnbindProjectRequest) (ProjectBindingSta
 	return state, nil
 }
 
+// ForgetProject removes both the remembered binding and recent-launch record.
+// It never reads, changes, or deletes the project folder.
+func (s *Service) ForgetProject(request ForgetProjectRequest) *Error {
+	projectPath, err := s.canonicalProjectPath(request.ProjectPath)
+	if err != nil {
+		return NewError(err)
+	}
+	if _, err := s.dependencies.Projects.Unbind(string(projectPath), projectPath); err != nil {
+		return NewError(err)
+	}
+	if err := s.dependencies.RecentProjects.Remove(projectPath); err != nil {
+		return NewError(err)
+	}
+	return nil
+}
+
 // CreateContext creates one default context for first-run onboarding.
 func (s *Service) CreateContext(request CreateContextRequest) (CreateContextResult, *Error) {
 	result, err := s.createContext(request)

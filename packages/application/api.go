@@ -913,3 +913,8 @@ type BindProjectRequest struct {
 type UnbindProjectRequest struct {
 	ProjectPath string `json:"projectPath,omitempty"`
 }
+
+// ForgetProjectRequest removes Dev Context metadata for one project only.
+type ForgetProjectRequest struct {
+	ProjectPath string `json:"projectPath"`
+}

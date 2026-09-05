@@ -11,6 +11,8 @@ interface ProjectDetailViewProps {
 	onOpenFolder?: (project: ProjectListItem) => void;
 	onChangeContext?: (project: ProjectListItem) => void;
 	onRemoveBinding?: (project: ProjectListItem) => void;
+	onForget?: (project: ProjectListItem) => void;
+	onLocate?: (project: ProjectListItem) => void;
 }
 
 function ProjectDetailView({
@@ -20,6 +22,8 @@ function ProjectDetailView({
 	onOpenFolder,
 	onChangeContext,
 	onRemoveBinding,
+	onForget,
+	onLocate,
 }: ProjectDetailViewProps) {
 	if (project === undefined) {
 		return (
@@ -141,6 +145,23 @@ function ProjectDetailView({
 						</Button>
 					</>
 				) : null}
+				<Button
+					type="button"
+					variant="destructive"
+					disabled={onForget === undefined}
+					onClick={() => onForget?.(project)}
+				>
+					Forget project
+				</Button>
+				<Button
+					type="button"
+					variant="outline"
+					disabled={!isAssigned || onLocate === undefined}
+					title={!isAssigned ? "Assign a context before relocating this project." : undefined}
+					onClick={() => onLocate?.(project)}
+				>
+					Locate project
+				</Button>
 			</div>
 		</section>
 	);

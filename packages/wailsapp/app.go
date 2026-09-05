@@ -26,6 +26,7 @@ type service interface {
 	LaunchProject(application.LaunchProjectRequest) (application.LaunchProjectResult, *application.Error)
 	BindProject(application.BindProjectRequest) (application.ProjectBindingState, *application.Error)
 	UnbindProject(application.UnbindProjectRequest) (application.ProjectBindingState, *application.Error)
+	ForgetProject(application.ForgetProjectRequest) *application.Error
 	CreateContext(application.CreateContextRequest) (application.CreateContextResult, *application.Error)
 	GetContextTemplates() application.ContextTemplatesState
 	DuplicateContext(application.DuplicateContextRequest) (application.DuplicateContextResult, *application.Error)
@@ -307,6 +308,13 @@ func (a *App) UnbindProject(request application.UnbindProjectRequest) any {
 		return err
 	}
 	return state
+}
+
+func (a *App) ForgetProject(request application.ForgetProjectRequest) any {
+	if err := a.service.ForgetProject(request); err != nil {
+		return err
+	}
+	return map[string]bool{"forgotten": true}
 }
 
 // CreateContext creates a default context during first-run onboarding.

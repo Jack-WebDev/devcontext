@@ -440,6 +440,10 @@ export interface UnbindProjectRequest {
 	projectPath?: string;
 }
 
+export interface ForgetProjectRequest {
+	projectPath: string;
+}
+
 export interface CreateContextRequest {
 	/** Internal IDs are generated from name when omitted. */
 	contextId?: string;
@@ -676,6 +680,7 @@ export interface DevContextApi {
 	unbindProject(
 		request?: UnbindProjectRequest,
 	): Promise<ApiResult<ProjectBindingState>>;
+	forgetProject(request: ForgetProjectRequest): Promise<ApiResult<unknown>>;
 	createContext(
 		request: CreateContextRequest,
 	): Promise<ApiResult<CreateContextResult>>;
@@ -736,6 +741,7 @@ export interface WailsBindings {
 	launchProject(request: LaunchProjectRequest): Promise<unknown>;
 	bindProject(request: BindProjectRequest): Promise<unknown>;
 	unbindProject(request: UnbindProjectRequest): Promise<unknown>;
+	forgetProject(request: ForgetProjectRequest): Promise<unknown>;
 	createContext(request: CreateContextRequest): Promise<unknown>;
 	getContextTemplates(): Promise<unknown>;
 	duplicateContext(request: DuplicateContextRequest): Promise<unknown>;
@@ -890,6 +896,9 @@ export function createDevContextApi(
 				() => bindings.unbindProject(request),
 				normalizeProjectBindingState,
 			);
+		},
+		forgetProject(request) {
+			return callBinding(() => bindings.forgetProject(request), (value) => value);
 		},
 		createContext(request) {
 			return callBinding(
@@ -1056,6 +1065,10 @@ const generatedBindings: WailsBindings = {
 	async unbindProject(request) {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
 		return bindings.UnbindProject(request);
+	},
+	async forgetProject(request) {
+		const bindings = await import("../../wailsjs/go/wailsapp/App");
+		return bindings.ForgetProject(request);
 	},
 	async createContext(request) {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");

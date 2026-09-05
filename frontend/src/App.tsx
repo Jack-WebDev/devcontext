@@ -544,6 +544,45 @@ function ManagementApp() {
 		}
 	}
 
+	async function handleProjectForget(project: ProjectListItem) {
+		if (!window.confirm(`Forget ${project.project.name} from Dev Context? Project files and folders are never deleted.`)) {
+			return;
+		}
+		const result = await devContextApi.forgetProject({
+			projectPath: project.project.path,
+		});
+		if (!result.ok) {
+			setProjectLaunchError(result.error);
+			setProjectErrorPath(project.project.path);
+			return;
+		}
+		await Promise.all([refreshProjects(), refreshHomeDashboard(), refreshRecentProjects(), refreshContexts()]);
+		handleNavigate("projects");
+	}
+
+	async function handleProjectLocate(project: ProjectListItem) {
+		if (project.contextId === undefined) return;
+		const selected = await devContextApi.chooseProjectDirectory();
+		if (!selected.ok || selected.data === undefined || selected.data === project.project.path) return;
+		const bound = await devContextApi.bindProject({
+			projectPath: selected.data,
+			contextId: project.contextId,
+		});
+		if (!bound.ok) {
+			setProjectLaunchError(bound.error);
+			setProjectErrorPath(project.project.path);
+			return;
+		}
+		const forgotten = await devContextApi.forgetProject({ projectPath: project.project.path });
+		if (!forgotten.ok) {
+			setProjectLaunchError(forgotten.error);
+			setProjectErrorPath(project.project.path);
+			return;
+		}
+		await Promise.all([refreshProjects(), refreshHomeDashboard(), refreshRecentProjects(), refreshContexts()]);
+		window.location.hash = projectDetailHash({ projectPath: selected.data });
+	}
+
 	function handleProjectOpenFolder(project: ProjectListItem) {
 		window.open(
 			new URL(project.project.path, "file://").href,
@@ -752,6 +791,8 @@ function ManagementApp() {
 										: undefined
 								}
 								onRemoveBinding={handleProjectBindingRemoval}
+								onForget={handleProjectForget}
+								onLocate={handleProjectLocate}
 							/>
 						)
 					) : (
