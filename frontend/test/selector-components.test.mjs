@@ -95,7 +95,13 @@ import {
 	shouldCloseSelectorAfterLaunch,
 } from "../.tmp-test/src/components/selector/launch-success-close-behavior.js";
 import { createContextAndRefresh } from "../.tmp-test/src/components/contexts/context-creation.js";
-import { ContextCreateIdentityScreen } from "../.tmp-test/src/components/contexts/ContextCreateIdentityScreen.js";
+import {
+	ContextCreateIdentityScreen,
+	contextAccentOptions,
+	contextIconOptions,
+	contextPurposeMaxLength,
+	contextPurposeValidation,
+} from "../.tmp-test/src/components/contexts/ContextCreateIdentityScreen.js";
 import {
 	contextIdentityTemplates,
 	draftFromContextIdentityTemplate,
@@ -3204,6 +3210,10 @@ test("context identity screen asks one question before continuing", () => {
 	assert.doesNotMatch(named, /disabled=""/);
 	assert.ok(named.includes("Preview"));
 	assert.ok(named.includes("Personal"));
+	assert.ok(named.includes("Purpose"));
+	assert.ok(named.includes("Description"));
+	assert.ok(named.includes("Choose an icon"));
+	assert.ok(named.includes("Choose an accent"));
 });
 
 test("identity templates update an editable request without exposing an ID", () => {
@@ -3219,6 +3229,35 @@ test("identity templates update an editable request without exposing an ID", () 
 		accent: "slate-blue",
 	});
 	assert.equal("contextId" in draft, false);
+});
+
+test("identity options are curated and purpose validation is user-facing", () => {
+	assert.deepEqual(
+		contextIconOptions.map((icon) => icon.id),
+		["user", "building", "users", "code", "heart", "sparkles"],
+	);
+	assert.deepEqual(
+		contextAccentOptions.map((accent) => accent.label),
+		["Sage", "Slate blue", "Amber", "Orchid"],
+	);
+	assert.equal(contextPurposeValidation("A clear purpose"), undefined);
+	assert.equal(
+		contextPurposeValidation("x".repeat(contextPurposeMaxLength + 1)),
+		"Keep the purpose to 120 characters or fewer.",
+	);
+
+	const invalid = renderToStaticMarkup(
+		createElement(ContextCreateIdentityScreen, {
+			draft: {
+				name: "Personal",
+				purpose: "x".repeat(contextPurposeMaxLength + 1),
+			},
+			onDraftChange() {},
+			onContinue() {},
+		}),
+	);
+	assert.match(invalid, /role="alert"/);
+	assert.match(invalid, /disabled=""/);
 });
 
 function contextFixture(id, name, providers = []) {

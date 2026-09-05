@@ -232,6 +232,7 @@ type ProjectState struct {
 type ContextState struct {
 	ID             string                `json:"id"`
 	Name           string                `json:"name"`
+	Purpose        string                `json:"purpose,omitempty"`
 	Description    string                `json:"description,omitempty"`
 	Tool           ToolState             `json:"tool"`
 	AvailableTools []ToolOption          `json:"availableTools"`
@@ -488,6 +489,7 @@ type CreateContextRequest struct {
 	ContextID          string   `json:"contextId"`
 	TemplateID         string   `json:"templateId,omitempty"`
 	Name               string   `json:"name,omitempty"`
+	Purpose            string   `json:"purpose,omitempty"`
 	Description        string   `json:"description,omitempty"`
 	Icon               string   `json:"icon,omitempty"`
 	Accent             string   `json:"accent,omitempty"`

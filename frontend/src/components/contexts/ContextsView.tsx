@@ -74,6 +74,11 @@ function ContextListCard({
 						>
 							{context.name}
 						</h3>
+						{context.purpose ? (
+							<p className="mt-1 text-sm font-medium text-foreground">
+								{context.purpose}
+							</p>
+						) : null}
 						{context.description ? (
 							<p className="mt-1 text-sm text-muted-foreground">
 								{context.description}

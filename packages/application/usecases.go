@@ -657,7 +657,7 @@ func (s *Service) contextFromCreateRequest(contextID devcontext.ID, request Crea
 		providers[providerID] = provider.Config{Enabled: true}
 	}
 	metadata := devcontext.Metadata{}
-	for key, value := range map[string]string{"description": request.Description, "icon": request.Icon, "accent": request.Accent} {
+	for key, value := range map[string]string{"purpose": request.Purpose, "description": request.Description, "icon": request.Icon, "accent": request.Accent} {
 		if value = strings.TrimSpace(value); value != "" {
 			metadata[key] = value
 		}
@@ -1328,6 +1328,7 @@ func (s *Service) contextState(ctx devcontext.Context) ContextState {
 	return ContextState{
 		ID:             ctx.ID.String(),
 		Name:           ctx.Name,
+		Purpose:        ctx.Metadata["purpose"],
 		Description:    ctx.Metadata["description"],
 		Tool:           toolState(ctx.Tool.DefaultTool, confidence),
 		AvailableTools: toolOptions(s.dependencies.ToolRegistry),
