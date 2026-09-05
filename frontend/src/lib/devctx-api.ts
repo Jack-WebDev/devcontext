@@ -15,8 +15,16 @@ export interface DisplayError {
 	message: string;
 	recovery: string;
 	technicalDetails?: string;
+	launchFailureDetails?: LaunchFailureDetails;
 	projectPathIssue?: ProjectPathIssue;
 	contextMismatch?: ContextMismatch;
+}
+
+export interface LaunchFailureDetails {
+	executable: string;
+	exitCode?: number;
+	timestamp: string;
+	logs: string;
 }
 
 export type ProjectPathIssue =
@@ -1782,14 +1790,35 @@ function normalizeResolutionWarning(value: unknown): ResolutionWarning {
 
 function normalizeApplicationError(value: ApplicationErrorLike): DisplayError {
 	const technicalDetails = optionalString(value.technicalDetails);
+	const launchFailureDetails = normalizeLaunchFailureDetails(
+		value.launchFailureDetails,
+	);
 	const projectPathIssue = normalizeProjectPathIssue(value.projectPathIssue);
 	return {
 		code: knownErrorCode(value.code),
 		message: stringValue(value.message),
 		recovery: stringValue(value.recovery),
 		...(technicalDetails === undefined ? {} : { technicalDetails }),
+		...(launchFailureDetails === undefined ? {} : { launchFailureDetails }),
 		...(projectPathIssue === undefined ? {} : { projectPathIssue }),
 		contextMismatch: normalizeContextMismatch(value.contextMismatch),
+	};
+}
+
+function normalizeLaunchFailureDetails(
+	value: unknown,
+): LaunchFailureDetails | undefined {
+	if (value === undefined || value === null) {
+		return undefined;
+	}
+
+	const object = objectValue(value);
+	const exitCode = optionalNumber(object.exitCode);
+	return {
+		executable: stringValue(object.executable),
+		...(exitCode === undefined ? {} : { exitCode }),
+		timestamp: stringValue(object.timestamp),
+		logs: stringValue(object.logs),
 	};
 }
 
@@ -1855,6 +1884,7 @@ interface ApplicationErrorLike {
 	message: unknown;
 	recovery: unknown;
 	technicalDetails?: unknown;
+	launchFailureDetails?: unknown;
 	projectPathIssue?: unknown;
 	contextMismatch?: unknown;
 }

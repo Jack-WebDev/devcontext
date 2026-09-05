@@ -614,15 +614,38 @@ func TestPreflightLaunchProjectReturnsReadinessWithoutStartingProcess(t *testing
 		t.Fatalf("preflight confidence = %#v, want context confidence %#v", result.Confidence, result.Context.Confidence)
 	}
 	if got, want := result.VerificationSteps, []LaunchVerificationStep{
-		{ID: "prepare_environment", Label: "Prepare isolated environment", Status: LaunchVerificationStepReady, Message: "Prepare isolated environment is ready."},
-		{ID: "check_providers", Label: "Check enabled providers", Status: LaunchVerificationStepReady, Message: "Check enabled providers is ready."},
-		{ID: "prepare_tool", Label: "Prepare Fake Tool", Status: LaunchVerificationStepReady, Message: "Prepare Fake Tool is ready."},
-		{ID: "start_tool", Label: "Start Fake Tool", Status: LaunchVerificationStepPending, Message: "Fake Tool will start after launch verification completes."},
+		{ID: "prepare_environment", Label: "Prepare isolated environment", Status: LaunchVerificationStepPending, Message: "Building the isolated launch environment."},
+		{ID: "start_tool", Label: "Start Fake Tool", Status: LaunchVerificationStepPending, Message: "Starting Fake Tool."},
+		{ID: "open_project", Label: "Open current", Status: LaunchVerificationStepPending, Message: "Opening current in Fake Tool."},
 	}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("verification steps = %#v, want %#v", got, want)
 	}
 	if len(fixture.process.requests) != 0 {
 		t.Fatalf("process requests = %#v, want none for preflight", fixture.process.requests)
+	}
+}
+
+func TestPreflightLaunchProjectIncludesToolSettingsStageOnlyWhenNeeded(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	statusTool := applicationStatusDataEditor{applicationFakeEditor: fixture.editor, fileName: "integration-status.json"}
+	fixture.toolRegistry = codingtool.MustNewRegistry([]codingtool.RegisteredTool{{Integration: statusTool, DisplayName: "Status Tool"}}, fixture.editor.ID())
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+
+	result, appErr := fixture.service().PreflightLaunchProject(PreflightLaunchProjectRequest{
+		ProjectPath: ".",
+		ContextID:   "personal",
+	})
+	if appErr != nil {
+		t.Fatalf("preflight launch project: %v", appErr)
+	}
+
+	if got, want := result.VerificationSteps, []LaunchVerificationStep{
+		{ID: "prepare_environment", Label: "Prepare isolated environment", Status: LaunchVerificationStepPending, Message: "Building the isolated launch environment."},
+		{ID: "write_tool_status", Label: "Apply Status Tool settings", Status: LaunchVerificationStepPending, Message: "Writing safe context settings for Status Tool."},
+		{ID: "start_tool", Label: "Start Status Tool", Status: LaunchVerificationStepPending, Message: "Starting Status Tool."},
+		{ID: "open_project", Label: "Open current", Status: LaunchVerificationStepPending, Message: "Opening current in Status Tool."},
+	}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("verification steps = %#v, want %#v", got, want)
 	}
 }
 
@@ -1723,7 +1746,7 @@ func TestLaunchProjectAcceptsConfirmedMismatch(t *testing.T) {
 func TestLaunchProjectReturnsPresentationSafeLaunchFailure(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.writeContext(t, fixture.context("personal", "Personal"))
-	fixture.process.err = launcher.ErrProcessStartFailed
+	fixture.process.err = fmt.Errorf("%w: API_TOKEN=launch-secret", launcher.ErrProcessStartFailed)
 
 	_, appErr := fixture.service().LaunchProject(LaunchProjectRequest{
 		ProjectPath: fixture.projectDir,
@@ -1734,6 +1757,18 @@ func TestLaunchProjectReturnsPresentationSafeLaunchFailure(t *testing.T) {
 	}
 	if appErr.Code != ErrorCodeLaunch {
 		t.Fatalf("error code = %q, want %q", appErr.Code, ErrorCodeLaunch)
+	}
+	if appErr.LaunchFailureDetails == nil {
+		t.Fatal("launch failure details = nil, want sanitized process diagnostics")
+	}
+	if appErr.LaunchFailureDetails.Executable != "/fixture/editor" || !appErr.LaunchFailureDetails.Timestamp.Equal(fixture.now) {
+		t.Fatalf("launch failure details = %#v, want executable and timestamp", appErr.LaunchFailureDetails)
+	}
+	if strings.Contains(appErr.LaunchFailureDetails.Logs, "launch-secret") {
+		t.Fatalf("launch logs expose a credential: %q", appErr.LaunchFailureDetails.Logs)
+	}
+	if appErr.LaunchFailureDetails.ExitCode != nil {
+		t.Fatalf("exit code = %#v, want none for a start failure", appErr.LaunchFailureDetails.ExitCode)
 	}
 	if len(fixture.process.requests) != 1 {
 		t.Fatalf("process request count = %d, want 1", len(fixture.process.requests))

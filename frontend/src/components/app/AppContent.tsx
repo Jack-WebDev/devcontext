@@ -194,7 +194,7 @@ export function SelectorContent({
 			onRunDiagnostics={onRunDiagnostics}
 			onCodingToolLaunched={notifyLaunch}
 			launchSuccessCloseBehavior={
-				settings?.closeAfterLaunch ? "close_selector" : "keep_open"
+				settings?.closeAfterLaunch === false ? "keep_open" : "close_selector"
 			}
 			showLaunchVerification={settings?.launchVerification ?? true}
 			showOnboardingReplay={showOnboardingReplay}

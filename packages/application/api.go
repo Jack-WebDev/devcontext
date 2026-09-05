@@ -15,6 +15,16 @@ type SettingsState struct {
 	TrayEnabled        bool `json:"trayEnabled"`
 }
 
+// LaunchFailureDetails contains presentation-safe diagnostics for a failed
+// process start. It intentionally excludes command arguments, environment
+// values, and context storage paths.
+type LaunchFailureDetails struct {
+	Executable string    `json:"executable"`
+	ExitCode   *int      `json:"exitCode,omitempty"`
+	Timestamp  time.Time `json:"timestamp"`
+	Logs       string    `json:"logs"`
+}
+
 // TrayState describes presentation-safe system-tray content. The desktop host
 // owns rendering and platform availability; this contract has no OS details.
 type TrayState struct {
@@ -442,8 +452,9 @@ const (
 	LaunchVerificationStepBlocked        LaunchVerificationStepStatus = "blocked"
 )
 
-// LaunchVerificationStep describes one stage of a safe launch. It does not
-// expose runtime paths, commands, or environment variables.
+// LaunchVerificationStep describes a presentation-safe launch stage. A
+// preflight result contains only pending stages because the work begins later
+// in LaunchProject; it never represents work already completed by preflight.
 type LaunchVerificationStep struct {
 	ID      string                       `json:"id"`
 	Label   string                       `json:"label"`

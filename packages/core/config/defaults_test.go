@@ -19,6 +19,9 @@ func TestDefaultGlobalConfig(t *testing.T) {
 	if !globalConfig.UI.RememberWindowPosition {
 		t.Fatal("remember window position = false, want true")
 	}
+	if !globalConfig.UI.CloseAfterLaunch {
+		t.Fatal("close after launch = false, want true")
+	}
 	if !globalConfig.Safety.WarnOnContextMismatch {
 		t.Fatal("warn on context mismatch = false, want true")
 	}

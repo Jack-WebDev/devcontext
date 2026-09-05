@@ -152,7 +152,7 @@ func globalConfigFromTOML(raw globalConfigTOML) (GlobalConfig, error) {
 		DefaultTool: defaultTool,
 		UI: UISettings{
 			RememberWindowPosition: *raw.UI.RememberWindowPosition,
-			CloseAfterLaunch:       optionalBool(raw.UI.CloseAfterLaunch, false),
+			CloseAfterLaunch:       optionalBool(raw.UI.CloseAfterLaunch, true),
 			LaunchVerification:     optionalBool(raw.UI.LaunchVerification, true),
 			RememberProjects:       optionalBool(raw.UI.RememberProjects, true),
 			TrayEnabled:            optionalBool(raw.UI.TrayEnabled, false),

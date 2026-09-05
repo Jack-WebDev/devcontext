@@ -1,7 +1,7 @@
 type LaunchSuccessCloseBehavior = "keep_open" | "close_selector";
 
 const defaultLaunchSuccessCloseBehavior: LaunchSuccessCloseBehavior =
-	"keep_open";
+	"close_selector";
 
 function shouldCloseSelectorAfterLaunch(
 	behavior: LaunchSuccessCloseBehavior,

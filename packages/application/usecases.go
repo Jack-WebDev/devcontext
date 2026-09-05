@@ -970,7 +970,7 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 
 	if err := s.processLauncher().Launch(processRequestFromLaunchPlan(plan, s.dependencies.DetachMode)); err != nil {
 		s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchProcessFailure, plan, err, s.now()))
-		return LaunchProjectResult{}, err
+		return LaunchProjectResult{}, newLaunchFailureError(err, plan.Executable, plan.Environment, s.now())
 	}
 
 	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchSucceeded, plan, nil, s.now()))
@@ -1042,7 +1042,7 @@ func (s *Service) preflightLaunchProject(request PreflightLaunchProjectRequest) 
 		Context:                    contextState,
 		Confidence:                 contextState.Confidence,
 		Groups:                     preflightGroups(contextState, warnings, runningConflict),
-		VerificationSteps:          launchVerificationSteps(contextState),
+		VerificationSteps:          s.launchVerificationSteps(contextState, projectState(projectPath)),
 		Warnings:                   warnings,
 		RunningEnvironmentConflict: runningConflict,
 	}, nil
@@ -1186,19 +1186,42 @@ func newPreflightGroup(id PreflightGroupID, label string, checks []PreflightChec
 	}
 }
 
-func launchVerificationSteps(context ContextState) []LaunchVerificationStep {
-	checks := context.Confidence.Checks
-	return []LaunchVerificationStep{
-		verificationStep("prepare_environment", "Prepare isolated environment", checksForComponent(checks, LaunchConfidenceCheckIsolation)),
-		verificationStep("check_providers", "Check enabled providers", checksForComponent(checks, LaunchConfidenceCheckProvider)),
-		verificationStep("prepare_tool", "Prepare "+context.Tool.Name, checksForTool(checks, context.Tool.ID)),
+// launchVerificationSteps describes work that starts only after a preflight
+// succeeds. Preflight proves readiness; it does not build the launch plan,
+// write tool status, or start a process, so these stages must remain pending.
+func (s *Service) launchVerificationSteps(context ContextState, project ProjectState) []LaunchVerificationStep {
+	steps := []LaunchVerificationStep{
 		{
+			ID:      "prepare_environment",
+			Label:   "Prepare isolated environment",
+			Status:  LaunchVerificationStepPending,
+			Message: "Building the isolated launch environment.",
+		},
+	}
+
+	if codingToolConsumesStatusData(s.dependencies.ToolRegistry, context.Tool.ID) {
+		steps = append(steps, LaunchVerificationStep{
+			ID:      "write_tool_status",
+			Label:   "Apply " + context.Tool.Name + " settings",
+			Status:  LaunchVerificationStepPending,
+			Message: "Writing safe context settings for " + context.Tool.Name + ".",
+		})
+	}
+
+	return append(steps,
+		LaunchVerificationStep{
 			ID:      "start_tool",
 			Label:   "Start " + context.Tool.Name,
 			Status:  LaunchVerificationStepPending,
-			Message: context.Tool.Name + " will start after launch verification completes.",
+			Message: "Starting " + context.Tool.Name + ".",
 		},
-	}
+		LaunchVerificationStep{
+			ID:      "open_project",
+			Label:   "Open " + project.Name,
+			Status:  LaunchVerificationStepPending,
+			Message: "Opening " + project.Name + " in " + context.Tool.Name + ".",
+		},
+	)
 }
 
 func checksForComponent(checks []LaunchConfidenceCheck, component LaunchConfidenceCheckComponent) []LaunchConfidenceCheck {
@@ -1211,31 +1234,13 @@ func checksForComponent(checks []LaunchConfidenceCheck, component LaunchConfiden
 	return result
 }
 
-func checksForTool(checks []LaunchConfidenceCheck, toolID string) []LaunchConfidenceCheck {
-	result := make([]LaunchConfidenceCheck, 0, 1)
-	for _, check := range checks {
-		if check.Component == LaunchConfidenceCheckTool && check.ToolID == toolID {
-			result = append(result, check)
-		}
+func codingToolConsumesStatusData(registry codingtool.Registry, toolID string) bool {
+	registered, ok := registry.Lookup(codingtool.ID(toolID))
+	if !ok {
+		return false
 	}
-	return result
-}
-
-func verificationStep(id string, label string, checks []LaunchConfidenceCheck) LaunchVerificationStep {
-	status := LaunchVerificationStepReady
-	message := label + " is ready."
-	for _, check := range checks {
-		if check.Severity == LaunchConfidenceBlocked {
-			status = LaunchVerificationStepBlocked
-			message = check.Message
-			break
-		}
-		if check.Severity == LaunchConfidenceNeedsAttention && status == LaunchVerificationStepReady {
-			status = LaunchVerificationStepNeedsAttention
-			message = check.Message
-		}
-	}
-	return LaunchVerificationStep{ID: id, Label: label, Status: status, Message: message}
+	_, ok = registered.Integration.(codingtool.StatusDataConsumer)
+	return ok
 }
 
 func (s *Service) bindProject(request BindProjectRequest) (ProjectBindingState, error) {

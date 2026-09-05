@@ -8,7 +8,7 @@ interface LaunchFailureViewProps {
 	onRetry: () => void;
 	onCancel: () => void;
 	onRunDiagnostics?: () => void;
-	onOpenConfiguration?: () => void;
+	onChooseAnotherContext: () => void;
 }
 
 function LaunchFailureView({
@@ -16,7 +16,7 @@ function LaunchFailureView({
 	onRetry,
 	onCancel,
 	onRunDiagnostics,
-	onOpenConfiguration,
+	onChooseAnotherContext,
 }: LaunchFailureViewProps) {
 	return (
 		<section
@@ -37,30 +37,42 @@ function LaunchFailureView({
 				<Button type="button" onClick={onRetry}>
 					Retry
 				</Button>
-				<Button
-					type="button"
-					variant="outline"
-					disabled={onRunDiagnostics === undefined}
-					onClick={onRunDiagnostics}
-				>
-					Run diagnostics
-				</Button>
-				<Button
-					type="button"
-					variant="outline"
-					disabled={onOpenConfiguration === undefined}
-					onClick={onOpenConfiguration}
-				>
-					Open configuration
+				{onRunDiagnostics ? (
+					<Button type="button" variant="outline" onClick={onRunDiagnostics}>
+						Run diagnostics
+					</Button>
+				) : null}
+				<Button type="button" variant="outline" onClick={onChooseAnotherContext}>
+					Choose another context
 				</Button>
 				<Button type="button" variant="ghost" onClick={onCancel}>
 					Cancel
 				</Button>
 			</div>
-			{error.technicalDetails ? (
+			{error.launchFailureDetails || error.technicalDetails ? (
 				<Disclosure summary="Technical details">
+					{error.launchFailureDetails ? (
+						<dl className="mt-3 grid gap-x-4 gap-y-2 text-xs sm:grid-cols-[auto_1fr]">
+							<dt className="font-medium">Executable</dt>
+							<dd className="wrap-break-word text-muted-foreground">
+								{error.launchFailureDetails.executable}
+							</dd>
+							{error.launchFailureDetails.exitCode !== undefined ? (
+								<>
+									<dt className="font-medium">Exit code</dt>
+									<dd className="text-muted-foreground">
+										{error.launchFailureDetails.exitCode}
+									</dd>
+								</>
+							) : null}
+							<dt className="font-medium">Timestamp</dt>
+							<dd className="text-muted-foreground">
+								{error.launchFailureDetails.timestamp}
+							</dd>
+						</dl>
+					) : null}
 					<pre className="mt-3 overflow-x-auto whitespace-pre-wrap wrap-break-word bg-muted/40 p-3 text-xs text-muted-foreground">
-						{error.technicalDetails}
+						{error.launchFailureDetails?.logs ?? error.technicalDetails}
 					</pre>
 				</Disclosure>
 			) : null}

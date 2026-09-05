@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
+	"time"
 
 	codingtool "devctx/packages/core/codingtool"
 	"devctx/packages/core/config"
@@ -48,6 +50,9 @@ type Error struct {
 	// TechnicalDetails contains sanitized diagnostic information. The GUI must
 	// keep it behind an explicit disclosure.
 	TechnicalDetails string `json:"technicalDetails,omitempty"`
+	// LaunchFailureDetails adds structured, sanitized diagnostics only when a
+	// coding-tool process could not start.
+	LaunchFailureDetails *LaunchFailureDetails `json:"launchFailureDetails,omitempty"`
 
 	ContextMismatch *ContextMismatch `json:"contextMismatch,omitempty"`
 
@@ -82,7 +87,12 @@ func NewError(err error) *Error {
 	var contextStorageError *filesystem.ContextStorageError
 	var executableNotFound *codingtool.ExecutableNotFoundError
 	var processLaunchError *launcher.ProcessLaunchError
+	var launchFailure *launchFailureError
 	switch {
+	case errors.As(err, &launchFailure):
+		result := NewError(launchFailure.cause)
+		result.LaunchFailureDetails = launchFailure.details()
+		return result
 	case errors.As(err, &contextMismatchError) && errors.Is(err, launcher.ErrContextMismatchRequiresConfirmation):
 		return &Error{
 			Code:     ErrorCodeContextMismatch,
@@ -148,6 +158,45 @@ func NewError(err error) *Error {
 		return applicationError(ErrorCodeValidation, "Unable to complete request.", "Check the selected project and context, then retry.", err)
 	default:
 		return applicationError(ErrorCodeInternal, "Dev Context failed unexpectedly.", "Retry the action. If it keeps failing, include debug details in a bug report.", err)
+	}
+}
+
+type launchFailureError struct {
+	cause            error
+	executable       string
+	knownEnvironment []string
+	timestamp        time.Time
+}
+
+func (e *launchFailureError) Error() string {
+	return e.cause.Error()
+}
+
+func (e *launchFailureError) Unwrap() error {
+	return e.cause
+}
+
+func (e *launchFailureError) details() *LaunchFailureDetails {
+	details := &LaunchFailureDetails{
+		Executable: e.executable,
+		Timestamp:  e.timestamp.UTC(),
+		Logs:       devlog.SanitizeError(e.cause, e.knownEnvironment),
+	}
+
+	var exitError *exec.ExitError
+	if errors.As(e.cause, &exitError) {
+		exitCode := exitError.ExitCode()
+		details.ExitCode = &exitCode
+	}
+	return details
+}
+
+func newLaunchFailureError(err error, executable launcher.Executable, environment launcher.Environment, timestamp time.Time) error {
+	return &launchFailureError{
+		cause:            err,
+		executable:       string(executable),
+		knownEnvironment: environment.Environ(),
+		timestamp:        timestamp,
 	}
 }
 

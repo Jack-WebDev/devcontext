@@ -63,6 +63,7 @@ import {
 } from "../.tmp-test/src/components/selector/FirstRunWelcome.js";
 import { GuiErrorNotice } from "../.tmp-test/src/components/selector/GuiErrorNotice.js";
 import { LaunchFailureView } from "../.tmp-test/src/components/selector/LaunchFailureView.js";
+import { LaunchProgressView } from "../.tmp-test/src/components/selector/LaunchProgressView.js";
 import { LauncherSurface } from "../.tmp-test/src/components/launcher/LauncherSurface.js";
 import { ProjectResolvingView } from "../.tmp-test/src/components/launcher/ProjectResolvingView.js";
 import {
@@ -2068,7 +2069,7 @@ test("launch verification progress renders a pending shell, groups, and backend 
 
 	assert.match(pending, /role="status"/);
 	assert.ok(pending.includes("Launching devctx as Company..."));
-	assert.ok(pending.includes("Preparing launch verification..."));
+	assert.ok(pending.includes("Preparing launch stages..."));
 	assert.ok(staged.includes("Prepare isolated environment"));
 	assert.ok(staged.includes("Needs attention"));
 	assert.ok(staged.includes("Pending"));
@@ -2890,10 +2891,34 @@ test("gui error notice renders failure and recovery guidance", () => {
 	}
 });
 
-test("launch success close behavior defaults to keeping the selector open", () => {
-	assert.equal(defaultLaunchSuccessCloseBehavior, "keep_open");
+test("launch success close behavior defaults to closing the selector", () => {
+	assert.equal(defaultLaunchSuccessCloseBehavior, "close_selector");
 	assert.equal(shouldCloseSelectorAfterLaunch("keep_open"), false);
 	assert.equal(shouldCloseSelectorAfterLaunch("close_selector"), true);
+});
+
+test("launch progress is a focused surface without launcher controls", () => {
+	const html = renderToStaticMarkup(
+		LaunchProgressView({
+			projectName: "api",
+			contextName: "Company",
+			showVerification: true,
+			steps: [
+				{
+					id: "start_tool",
+					label: "Start VS Code",
+					status: "pending",
+					message: "Starting VS Code.",
+				},
+			],
+		}),
+	);
+
+	assert.match(html, /aria-label="Launching project"/);
+	assert.ok(html.includes("Opening api"));
+	assert.ok(html.includes("Using Company"));
+	assert.ok(html.includes("Start VS Code"));
+	assert.doesNotMatch(html, /Launch Company|Choose another|Remember this project/);
 });
 
 test("launch failure view keeps recovery actions available without exposing technical details", () => {
@@ -2903,14 +2928,20 @@ test("launch failure view keeps recovery actions available without exposing tech
 		"Check the editor command, project path, and permissions, then retry.",
 	).error;
 	const html = renderToStaticMarkup(
-		LaunchFailureView({ error, onRetry: () => {}, onCancel: () => {} }),
+		LaunchFailureView({
+			error,
+			onRetry: () => {},
+			onRunDiagnostics: () => {},
+			onChooseAnotherContext: () => {},
+			onCancel: () => {},
+		}),
 	);
 
 	assert.match(html, /role="alert"/);
 	assert.ok(html.includes("Dev Context is still open"));
 	assert.ok(html.includes("Retry"));
 	assert.ok(html.includes("Run diagnostics"));
-	assert.ok(html.includes("Open configuration"));
+	assert.ok(html.includes("Choose another context"));
 	assert.ok(html.includes("Cancel"));
 	assert.doesNotMatch(html, /Technical details/);
 });
@@ -2922,13 +2953,27 @@ test("launch failure view hides technical details until requested", () => {
 			"Unable to launch editor.",
 			"Check the editor command, then retry.",
 		).error,
-		technicalDetails: "starting tool in /work/api failed: permission denied",
+		launchFailureDetails: {
+			executable: "/usr/bin/code",
+			exitCode: 1,
+			timestamp: "2026-09-05T10:30:00Z",
+			logs: "starting tool in /work/api failed: permission denied",
+		},
 	};
 	const html = renderToStaticMarkup(
-		LaunchFailureView({ error, onRetry: () => {}, onCancel: () => {} }),
+		LaunchFailureView({
+			error,
+			onRetry: () => {},
+			onChooseAnotherContext: () => {},
+			onCancel: () => {},
+		}),
 	);
 
 	assert.ok(html.includes("Technical details"));
+	assert.ok(html.includes("Executable"));
+	assert.ok(html.includes("Exit code"));
+	assert.ok(html.includes("Timestamp"));
+	assert.ok(html.includes("/usr/bin/code"));
 	assert.ok(html.includes("/work/api"));
 	assert.match(html, /<details/);
 	assert.doesNotMatch(html, /<details(?:\s[^>]*)?\sopen(?:=|\s|>)/);
