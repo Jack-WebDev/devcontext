@@ -8,6 +8,7 @@ import (
 )
 
 type service interface {
+	ValidateProjectDirectory(application.ValidateProjectDirectoryRequest) (application.ProjectState, *application.Error)
 	GetLaunchState(application.GetLaunchStateRequest) (application.LaunchState, *application.Error)
 	GetHomeDashboard(application.GetHomeDashboardRequest) (application.HomeDashboardState, *application.Error)
 	GetRecentProjects() (application.RecentProjectsState, *application.Error)
@@ -187,6 +188,15 @@ func (a *App) ChooseProjectDirectory() any {
 		return application.NewError(err)
 	}
 	return path
+}
+
+// ValidateProjectDirectory validates a folder selected for a context draft.
+func (a *App) ValidateProjectDirectory(request application.ValidateProjectDirectoryRequest) any {
+	project, err := a.service.ValidateProjectDirectory(request)
+	if err != nil {
+		return err
+	}
+	return project
 }
 
 // GetLaunchState returns selector state for the current project.

@@ -54,3 +54,5 @@ export function RunRepairAction(arg1:application.RunRepairActionRequest):Promise
 export function UnbindProject(arg1:application.UnbindProjectRequest):Promise<any>;
 
 export function UpdateSettings(arg1:application.UpdateSettingsRequest):Promise<any>;
+
+export function ValidateProjectDirectory(arg1:application.ValidateProjectDirectoryRequest):Promise<any>;

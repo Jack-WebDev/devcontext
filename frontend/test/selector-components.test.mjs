@@ -100,6 +100,10 @@ import {
 	contextPurposeMaxLength,
 	contextPurposeValidation,
 } from "../.tmp-test/src/components/contexts/ContextCreateIdentityScreen.js";
+import {
+	ContextCreateProjectsScreen,
+	addProjectToDraft,
+} from "../.tmp-test/src/components/contexts/ContextCreateProjectsScreen.js";
 import { ContextPreview } from "../.tmp-test/src/components/contexts/ContextPreview.js";
 import {
 	contextIdentityTemplates,
@@ -117,6 +121,7 @@ import {
 	previousContextCreateStep,
 	returnToContextCreateReview,
 	updateContextCreateDraft,
+	updateContextCreateProjects,
 } from "../.tmp-test/src/components/contexts/context-create-flow.js";
 import { ProjectIdentity } from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import { ProviderCredentialClassification } from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
@@ -3164,6 +3169,7 @@ test("context creation flow preserves its draft across forward and back steps", 
 		description: "Personal repositories and experiments",
 		enabledProviderIds: ["codex"],
 	});
+	flow = updateContextCreateProjects(flow, [{ name: "web", path: "/work/web" }]);
 	flow = nextContextCreateStep(flow);
 	flow = nextContextCreateStep(flow);
 	flow = previousContextCreateStep(flow);
@@ -3177,6 +3183,27 @@ test("context creation flow preserves its draft across forward and back steps", 
 		accent: "sage",
 		enabledProviderIds: ["codex"],
 	});
+	assert.deepEqual(flow.projects, [{ name: "web", path: "/work/web" }]);
+});
+
+test("context creation projects screen keeps validated folders as pending cards", () => {
+	const project = { name: "api", path: "/work/api" };
+	assert.deepEqual(addProjectToDraft([], project), [project]);
+	assert.deepEqual(addProjectToDraft([project], project), [project]);
+
+	const html = renderToStaticMarkup(
+		createElement(ContextCreateProjectsScreen, {
+			projects: [project],
+			onProjectsChange() {},
+			onBack() {},
+			onContinue() {},
+		}),
+	);
+	assert.match(html, /Which projects normally belong to this context/);
+	assert.match(html, /Pending projects/);
+	assert.match(html, /\/work\/api/);
+	assert.match(html, /Choose folder/);
+	assert.match(html, /Nothing is changed until you create the context/);
 });
 
 test("context creation flow permits creation only from review", () => {

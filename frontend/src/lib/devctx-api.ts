@@ -366,6 +366,10 @@ export interface BindProjectRequest {
 	contextId: string;
 }
 
+export interface ValidateProjectDirectoryRequest {
+	projectPath: string;
+}
+
 export interface UnbindProjectRequest {
 	projectPath?: string;
 }
@@ -555,6 +559,9 @@ export interface ProviderCredentialSession {
 export interface DevContextApi {
 	getApplicationMode(): Promise<ApiResult<ApplicationMode>>;
 	chooseProjectDirectory(): Promise<ApiResult<string | undefined>>;
+	validateProjectDirectory(
+		request: ValidateProjectDirectoryRequest,
+	): Promise<ApiResult<ProjectState>>;
 	getLaunchState(
 		request?: GetLaunchStateRequest,
 	): Promise<ApiResult<LaunchState>>;
@@ -613,6 +620,7 @@ export interface DevContextApi {
 export interface WailsBindings {
 	getApplicationMode(): Promise<unknown>;
 	chooseProjectDirectory(): Promise<unknown>;
+	validateProjectDirectory(request: ValidateProjectDirectoryRequest): Promise<unknown>;
 	getLaunchState(request: GetLaunchStateRequest): Promise<unknown>;
 	getHomeDashboard(request: GetHomeDashboardRequest): Promise<unknown>;
 	getRecentProjects(): Promise<unknown>;
@@ -658,6 +666,12 @@ export function createDevContextApi(
 			return callBinding(
 				() => bindings.chooseProjectDirectory(),
 				optionalString,
+			);
+		},
+		validateProjectDirectory(request) {
+			return callBinding(
+				() => bindings.validateProjectDirectory(request),
+				normalizeProjectState,
 			);
 		},
 		getLaunchState(request = {}) {
@@ -812,6 +826,10 @@ const generatedBindings: WailsBindings = {
 	async chooseProjectDirectory() {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
 		return bindings.ChooseProjectDirectory();
+	},
+	async validateProjectDirectory(request) {
+		const bindings = await import("../../wailsjs/go/wailsapp/App");
+		return bindings.ValidateProjectDirectory(request);
 	},
 	async getLaunchState(request) {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");

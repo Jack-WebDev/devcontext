@@ -227,6 +227,12 @@ type ProjectState struct {
 	Path string `json:"path"`
 }
 
+// ValidateProjectDirectoryRequest asks the application to canonicalize and
+// validate a project folder before it is used by a later operation.
+type ValidateProjectDirectoryRequest struct {
+	ProjectPath string `json:"projectPath"`
+}
+
 // ContextState is the presentation-safe identity and readiness summary for one
 // configured context.
 type ContextState struct {

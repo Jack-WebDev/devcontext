@@ -28,6 +28,16 @@ func (s *Service) GetLaunchState(request GetLaunchStateRequest) (LaunchState, *E
 	return state, nil
 }
 
+// ValidateProjectDirectory returns a presentation-safe project identity only
+// when the selected folder is a readable directory.
+func (s *Service) ValidateProjectDirectory(request ValidateProjectDirectoryRequest) (ProjectState, *Error) {
+	projectPath, err := s.validatedProjectPath(request.ProjectPath)
+	if err != nil {
+		return ProjectState{}, NewError(err)
+	}
+	return projectState(projectPath), nil
+}
+
 func (s *Service) GetSettings() (SettingsState, *Error) {
 	settings, err := s.getSettings()
 	if err != nil {

@@ -1,4 +1,4 @@
-import type { CreateContextRequest } from "../../lib/devctx-api";
+import type { CreateContextRequest, ProjectState } from "../../lib/devctx-api";
 
 const contextCreateSteps = [
 	"identity",
@@ -13,12 +13,20 @@ type ContextCreateFlowStatus = ContextCreateStep | "creating" | "success";
 interface ContextCreateFlowState {
 	status: ContextCreateFlowStatus;
 	draft: CreateContextRequest;
+	projects: ProjectState[];
 }
 
 function initialContextCreateFlow(
 	draft: CreateContextRequest = {},
 ): ContextCreateFlowState {
-	return { status: "identity", draft };
+	return { status: "identity", draft, projects: [] };
+}
+
+function updateContextCreateProjects(
+	state: ContextCreateFlowState,
+	projects: ProjectState[],
+): ContextCreateFlowState {
+	return { ...state, projects };
 }
 
 function updateContextCreateDraft(
@@ -85,4 +93,5 @@ export {
 	previousContextCreateStep,
 	returnToContextCreateReview,
 	updateContextCreateDraft,
+	updateContextCreateProjects,
 };

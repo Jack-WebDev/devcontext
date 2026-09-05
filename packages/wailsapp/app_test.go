@@ -11,6 +11,7 @@ import (
 
 func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 	service := &fakeService{
+		validatedProject: application.ProjectState{Name: "api", Path: "/work/api"},
 		launchState: application.LaunchState{
 			Project: application.ProjectState{Name: "api", Path: "/work/api"},
 		},
@@ -67,6 +68,14 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 
 	if app.ctx == nil {
 		t.Fatal("startup context was not stored")
+	}
+
+	validationRequest := application.ValidateProjectDirectoryRequest{ProjectPath: "/work/api"}
+	if project := app.ValidateProjectDirectory(validationRequest); !reflect.DeepEqual(project, service.validatedProject) {
+		t.Fatalf("validated project = %#v, want %#v", project, service.validatedProject)
+	}
+	if service.validationRequest != validationRequest {
+		t.Fatalf("validation request = %#v, want %#v", service.validationRequest, validationRequest)
 	}
 
 	stateRequest := application.GetLaunchStateRequest{ProjectPath: "/work/api"}
@@ -252,6 +261,10 @@ func TestNewRetainsHostSelectedApplicationMode(t *testing.T) {
 }
 
 type fakeService struct {
+	validationRequest   application.ValidateProjectDirectoryRequest
+	validatedProject    application.ProjectState
+	validatedProjectErr *application.Error
+
 	settings           application.SettingsState
 	launchStateRequest application.GetLaunchStateRequest
 	launchState        application.LaunchState
@@ -326,6 +339,11 @@ type fakeService struct {
 
 	runningEnvironments    application.RunningEnvironmentsState
 	runningEnvironmentsErr *application.Error
+}
+
+func (s *fakeService) ValidateProjectDirectory(request application.ValidateProjectDirectoryRequest) (application.ProjectState, *application.Error) {
+	s.validationRequest = request
+	return s.validatedProject, s.validatedProjectErr
 }
 
 func (s *fakeService) GetSettings() (application.SettingsState, *application.Error) {
