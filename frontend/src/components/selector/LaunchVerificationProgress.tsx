@@ -1,18 +1,26 @@
 import type {
 	LaunchVerificationStep,
 	LaunchVerificationStepStatus,
+	PreflightCheck,
+	PreflightGroup,
 } from "../../lib/devctx-api";
 import { Card } from "../ui/card.js";
 
 interface LaunchVerificationProgressProps {
 	projectName: string;
 	contextName: string;
+	heading?: string;
+	description?: string;
+	groups?: PreflightGroup[];
 	steps?: LaunchVerificationStep[];
 }
 
 function LaunchVerificationProgress({
 	projectName,
 	contextName,
+	heading = "Launch verification",
+	description = `Launching ${projectName} as ${contextName}...`,
+	groups = [],
 	steps = [],
 }: LaunchVerificationProgressProps) {
 	return (
@@ -25,12 +33,12 @@ function LaunchVerificationProgress({
 			role="status"
 		>
 			<h3 id="launch-verification-title" className="font-medium">
-				Launch verification
+				{heading}
 			</h3>
-			<p className="mt-1 text-muted-foreground">
-				Launching {projectName} as {contextName}...
-			</p>
-			{steps.length === 0 ? (
+			<p className="mt-1 text-muted-foreground">{description}</p>
+			{groups.length > 0 ? (
+				<PreflightGroups groups={groups} />
+			) : steps.length === 0 ? (
 				<p className="mt-3 text-muted-foreground">
 					Preparing launch verification...
 				</p>
@@ -42,6 +50,64 @@ function LaunchVerificationProgress({
 				</ol>
 			)}
 		</Card>
+	);
+}
+
+function PreflightGroups({ groups }: { groups: PreflightGroup[] }) {
+	return (
+		<ol className="mt-3 space-y-3 border-t border-border pt-3">
+			{groups.map((group) => (
+				<PreflightGroupRow key={group.id} group={group} />
+			))}
+		</ol>
+	);
+}
+
+function PreflightGroupRow({ group }: { group: PreflightGroup }) {
+	const presentation = verificationStepPresentation(group.status);
+
+	return (
+		<li className="min-w-0">
+			<div className="flex items-start justify-between gap-3">
+				<p className="font-medium">{group.label}</p>
+				<span
+					className={`shrink-0 text-xs font-medium ${presentation.className}`}
+				>
+					{group.blocking ? "Fix required" : presentation.label}
+				</span>
+			</div>
+			<p className="mt-1 text-xs text-muted-foreground">{group.message}</p>
+			{group.checks.length > 0 ? (
+				<details className="mt-2 text-xs">
+					<summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+						Show details
+					</summary>
+					<ul className="mt-2 space-y-2 border-l border-border pl-3">
+						{group.checks.map((check) => (
+							<PreflightCheckRow key={check.id} check={check} />
+						))}
+					</ul>
+				</details>
+			) : null}
+		</li>
+	);
+}
+
+function PreflightCheckRow({ check }: { check: PreflightCheck }) {
+	const presentation = verificationStepPresentation(check.status);
+	return (
+		<li>
+			<div className="flex items-start justify-between gap-3">
+				<p className="font-medium">{check.label}</p>
+				<span className={`shrink-0 ${presentation.className}`}>
+					{check.blocking ? "Fix required" : presentation.label}
+				</span>
+			</div>
+			<p className="mt-1 text-muted-foreground">{check.message}</p>
+			{check.actionHint ? (
+				<p className="mt-1 text-muted-foreground">{check.actionHint}</p>
+			) : null}
+		</li>
 	);
 }
 
