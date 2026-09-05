@@ -1,7 +1,6 @@
 import type { ProjectListItem } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
-import { ProjectSafetyLabel } from "./ProjectSafetyLabel.js";
 
 interface ProjectsViewProps {
 	projects: ProjectListItem[];
@@ -45,9 +44,10 @@ function ProjectsView({
 				</Card>
 			) : (
 				<div className="space-y-4">
-					{projects.map((project) => (
+					{projects.map((project, index) => (
 						<ProjectCard
 							key={project.project.path}
+							id={`project-${index}-heading`}
 							project={project}
 							launching={launchingProjectPath === project.project.path}
 							launchError={
@@ -68,6 +68,7 @@ function ProjectsView({
 }
 
 function ProjectCard({
+	id,
 	project,
 	launching,
 	launchError,
@@ -76,6 +77,7 @@ function ProjectCard({
 	onOpenFolder,
 	onForget,
 }: {
+	id: string;
 	project: ProjectListItem;
 	launching: boolean;
 	launchError?: string;
@@ -84,8 +86,8 @@ function ProjectCard({
 	onOpenFolder?: (project: ProjectListItem) => void;
 	onForget?: (project: ProjectListItem) => void;
 }) {
-	const contextName =
-		project.contextName ?? project.contextId ?? "No context selected";
+	const isAssigned = project.contextId !== undefined;
+	const contextName = project.contextName ?? project.contextId ?? "Unassigned";
 	const canLaunch = project.contextId !== undefined && onLaunch !== undefined;
 
 	return (
@@ -93,40 +95,52 @@ function ProjectCard({
 			as="article"
 			hierarchy="secondary"
 			className="py-0"
-			aria-labelledby={`project-${project.project.path}-heading`}
+			aria-labelledby={id}
 		>
 			<CardContent className="space-y-4 p-5">
 				<div className="flex flex-wrap items-start justify-between gap-3">
 					<div className="min-w-0">
 						<h3
-							id={`project-${project.project.path}-heading`}
+							id={id}
 							className="truncate text-lg font-semibold"
 							title={project.project.name}
 						>
 							{project.project.name}
 						</h3>
-						<p
-							className="mt-1 truncate font-mono text-sm text-muted-foreground"
-							title={project.project.path}
-						>
-							{project.project.path}
-						</p>
 					</div>
-					<div className="flex shrink-0 flex-wrap justify-end gap-2">
-						<ProjectSafetyLabel
-							contextName={project.contextName ?? project.contextId}
-						/>
-						<span className="text-sm font-medium text-muted-foreground">
-							{project.running ? "Running" : "Not running"}
-						</span>
-					</div>
+					<span
+						className={
+							isAssigned
+								? "inline-flex shrink-0 border border-border bg-muted/30 px-2 py-1 text-xs font-medium text-foreground"
+								: "inline-flex shrink-0 border border-border bg-background px-2 py-1 text-xs font-medium text-muted-foreground"
+						}
+					>
+						{isAssigned ? "Assigned" : "Unassigned"}
+					</span>
 				</div>
 
-				<dl className="grid gap-3 border-t border-border pt-4 text-sm sm:grid-cols-2">
-					<ProjectDetail label="Remembered context" value={contextName} />
+				<dl className="grid gap-4 border-y border-border py-4 text-sm sm:grid-cols-2">
 					<ProjectDetail
-						label="Last launched"
+						label="Normal context"
+						value={contextName}
+						prominent
+					/>
+					<ProjectDetail
+						label="Binding state"
+						value={
+							isAssigned
+								? "This project opens with its normal context."
+								: "Choose a context before launching."
+						}
+					/>
+					<ProjectDetail label="Path" value={project.project.path} mono />
+					<ProjectDetail
+						label="Last opened"
 						value={formatProjectTime(project.lastLaunchedAt)}
+					/>
+					<ProjectDetail
+						label="Workspace"
+						value={project.running ? "Running" : "Not running"}
 					/>
 				</dl>
 
@@ -136,16 +150,14 @@ function ProjectCard({
 					</p>
 				) : null}
 
-				<div className="flex flex-wrap gap-3 border-t border-border pt-4">
+				<div className="flex flex-wrap gap-3">
 					<Button
 						type="button"
 						size="sm"
 						disabled={!canLaunch || launching}
 						onClick={() => onLaunch?.(project)}
 					>
-						{launching
-							? `Launching ${contextName}...`
-							: `Launch ${contextName}`}
+						{launching ? `Launching ${contextName}...` : `Launch ${contextName}`}
 					</Button>
 					<Button
 						type="button"
@@ -165,31 +177,42 @@ function ProjectCard({
 					>
 						Open folder
 					</Button>
-					<Button
-						type="button"
-						variant="destructive"
-						size="sm"
-						disabled={onForget === undefined}
-						title={
-							onForget === undefined
-								? "Forgetting projects will be available when project removal is supported."
-								: undefined
-						}
-						onClick={() => onForget?.(project)}
-					>
-						Forget project
-					</Button>
+					{onForget ? (
+						<Button
+							type="button"
+							variant="destructive"
+							size="sm"
+							onClick={() => onForget(project)}
+						>
+							Forget project
+						</Button>
+					) : null}
 				</div>
 			</CardContent>
 		</Card>
 	);
 }
 
-function ProjectDetail({ label, value }: { label: string; value: string }) {
+function ProjectDetail({
+	label,
+	value,
+	prominent = false,
+	mono = false,
+}: {
+	label: string;
+	value: string;
+	prominent?: boolean;
+	mono?: boolean;
+}) {
 	return (
 		<div className="min-w-0">
 			<dt className="text-muted-foreground">{label}</dt>
-			<dd className="mt-1 truncate font-medium" title={value}>
+			<dd
+				className={`mt-1 truncate ${
+					prominent ? "text-base font-semibold" : "font-medium"
+				} ${mono ? "font-mono text-xs" : ""}`}
+				title={value}
+			>
 				{value}
 			</dd>
 		</div>

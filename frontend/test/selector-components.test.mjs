@@ -1377,6 +1377,10 @@ test("Projects lists known projects with safe launch and management entry points
 					lastLaunchedAt: "2026-08-28T10:30:00Z",
 					running: true,
 				},
+				{
+					project: { name: "notes", path: "/work/notes" },
+					running: false,
+				},
 			],
 			onLaunch: () => {},
 			onChangeContext: () => {},
@@ -1386,15 +1390,17 @@ test("Projects lists known projects with safe launch and management entry points
 
 	assert.ok(html.includes("Known projects"));
 	assert.ok(html.includes("/work/api"));
-	assert.ok(html.includes("Remembered context"));
+	assert.ok(html.includes("Normal context"));
+	assert.ok(html.includes("Binding state"));
+	assert.ok(html.includes("Assigned"));
+	assert.ok(html.includes("Unassigned"));
+	assert.ok(html.includes("Choose a context before launching."));
 	assert.ok(html.includes("Company"));
 	assert.ok(html.includes("Running"));
 	assert.ok(html.includes("Launch Company"));
 	assert.ok(html.includes("Change context"));
 	assert.ok(html.includes("Open folder"));
-	assert.ok(html.includes("Forget project"));
-	assert.match(html, /Forget project<\/button>/);
-	assert.match(html, /disabled=""/);
+	assert.doesNotMatch(html, /Forget project/);
 	assert.equal(formatProjectTime(undefined), "Never launched");
 });
 
