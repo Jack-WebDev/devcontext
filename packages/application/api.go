@@ -539,8 +539,13 @@ type CreateContextRequest struct {
 	Icon               string   `json:"icon,omitempty"`
 	Accent             string   `json:"accent,omitempty"`
 	EnabledProviderIDs []string `json:"enabledProviderIds,omitempty"`
-	ToolID             string   `json:"toolId,omitempty"`
-	ImportProviderIDs  []string `json:"importProviderIds,omitempty"`
+	// EnabledDevelopmentToolIDs is the generic creation-flow representation of
+	// selected registered integrations. It supersedes the UI's need to split
+	// selections by adapter type; the legacy fields above remain supported for
+	// existing callers.
+	EnabledDevelopmentToolIDs []string `json:"enabledDevelopmentToolIds,omitempty"`
+	ToolID                    string   `json:"toolId,omitempty"`
+	ImportProviderIDs         []string `json:"importProviderIds,omitempty"`
 }
 
 // CreateContextResult describes a newly created context.

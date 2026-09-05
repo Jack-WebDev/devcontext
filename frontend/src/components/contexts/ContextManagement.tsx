@@ -86,6 +86,7 @@ export function CreateContextDialog({
 			accent,
 			toolId,
 			enabledProviderIds: providers,
+			enabledDevelopmentToolIds: [toolId, ...providers].filter(Boolean),
 		};
 		const result = await contextCreation.create(request);
 		if (result === undefined || !result.ok) {

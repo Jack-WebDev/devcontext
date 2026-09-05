@@ -412,6 +412,7 @@ export interface CreateContextRequest {
 	icon?: string;
 	accent?: string;
 	enabledProviderIds?: string[];
+	enabledDevelopmentToolIds?: string[];
 	toolId?: string;
 	importProviderIds?: string[];
 }

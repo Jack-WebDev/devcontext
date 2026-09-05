@@ -3176,7 +3176,7 @@ test("context creation flow preserves its draft across forward and back steps", 
 	});
 	flow = updateContextCreateDraft(flow, {
 		description: "Personal repositories and experiments",
-		enabledProviderIds: ["codex"],
+		enabledDevelopmentToolIds: ["vscode", "codex"],
 	});
 	flow = updateContextCreateProjects(flow, [
 		{ name: "web", path: "/work/web" },
@@ -3192,7 +3192,7 @@ test("context creation flow preserves its draft across forward and back steps", 
 		description: "Personal repositories and experiments",
 		icon: "heart",
 		accent: "sage",
-		enabledProviderIds: ["codex"],
+		enabledDevelopmentToolIds: ["vscode", "codex"],
 	});
 	assert.deepEqual(flow.projects, [{ name: "web", path: "/work/web" }]);
 });
@@ -3343,6 +3343,8 @@ test("context creation frames tool setup as development tools with generic categ
 	assert.match(html, /Needs sign-in/);
 	assert.match(html, /Sign in to continue/);
 	assert.match(html, /Continue/);
+	assert.match(html, /Disable/);
+	assert.match(html, /Set up/);
 	assert.doesNotMatch(html, /Provider/);
 	assert.deepEqual(Object.keys(developmentToolStatusPresentation), [
 		"available",

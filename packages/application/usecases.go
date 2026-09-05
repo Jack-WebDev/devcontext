@@ -651,6 +651,9 @@ func (s *Service) contextFromCreateRequest(contextID devcontext.ID, request Crea
 	if strings.TrimSpace(request.Name) == "" {
 		return devcontext.DefaultContextForIDWithRegistries(contextID, s.now(), s.dependencies.ProviderRegistry, s.dependencies.ToolRegistry)
 	}
+	if err := s.applyDevelopmentToolSelections(&request); err != nil {
+		return devcontext.Context{}, err
+	}
 	toolID := codingtool.ID(request.ToolID)
 	if toolID == "" {
 		toolID = s.dependencies.ToolRegistry.DefaultID()
@@ -673,6 +676,46 @@ func (s *Service) contextFromCreateRequest(contextID devcontext.ID, request Crea
 		}
 	}
 	return devcontext.Context{ID: contextID, Name: strings.TrimSpace(request.Name), Tool: codingtool.LaunchTarget{DefaultTool: toolID, Tools: map[codingtool.ID]codingtool.Config{toolID: {}}}, Providers: providers, Metadata: metadata, CreatedAt: s.now().UTC()}, nil
+}
+
+// applyDevelopmentToolSelections translates the creation flow's generic
+// registry IDs into the persisted tool and provider configuration. Registry
+// IDs must not be shared across the two integration types: accepting an
+// ambiguous ID could silently configure the wrong integration.
+func (s *Service) applyDevelopmentToolSelections(request *CreateContextRequest) error {
+	if len(request.EnabledDevelopmentToolIDs) == 0 {
+		return nil
+	}
+
+	providerIDs := make([]string, 0, len(request.EnabledDevelopmentToolIDs))
+	seen := make(map[string]struct{}, len(request.EnabledDevelopmentToolIDs))
+	for _, rawID := range request.EnabledDevelopmentToolIDs {
+		id := strings.TrimSpace(rawID)
+		if id == "" {
+			return fmt.Errorf("development tool selection has an empty ID")
+		}
+		if _, duplicate := seen[id]; duplicate {
+			continue
+		}
+		seen[id] = struct{}{}
+		_, isTool := s.dependencies.ToolRegistry.Get(codingtool.ID(id))
+		_, isProvider := s.dependencies.ProviderRegistry.Get(provider.ID(id))
+		switch {
+		case isTool && isProvider:
+			return fmt.Errorf("development tool ID %q is ambiguous", id)
+		case isTool:
+			if request.ToolID != "" && request.ToolID != id {
+				return fmt.Errorf("select only one coding tool")
+			}
+			request.ToolID = id
+		case isProvider:
+			providerIDs = append(providerIDs, id)
+		default:
+			return fmt.Errorf("unknown development tool %q", id)
+		}
+	}
+	request.EnabledProviderIDs = providerIDs
+	return nil
 }
 
 func (s *Service) duplicateContext(request DuplicateContextRequest) (DuplicateContextResult, error) {
