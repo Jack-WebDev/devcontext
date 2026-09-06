@@ -51,7 +51,11 @@ function ProjectDetailView({
 	return (
 		<section aria-labelledby="project-detail-heading" className="space-y-6">
 			<nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-muted-foreground">
-				<button type="button" className="hover:text-foreground" onClick={onBack}>
+				<button
+					type="button"
+					className="rounded-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
+					onClick={onBack}
+				>
 					Projects
 				</button>
 				<span aria-hidden="true">/</span>

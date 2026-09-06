@@ -1,4 +1,6 @@
 import { Button } from "../ui/button.js";
+import { Input } from "../ui/input.js";
+import { Textarea } from "../ui/textarea.js";
 import type { CreateContextRequest } from "../../lib/devctx-api";
 import { ContextPreview } from "./ContextPreview.js";
 import {
@@ -84,8 +86,7 @@ function ContextCreateIdentityScreen({
 
 			<label className="block space-y-2 text-sm font-medium">
 				Context name
-				<input
-					className="h-10 w-full rounded-lg border border-input bg-card px-3 py-1 text-base outline-none placeholder:text-muted-foreground hover:border-foreground/20 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 md:text-sm"
+				<Input
 					value={draft.name ?? ""}
 					onChange={(event) =>
 						onDraftChange({ ...draft, name: event.target.value })
@@ -97,8 +98,7 @@ function ContextCreateIdentityScreen({
 
 			<label className="block space-y-2 text-sm font-medium">
 				Purpose <span className="font-normal text-muted-foreground">(optional)</span>
-				<input
-					className="h-10 w-full rounded-lg border border-input bg-card px-3 py-1 text-base outline-none placeholder:text-muted-foreground hover:border-foreground/20 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 md:text-sm"
+				<Input
 					value={draft.purpose ?? ""}
 					onChange={(event) =>
 						onDraftChange({ ...draft, purpose: event.target.value })
@@ -116,8 +116,7 @@ function ContextCreateIdentityScreen({
 
 			<label className="block space-y-2 text-sm font-medium">
 				Description <span className="font-normal text-muted-foreground">(optional)</span>
-				<textarea
-					className="min-h-24 w-full resize-none rounded-lg border border-input bg-card px-3 py-2 text-base outline-none placeholder:text-muted-foreground hover:border-foreground/20 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 md:text-sm"
+				<Textarea
 					value={draft.description ?? ""}
 					onChange={(event) =>
 						onDraftChange({ ...draft, description: event.target.value })
