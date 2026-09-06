@@ -1480,6 +1480,7 @@ test("adapter normalizes structured diagnostics and preserves path disclosure me
 								severity: "needs_attention",
 								label: "Context directory",
 								message: "The context directory needs repair.",
+								actionHint: "Use Recreate missing directories.",
 								details: [
 									{
 										label: "Location",
@@ -1508,6 +1509,7 @@ test("adapter normalizes structured diagnostics and preserves path disclosure me
 							severity: "needs_attention",
 							label: "Context directory",
 							message: "The context directory needs repair.",
+							actionHint: "Use Recreate missing directories.",
 							details: [
 								{
 									label: "Location",

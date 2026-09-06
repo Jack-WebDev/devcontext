@@ -1615,6 +1615,7 @@ test("Diagnostics groups backend checks and keeps paths in a disclosure", () => 
 									severity: "ready",
 									label: "Context directory",
 									message: "Context directory is available.",
+									actionHint: "Inspect this context when its storage changes.",
 									details: [
 										{ label: "Mode", value: "-rwx------", isPath: false },
 										{
@@ -1637,6 +1638,7 @@ test("Diagnostics groups backend checks and keeps paths in a disclosure", () => 
 	assert.ok(html.includes("Context directory is available."));
 	assert.ok(html.includes("Mode"));
 	assert.ok(html.includes("Show paths"));
+	assert.ok(html.includes("Next step: Inspect this context when its storage changes."));
 	assert.match(html, /<details/);
 	assert.doesNotMatch(html, /<details open/);
 });

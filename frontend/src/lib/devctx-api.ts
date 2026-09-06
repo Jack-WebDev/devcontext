@@ -549,6 +549,7 @@ export interface DiagnosticCheck {
 	label: string;
 	message: string;
 	details: DiagnosticDetail[];
+	actionHint?: string;
 }
 export interface DiagnosticDetail {
 	label: string;
@@ -1761,12 +1762,14 @@ function normalizeDiagnosticGroup(value: unknown): DiagnosticGroup {
 }
 function normalizeDiagnosticCheck(value: unknown): DiagnosticCheck {
 	const object = objectValue(value);
+	const actionHint = optionalString(object.actionHint);
 	return {
 		id: stringValue(object.id),
 		severity: normalizeLaunchConfidenceStatus(object.severity),
 		label: stringValue(object.label),
 		message: stringValue(object.message),
 		details: arrayValue(object.details).map(normalizeDiagnosticDetail),
+		...(actionHint === undefined ? {} : { actionHint }),
 	};
 }
 function normalizeDiagnosticDetail(value: unknown): DiagnosticDetail {

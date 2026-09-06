@@ -38,7 +38,7 @@ function DiagnosticsView({
 	loadRepairActions,
 	runRepairAction,
 }: DiagnosticsViewProps) {
-	const [contextID, setContextID] = useState(contexts[0]?.context.id ?? "");
+	const [contextID, setContextID] = useState("");
 	const [diagnostics, setDiagnostics] = useState<DiagnosticsLoad>({
 		status: "loading",
 	});
@@ -48,16 +48,12 @@ function DiagnosticsView({
 	const [repairError, setRepairError] = useState<DisplayError>();
 
 	useEffect(() => {
-		if (!contexts.some((item) => item.context.id === contextID)) {
-			setContextID(contexts[0]?.context.id ?? "");
+		if (contextID !== "" && !contexts.some((item) => item.context.id === contextID)) {
+			setContextID("");
 		}
 	}, [contextID, contexts]);
 
 	useEffect(() => {
-		if (contextID === "") {
-			setDiagnostics({ status: "loaded", data: { groups: [] } });
-			return;
-		}
 		let active = true;
 		setDiagnostics({ status: "loading" });
 		load(contextID).then((result) => {
@@ -120,8 +116,8 @@ function DiagnosticsView({
 					Diagnostics
 				</h2>
 				<p className="mt-1 text-sm text-muted-foreground">
-					Review local context storage, provider setup, and coding-tool
-					readiness.
+					Review application health or select a context to troubleshoot its
+					files, isolation, tools, bindings, and environment.
 				</p>
 			</div>
 
@@ -134,9 +130,9 @@ function DiagnosticsView({
 					id="diagnostics-context-select"
 					className="h-10 border border-input bg-background px-3 text-sm text-foreground"
 					value={contextID}
-					disabled={contexts.length === 0}
 					onChange={(event) => setContextID(event.currentTarget.value)}
 				>
+					<option value="">System health</option>
 					{contexts.map((item) => (
 						<option key={item.context.id} value={item.context.id}>
 							{item.context.name}
@@ -371,6 +367,9 @@ function DiagnosticCheckRow({
 				<Disclosure summary="Show paths">
 					<DiagnosticDetails details={pathDetails} className="mt-3" />
 				</Disclosure>
+			) : null}
+			{check.actionHint ? (
+				<p className="text-sm text-muted-foreground">Next step: {check.actionHint}</p>
 			) : null}
 		</li>
 	);
