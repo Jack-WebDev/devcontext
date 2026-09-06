@@ -32,7 +32,7 @@ function Card({
 		"data-size": size,
 		"data-hierarchy": hierarchy,
 		className: cn(
-			"group/card flex flex-col gap-4 overflow-hidden rounded-xl py-[var(--card-spacing)] text-sm text-card-foreground [--card-spacing:var(--layout-card-padding)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:1rem] *:[img:first-child]:rounded-none *:[img:last-child]:rounded-none",
+			"group/card flex flex-col gap-4 overflow-hidden rounded-xl py-[var(--card-spacing)] text-sm text-card-foreground [--card-spacing:var(--layout-card-padding)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:var(--layout-card-padding-compact)] *:[img:first-child]:rounded-none *:[img:last-child]:rounded-none",
 			cardHierarchyClassName(hierarchy),
 			className,
 		),

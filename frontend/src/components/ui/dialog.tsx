@@ -31,7 +31,7 @@ function DialogOverlay({
 		<DialogPrimitive.Backdrop
 			data-slot="dialog-overlay"
 			className={cn(
-				"fixed inset-0 isolate z-50 bg-black/20 duration-100 supports-backdrop-filter:backdrop-blur-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+				"overlay-backdrop fixed inset-0 isolate z-50 bg-black/20 supports-backdrop-filter:backdrop-blur-sm motion-reduce:transition-none",
 				className,
 			)}
 			{...props}
@@ -43,6 +43,7 @@ function DialogContent({
 	className,
 	children,
 	showCloseButton = true,
+	finalFocus = true,
 	...props
 }: DialogPrimitive.Popup.Props & {
 	showCloseButton?: boolean;
@@ -53,10 +54,11 @@ function DialogContent({
 			<DialogPrimitive.Popup
 				data-slot="dialog-content"
 				className={cn(
-					"fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-2xl border border-border/70 bg-popover p-7 text-sm text-popover-foreground shadow-xl duration-150 outline-none sm:max-w-lg data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 motion-reduce:transition-none",
+					"overlay-surface fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-2xl border border-border/70 bg-popover p-7 text-sm text-popover-foreground shadow-xl outline-none data-starting-style:scale-[0.98] data-ending-style:scale-[0.98] sm:max-w-lg motion-reduce:transition-none",
 					className,
 				)}
 				{...props}
+				finalFocus={finalFocus}
 			>
 				{children}
 				{showCloseButton && (

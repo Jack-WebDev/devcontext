@@ -113,11 +113,7 @@ function FirstRunHome({
 			</section>
 
 			<div className="mt-6">
-				<Button
-					type="button"
-					className="h-[42px] rounded-[10px] bg-[var(--green-strong)] px-[18px] text-[13px] font-semibold normal-case tracking-normal text-white shadow-[0_1px_2px_rgb(0_0_0/0.12)] transition-[background-color,transform,box-shadow] duration-150 ease-out hover:bg-[var(--green)] active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-[var(--green-strong)]/30 focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none"
-					onClick={onReviewLaunchOptions}
-				>
+				<Button type="button" variant="primary" onClick={onReviewLaunchOptions}>
 					Set up your first context
 				</Button>
 				<p className="mt-[7px] text-[11px] text-muted-foreground">
@@ -126,7 +122,7 @@ function FirstRunHome({
 			</div>
 
 			<section
-				className="mt-7 max-w-[620px] rounded-[11px] border border-black/[0.045] bg-white/60 px-[15px] py-[13px] shadow-[0_1px_2px_rgb(0_0_0/0.018)]"
+				className="mt-7 max-w-[620px] rounded-xl border border-border bg-card px-[15px] py-[13px] shadow-sm"
 				aria-labelledby="home-current-project-heading"
 			>
 				<p
@@ -169,7 +165,7 @@ function ContextExplanation({
 	tone: "personal" | "work";
 }) {
 	return (
-		<div className="flex min-h-[84px] gap-3 rounded-[11px] border border-black/[0.05] bg-white/70 px-[14px] py-[13px] shadow-[0_1px_2px_rgb(0_0_0/0.02)]">
+		<div className="flex min-h-[84px] gap-3 rounded-xl border border-border bg-card px-[14px] py-[13px] shadow-sm">
 			<span
 				className={`grid size-8 shrink-0 place-items-center rounded-[8px] ${tone === "personal" ? "bg-[var(--company-soft)] text-[var(--company-accent)]" : "bg-[var(--green-soft)] text-[var(--green-strong)]"}`}
 			>

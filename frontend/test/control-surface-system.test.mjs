@@ -35,6 +35,7 @@ test("UXF-03 and UXF-04 define shared control states and surface purposes", asyn
 		assert.match(control, /aria-busy/);
 	}
 	assert.match(button, /variant: \{/);
+	assert.match(button, /primary:/);
 	assert.match(button, /destructive/);
 	for (const hierarchy of [
 		"primary",

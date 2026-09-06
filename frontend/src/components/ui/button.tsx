@@ -8,6 +8,10 @@ const buttonVariants = cva(
 	{
 		variants: {
 			variant: {
+				// The default remains primary for existing callers. New call sites may
+				// name it explicitly when the safe forward action needs emphasis.
+				primary:
+					"bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow",
 				default:
 					"bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow",
 				outline:

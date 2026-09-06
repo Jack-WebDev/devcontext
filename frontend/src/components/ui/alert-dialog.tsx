@@ -27,7 +27,7 @@ function AlertDialogOverlay({
 		<AlertDialogPrimitive.Backdrop
 			data-slot="alert-dialog-overlay"
 			className={cn(
-				"fixed inset-0 isolate z-50 bg-black/20 duration-100 supports-backdrop-filter:backdrop-blur-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+				"overlay-backdrop fixed inset-0 isolate z-50 bg-black/20 supports-backdrop-filter:backdrop-blur-sm motion-reduce:transition-none",
 				className,
 			)}
 			{...props}
@@ -38,6 +38,7 @@ function AlertDialogOverlay({
 function AlertDialogContent({
 	className,
 	size = "default",
+	finalFocus = true,
 	...props
 }: AlertDialogPrimitive.Popup.Props & {
 	size?: "default" | "sm";
@@ -49,10 +50,11 @@ function AlertDialogContent({
 				data-slot="alert-dialog-content"
 				data-size={size}
 				className={cn(
-					"group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-6 rounded-2xl border border-border/70 bg-popover p-7 text-popover-foreground shadow-xl duration-150 outline-none data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 motion-reduce:transition-none",
+					"overlay-surface group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-6 rounded-2xl border border-border/70 bg-popover p-7 text-popover-foreground shadow-xl outline-none data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-md data-starting-style:scale-[0.98] data-ending-style:scale-[0.98] motion-reduce:transition-none",
 					className,
 				)}
 				{...props}
+				finalFocus={finalFocus}
 			/>
 		</AlertDialogPortal>
 	);
