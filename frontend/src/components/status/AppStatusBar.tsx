@@ -28,7 +28,7 @@ function AppStatusBar({
 		<footer className="h-12 border-t border-border bg-[#faf9f7]">
 			<div className="flex h-full items-center text-[11px] text-muted-foreground">
 				<div className="flex h-full w-59.5 items-center gap-2 border-r border-border px-5">
-					<ShieldCheck className="size-4" />
+					<ShieldCheck className="size-4" aria-hidden="true" />
 					{isolation}
 				</div>
 				<button
@@ -38,6 +38,7 @@ function AppStatusBar({
 				>
 					<span
 						className={`size-2 rounded-full ${checkingIsolation ? "bg-muted-foreground" : setupRequired || needsAttention ? "bg-warning" : "bg-success"}`}
+						aria-hidden="true"
 					/>
 					{setupRequired
 						? "Setup required"

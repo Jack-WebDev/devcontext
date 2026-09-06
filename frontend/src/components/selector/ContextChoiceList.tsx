@@ -1,6 +1,7 @@
 import type { Ref } from "react";
 import type { ContextState, LaunchState } from "../../lib/devctx-api";
 import { ContextCard } from "./ContextCard.js";
+import { Input } from "../ui/input.js";
 import { contextRecommendation } from "./recommendation.js";
 import type { ContextNavigationDirection } from "./selection-state.js";
 
@@ -51,12 +52,12 @@ function ContextChoiceList({
 			{shouldShowContextSearch(launchState.contexts) ? (
 				<label className="block">
 					<span className="sr-only">Search contexts</span>
-					<input
+					<Input
 						type="search"
 						value={search}
 						onChange={(event) => onSearchChange(event.target.value)}
 						placeholder="Search contexts"
-						className="w-full border border-input bg-background px-3 py-2 text-sm"
+						className="bg-background"
 					/>
 				</label>
 			) : null}

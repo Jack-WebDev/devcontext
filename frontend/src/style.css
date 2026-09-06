@@ -33,7 +33,7 @@ body,
   --surface: #ffffff;
   --surface-subtle: #faf9f7;
   --foreground-secondary: #66645f;
-  --foreground-muted: #898680;
+  --foreground-muted: #6f6d68;
   --border-subtle: #eeebe6;
   --nav-active: #efede9;
   --hover: #f3f1ed;
@@ -66,7 +66,7 @@ body,
   --accent-custom: oklch(0.541 0.281 293.009);
   --border: #e7e3dd;
   --input: oklch(0.922 0.005 34.3);
-  --ring: oklch(0.714 0.014 41.2);
+  --ring: #5f594e;
   --chart-1: oklch(0.868 0.007 39.5);
   --chart-2: oklch(0.547 0.021 43.1);
   --chart-3: oklch(0.438 0.017 39.3);
@@ -80,7 +80,7 @@ body,
   --sidebar-accent: #efede9;
   --sidebar-accent-foreground: oklch(0.214 0.009 43.1);
   --sidebar-border: oklch(0.922 0.005 34.3);
-  --sidebar-ring: oklch(0.714 0.014 41.2);
+  --sidebar-ring: #5f594e;
 }
 
 .dark {
@@ -110,7 +110,7 @@ body,
   --surface-muted: #242421;
   --border: #46433e;
   --input: #46433e;
-  --ring: #c4c1ba;
+  --ring: #e8e4db;
   --sidebar: #20201e;
   --sidebar-foreground: #f4f1e9;
   --sidebar-primary: #f4f1e9;
@@ -118,7 +118,28 @@ body,
   --sidebar-accent: #35332f;
   --sidebar-accent-foreground: #f4f1e9;
   --sidebar-border: #46433e;
-  --sidebar-ring: #c4c1ba;
+  --sidebar-ring: #e8e4db;
+}
+
+/* Native controls remain in a few focused flows. Give them the same visible
+ * keyboard treatment as the shared primitives until they can be consolidated. */
+button:not([data-slot="button"]):focus-visible,
+input:not([data-slot="input"]):focus-visible,
+select:focus-visible,
+textarea:not([data-slot="textarea"]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .desktop-shell {
@@ -267,6 +288,11 @@ body,
 .home-toolbar-button:hover {
   background: var(--surface-subtle);
   border-color: #dcd7d0;
+}
+.home-toolbar-button:focus-visible,
+.home-row-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 .home-toolbar-button:active,
 .home-row-button:active {

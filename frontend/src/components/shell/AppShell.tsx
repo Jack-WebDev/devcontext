@@ -54,7 +54,7 @@ function AppShell({
 								<button
 									key={route.id}
 									type="button"
-									className="flex h-[38px] min-w-0 items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-[#f3f1ed] hover:text-foreground data-[active=true]:bg-[#efede9] data-[active=true]:text-foreground"
+									className="flex h-[38px] min-w-0 items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-[#f3f1ed] hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 data-[active=true]:bg-[#efede9] data-[active=true]:text-foreground motion-reduce:transition-none"
 									data-active={activeRoute === route.id}
 									aria-current={activeRoute === route.id ? "page" : undefined}
 									onClick={() => onNavigate(route.id)}
@@ -67,7 +67,7 @@ function AppShell({
 					<div className="mx-5 mt-5 border-t border-sidebar-border pt-4">
 						<button
 							type="button"
-							className="flex h-[38px] w-full items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-[#f3f1ed] hover:text-foreground data-[active=true]:bg-[#efede9] data-[active=true]:text-foreground"
+							className="flex h-[38px] w-full items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-[#f3f1ed] hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 data-[active=true]:bg-[#efede9] data-[active=true]:text-foreground motion-reduce:transition-none"
 							data-active={activeRoute === "settings"}
 							onClick={() => onNavigate("settings")}
 						>
