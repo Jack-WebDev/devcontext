@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { HistoryCategory, HistoryEntry } from "../../lib/devctx-api";
 import { ProjectSafetyLabel } from "../projects/ProjectSafetyLabel.js";
 import { Card, CardContent } from "../ui/card.js";
+import { Disclosure } from "../ui/disclosure.js";
+import { Button } from "../ui/button.js";
 
 interface HistoryViewProps {
 	entries: HistoryEntry[];
@@ -12,11 +14,18 @@ interface HistoryDateGroup {
 	entries: HistoryEntry[];
 }
 
-type HistoryFilter = "all" | HistoryCategory;
+type HistoryFilter =
+	| "all"
+	| "launches"
+	| "context"
+	| "project"
+	| "repair"
+	| "authentication";
 
 function HistoryView({ entries }: HistoryViewProps) {
 	const [filter, setFilter] = useState<HistoryFilter>("all");
 	const [search, setSearch] = useState("");
+	const [selectedEntry, setSelectedEntry] = useState<HistoryEntry>();
 	const groups = groupHistoryEntriesByDate(
 		filterHistoryEntries(entries, filter, search),
 	);
@@ -48,9 +57,11 @@ function HistoryView({ entries }: HistoryViewProps) {
 						}
 					>
 						<option value="all">All activity</option>
-						<option value="launch">Launches</option>
-						<option value="configuration">Configuration</option>
-						<option value="warning">Warnings</option>
+						<option value="launches">Launches</option>
+						<option value="context">Context changes</option>
+						<option value="project">Project changes</option>
+						<option value="repair">Repairs</option>
+						<option value="authentication">Authentication</option>
 					</select>
 				</label>
 				<label
@@ -80,15 +91,31 @@ function HistoryView({ entries }: HistoryViewProps) {
 			) : (
 				<div className="space-y-6">
 					{groups.map((group) => (
-						<HistoryDateGroupCard key={group.date} group={group} />
+						<HistoryDateGroupCard
+							key={group.date}
+							group={group}
+							onSelectEntry={setSelectedEntry}
+						/>
 					))}
 				</div>
 			)}
+			{selectedEntry ? (
+				<HistoryEventDetails
+					entry={selectedEntry}
+					onClose={() => setSelectedEntry(undefined)}
+				/>
+			) : null}
 		</section>
 	);
 }
 
-function HistoryDateGroupCard({ group }: { group: HistoryDateGroup }) {
+function HistoryDateGroupCard({
+	group,
+	onSelectEntry,
+}: {
+	group: HistoryDateGroup;
+	onSelectEntry: (entry: HistoryEntry) => void;
+}) {
 	return (
 		<section
 			aria-labelledby={`history-date-${group.date}`}
@@ -106,6 +133,7 @@ function HistoryDateGroupCard({ group }: { group: HistoryDateGroup }) {
 						<HistoryEntryRow
 							key={historyEntryKey(entry, index)}
 							entry={entry}
+							onSelect={() => onSelectEntry(entry)}
 						/>
 					))}
 				</CardContent>
@@ -114,14 +142,20 @@ function HistoryDateGroupCard({ group }: { group: HistoryDateGroup }) {
 	);
 }
 
-function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
+function HistoryEntryRow({
+	entry,
+	onSelect,
+}: {
+	entry: HistoryEntry;
+	onSelect: () => void;
+}) {
 	return (
 		<article className="space-y-3 p-5">
 			<div className="flex flex-wrap items-start justify-between gap-3">
 				<div>
 					<h4 className="font-medium">{entry.message}</h4>
 					<p className="mt-1 text-sm text-muted-foreground">
-						{formatHistoryEvent(entry.event)}
+						{formatHistoryCategory(entry.category)}
 					</p>
 				</div>
 				<time
@@ -143,9 +177,68 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
 						<ProjectSafetyLabel contextName={entry.contextId} />
 					</dd>
 				</div>
-				<HistoryDetail label="Event" value={formatHistoryEvent(entry.event)} />
+				<HistoryDetail
+					label="Activity"
+					value={formatHistoryCategory(entry.category)}
+				/>
 			</dl>
+			<Button type="button" variant="ghost" size="sm" onClick={onSelect}>
+				View details
+			</Button>
 		</article>
+	);
+}
+
+function HistoryEventDetails({
+	entry,
+	onClose,
+}: {
+	entry: HistoryEntry;
+	onClose: () => void;
+}) {
+	const timestamp = formatHistoryTimestamp(entry.timestamp);
+	return (
+		<Card
+			as="section"
+			aria-labelledby="history-event-details-title"
+			className="border-primary/30 py-0"
+		>
+			<CardContent className="space-y-5 p-5">
+				<div>
+					<h3 id="history-event-details-title" className="text-base font-semibold">
+						Activity details
+					</h3>
+					<p className="mt-1 text-sm text-muted-foreground">{entry.message}</p>
+				</div>
+				<dl className="grid gap-x-4 gap-y-3 text-sm sm:grid-cols-[8rem_minmax(0,1fr)]">
+					<HistoryDetail label="Result" value={entry.message} />
+					<HistoryDetail label="When" value={timestamp} />
+					<HistoryDetail
+						label="Project"
+						value={entry.projectPath ?? "Not associated with a project"}
+						mono={entry.projectPath !== undefined}
+					/>
+					<HistoryDetail
+						label="Context"
+						value={entry.contextId ?? "Not associated with a context"}
+					/>
+					<HistoryDetail
+						label="Activity"
+						value={formatHistoryCategory(entry.category)}
+					/>
+				</dl>
+				{entry.toolId ? (
+					<Disclosure summary="Technical details">
+						<HistoryDetail label="Tool" value={entry.toolId} mono />
+					</Disclosure>
+				) : null}
+				<div className="flex justify-end">
+					<Button type="button" onClick={onClose}>
+						Close
+					</Button>
+				</div>
+			</CardContent>
+		</Card>
 	);
 }
 
@@ -203,7 +296,7 @@ function filterHistoryEntries(
 ): HistoryEntry[] {
 	const query = search.trim().toLocaleLowerCase();
 	return entries.filter((entry) => {
-		if (filter !== "all" && entry.category !== filter) {
+		if (!historyFilterIncludes(filter, entry.category)) {
 			return false;
 		}
 		if (query === "") {
@@ -213,6 +306,27 @@ function filterHistoryEntries(
 			value?.toLocaleLowerCase().includes(query),
 		);
 	});
+}
+
+function historyFilterIncludes(
+	filter: HistoryFilter,
+	category: HistoryCategory,
+): boolean {
+	if (filter === "all") {
+		return true;
+	}
+	if (filter === "launches") {
+		return (
+			category === "launch" ||
+			category === "warning" ||
+			category === "workspace" ||
+			category === "override"
+		);
+	}
+	if (filter === "project") {
+		return category === "binding";
+	}
+	return category === filter;
 }
 
 function historyDateKey(timestamp: string): string {
@@ -255,26 +369,46 @@ function formatHistoryTime(timestamp: string): string {
 			});
 }
 
-function formatHistoryEvent(event: string): string {
-	if (event === "") {
-		return "Activity recorded";
-	}
-	return event
-		.split("_")
-		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-		.join(" ");
+function formatHistoryTimestamp(timestamp: string): string {
+	const value = new Date(timestamp);
+	return Number.isNaN(value.getTime())
+		? "Time unavailable"
+		: value.toLocaleString(undefined, {
+				year: "numeric",
+				month: "long",
+				day: "numeric",
+				hour: "numeric",
+				minute: "2-digit",
+			});
+}
+
+function formatHistoryCategory(category: HistoryCategory): string {
+	const labels: Record<HistoryCategory, string> = {
+		launch: "Launch",
+		context: "Context change",
+		binding: "Project binding",
+		repair: "Repair",
+		authentication: "Authentication",
+		workspace: "Workspace",
+		override: "Context override",
+		warning: "Warning",
+	};
+	return labels[category];
 }
 
 function historyEntryKey(entry: HistoryEntry, index: number): string {
-	return `${entry.timestamp}:${entry.event}:${entry.projectPath ?? ""}:${entry.contextId ?? ""}:${index}`;
+	return `${entry.timestamp}:${entry.projectPath ?? ""}:${entry.contextId ?? ""}:${index}`;
 }
 
 export type { HistoryDateGroup, HistoryFilter, HistoryViewProps };
 export {
 	filterHistoryEntries,
 	formatHistoryDate,
-	formatHistoryEvent,
+	formatHistoryCategory,
 	formatHistoryTime,
+	formatHistoryTimestamp,
 	groupHistoryEntriesByDate,
+	historyFilterIncludes,
+	HistoryEventDetails,
 	HistoryView,
 };

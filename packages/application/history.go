@@ -18,7 +18,7 @@ func (s *Service) getHistory() (HistoryState, error) {
 	entries := make([]HistoryEntry, 0, len(events))
 	for _, event := range events {
 		entries = append(entries, HistoryEntry{
-			Event: string(event.Name), Category: historyEventCategory(event.Name), Timestamp: event.Timestamp.UTC(), ProjectPath: event.ProjectPath,
+			Category: historyEventCategory(event.Name), Timestamp: event.Timestamp.UTC(), ProjectPath: event.ProjectPath,
 			ContextID: event.ContextID, ToolID: event.ToolID, Message: historyEventMessage(event),
 		})
 	}
@@ -31,13 +31,25 @@ func historyEventCategory(name devlog.EventName) HistoryCategory {
 		return HistoryCategoryLaunch
 	case devlog.EventLaunchMissingEditor, devlog.EventLaunchConfigError, devlog.EventLaunchProviderMissing, devlog.EventLaunchProcessFailure:
 		return HistoryCategoryWarning
+	case devlog.EventProjectBound, devlog.EventProjectUnbound, "project_binding_changed":
+		return HistoryCategoryBinding
+	case devlog.EventRepairCompleted, devlog.EventProviderReset:
+		return HistoryCategoryRepair
+	case devlog.EventProviderAuthenticated, "provider_connected":
+		return HistoryCategoryAuthentication
+	case devlog.EventWorkspaceStopped, "environment_stopped":
+		return HistoryCategoryWorkspace
+	case devlog.EventContextOverrideAccepted:
+		return HistoryCategoryOverride
 	default:
-		return HistoryCategoryConfiguration
+		return HistoryCategoryContext
 	}
 }
 
 func historyEventMessage(event devlog.Event) string {
 	switch event.Name {
+	case devlog.EventContextResolution:
+		return "Launch context resolved."
 	case devlog.EventLaunchSucceeded:
 		return "Launch succeeded."
 	case devlog.EventLaunchMissingEditor:
@@ -52,17 +64,29 @@ func historyEventMessage(event devlog.Event) string {
 		return "Context created."
 	case devlog.EventContextUpdated:
 		return "Context updated."
-	case devlog.EventProviderConnected:
-		return "Provider connected."
+	case devlog.EventContextArchived:
+		return "Context archived."
+	case devlog.EventContextRestored:
+		return "Context restored."
+	case devlog.EventContextDeleted:
+		return "Context deleted."
+	case devlog.EventProviderAuthenticated, "provider_connected":
+		return "Provider authenticated."
 	case devlog.EventProviderReset:
 		return "Provider storage reset."
 	case devlog.EventRepairCompleted:
 		return "Repair completed."
-	case devlog.EventProjectBindingChanged:
+	case devlog.EventProjectBound:
+		return "Project bound to context."
+	case devlog.EventProjectUnbound:
+		return "Project binding removed."
+	case "project_binding_changed":
 		return "Project context binding changed."
-	case devlog.EventEnvironmentStopped:
-		return "Environment stopped."
+	case devlog.EventWorkspaceStopped, "environment_stopped":
+		return "Workspace stopped."
+	case devlog.EventContextOverrideAccepted:
+		return "Context override accepted."
 	default:
-		return "Launch context was resolved."
+		return "Activity recorded."
 	}
 }

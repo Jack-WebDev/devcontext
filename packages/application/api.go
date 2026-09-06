@@ -805,7 +805,6 @@ type HistoryState struct {
 
 // HistoryEntry is a presentation-safe local activity record.
 type HistoryEntry struct {
-	Event       string          `json:"event"`
 	Category    HistoryCategory `json:"category"`
 	Timestamp   time.Time       `json:"timestamp"`
 	ProjectPath string          `json:"projectPath,omitempty"`
@@ -818,9 +817,14 @@ type HistoryEntry struct {
 type HistoryCategory string
 
 const (
-	HistoryCategoryLaunch        HistoryCategory = "launch"
-	HistoryCategoryConfiguration HistoryCategory = "configuration"
-	HistoryCategoryWarning       HistoryCategory = "warning"
+	HistoryCategoryLaunch         HistoryCategory = "launch"
+	HistoryCategoryContext        HistoryCategory = "context"
+	HistoryCategoryBinding        HistoryCategory = "binding"
+	HistoryCategoryRepair         HistoryCategory = "repair"
+	HistoryCategoryAuthentication HistoryCategory = "authentication"
+	HistoryCategoryWorkspace      HistoryCategory = "workspace"
+	HistoryCategoryOverride       HistoryCategory = "override"
+	HistoryCategoryWarning        HistoryCategory = "warning"
 )
 
 // RunningEnvironmentState is the presentation-safe model for one immutable

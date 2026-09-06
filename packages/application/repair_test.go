@@ -49,7 +49,7 @@ func TestRepairActionsPreviewAndResetOnlyProviderOwnedStorage(t *testing.T) {
 	if info, err := os.Stat(providerStorage); err != nil || !info.IsDir() {
 		t.Fatalf("provider storage = %#v, %v; want preserved directory", info, err)
 	}
-	wantEvents := []devlog.EventName{devlog.EventProviderReset, devlog.EventRepairCompleted}
+	wantEvents := []devlog.EventName{devlog.EventRepairCompleted}
 	if got := applicationEventNames(logger.events); !reflect.DeepEqual(got, wantEvents) {
 		t.Fatalf("repair events = %#v, want %#v", got, wantEvents)
 	}

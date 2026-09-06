@@ -154,7 +154,7 @@ func (s *Service) runningEnvironmentConflict(projectPath project.Path, contextID
 
 func environmentStoppedEvent(environment coreRunning.Environment, timestamp time.Time) devlog.Event {
 	return devlog.NewEvent(devlog.EventInput{
-		Name:        devlog.EventEnvironmentStopped,
+		Name:        devlog.EventWorkspaceStopped,
 		Timestamp:   timestamp,
 		ProjectPath: string(environment.Project.Path),
 		ContextID:   environment.Context.ID.String(),

@@ -851,7 +851,7 @@ func (s *Service) createContext(request CreateContextRequest) (CreateContextResu
 		}
 		recordedProviders[providerID] = true
 		s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{
-			Name:      devlog.EventProviderConnected,
+			Name:      devlog.EventProviderAuthenticated,
 			Timestamp: s.now(),
 			ContextID: ctx.ID.String(),
 			ToolID:    string(ctx.Tool.DefaultTool),
@@ -1299,6 +1299,9 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 	}
 
 	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventContextResolution, plan, nil, s.now()))
+	if request.ConfirmContextMismatch && hasContextMismatchWarning(plan.Warnings) {
+		s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventContextOverrideAccepted, plan, nil, s.now()))
+	}
 	for range plan.MissingProviderIDs {
 		event := eventFromLaunchPlan(devlog.EventLaunchProviderMissing, plan, nil, s.now())
 		event.ErrorCategory = devlog.ErrorCategoryProvider
@@ -1598,7 +1601,7 @@ func (s *Service) bindProject(request BindProjectRequest) (ProjectBindingState, 
 		return ProjectBindingState{}, err
 	}
 	s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{
-		Name:        devlog.EventProjectBindingChanged,
+		Name:        devlog.EventProjectBound,
 		Timestamp:   s.now(),
 		ProjectPath: string(binding.ProjectPath),
 		ContextID:   binding.ContextID.String(),
@@ -1623,7 +1626,7 @@ func (s *Service) unbindProject(request UnbindProjectRequest) (ProjectBindingSta
 	}
 	if result.Removed {
 		s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{
-			Name:        devlog.EventProjectBindingChanged,
+			Name:        devlog.EventProjectUnbound,
 			Timestamp:   s.now(),
 			ProjectPath: string(result.ProjectPath),
 			ContextID:   result.Binding.ContextID.String(),
@@ -2261,6 +2264,15 @@ func warningStates(warnings []launcher.ResolutionWarning) []ResolutionWarning {
 		}
 	}
 	return states
+}
+
+func hasContextMismatchWarning(warnings []launcher.ResolutionWarning) bool {
+	for _, warning := range warnings {
+		if warning.Code == launcher.WarningContextMismatch {
+			return true
+		}
+	}
+	return false
 }
 
 func cloneMetadata(metadata devcontext.Metadata) map[string]string {

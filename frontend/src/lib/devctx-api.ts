@@ -579,9 +579,16 @@ export interface RunRepairActionResult {
 export interface HistoryState {
 	entries: HistoryEntry[];
 }
-export type HistoryCategory = "launch" | "configuration" | "warning";
+export type HistoryCategory =
+	| "launch"
+	| "context"
+	| "binding"
+	| "repair"
+	| "authentication"
+	| "workspace"
+	| "override"
+	| "warning";
 export interface HistoryEntry {
-	event: string;
 	category: HistoryCategory;
 	timestamp: string;
 	projectPath?: string;
@@ -1784,7 +1791,6 @@ function normalizeHistoryState(value: unknown): HistoryState {
 function normalizeHistoryEntry(value: unknown): HistoryEntry {
 	const object = objectValue(value);
 	return {
-		event: stringValue(object.event),
 		category: normalizeHistoryCategory(object.category),
 		timestamp: stringValue(object.timestamp),
 		projectPath: optionalString(object.projectPath),
@@ -1872,10 +1878,19 @@ function normalizeRunningEnvironmentLaunchState(
 }
 
 function normalizeHistoryCategory(value: unknown): HistoryCategory {
-	if (value === "launch" || value === "warning") {
+	if (
+		value === "launch" ||
+		value === "context" ||
+		value === "binding" ||
+		value === "repair" ||
+		value === "authentication" ||
+		value === "workspace" ||
+		value === "override" ||
+		value === "warning"
+	) {
 		return value;
 	}
-	return "configuration";
+	return "context";
 }
 
 function normalizeProjectState(value: unknown): ProjectState {
