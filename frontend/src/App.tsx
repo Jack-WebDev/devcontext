@@ -873,6 +873,7 @@ function ManagementApp() {
 							setOnboardingReplayVisible(true);
 							handleNavigate("home");
 						}}
+						onOpenDiagnostics={() => handleNavigate("diagnostics")}
 					/>
 				) : settings.status === "error" ? (
 					<GuiErrorNotice error={settings.error} />

@@ -38,6 +38,10 @@ export function ForgetProject(arg1) {
   return window['go']['wailsapp']['App']['ForgetProject'](arg1);
 }
 
+export function GetAbout() {
+  return window['go']['wailsapp']['App']['GetAbout']();
+}
+
 export function GetApplicationMode() {
   return window['go']['wailsapp']['App']['GetApplicationMode']();
 }

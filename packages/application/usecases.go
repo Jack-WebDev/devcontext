@@ -54,6 +54,11 @@ func (s *Service) UpdateSettings(request UpdateSettingsRequest) (SettingsState, 
 	return settings, nil
 }
 
+// GetAbout returns build metadata and project links that are safe to display.
+func (s *Service) GetAbout() AboutState {
+	return aboutState()
+}
+
 func (s *Service) GetTrayState() (TrayState, *Error) {
 	state, err := s.getTrayState()
 	if err != nil {

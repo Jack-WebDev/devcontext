@@ -1,6 +1,10 @@
 package application
 
-import "time"
+import (
+	"time"
+
+	coreversion "devctx/packages/core/version"
+)
 
 // GetLaunchStateRequest identifies the project the GUI is rendering.
 type GetLaunchStateRequest struct {
@@ -47,6 +51,28 @@ type TrayRecentProjectItem struct {
 
 // UpdateSettingsRequest replaces the supported application preferences.
 type UpdateSettingsRequest SettingsState
+
+// AboutState contains build metadata and verified project links for the desktop UI.
+type AboutState struct {
+	Version          string `json:"version"`
+	Commit           string `json:"commit"`
+	BuildDate        string `json:"buildDate"`
+	License          string `json:"license"`
+	RepositoryURL    string `json:"repositoryUrl"`
+	DocumentationURL string `json:"documentationUrl"`
+}
+
+func aboutState() AboutState {
+	build := coreversion.Current()
+	return AboutState{
+		Version:          build.Version,
+		Commit:           build.Commit,
+		BuildDate:        build.Date,
+		License:          "MIT",
+		RepositoryURL:    "https://github.com/Jack-WebDev/devcontext",
+		DocumentationURL: "https://github.com/Jack-WebDev/devcontext#readme",
+	}
+}
 
 // GetHomeDashboardRequest identifies the project represented by the Home
 // dashboard.

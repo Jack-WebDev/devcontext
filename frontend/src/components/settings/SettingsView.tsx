@@ -3,6 +3,8 @@ import { Button } from "../ui/button.js";
 import { Label } from "../ui/label.js";
 import { Switch } from "../ui/switch.js";
 import { AppearanceSettings } from "./AppearanceSettings.js";
+import { AboutSettings } from "./AboutSettings.js";
+import { AdvancedSettings } from "./AdvancedSettings.js";
 import { PrivacySettings } from "./PrivacySettings.js";
 import {
 	settingsSections,
@@ -16,6 +18,7 @@ interface SettingsViewProps {
 	error?: DisplayError;
 	onChange: (settings: SettingsState) => void;
 	onReplayOnboarding: () => void;
+	onOpenDiagnostics: () => void;
 }
 
 const labels: Record<
@@ -49,6 +52,7 @@ function SettingsView({
 	error,
 	onChange,
 	onReplayOnboarding,
+	onOpenDiagnostics,
 }: SettingsViewProps) {
 	return (
 		<section className="max-w-3xl space-y-8" aria-labelledby="settings-heading">
@@ -110,6 +114,8 @@ function SettingsView({
 			))}
 			<AppearanceSettings />
 			<PrivacySettings />
+			<AdvancedSettings onOpenDiagnostics={onOpenDiagnostics} />
+			<AboutSettings />
 		</section>
 	);
 }
