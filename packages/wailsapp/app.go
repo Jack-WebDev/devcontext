@@ -2,10 +2,14 @@ package wailsapp
 
 import (
 	"context"
+	"fmt"
+	"os"
 
 	"devctx/packages/application"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
+
+const maxContextMetadataImportSize = 1024 * 1024
 
 type service interface {
 	ValidateProjectDirectory(application.ValidateProjectDirectoryRequest) (application.ProjectState, *application.Error)
@@ -271,6 +275,33 @@ func (a *App) ChooseProjectDirectory() any {
 		return application.NewError(err)
 	}
 	return path
+}
+
+// ChooseContextMetadataImport opens a host-owned file picker and returns the
+// selected metadata document. The frontend never receives a filesystem path.
+func (a *App) ChooseContextMetadataImport() any {
+	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:   "Choose a context metadata export",
+		Filters: []runtime.FileFilter{{DisplayName: "JSON files", Pattern: "*.json"}},
+	})
+	if err != nil {
+		return application.NewError(err)
+	}
+	if path == "" {
+		return ""
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return application.NewError(fmt.Errorf("read context metadata export: %w", err))
+	}
+	if info.Size() > maxContextMetadataImportSize {
+		return application.NewError(fmt.Errorf("context metadata export is larger than 1 MB"))
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return application.NewError(fmt.Errorf("read context metadata export: %w", err))
+	}
+	return string(contents)
 }
 
 // ValidateProjectDirectory validates a folder selected for a context draft.

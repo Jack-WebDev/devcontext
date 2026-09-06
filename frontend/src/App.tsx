@@ -736,6 +736,12 @@ function ManagementApp() {
 								}}
 								exportMetadata={devContextApi.exportContextMetadata}
 								importMetadata={handleImportContextMetadata}
+								chooseImportFile={devContextApi.chooseContextMetadataImport}
+								contextNames={
+									contexts.status === "loaded"
+										? contexts.data.map((item) => item.context.name)
+										: []
+								}
 							/>
 						) : null}
 						{creatingContext && contexts.status === "loaded" ? (

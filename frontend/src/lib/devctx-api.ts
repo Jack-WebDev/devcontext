@@ -482,6 +482,12 @@ export interface DuplicateContextResult {
 }
 export interface ExportContextMetadataRequest {
 	contextId: string;
+	options: ContextMetadataExportOptions;
+}
+export interface ContextMetadataExportOptions {
+	includeMetadata: boolean;
+	includeProviderOptions: boolean;
+	includeToolOptions: boolean;
 }
 export interface ContextMetadataExport {
 	version: number;
@@ -507,7 +513,9 @@ export interface ContextTransferTool {
 	options?: Record<string, string>;
 }
 export interface ImportContextMetadataRequest {
-	contextId: string;
+	/** Internal IDs are generated from the imported name when omitted. */
+	contextId?: string;
+	name?: string;
 	export: ContextMetadataExport;
 }
 export interface ImportContextMetadataResult {
@@ -650,6 +658,7 @@ export interface ProviderCredentialSession {
 export interface DevContextApi {
 	getApplicationMode(): Promise<ApiResult<ApplicationMode>>;
 	chooseProjectDirectory(): Promise<ApiResult<string | undefined>>;
+	chooseContextMetadataImport(): Promise<ApiResult<string | undefined>>;
 	validateProjectDirectory(
 		request: ValidateProjectDirectoryRequest,
 	): Promise<ApiResult<ProjectState>>;
@@ -735,6 +744,7 @@ export interface DevContextApi {
 export interface WailsBindings {
 	getApplicationMode(): Promise<unknown>;
 	chooseProjectDirectory(): Promise<unknown>;
+	chooseContextMetadataImport(): Promise<unknown>;
 	validateProjectDirectory(
 		request: ValidateProjectDirectoryRequest,
 	): Promise<unknown>;
@@ -796,6 +806,12 @@ export function createDevContextApi(
 		chooseProjectDirectory() {
 			return callBinding(
 				() => bindings.chooseProjectDirectory(),
+				optionalString,
+			);
+		},
+		chooseContextMetadataImport() {
+			return callBinding(
+				() => bindings.chooseContextMetadataImport(),
 				optionalString,
 			);
 		},
@@ -1009,6 +1025,10 @@ const generatedBindings: WailsBindings = {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
 		return bindings.ChooseProjectDirectory();
 	},
+	async chooseContextMetadataImport() {
+		const bindings = await import("../../wailsjs/go/wailsapp/App");
+		return bindings.ChooseContextMetadataImport();
+	},
 	async validateProjectDirectory(request) {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
 		return bindings.ValidateProjectDirectory(request);
@@ -1110,8 +1130,13 @@ const generatedBindings: WailsBindings = {
 		return bindings.DuplicateContext(request);
 	},
 	async exportContextMetadata(request) {
-		const bindings = await import("../../wailsjs/go/wailsapp/App");
-		return bindings.ExportContextMetadata(request);
+		const [bindings, models] = await Promise.all([
+			import("../../wailsjs/go/wailsapp/App"),
+			import("../../wailsjs/go/models"),
+		]);
+		return bindings.ExportContextMetadata(
+			models.application.ExportContextMetadataRequest.createFrom(request),
+		);
 	},
 	async importContextMetadata(request) {
 		const [bindings, models] = await Promise.all([

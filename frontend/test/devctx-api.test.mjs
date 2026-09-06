@@ -80,6 +80,28 @@ test("adapter returns the selected project directory or a canceled selection", a
 	});
 });
 
+test("adapter returns context metadata selected by the host or a canceled selection", async () => {
+	const selectedApi = createDevContextApi({
+		async chooseContextMetadataImport() {
+			return '{"version":1}';
+		},
+	});
+	const canceledApi = createDevContextApi({
+		async chooseContextMetadataImport() {
+			return "";
+		},
+	});
+
+	assert.deepEqual(await selectedApi.chooseContextMetadataImport(), {
+		ok: true,
+		data: '{"version":1}',
+	});
+	assert.deepEqual(await canceledApi.chooseContextMetadataImport(), {
+		ok: true,
+		data: undefined,
+	});
+});
+
 test("adapter excludes raw history diagnostics from the presentation contract", async () => {
 	const api = createDevContextApi({
 		async getHistory() {
@@ -237,11 +259,18 @@ test("adapter normalizes safe context metadata export and import", async () => {
 	};
 	const api = createDevContextApi({
 		async exportContextMetadata(request) {
-			assert.deepEqual(request, { contextId: "personal" });
+			assert.deepEqual(request, {
+				contextId: "personal",
+				options: {
+					includeMetadata: true,
+					includeProviderOptions: true,
+					includeToolOptions: true,
+				},
+			});
 			return exported;
 		},
 		async importContextMetadata(request) {
-			assert.deepEqual(request, { contextId: "imported", export: exported });
+			assert.deepEqual(request, { contextId: "imported", name: "Imported", export: exported });
 			return {
 				context: {
 					id: "imported",
@@ -255,13 +284,16 @@ test("adapter normalizes safe context metadata export and import", async () => {
 		},
 	});
 
-	assert.deepEqual(await api.exportContextMetadata({ contextId: "personal" }), {
+	assert.deepEqual(await api.exportContextMetadata({ contextId: "personal", options: {
+		includeMetadata: true, includeProviderOptions: true, includeToolOptions: true,
+	} }), {
 		ok: true,
 		data: exported,
 	});
 	assert.deepEqual(
 		await api.importContextMetadata({
 			contextId: "imported",
+			name: "Imported",
 			export: exported,
 		}),
 		{
