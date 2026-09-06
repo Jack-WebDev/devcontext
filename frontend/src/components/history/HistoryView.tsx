@@ -382,16 +382,6 @@ function formatHistoryTimestamp(timestamp: string): string {
 			});
 }
 
-function formatHistoryEvent(event: string): string {
-	if (event === "") {
-		return "Activity recorded";
-	}
-	return event
-		.split("_")
-		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-		.join(" ");
-}
-
 function formatHistoryCategory(category: HistoryCategory): string {
 	const labels: Record<HistoryCategory, string> = {
 		launch: "Launch",
@@ -407,7 +397,7 @@ function formatHistoryCategory(category: HistoryCategory): string {
 }
 
 function historyEntryKey(entry: HistoryEntry, index: number): string {
-	return `${entry.timestamp}:${entry.event}:${entry.projectPath ?? ""}:${entry.contextId ?? ""}:${index}`;
+	return `${entry.timestamp}:${entry.projectPath ?? ""}:${entry.contextId ?? ""}:${index}`;
 }
 
 export type { HistoryDateGroup, HistoryFilter, HistoryViewProps };
@@ -415,7 +405,6 @@ export {
 	filterHistoryEntries,
 	formatHistoryDate,
 	formatHistoryCategory,
-	formatHistoryEvent,
 	formatHistoryTime,
 	formatHistoryTimestamp,
 	groupHistoryEntriesByDate,

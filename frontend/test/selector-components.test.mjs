@@ -31,7 +31,6 @@ import { renderDiagnostics } from "../.tmp-test/src/components/diagnostics/Diagn
 import {
 	filterHistoryEntries,
 	formatHistoryCategory,
-	formatHistoryEvent,
 	groupHistoryEntriesByDate,
 	historyFilterIncludes,
 	HistoryEventDetails,
@@ -505,7 +504,6 @@ test("command palette actions use context names and configured routes", () => {
 test("history groups entries by date and presents project, context, event, and time", () => {
 	const entries = [
 		{
-			event: "launch_succeeded",
 			category: "launch",
 			timestamp: "2026-08-14T08:30:00Z",
 			projectPath: "/work/api",
@@ -513,14 +511,12 @@ test("history groups entries by date and presents project, context, event, and t
 			message: "Launch succeeded.",
 		},
 		{
-			event: "context_created",
 			category: "context",
 			timestamp: "2026-08-13T15:00:00Z",
 			contextId: "personal",
 			message: "Context created.",
 		},
 		{
-			event: "project_binding_changed",
 			category: "binding",
 			timestamp: "2026-08-14T12:45:00Z",
 			projectPath: "/work/web",
@@ -532,8 +528,7 @@ test("history groups entries by date and presents project, context, event, and t
 	const groups = groupHistoryEntriesByDate(entries);
 	assert.equal(groups.length, 2);
 	assert.equal(groups[0].date, "2026-08-14");
-	assert.equal(groups[0].entries[0].event, "project_binding_changed");
-	assert.equal(formatHistoryEvent("provider_reset"), "Provider Reset");
+	assert.equal(groups[0].entries[0].message, "Project context binding changed.");
 	assert.equal(formatHistoryCategory("binding"), "Project binding");
 
 	const html = renderToStaticMarkup(createElement(HistoryView, { entries }));
@@ -549,7 +544,6 @@ test("history groups entries by date and presents project, context, event, and t
 test("history filters map every normalized category to a planned product filter", () => {
 	const entries = [
 		{
-			event: "launch_succeeded",
 			category: "launch",
 			timestamp: "2026-08-14T08:30:00Z",
 			projectPath: "/work/api",
@@ -557,14 +551,12 @@ test("history filters map every normalized category to a planned product filter"
 			message: "Launch succeeded.",
 		},
 		{
-			event: "provider_reset",
 			category: "repair",
 			timestamp: "2026-08-14T08:30:00Z",
 			contextId: "personal",
 			message: "Provider storage reset.",
 		},
 		{
-			event: "launch_process_failure",
 			category: "warning",
 			timestamp: "2026-08-14T08:30:00Z",
 			projectPath: "/work/web",
@@ -595,7 +587,6 @@ test("history event details show user-facing fields and disclose only the tool i
 	const html = renderToStaticMarkup(
 		createElement(HistoryEventDetails, {
 			entry: {
-				event: "launch_process_failure",
 				category: "warning",
 				timestamp: "2026-08-14T08:30:00Z",
 				projectPath: "/work/api",
@@ -613,7 +604,6 @@ test("history event details show user-facing fields and disclose only the tool i
 	assert.ok(html.includes("company"));
 	assert.ok(html.includes("Technical details"));
 	assert.ok(html.includes("cursor"));
-	assert.ok(!html.includes("launch_process_failure"));
 });
 
 test("history presents an empty activity state", () => {

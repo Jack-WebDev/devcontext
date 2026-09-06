@@ -1,7 +1,12 @@
 package application
 
 import (
+	"encoding/json"
+	"fmt"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	devlog "devctx/packages/core/logging"
 )
@@ -28,6 +33,50 @@ func TestHistoryEventCategoryUsesBackendOwnedFilters(t *testing.T) {
 				t.Fatalf("history event category = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestGetHistoryExcludesCredentialsAndEnvironmentValues(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	secret := "history-private-token"
+	homeDir, err := fixture.paths.DevContextHomeDir()
+	if err != nil {
+		t.Fatalf("dev context home: %v", err)
+	}
+	logsDir := filepath.Join(homeDir, "logs")
+	logger := devlog.NewLocalLogger(logsDir, fixture.storagePermissions, func() time.Time {
+		return fixture.now
+	})
+	if err := logger.Record(devlog.NewEvent(devlog.EventInput{
+		Name:        devlog.EventLaunchProcessFailure,
+		Timestamp:   fixture.now,
+		ProjectPath: fixture.projectDir,
+		ContextID:   "personal",
+		ToolID:      "fake-editor",
+		Err:         fmt.Errorf("launch failed: API_TOKEN=%s", secret),
+		KnownEnvironment: []string{
+			"API_TOKEN=" + secret,
+			"PRIVATE_WORKSPACE_VALUE=" + secret,
+		},
+	})); err != nil {
+		t.Fatalf("record history event: %v", err)
+	}
+
+	history, appErr := fixture.service().GetHistory()
+	if appErr != nil {
+		t.Fatalf("get history: %v", appErr)
+	}
+	data, err := json.Marshal(history)
+	if err != nil {
+		t.Fatalf("marshal history: %v", err)
+	}
+	for _, privateValue := range []string{secret, "API_TOKEN", "PRIVATE_WORKSPACE_VALUE"} {
+		if strings.Contains(string(data), privateValue) {
+			t.Fatalf("history leaked %q: %s", privateValue, data)
+		}
+	}
+	if len(history.Entries) != 1 || history.Entries[0].Message != "Launch could not start the selected coding tool." {
+		t.Fatalf("history entries = %#v, want safe launch outcome", history.Entries)
 	}
 }
 

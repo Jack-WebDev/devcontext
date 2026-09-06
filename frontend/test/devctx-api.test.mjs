@@ -80,6 +80,44 @@ test("adapter returns the selected project directory or a canceled selection", a
 	});
 });
 
+test("adapter excludes raw history diagnostics from the presentation contract", async () => {
+	const api = createDevContextApi({
+		async getHistory() {
+			return {
+				entries: [
+					{
+						event: "launch_process_failure",
+						category: "warning",
+						timestamp: "2026-08-14T08:30:00Z",
+						projectPath: "/work/api",
+						contextId: "personal",
+						toolId: "cursor",
+						message: "Launch could not start the selected coding tool.",
+						error: "API_TOKEN=history-private-token",
+						resolutionSource: "explicit",
+					},
+				],
+			};
+		},
+	});
+
+	assert.deepEqual(await api.getHistory(), {
+		ok: true,
+		data: {
+			entries: [
+				{
+					category: "warning",
+					timestamp: "2026-08-14T08:30:00Z",
+					projectPath: "/work/api",
+					contextId: "personal",
+					toolId: "cursor",
+					message: "Launch could not start the selected coding tool.",
+				},
+			],
+		},
+	});
+});
+
 test("adapter normalizes generic development tool metadata and statuses", async () => {
 	const api = createDevContextApi({
 		async getContexts() {

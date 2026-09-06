@@ -18,7 +18,7 @@ func (s *Service) getHistory() (HistoryState, error) {
 	entries := make([]HistoryEntry, 0, len(events))
 	for _, event := range events {
 		entries = append(entries, HistoryEntry{
-			Event: string(event.Name), Category: historyEventCategory(event.Name), Timestamp: event.Timestamp.UTC(), ProjectPath: event.ProjectPath,
+			Category: historyEventCategory(event.Name), Timestamp: event.Timestamp.UTC(), ProjectPath: event.ProjectPath,
 			ContextID: event.ContextID, ToolID: event.ToolID, Message: historyEventMessage(event),
 		})
 	}

@@ -805,7 +805,6 @@ type HistoryState struct {
 
 // HistoryEntry is a presentation-safe local activity record.
 type HistoryEntry struct {
-	Event       string          `json:"event"`
 	Category    HistoryCategory `json:"category"`
 	Timestamp   time.Time       `json:"timestamp"`
 	ProjectPath string          `json:"projectPath,omitempty"`

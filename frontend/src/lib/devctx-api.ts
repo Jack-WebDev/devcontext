@@ -589,7 +589,6 @@ export type HistoryCategory =
 	| "override"
 	| "warning";
 export interface HistoryEntry {
-	event: string;
 	category: HistoryCategory;
 	timestamp: string;
 	projectPath?: string;
@@ -1792,7 +1791,6 @@ function normalizeHistoryState(value: unknown): HistoryState {
 function normalizeHistoryEntry(value: unknown): HistoryEntry {
 	const object = objectValue(value);
 	return {
-		event: stringValue(object.event),
 		category: normalizeHistoryCategory(object.category),
 		timestamp: stringValue(object.timestamp),
 		projectPath: optionalString(object.projectPath),
