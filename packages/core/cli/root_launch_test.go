@@ -162,6 +162,36 @@ func TestParseLaunchRequestAcceptsGenericContextFlag(t *testing.T) {
 	}
 }
 
+func TestParseLaunchRequestAcceptsExplicitContextMismatchOverride(t *testing.T) {
+	fixture := newLaunchRequestFixture(t)
+	contextID := devcontext.MustID("personal")
+
+	request, err := cli.ParseLaunchRequest([]string{"--context", "personal", cli.ContextMismatchOverrideFlag, "."}, fixture.workingDir, fixture.paths)
+	if err != nil {
+		t.Fatalf("parse launch request: %v", err)
+	}
+
+	assertLaunchRequest(t, request, launcher.LaunchRequest{
+		ProjectPath:          project.Path(fixture.workingDir),
+		RequestedContext:     &contextID,
+		MismatchConfirmation: launcher.ContextMismatchAccepted,
+		Interactive:          false,
+		Source:               launcher.InvocationSourceCLI,
+	})
+}
+
+func TestParseLaunchRequestRejectsContextMismatchOverrideWithoutContext(t *testing.T) {
+	fixture := newLaunchRequestFixture(t)
+
+	_, err := cli.ParseLaunchRequest([]string{cli.ContextMismatchOverrideFlag, "."}, fixture.workingDir, fixture.paths)
+	if !errors.Is(err, cli.ErrInvalidCommand) {
+		t.Fatalf("error = %v, want invalid command", err)
+	}
+	if !strings.Contains(err.Error(), "requires --context <id>, --personal, or --company") {
+		t.Fatalf("error = %q, want explicit Context guidance", err)
+	}
+}
+
 func TestParseLaunchRequestAcceptsPersonalAndCompanyAliases(t *testing.T) {
 	fixture := newLaunchRequestFixture(t)
 
@@ -336,5 +366,8 @@ func assertLaunchRequest(t *testing.T, got launcher.LaunchRequest, want launcher
 	}
 	if !reflect.DeepEqual(got.RequestedContext, want.RequestedContext) {
 		t.Fatalf("requested context = %#v, want %#v", got.RequestedContext, want.RequestedContext)
+	}
+	if got.MismatchConfirmation != want.MismatchConfirmation {
+		t.Fatalf("mismatch confirmation = %q, want %q", got.MismatchConfirmation, want.MismatchConfirmation)
 	}
 }

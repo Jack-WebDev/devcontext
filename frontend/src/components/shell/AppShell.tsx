@@ -35,10 +35,10 @@ function AppShell({
 			data-app-shell
 		>
 			<div className="app-shell-grid grid min-h-0 overflow-hidden">
-				<aside className="flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+				<aside className="app-sidebar flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
 					<div className="px-7 pt-9 pb-8">
-						<h1 className="flex items-center gap-3 text-lg font-semibold tracking-tight">
-							<span className="grid size-8 place-items-center rounded-md bg-primary text-primary-foreground">
+						<h1 className="flex items-center gap-3 text-[15px] font-bold tracking-[-0.025em]">
+							<span className="grid size-8 place-items-center rounded-[10px] bg-primary text-primary-foreground shadow-sm">
 								<Layers3 className="size-5" />
 							</span>
 							Dev Context
@@ -54,7 +54,7 @@ function AppShell({
 								<button
 									key={route.id}
 									type="button"
-									className="flex h-[38px] min-w-0 items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 data-[active=true]:bg-sidebar-accent data-[active=true]:text-foreground motion-reduce:transition-none"
+									className="flex h-[38px] min-w-0 items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-sidebar-foreground/65 transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-sidebar-ring focus-visible:outline-offset-2 data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground motion-reduce:transition-none"
 									data-active={activeRoute === route.id}
 									aria-current={activeRoute === route.id ? "page" : undefined}
 									onClick={() => onNavigate(route.id)}
@@ -67,7 +67,7 @@ function AppShell({
 					<div className="mx-5 mt-5 border-t border-sidebar-border pt-4">
 						<button
 							type="button"
-							className="flex h-[38px] w-full items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 data-[active=true]:bg-sidebar-accent data-[active=true]:text-foreground motion-reduce:transition-none"
+							className="flex h-[38px] w-full items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-sidebar-foreground/65 transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-sidebar-ring focus-visible:outline-offset-2 data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground motion-reduce:transition-none"
 							data-active={activeRoute === "settings"}
 							onClick={() => onNavigate("settings")}
 						>
@@ -76,12 +76,10 @@ function AppShell({
 						</button>
 					</div>
 					<div className="flex-1" />
+					{isFirstRun || !currentProject ? null : (
+						<CurrentProjectSummary project={currentProject} />
+					)}
 					{isFirstRun ? null : <SidebarShortcuts />}
-					{currentProject ? (
-						<span className="sr-only">
-							Current project {currentProject.name} {currentProject.path}
-						</span>
-					) : null}
 				</aside>
 				<main className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto">
 					<div className="app-page-container">{children}</div>
@@ -108,7 +106,7 @@ function SidebarShortcuts() {
 
 function Shortcut({ label, keycap }: { label: string; keycap: string }) {
 	return (
-		<div className="flex h-[29px] items-center justify-between text-[11px] text-muted-foreground">
+		<div className="flex h-[29px] items-center justify-between text-[11px] text-sidebar-foreground/65">
 			<span>{label}</span>
 			<kbd className="min-w-9 rounded border border-sidebar-border bg-sidebar px-1.5 py-0.5 text-center text-[10px] text-foreground">
 				{keycap}
@@ -137,15 +135,7 @@ function NavIcon({ route }: { route: AppRoute }) {
 	}
 }
 
-function CurrentProjectSummary({ project }: { project?: ProjectState }) {
-	if (project === undefined) {
-		return (
-			<div className="border-t border-sidebar-border px-5 py-4 text-xs text-sidebar-foreground/70">
-				Current project unavailable
-			</div>
-		);
-	}
-
+function CurrentProjectSummary({ project }: { project: ProjectState }) {
 	return (
 		<section
 			className="min-w-0 border-t border-sidebar-border px-5 py-4"

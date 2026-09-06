@@ -107,7 +107,10 @@ func (r Runner) runRootLaunch(command RootLaunchCommand) Result {
 		ToolRegistry:      r.toolRegistry(),
 		ParentEnvironment: r.parentEnvironment(),
 	}
-	plan, err := builder.Build(request)
+	// A direct Context launch uses the same preflight boundary as the launcher:
+	// project resolution, Context validation, isolation checks, integration
+	// readiness, and command construction all complete before a process starts.
+	plan, err := builder.Preflight(request)
 	if err != nil {
 		r.recordLaunchEvent(devlog.NewEvent(devlog.EventInput{
 			Name:             devlog.LaunchEventNameForError(err),

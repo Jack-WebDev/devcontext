@@ -445,6 +445,51 @@ func TestRunnerRootLaunchRequiresMismatchConfirmation(t *testing.T) {
 	}
 }
 
+func TestRunnerRootLaunchAllowsExplicitContextMismatchOverride(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	fixture.writeContext(t, testCLIContext("personal", "Personal"))
+	fixture.writeContext(t, testCLIContext("company", "Company"))
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.workingDir),
+		ContextID:   devcontext.MustID("company"),
+		CreatedAt:   fixture.now,
+	})
+
+	processLauncher := &recordingProcessLauncher{}
+	runner := fixture.runner()
+	runner.Tool = &recordingCLIEditor{}
+	runner.ProcessLauncher = processLauncher
+	runner.ParentEnvironment = []string{"PATH=/usr/local/bin"}
+
+	result := runner.Run([]string{"--context", "personal", cli.ContextMismatchOverrideFlag, "."})
+	assertResult(t, result, cli.ExitSuccess, "Project:\n"+fixture.workingDir+"\n\nContext:\npersonal\n\nStatus:\nlaunched\n", "")
+	if len(processLauncher.requests) != 1 {
+		t.Fatalf("process requests = %#v, want one explicit override launch", processLauncher.requests)
+	}
+}
+
+func TestRunnerDirectContextLaunchPreflightsBeforeStartingProcess(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	fixture.writeContext(t, testCLIContext("personal", "Personal"))
+
+	processLauncher := &recordingProcessLauncher{}
+	runner := fixture.runner()
+	runner.Tool = unavailableCLIEditor{}
+	runner.ProcessLauncher = processLauncher
+	runner.ParentEnvironment = []string{"PATH=/usr/local/bin"}
+
+	result := runner.Run([]string{"--context", "personal", "."})
+	if result.Code != cli.ExitLaunchFailure {
+		t.Fatalf("exit code = %d, want %d; stderr = %q", result.Code, cli.ExitLaunchFailure, result.Stderr)
+	}
+	if !strings.Contains(result.Stderr, "Unable to launch coding tool") {
+		t.Fatalf("stderr = %q, want coding-tool recovery", result.Stderr)
+	}
+	if len(processLauncher.requests) != 0 {
+		t.Fatalf("process requests = %#v, want none after failed preflight", processLauncher.requests)
+	}
+}
+
 func TestRunnerRootLaunchExecutesDirectCLIWithRecordingExecutable(t *testing.T) {
 	fixture := newRunnerFixture(t)
 	fixture.writeContext(t, testCLIContext("personal", "Personal"))
@@ -881,6 +926,20 @@ func (e *recordingCLIEditor) BuildLaunchCommand(request codingtool.CommandReques
 type recordingProcessLauncher struct {
 	requests []launcher.ProcessRequest
 	err      error
+}
+
+type unavailableCLIEditor struct{}
+
+func (unavailableCLIEditor) ID() codingtool.ID {
+	return codingtool.VSCodeID
+}
+
+func (unavailableCLIEditor) DetectExecutable(codingtool.Config) (codingtool.Executable, error) {
+	return "", codingtool.ErrExecutableNotFound
+}
+
+func (unavailableCLIEditor) BuildLaunchCommand(codingtool.CommandRequest) (codingtool.Command, error) {
+	return codingtool.Command{}, fmt.Errorf("build command should not run when preflight fails")
 }
 
 func (l *recordingProcessLauncher) Launch(request launcher.ProcessRequest) error {

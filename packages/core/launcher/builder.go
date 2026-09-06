@@ -49,9 +49,10 @@ type LaunchPlanBuilder struct {
 	ParentEnvironment []string
 }
 
-// Build validates the project, resolves the context, builds provider
-// environment, and constructs the coding-tool command for one launch.
-func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
+// Preflight validates the project and selected context, checks the context's
+// isolated storage and configured integrations, and constructs the process
+// request without starting it. Callers must complete this step before launch.
+func (b LaunchPlanBuilder) Preflight(request LaunchRequest) (LaunchPlan, error) {
 	if b.Resolver == nil {
 		return LaunchPlan{}, ErrMissingContextResolver
 	}
@@ -133,6 +134,13 @@ func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
 		ResolutionSource:   resolution.Source,
 		MissingProviderIDs: missingProviderIDs,
 	}, nil
+}
+
+// Build is retained for callers that construct a launch plan directly.
+// Preflight is the preferred name when the plan is used as a safety boundary
+// before starting a process.
+func (b LaunchPlanBuilder) Build(request LaunchRequest) (LaunchPlan, error) {
+	return b.Preflight(request)
 }
 
 func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, paths filesystem.ContextPaths, registry provider.Registry) ([]provider.EnvironmentContribution, []provider.ID, error) {

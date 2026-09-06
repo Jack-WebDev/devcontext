@@ -175,22 +175,18 @@ Company
 
 Dev Context prepares that context and launches the project.
 
-You can also launch a specific identity directly:
-
-```bash
-devctx --personal .
-```
-
-```bash
-devctx --company .
-```
-
-Equivalent long form:
+You can also launch a specific Context directly:
 
 ```bash
 devctx --context personal .
+```
+
+```bash
 devctx --context company .
 ```
+
+`--personal` and `--company` remain available as shortcuts for the built-in
+Contexts.
 
 Or open another project:
 
@@ -304,12 +300,19 @@ devctx project show
 devctx project unbind
 ```
 
-### ⚡ Direct launching
+### ⚡ Direct Context launch
 
-Skip the selector when you already know the context:
+Launch a Project with a Context when you already know which Context to use:
 
 ```bash
-devctx --personal .
+devctx --context personal .
+```
+
+If the Project remembers a different Context, the launch stops safely. After
+verifying the intended override, automation can opt in explicitly:
+
+```bash
+devctx --context company --allow-context-mismatch .
 ```
 
 ### 🔒 Local-first
