@@ -6,7 +6,6 @@ import {
 	PlaceholderScreen,
 	ProjectsContent,
 	RunningContent,
-	TrustCenterContent,
 } from "./components/app/AppContent";
 import { useAppData } from "./components/app/useAppData";
 import {
@@ -126,7 +125,6 @@ function ManagementApp() {
 		history,
 		running,
 		settings,
-		trustCenter,
 		refreshHomeDashboard,
 		refreshRecentProjects,
 		refreshContexts,
@@ -880,8 +878,6 @@ function ManagementApp() {
 				) : (
 					<p className="text-sm text-muted-foreground">Loading settings...</p>
 				)
-			) : activeRoute === "trust" ? (
-				<TrustCenterContent trustCenter={trustCenter} />
 			) : (
 				<PlaceholderScreen route={activeRoute} />
 			)}

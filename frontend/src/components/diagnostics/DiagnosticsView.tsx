@@ -134,8 +134,8 @@ function DiagnosticsView({
 					Diagnostics
 				</h2>
 				<p className="mt-1 text-sm text-muted-foreground">
-					Review application health or select a context to troubleshoot its
-					files, isolation, tools, bindings, and environment.
+					Review application health or select a context to check its isolation,
+					files, tools, bindings, and environment.
 				</p>
 			</div>
 

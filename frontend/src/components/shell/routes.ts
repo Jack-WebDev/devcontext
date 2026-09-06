@@ -5,7 +5,6 @@ type AppRoute =
 	| "running"
 	| "history"
 	| "settings"
-	| "trust"
 	| "diagnostics";
 
 interface AppRouteDefinition {
@@ -40,7 +39,6 @@ const appRoutes: AppRouteDefinition[] = [
 	{ id: "running", label: "Workspaces" },
 	{ id: "history", label: "History" },
 	{ id: "settings", label: "Settings" },
-	{ id: "trust", label: "Trust Center" },
 ];
 
 const appRouteDefinitions: AppRouteDefinition[] = [

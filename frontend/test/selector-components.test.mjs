@@ -211,7 +211,6 @@ import {
 	StatusIndicator,
 	statusPresentation,
 } from "../.tmp-test/src/components/status/StatusIndicator.js";
-import { TrustCenterView } from "../.tmp-test/src/components/trust/TrustCenterView.js";
 import { Card } from "../.tmp-test/src/components/ui/card.js";
 import { createDevContextWindow } from "../.tmp-test/src/lib/devctx-window.js";
 
@@ -1294,13 +1293,13 @@ test("app shell exposes stable navigation, current project state, and a responsi
 			"Workspaces",
 			"History",
 			"Settings",
-			"Trust Center",
 		],
 	);
 	assert.equal(appRouteFromHash("#projects"), "projects");
 	assert.equal(appRouteFromHash("#projects%2Fapi"), "home");
 	assert.equal(appRouteFromHash("#projects/%2Fwork%2Fapi"), "projects");
 	assert.equal(appRouteFromHash("#contexts/company/appearance"), "contexts");
+	assert.equal(appRouteFromHash("#trust"), "home");
 	assert.deepEqual(
 		contextDetailRouteFromHash("#contexts/company/name-purpose"),
 		{
@@ -1320,63 +1319,6 @@ test("app shell exposes stable navigation, current project state, and a responsi
 		"projects/%2Fwork%2FClient%20A",
 	);
 	assert.equal(appRouteFromHash("#unknown"), "home");
-});
-
-test("Trust Center presents actual isolation, mappings, integration boundaries, and credential-sync state", () => {
-	const html = renderToStaticMarkup(
-		createElement(TrustCenterView, {
-			state: {
-				contexts: [
-					{
-						id: "personal",
-						name: "Personal",
-						providers: [
-							{
-								id: "codex",
-								name: "Codex",
-								isolation: {
-									status: "ready",
-									message: "Codex isolation storage is ready.",
-								},
-							},
-						],
-						tool: {
-							id: "vscode",
-							name: "VS Code",
-							isolation: {
-								status: "ready",
-								message: "VS Code isolation storage is ready.",
-							},
-						},
-					},
-				],
-				projectMappings: [
-					{
-						project: { name: "api", path: "/work/api" },
-						contextId: "personal",
-						contextName: "Personal",
-					},
-				],
-				credentialSync: {
-					enabled: false,
-					message: "Dev Context does not sync credentials.",
-				},
-				integrationBoundaries: [
-					{
-						toolId: "vscode",
-						toolName: "VS Code",
-						statusDataAvailable: true,
-						message: "Safe status data stays in tool storage.",
-					},
-				],
-			},
-		}),
-	);
-	assert.ok(html.includes("Trust Center"));
-	assert.ok(html.includes("Credential sync"));
-	assert.ok(html.includes("Codex isolation storage is ready."));
-	assert.ok(html.includes("Suggested context: Personal"));
-	assert.ok(html.includes("Safe status data available"));
 });
 
 test("Home shows project, selected context, and context-named quick launch", () => {
@@ -4108,6 +4050,7 @@ test("privacy settings describe implemented local data boundaries", () => {
 		],
 	);
 	assert.match(privacyStatements[1].description, /only when you choose/);
+	assert.match(privacyStatements[2].description, /does not store or sync/);
 	assert.match(privacyStatements[3].description, /do not include credentials/);
 });
 
