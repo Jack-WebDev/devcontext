@@ -1,7 +1,16 @@
 import type { DisplayError, SettingsState } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
-import { Label } from "../ui/label";
+import { Label } from "../ui/label.js";
 import { Switch } from "../ui/switch.js";
+import { AppearanceSettings } from "./AppearanceSettings.js";
+import { AboutSettings } from "./AboutSettings.js";
+import { AdvancedSettings } from "./AdvancedSettings.js";
+import { PrivacySettings } from "./PrivacySettings.js";
+import {
+	settingsSections,
+	type SafetySetting,
+	type SupportedSetting,
+} from "./settings-sections.js";
 
 interface SettingsViewProps {
 	settings: SettingsState;
@@ -9,40 +18,11 @@ interface SettingsViewProps {
 	error?: DisplayError;
 	onChange: (settings: SettingsState) => void;
 	onReplayOnboarding: () => void;
+	onOpenDiagnostics: () => void;
 }
 
-const sections = [
-	{
-		title: "General",
-		description: "Choose how Dev Context prepares launches.",
-		fields: ["launchVerification", "closeAfterLaunch"] as const,
-	},
-	{
-		title: "Projects",
-		description: "Control project-context suggestions.",
-		fields: ["rememberProjects"] as const,
-	},
-	{
-		title: "Application",
-		description: "Control background application behavior.",
-		fields: ["trayEnabled"] as const,
-	},
-	{
-		title: "Advanced",
-		description:
-			"Advanced preferences will appear here as capabilities are added.",
-		fields: [] as const,
-	},
-	{
-		title: "About",
-		description:
-			"Dev Context keeps coding-tool and provider state isolated per context.",
-		fields: [] as const,
-	},
-];
-
 const labels: Record<
-	keyof SettingsState,
+	SupportedSetting | SafetySetting,
 	{ label: string; description: string }
 > = {
 	closeAfterLaunch: {
@@ -57,12 +37,12 @@ const labels: Record<
 	rememberProjects: {
 		label: "Remember project contexts",
 		description:
-			"Offer the last selected context as a suggestion for a project.",
+			"Allow the selected context to be remembered for a project when you choose it.",
 	},
-	trayEnabled: {
-		label: "Enable system tray",
+	warnOnContextMismatch: {
+		label: "Confirm temporary context overrides",
 		description:
-			"Keep Dev Context available from the system tray when supported.",
+			"Ask before launching a project with a context other than its remembered context.",
 	},
 };
 
@@ -72,6 +52,7 @@ function SettingsView({
 	error,
 	onChange,
 	onReplayOnboarding,
+	onOpenDiagnostics,
 }: SettingsViewProps) {
 	return (
 		<section className="max-w-3xl space-y-8" aria-labelledby="settings-heading">
@@ -86,7 +67,22 @@ function SettingsView({
 					{error.message}
 				</p>
 			) : null}
-			{sections.map((section) => (
+			<section
+				className="border-b border-border pb-6"
+				aria-labelledby="settings-general"
+			>
+				<h3 id="settings-general" className="font-semibold">
+					General
+				</h3>
+				<p className="mt-1 text-sm text-muted-foreground">
+					Revisit the introduction to development contexts and local isolation.
+				</p>
+				<OnboardingReplayAction
+					disabled={pending}
+					onReplay={onReplayOnboarding}
+				/>
+			</section>
+			{settingsSections.map((section) => (
 				<section
 					key={section.title}
 					className="border-b border-border pb-6"
@@ -114,14 +110,12 @@ function SettingsView({
 							))}
 						</div>
 					) : null}
-					{section.title === "General" ? (
-						<OnboardingReplayAction
-							disabled={pending}
-							onReplay={onReplayOnboarding}
-						/>
-					) : null}
 				</section>
 			))}
+			<AppearanceSettings />
+			<PrivacySettings />
+			<AdvancedSettings onOpenDiagnostics={onOpenDiagnostics} />
+			<AboutSettings />
 		</section>
 	);
 }
@@ -132,7 +126,7 @@ function SettingToggle({
 	disabled,
 	onChange,
 }: {
-	field: keyof SettingsState;
+	field: SupportedSetting | SafetySetting;
 	settings: SettingsState;
 	disabled: boolean;
 	onChange: (settings: SettingsState) => void;

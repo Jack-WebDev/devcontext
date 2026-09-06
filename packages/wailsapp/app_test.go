@@ -70,6 +70,10 @@ func TestAppDelegatesApplicationMethodsToService(t *testing.T) {
 		t.Fatal("startup context was not stored")
 	}
 
+	if about := app.GetAbout(); !reflect.DeepEqual(about, service.about) {
+		t.Fatalf("about = %#v, want %#v", about, service.about)
+	}
+
 	validationRequest := application.ValidateProjectDirectoryRequest{ProjectPath: "/work/api"}
 	if project := app.ValidateProjectDirectory(validationRequest); !reflect.DeepEqual(project, service.validatedProject) {
 		t.Fatalf("validated project = %#v, want %#v", project, service.validatedProject)
@@ -280,6 +284,7 @@ type fakeService struct {
 	validatedProjectErr *application.Error
 
 	settings           application.SettingsState
+	about              application.AboutState
 	launchStateRequest application.GetLaunchStateRequest
 	launchState        application.LaunchState
 	launchStateErr     *application.Error
@@ -376,6 +381,9 @@ func (s *fakeService) GetSettings() (application.SettingsState, *application.Err
 func (s *fakeService) UpdateSettings(request application.UpdateSettingsRequest) (application.SettingsState, *application.Error) {
 	s.settings = application.SettingsState(request)
 	return s.settings, nil
+}
+func (s *fakeService) GetAbout() application.AboutState {
+	return s.about
 }
 func (s *fakeService) GetTrayState() (application.TrayState, *application.Error) {
 	return application.TrayState{}, nil

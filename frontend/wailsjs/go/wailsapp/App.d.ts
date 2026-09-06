@@ -21,6 +21,8 @@ export function ExportContextMetadata(arg1:application.ExportContextMetadataRequ
 
 export function ForgetProject(arg1:application.ForgetProjectRequest):Promise<any>;
 
+export function GetAbout():Promise<any>;
+
 export function GetApplicationMode():Promise<wailsapp.ApplicationMode>;
 
 export function GetContextDetails(arg1:application.GetContextDetailsRequest):Promise<any>;

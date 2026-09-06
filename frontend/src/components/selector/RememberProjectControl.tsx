@@ -6,6 +6,7 @@ interface RememberProjectControlProps {
 	binding: ProjectBindingState;
 	contexts: ContextState[];
 	rememberProject: boolean;
+	projectMemoryEnabled?: boolean;
 	selectedContextId?: string;
 	disabled?: boolean;
 	onRememberProjectChange?: (rememberProject: boolean) => void;
@@ -15,6 +16,7 @@ function RememberProjectControl({
 	binding,
 	contexts,
 	rememberProject,
+	projectMemoryEnabled = true,
 	selectedContextId,
 	disabled: disabledByParent = false,
 	onRememberProjectChange,
@@ -45,6 +47,9 @@ function RememberProjectControl({
 				</p>
 			</Card>
 		);
+	}
+	if (!projectMemoryEnabled) {
+		return null;
 	}
 
 	const disabled = disabledByParent || selectedContextId === undefined;

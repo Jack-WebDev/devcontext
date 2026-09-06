@@ -82,6 +82,7 @@ import {
 	canLaunchSelectedContextFromKeyboard,
 	escapeKeyboardAction,
 } from "./selector-keyboard";
+import { projectMemoryBindingContextId } from "./project-memory.js";
 
 interface SelectorViewProps {
 	launchState: LaunchState;
@@ -103,6 +104,8 @@ interface SelectorViewProps {
 	onRunDiagnostics?: () => void;
 	onCodingToolLaunched?: (result: LaunchProjectResult) => void;
 	showLaunchVerification?: boolean;
+	projectMemoryEnabled?: boolean;
+	requireContextMismatchConfirmation?: boolean;
 	showOnboardingReplay?: boolean;
 	onDismissOnboardingReplay?: () => void;
 	onStartContextCreation?: () => void;
@@ -120,6 +123,8 @@ function SelectorView({
 	onRunDiagnostics,
 	onCodingToolLaunched,
 	showLaunchVerification = true,
+	projectMemoryEnabled = true,
+	requireContextMismatchConfirmation = true,
 	showOnboardingReplay = false,
 	onDismissOnboardingReplay,
 	onStartContextCreation,
@@ -337,11 +342,14 @@ function SelectorView({
 				const result = await launchSelectedContext({
 					projectPath: launchState.project.path,
 					selectedContextId: contextId,
-					bindingContextId:
-						canRememberProject(launchState.binding) && rememberProject
-							? contextId
-							: undefined,
-					confirmContextMismatch,
+					bindingContextId: projectMemoryBindingContextId({
+						projectMemoryEnabled,
+						binding: launchState.binding,
+						rememberProject,
+						selectedContextId: contextId,
+					}),
+					confirmContextMismatch:
+						confirmContextMismatch || !requireContextMismatchConfirmation,
 					allowExistingEnvironmentLaunch,
 					onPreflightComplete: (preflight) => {
 						if (
@@ -657,6 +665,7 @@ function SelectorView({
 							binding={launchState.binding}
 							contexts={launchState.contexts}
 							rememberProject={rememberProject}
+							projectMemoryEnabled={projectMemoryEnabled}
 							selectedContextId={selectedContextId}
 							disabled={launchPending}
 							onRememberProjectChange={handleRememberProjectChange}

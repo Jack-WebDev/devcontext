@@ -54,6 +54,11 @@ func (s *Service) UpdateSettings(request UpdateSettingsRequest) (SettingsState, 
 	return settings, nil
 }
 
+// GetAbout returns build metadata and project links that are safe to display.
+func (s *Service) GetAbout() AboutState {
+	return aboutState()
+}
+
 func (s *Service) GetTrayState() (TrayState, *Error) {
 	state, err := s.getTrayState()
 	if err != nil {
@@ -102,6 +107,7 @@ func (s *Service) updateSettings(request UpdateSettingsRequest) (SettingsState, 
 	globalConfig.UI.LaunchVerification = request.LaunchVerification
 	globalConfig.UI.RememberProjects = request.RememberProjects
 	globalConfig.UI.TrayEnabled = request.TrayEnabled
+	globalConfig.Safety.WarnOnContextMismatch = request.WarnOnContextMismatch
 	if err := config.WriteGlobalConfigFileWithPermissions(s.dependencies.ConfigPath, globalConfig, s.dependencies.StoragePermissions); err != nil {
 		return SettingsState{}, err
 	}
@@ -109,7 +115,7 @@ func (s *Service) updateSettings(request UpdateSettingsRequest) (SettingsState, 
 }
 
 func settingsState(globalConfig config.GlobalConfig) SettingsState {
-	return SettingsState{CloseAfterLaunch: globalConfig.UI.CloseAfterLaunch, LaunchVerification: globalConfig.UI.LaunchVerification, RememberProjects: globalConfig.UI.RememberProjects, TrayEnabled: globalConfig.UI.TrayEnabled}
+	return SettingsState{CloseAfterLaunch: globalConfig.UI.CloseAfterLaunch, LaunchVerification: globalConfig.UI.LaunchVerification, RememberProjects: globalConfig.UI.RememberProjects, TrayEnabled: globalConfig.UI.TrayEnabled, WarnOnContextMismatch: globalConfig.Safety.WarnOnContextMismatch}
 }
 
 // GetHomeDashboard returns the backend-owned summary for the Home screen.

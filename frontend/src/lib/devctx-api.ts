@@ -52,8 +52,18 @@ export interface SettingsState {
 	launchVerification: boolean;
 	rememberProjects: boolean;
 	trayEnabled: boolean;
+	warnOnContextMismatch: boolean;
 }
 export type UpdateSettingsRequest = SettingsState;
+
+export interface AboutState {
+	version: string;
+	commit: string;
+	buildDate: string;
+	license: string;
+	repositoryUrl: string;
+	documentationUrl: string;
+}
 
 export interface GetHomeDashboardRequest {
 	projectPath?: string;
@@ -740,6 +750,7 @@ export interface DevContextApi {
 	updateSettings(
 		request: UpdateSettingsRequest,
 	): Promise<ApiResult<SettingsState>>;
+	getAbout(): Promise<ApiResult<AboutState>>;
 }
 
 export interface WailsBindings {
@@ -792,6 +803,7 @@ export interface WailsBindings {
 	stopWorkspace(request: WorkspaceActionRequest): Promise<unknown>;
 	getSettings(): Promise<unknown>;
 	updateSettings(request: UpdateSettingsRequest): Promise<unknown>;
+	getAbout(): Promise<unknown>;
 }
 
 export function createDevContextApi(
@@ -1014,6 +1026,9 @@ export function createDevContextApi(
 				normalizeSettingsState,
 			);
 		},
+		getAbout() {
+			return callBinding(() => bindings.getAbout(), normalizeAboutState);
+		},
 	};
 }
 
@@ -1191,7 +1206,23 @@ const generatedBindings: WailsBindings = {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
 		return bindings.UpdateSettings(request);
 	},
+	async getAbout() {
+		const bindings = await import("../../wailsjs/go/wailsapp/App");
+		return bindings.GetAbout();
+	},
 };
+
+function normalizeAboutState(value: unknown): AboutState {
+	const object = objectValue(value);
+	return {
+		version: stringValue(object.version),
+		commit: stringValue(object.commit),
+		buildDate: stringValue(object.buildDate),
+		license: stringValue(object.license),
+		repositoryUrl: stringValue(object.repositoryUrl),
+		documentationUrl: stringValue(object.documentationUrl),
+	};
+}
 
 function normalizeSettingsState(value: unknown): SettingsState {
 	const object = objectValue(value);
@@ -1200,6 +1231,7 @@ function normalizeSettingsState(value: unknown): SettingsState {
 		launchVerification: booleanValue(object.launchVerification),
 		rememberProjects: booleanValue(object.rememberProjects),
 		trayEnabled: booleanValue(object.trayEnabled),
+		warnOnContextMismatch: booleanValue(object.warnOnContextMismatch),
 	};
 }
 

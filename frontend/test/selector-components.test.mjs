@@ -99,6 +99,10 @@ import {
 	verificationStepPresentation,
 } from "../.tmp-test/src/components/selector/LaunchVerificationProgress.js";
 import { PreflightReviewView } from "../.tmp-test/src/components/selector/PreflightReviewView.js";
+import { settingsSections } from "../.tmp-test/src/components/settings/settings-sections.js";
+import { appearanceOptions } from "../.tmp-test/src/components/settings/AppearanceSettings.js";
+import { privacyStatements } from "../.tmp-test/src/components/settings/privacy-statements.js";
+import { projectMemoryBindingContextId } from "../.tmp-test/src/components/selector/project-memory.js";
 import {
 	createLaunchRequestGuard,
 	launchSelectedContext,
@@ -2248,6 +2252,43 @@ test("remember control renders checked user intent for unbound selected projects
 	assert.ok(html.includes("Remember Personal for this project"));
 });
 
+test("remember control is withheld when project memory is disabled", () => {
+	const state = launchStateFixture();
+	const html = renderToStaticMarkup(
+		RememberProjectControl({
+			binding: state.binding,
+			contexts: state.contexts,
+			rememberProject: false,
+			projectMemoryEnabled: false,
+			selectedContextId: "personal",
+		}),
+	);
+
+	assert.equal(html, "");
+});
+
+test("project memory creates bindings only after explicit enabled intent", () => {
+	const binding = launchStateFixture().binding;
+	assert.equal(
+		projectMemoryBindingContextId({
+			projectMemoryEnabled: true,
+			binding,
+			rememberProject: true,
+			selectedContextId: "personal",
+		}),
+		"personal",
+	);
+	assert.equal(
+		projectMemoryBindingContextId({
+			projectMemoryEnabled: false,
+			binding,
+			rememberProject: true,
+			selectedContextId: "personal",
+		}),
+		undefined,
+	);
+});
+
 test("remember control renders existing binding without a checkbox", () => {
 	const state = launchStateFixture({
 		binding: {
@@ -4028,6 +4069,47 @@ function preflightLaunchProjectResult() {
 		},
 	};
 }
+
+test("settings navigation includes only functional settings", () => {
+	assert.deepEqual(settingsSections, [
+		{
+			title: "Launching",
+			description: "Choose how Dev Context handles a successful launch.",
+			fields: [
+				"launchVerification",
+				"rememberProjects",
+				"closeAfterLaunch",
+			],
+		},
+		{
+			title: "Safety",
+			description: "Keep context overrides deliberate.",
+			fields: ["warnOnContextMismatch"],
+		},
+	]);
+});
+
+test("appearance offers persisted system and explicit color themes", () => {
+	assert.deepEqual(appearanceOptions, [
+		{ value: "system", label: "System" },
+		{ value: "light", label: "Light" },
+		{ value: "dark", label: "Dark" },
+	]);
+});
+
+test("privacy settings describe implemented local data boundaries", () => {
+	assert.deepEqual(
+		privacyStatements.map((statement) => statement.title),
+		[
+			"Stored on this device",
+			"Project paths",
+			"Credentials stay with integrations",
+			"Portable exports",
+		],
+	);
+	assert.match(privacyStatements[1].description, /only when you choose/);
+	assert.match(privacyStatements[3].description, /do not include credentials/);
+});
 
 function apiError(code, message, recovery, contextMismatch) {
 	return {

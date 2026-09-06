@@ -25,6 +25,33 @@ test("adapter exposes the host-selected application mode", async () => {
 	});
 });
 
+test("adapter normalizes build-backed About metadata", async () => {
+	const api = createDevContextApi({
+		async getAbout() {
+			return {
+				version: "1.2.3",
+				commit: "abc123",
+				buildDate: "2026-09-06",
+				license: "MIT",
+				repositoryUrl: "https://github.com/Jack-WebDev/devcontext",
+				documentationUrl: "https://github.com/Jack-WebDev/devcontext#readme",
+			};
+		},
+	});
+
+	assert.deepEqual(await api.getAbout(), {
+		ok: true,
+		data: {
+			version: "1.2.3",
+			commit: "abc123",
+			buildDate: "2026-09-06",
+			license: "MIT",
+			repositoryUrl: "https://github.com/Jack-WebDev/devcontext",
+			documentationUrl: "https://github.com/Jack-WebDev/devcontext#readme",
+		},
+	});
+});
+
 test("adapter rejects an invalid application mode", async () => {
 	const api = createDevContextApi({
 		async getApplicationMode() {

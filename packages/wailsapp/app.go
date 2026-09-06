@@ -46,6 +46,7 @@ type service interface {
 	StopWorkspace(application.WorkspaceActionRequest) *application.Error
 	GetSettings() (application.SettingsState, *application.Error)
 	UpdateSettings(application.UpdateSettingsRequest) (application.SettingsState, *application.Error)
+	GetAbout() application.AboutState
 	GetTrayState() (application.TrayState, *application.Error)
 }
 
@@ -69,6 +70,10 @@ func (a *App) GetTrayState() any {
 		return err
 	}
 	return state
+}
+
+func (a *App) GetAbout() any {
+	return a.service.GetAbout()
 }
 
 func (a *App) GetProjects() any {
