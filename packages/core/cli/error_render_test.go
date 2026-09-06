@@ -122,7 +122,18 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 				"The project at \"/work/constructa\" is bound to context \"personal\", but the request selected context \"company\".\n" +
 				"\n" +
 				"Next step:\n" +
-				"Confirm the mismatch intentionally or rerun with the bound context.\n",
+				"Rerun with the bound context, or after verifying the intended override, add `--allow-context-mismatch`.\n",
+		},
+		{
+			name: "unavailable configured coding tool",
+			err:  launcher.ErrMissingTool,
+			want: "" +
+				"Unable to launch coding tool\n" +
+				"\n" +
+				"The selected context refers to a coding tool that is unavailable in this Dev Context installation.\n" +
+				"\n" +
+				"Next step:\n" +
+				"Choose an available coding tool for this context, then retry the launch.\n",
 		},
 		{
 			name: "selection required",
@@ -223,13 +234,13 @@ func TestRenderErrorSnapshotsRepresentativeFailures(t *testing.T) {
 }
 
 func TestRenderErrorDebugRedactsSensitiveValues(t *testing.T) {
-	err := errors.New("launch failed with CODEX_TOKEN=secret-token and API_KEY=secret-key")
+	err := errors.New("launch failed with CODEX_TOKEN=secret-token, API_KEY=secret-key, and Authorization: Bearer bearer-secret")
 
 	got := cli.RenderError(err, true)
-	if strings.Contains(got, "secret-token") || strings.Contains(got, "secret-key") {
+	if strings.Contains(got, "secret-token") || strings.Contains(got, "secret-key") || strings.Contains(got, "bearer-secret") {
 		t.Fatalf("rendered debug error leaked secret value: %q", got)
 	}
-	for _, want := range []string{"CODEX_TOKEN=<redacted>", "API_KEY=<redacted>"} {
+	for _, want := range []string{"CODEX_TOKEN=<redacted>", "API_KEY=<redacted>", "Authorization: <redacted>"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("rendered debug error = %q, want containing %q", got, want)
 		}

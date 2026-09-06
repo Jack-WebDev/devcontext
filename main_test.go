@@ -58,6 +58,11 @@ func TestShouldRunCLIRoutesManagementAndDirectLaunchCommands(t *testing.T) {
 			args: []string{"--company", "."},
 			want: true,
 		},
+		{
+			name: "context mismatch override is a CLI option",
+			args: []string{cli.ContextMismatchOverrideFlag, "."},
+			want: true,
+		},
 	}
 
 	for _, tt := range tests {

@@ -15,12 +15,17 @@ const (
 	personalFlag = "--personal"
 	companyFlag  = "--company"
 	debugFlag    = "--debug"
+	// ContextMismatchOverrideFlag explicitly permits a Context that differs
+	// from the Project's remembered Context. It is intended for deliberate
+	// non-interactive automation only.
+	ContextMismatchOverrideFlag = "--allow-context-mismatch"
 )
 
 type rootLaunchArguments struct {
-	projectPath      string
-	requestedContext *devcontext.ID
-	debug            bool
+	projectPath          string
+	requestedContext     *devcontext.ID
+	allowContextMismatch bool
+	debug                bool
 }
 
 // ParseLaunchRequest converts root launch command arguments into an application
@@ -57,12 +62,16 @@ func launchRequestFromRootCommand(command RootLaunchCommand, workingDirectory st
 		return launcher.LaunchRequest{}, err
 	}
 
-	return launcher.LaunchRequest{
+	request := launcher.LaunchRequest{
 		ProjectPath:      canonicalPath,
 		RequestedContext: args.requestedContext,
 		Interactive:      args.requestedContext == nil,
 		Source:           launcher.InvocationSourceCLI,
-	}, nil
+	}
+	if args.allowContextMismatch {
+		request.MismatchConfirmation = launcher.ContextMismatchAccepted
+	}
+	return request, nil
 }
 
 func parseRootLaunchArguments(args []string) (rootLaunchArguments, error) {
@@ -95,6 +104,8 @@ func parseRootLaunchArguments(args []string) (rootLaunchArguments, error) {
 			}
 		case arg == debugFlag:
 			parsed.debug = true
+		case arg == ContextMismatchOverrideFlag:
+			parsed.allowContextMismatch = true
 		case strings.HasPrefix(arg, "-"):
 			return rootLaunchArguments{}, fmt.Errorf("%w: unknown root option %q", ErrInvalidCommand, arg)
 		default:
@@ -103,6 +114,9 @@ func parseRootLaunchArguments(args []string) (rootLaunchArguments, error) {
 			}
 			parsed.projectPath = arg
 		}
+	}
+	if parsed.allowContextMismatch && parsed.requestedContext == nil {
+		return rootLaunchArguments{}, fmt.Errorf("%w: %s requires --context <id>, --personal, or --company", ErrInvalidCommand, ContextMismatchOverrideFlag)
 	}
 
 	return parsed, nil

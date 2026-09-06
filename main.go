@@ -110,7 +110,7 @@ func shouldRunCLI(args []string) bool {
 		return true
 	}
 	for _, arg := range args {
-		if arg == "--context" || arg == "--personal" || arg == "--company" {
+		if arg == "--context" || arg == "--personal" || arg == "--company" || arg == cli.ContextMismatchOverrideFlag {
 			return true
 		}
 	}

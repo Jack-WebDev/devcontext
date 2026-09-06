@@ -3,7 +3,6 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	codingtool "devctx/packages/core/codingtool"
@@ -11,6 +10,7 @@ import (
 	devcontext "devctx/packages/core/context"
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
+	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
 )
 
@@ -19,8 +19,6 @@ type renderedError struct {
 	Why      string
 	Recovery string
 }
-
-var sensitiveAssignmentPattern = regexp.MustCompile(`(?i)\b([A-Z0-9_]*(TOKEN|SECRET|PASSWORD|KEY)[A-Z0-9_]*)=([^\s]+)`)
 
 // RenderError returns a user-facing CLI error with what failed, why it failed,
 // and what to do next. Debug output includes sanitized internal details.
@@ -73,7 +71,7 @@ func classifyError(err error) renderedError {
 				contextMismatchError.BoundContextID.String(),
 				contextMismatchError.RequestedContextID.String(),
 			),
-			Recovery: "Confirm the mismatch intentionally or rerun with the bound context.",
+			Recovery: "Rerun with the bound context, or after verifying the intended override, add `--allow-context-mismatch`.",
 		}
 	case errors.As(err, &contextMismatchError) && errors.Is(err, launcher.ErrContextMismatchRejected):
 		return renderedError{
@@ -200,6 +198,12 @@ func classifyError(err error) renderedError {
 			Why:      "No coding tool executable was resolved for the selected context.",
 			Recovery: "Configure an executable or install the coding tool command on PATH.",
 		}
+	case errors.Is(err, launcher.ErrMissingTool):
+		return renderedError{
+			Title:    "Unable to launch coding tool",
+			Why:      "The selected context refers to a coding tool that is unavailable in this Dev Context installation.",
+			Recovery: "Choose an available coding tool for this context, then retry the launch.",
+		}
 	case errors.As(err, &processLaunchError) && errors.Is(err, launcher.ErrProcessExecutableNotFound):
 		return renderedError{
 			Title:    toolCommandNotFoundTitle(processLaunchError.Tool.DisplayName),
@@ -263,7 +267,7 @@ type storagePermissionDetails interface {
 }
 
 func redactSensitiveValues(value string) string {
-	return sensitiveAssignmentPattern.ReplaceAllString(value, "$1=<redacted>")
+	return devlog.SanitizeText(value, nil)
 }
 
 func storagePermissionWhy(err storagePermissionDetails) string {

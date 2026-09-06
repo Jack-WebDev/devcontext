@@ -445,6 +445,29 @@ func TestRunnerRootLaunchRequiresMismatchConfirmation(t *testing.T) {
 	}
 }
 
+func TestRunnerRootLaunchAllowsExplicitContextMismatchOverride(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	fixture.writeContext(t, testCLIContext("personal", "Personal"))
+	fixture.writeContext(t, testCLIContext("company", "Company"))
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.workingDir),
+		ContextID:   devcontext.MustID("company"),
+		CreatedAt:   fixture.now,
+	})
+
+	processLauncher := &recordingProcessLauncher{}
+	runner := fixture.runner()
+	runner.Tool = &recordingCLIEditor{}
+	runner.ProcessLauncher = processLauncher
+	runner.ParentEnvironment = []string{"PATH=/usr/local/bin"}
+
+	result := runner.Run([]string{"--context", "personal", cli.ContextMismatchOverrideFlag, "."})
+	assertResult(t, result, cli.ExitSuccess, "Project:\n"+fixture.workingDir+"\n\nContext:\npersonal\n\nStatus:\nlaunched\n", "")
+	if len(processLauncher.requests) != 1 {
+		t.Fatalf("process requests = %#v, want one explicit override launch", processLauncher.requests)
+	}
+}
+
 func TestRunnerDirectContextLaunchPreflightsBeforeStartingProcess(t *testing.T) {
 	fixture := newRunnerFixture(t)
 	fixture.writeContext(t, testCLIContext("personal", "Personal"))

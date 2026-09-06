@@ -308,6 +308,13 @@ Launch a Project with a Context when you already know which Context to use:
 devctx --context personal .
 ```
 
+If the Project remembers a different Context, the launch stops safely. After
+verifying the intended override, automation can opt in explicitly:
+
+```bash
+devctx --context company --allow-context-mismatch .
+```
+
 ### 🔒 Local-first
 
 No Dev Context cloud account required — everything stays on your machine.
