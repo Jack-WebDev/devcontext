@@ -560,6 +560,48 @@ func TestToolConfidenceCheckExplainsLinuxDetectionRecovery(t *testing.T) {
 	}
 }
 
+func TestToolConfidenceCheckExplainsMacOSDetectionRecovery(t *testing.T) {
+	tests := []struct {
+		name      string
+		detection codingtool.ExecutableDetection
+		err       error
+		want      launcher.ConfidenceCheck
+	}{
+		{
+			name:      "application bundle when shell command is missing",
+			detection: codingtool.ExecutableDetection{Executable: "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code", Platform: "darwin", Source: codingtool.ExecutableDetectionInstalled},
+			want:      launcher.ConfidenceCheck{Component: launcher.ConfidenceCheckTool, ToolID: "vscode", Severity: launcher.ConfidenceReady, Label: "VS Code", Message: "VS Code is installed, but its command is not on PATH. Dev Context will use the application bundle.", ActionHint: "Install the VS Code shell command if you also want to launch it from a terminal."},
+		},
+		{
+			name:      "missing application bundle and shell command",
+			detection: codingtool.ExecutableDetection{Platform: "darwin", Source: codingtool.ExecutableDetectionUnavailable},
+			err:       &codingtool.ExecutableNotFoundError{ToolID: codingtool.VSCodeID},
+			want:      launcher.ConfidenceCheck{Component: launcher.ConfidenceCheckTool, ToolID: "vscode", Severity: launcher.ConfidenceBlocked, Label: "VS Code", Message: "VS Code was not found in Applications or on PATH.", ActionHint: "Install VS Code, add its command to PATH, or select its executable for this context."},
+		},
+		{
+			name:      "configured executable is missing",
+			detection: codingtool.ExecutableDetection{Platform: "darwin", Source: codingtool.ExecutableDetectionConfigured},
+			err:       &codingtool.ExecutableNotFoundError{ToolID: codingtool.VSCodeID},
+			want:      launcher.ConfidenceCheck{Component: launcher.ConfidenceCheckTool, ToolID: "vscode", Severity: launcher.ConfidenceBlocked, Label: "VS Code", Message: "The executable selected for VS Code was not found.", ActionHint: "Select a valid VS Code executable for this context."},
+		},
+		{
+			name:      "application is blocked by permissions or security settings",
+			detection: codingtool.ExecutableDetection{Platform: "darwin", Source: codingtool.ExecutableDetectionInstalled},
+			err:       &codingtool.ExecutableNotExecutableError{ToolID: codingtool.VSCodeID, Path: "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"},
+			want:      launcher.ConfidenceCheck{Component: launcher.ConfidenceCheckTool, ToolID: "vscode", Severity: launcher.ConfidenceBlocked, Label: "VS Code", Message: "macOS could not run VS Code.", ActionHint: "Check the app permissions and macOS security settings, or select a different VS Code executable for this context."},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := launcher.ToolConfidenceCheckWithDetection("vscode", "VS Code", tt.detection, tt.err)
+			if got != tt.want {
+				t.Fatalf("check = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestIsolationConfidenceChecksRepresentStorageReadiness(t *testing.T) {
 	root := t.TempDir()
 	paths := filesystem.ContextPaths{

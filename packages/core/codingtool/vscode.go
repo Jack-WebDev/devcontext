@@ -92,6 +92,11 @@ type VSCodeEditor struct {
 	// It exists primarily for deterministic tests and packaged deployments with
 	// a known installation directory.
 	LinuxInstallPaths []string
+
+	// MacOSInstallPaths augments the standard macOS application bundle paths.
+	// It exists primarily for deterministic tests and packaged deployments with
+	// a known installation directory.
+	MacOSInstallPaths []string
 }
 
 var _ CodingTool = VSCodeEditor{}
@@ -150,7 +155,7 @@ func (e VSCodeEditor) DetectExecutableDetailed(config Config) (ExecutableDetecti
 					Source:     ExecutableDetectionInstalled,
 				}, nil
 			}
-			if goos == "linux" {
+			if goos == "linux" || goos == "darwin" {
 				return ExecutableDetection{Platform: goos, Source: ExecutableDetectionInstalled}, &ExecutableNotExecutableError{
 					ToolID: VSCodeID,
 					Path:   path,
@@ -172,6 +177,8 @@ func (e VSCodeEditor) installedExecutablePaths(goos string) []string {
 		return e.windowsInstallPaths()
 	case "linux":
 		return e.linuxInstallPaths()
+	case "darwin":
+		return e.macOSInstallPaths()
 	default:
 		return nil
 	}
@@ -199,6 +206,11 @@ func (e VSCodeEditor) linuxInstallPaths() []string {
 		"/snap/bin/code",
 		"/var/lib/flatpak/exports/bin/com.visualstudio.code",
 	)
+}
+
+func (e VSCodeEditor) macOSInstallPaths() []string {
+	paths := append([]string(nil), e.MacOSInstallPaths...)
+	return append(paths, "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code")
 }
 
 // BuildLaunchCommand returns the structured VS Code command for one project.
