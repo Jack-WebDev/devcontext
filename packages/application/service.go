@@ -29,15 +29,16 @@ type Dependencies struct {
 	ToolRegistry        codingtool.Registry
 	// Tool is retained temporarily for callers that have not yet moved to the
 	// registry contract. New code must provide ToolRegistry.
-	Tool               codingtool.CodingTool
-	ProcessLauncher    launcher.ProcessLauncher
-	StoragePermissions filesystem.StoragePermissions
-	ParentEnvironment  []string
-	WorkingDirectory   string
-	ConfigPath         string
-	DetachMode         launcher.DetachMode
-	Now                func() time.Time
-	Logger             devlog.Logger
+	Tool                       codingtool.CodingTool
+	ProcessLauncher            launcher.ProcessLauncher
+	StoragePermissions         filesystem.StoragePermissions
+	ParentEnvironment          []string
+	WorkingDirectory           string
+	ConfigPath                 string
+	DetachMode                 launcher.DetachMode
+	ExecutableDetectionTimeout time.Duration
+	Now                        func() time.Time
+	Logger                     devlog.Logger
 }
 
 // DefaultOptions contains host-provided values needed to construct the default
@@ -81,22 +82,23 @@ func NewDefaultService(options DefaultOptions) (*Service, error) {
 	}
 
 	return NewServiceWithDependencies(Dependencies{
-		Contexts:            devcontext.NewRepository(layout.ContextsDir),
-		Projects:            project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
-		RecentProjects:      project.NewRecentRepository(filepath.Join(layout.HomeDir, "recents.toml")),
-		RunningEnvironments: running.NewRepository(filepath.Join(layout.HomeDir, "running.toml")),
-		ProcessInspector:    running.NativeProcessInspector{},
-		Paths:               paths,
-		ProviderRegistry:    provider.BuiltInRegistry(),
-		ToolRegistry:        codingtool.BuiltInRegistry(),
-		ProcessLauncher:     launcher.NativeProcessLauncher{},
-		StoragePermissions:  filesystem.NewDefaultStoragePermissions(),
-		ParentEnvironment:   options.ParentEnvironment,
-		WorkingDirectory:    workingDirectory,
-		ConfigPath:          layout.ConfigPath,
-		DetachMode:          launcher.DetachModeDetached,
-		Now:                 options.Now,
-		Logger:              devlog.NewLocalLogger(layout.LogsDir, filesystem.NewDefaultStoragePermissions(), options.Now),
+		Contexts:                   devcontext.NewRepository(layout.ContextsDir),
+		Projects:                   project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
+		RecentProjects:             project.NewRecentRepository(filepath.Join(layout.HomeDir, "recents.toml")),
+		RunningEnvironments:        running.NewRepository(filepath.Join(layout.HomeDir, "running.toml")),
+		ProcessInspector:           running.NativeProcessInspector{},
+		Paths:                      paths,
+		ProviderRegistry:           provider.BuiltInRegistry(),
+		ToolRegistry:               codingtool.BuiltInRegistry(),
+		ProcessLauncher:            launcher.NativeProcessLauncher{},
+		StoragePermissions:         filesystem.NewDefaultStoragePermissions(),
+		ParentEnvironment:          options.ParentEnvironment,
+		WorkingDirectory:           workingDirectory,
+		ConfigPath:                 layout.ConfigPath,
+		DetachMode:                 launcher.DetachModeDetached,
+		ExecutableDetectionTimeout: 2 * time.Second,
+		Now:                        options.Now,
+		Logger:                     devlog.NewLocalLogger(layout.LogsDir, filesystem.NewDefaultStoragePermissions(), options.Now),
 	}), nil
 }
 
@@ -161,6 +163,9 @@ func normalizeDependencies(dependencies Dependencies) Dependencies {
 	}
 	if dependencies.DetachMode == "" {
 		dependencies.DetachMode = launcher.DetachModeDetached
+	}
+	if dependencies.ExecutableDetectionTimeout <= 0 {
+		dependencies.ExecutableDetectionTimeout = 2 * time.Second
 	}
 	if dependencies.Now == nil {
 		dependencies.Now = time.Now

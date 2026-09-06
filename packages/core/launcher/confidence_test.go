@@ -560,6 +560,22 @@ func TestToolConfidenceCheckExplainsLinuxDetectionRecovery(t *testing.T) {
 	}
 }
 
+func TestToolConfidenceCheckTreatsDetectionTimeoutAsRetryable(t *testing.T) {
+	check := launcher.ToolConfidenceCheck("vscode", "VS Code", "", codingtool.ErrExecutableDetectionTimedOut)
+	want := launcher.ConfidenceCheck{
+		Component:  launcher.ConfidenceCheckTool,
+		ToolID:     "vscode",
+		Severity:   launcher.ConfidenceNeedsAttention,
+		Label:      "VS Code",
+		Message:    "VS Code is taking longer than expected to check.",
+		ActionHint: "Check again, continue without detection, or review diagnostics.",
+		Retryable:  true,
+	}
+	if check != want {
+		t.Fatalf("check = %#v, want %#v", check, want)
+	}
+}
+
 func TestToolConfidenceCheckExplainsMacOSDetectionRecovery(t *testing.T) {
 	tests := []struct {
 		name      string

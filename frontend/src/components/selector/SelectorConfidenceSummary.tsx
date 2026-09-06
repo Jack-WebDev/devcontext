@@ -5,15 +5,18 @@ import type {
 	ProjectState,
 } from "../../lib/devctx-api";
 import { Card } from "../ui/card.js";
+import { Button } from "../ui/button.js";
 
 interface SelectorConfidenceSummaryProps {
 	context?: ContextState;
 	project?: ProjectState;
+	onRetryDetection?: () => void;
 }
 
 function SelectorConfidenceSummary({
 	context,
 	project,
+	onRetryDetection,
 }: SelectorConfidenceSummaryProps) {
 	if (
 		context === undefined ||
@@ -67,7 +70,11 @@ function SelectorConfidenceSummary({
 							check.component === "tool" && check.toolId === context.tool.id,
 					)
 					.map((check) => (
-						<ConfidenceCheckRow key={`tool-${check.toolId}`} check={check} />
+						<ConfidenceCheckRow
+							key={`tool-${check.toolId}`}
+							check={check}
+							onRetryDetection={onRetryDetection}
+						/>
 					))}
 				<IsolationConfidenceRow
 					checks={context.confidence.checks.filter(
@@ -96,7 +103,13 @@ function ConfidenceSummaryRow({
 	);
 }
 
-function ConfidenceCheckRow({ check }: { check: LaunchConfidenceCheck }) {
+function ConfidenceCheckRow({
+	check,
+	onRetryDetection,
+}: {
+	check: LaunchConfidenceCheck;
+	onRetryDetection?: () => void;
+}) {
 	const status = confidenceStatusPresentation(check.severity);
 
 	return (
@@ -110,6 +123,16 @@ function ConfidenceCheckRow({ check }: { check: LaunchConfidenceCheck }) {
 				</dd>
 			</div>
 			<p className="text-xs text-muted-foreground">{check.message}</p>
+			{check.retryable && onRetryDetection ? (
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					onClick={onRetryDetection}
+				>
+					Check again
+				</Button>
+			) : null}
 		</div>
 	);
 }

@@ -353,6 +353,7 @@ export interface LaunchConfidenceCheck {
 	label: string;
 	message: string;
 	actionHint?: string;
+	retryable?: boolean;
 }
 
 export interface ProjectBindingState {
@@ -1529,6 +1530,7 @@ function normalizeLaunchConfidenceCheck(value: unknown): LaunchConfidenceCheck {
 		label: stringValue(object.label),
 		message: stringValue(object.message),
 		actionHint: optionalString(object.actionHint),
+		...(object.retryable === true ? { retryable: true } : {}),
 	};
 }
 

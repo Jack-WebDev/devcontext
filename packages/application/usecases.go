@@ -1,6 +1,7 @@
 package application
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -2028,11 +2029,7 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 		toolErr = fmt.Errorf("selected coding tool %q is not registered", toolID)
 	} else {
 		toolName = registeredTool.DisplayName
-		if detailed, ok := registeredTool.Integration.(codingtool.DetailedExecutableDetector); ok {
-			detection, toolErr = detailed.DetectExecutableDetailed(toolConfig)
-		} else {
-			detection.Executable, toolErr = registeredTool.Integration.DetectExecutable(toolConfig)
-		}
+		detection, toolErr = codingtool.DetectExecutableDetailedWithin(context.Background(), s.dependencies.ExecutableDetectionTimeout, registeredTool.Integration, toolConfig)
 	}
 	checks = append(checks, launcher.ToolConfidenceCheckWithDetection(toolID, toolName, detection, toolErr))
 

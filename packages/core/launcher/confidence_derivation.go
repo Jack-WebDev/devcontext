@@ -71,6 +71,13 @@ func ToolConfidenceCheck(toolID codingtool.ID, displayName string, executable co
 		check.Message = name + " is available for launch."
 		return check
 	}
+	if errors.Is(err, codingtool.ErrExecutableDetectionTimedOut) {
+		check.Severity = ConfidenceNeedsAttention
+		check.Message = name + " is taking longer than expected to check."
+		check.ActionHint = "Check again, continue without detection, or review diagnostics."
+		check.Retryable = true
+		return check
+	}
 
 	check.Severity = ConfidenceBlocked
 	check.ActionHint = "Install " + name + " or configure its executable."

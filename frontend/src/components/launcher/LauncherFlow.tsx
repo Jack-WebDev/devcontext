@@ -44,6 +44,7 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 		status: "loading",
 	});
 	const [choosingFolder, setChoosingFolder] = useState(false);
+	const [detectionRetry, setDetectionRetry] = useState(0);
 	const [creatingFirstContext, setCreatingFirstContext] = useState(false);
 	const resolving =
 		launchState.projectPath !== activeProjectPath ||
@@ -71,7 +72,7 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 		return () => {
 			active = false;
 		};
-	}, [activeProjectPath]);
+	}, [activeProjectPath, detectionRetry]);
 
 	useEffect(() => {
 		let active = true;
@@ -147,6 +148,7 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 					onCancel={devContextWindow.closeSelector}
 					onCreateContext={createContext}
 					onStartContextCreation={() => setCreatingFirstContext(true)}
+					onRetryDetection={() => setDetectionRetry((attempt) => attempt + 1)}
 					launchSuccessCloseBehavior={
 						settings.data.closeAfterLaunch ? "close_selector" : "keep_open"
 					}

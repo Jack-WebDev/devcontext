@@ -252,7 +252,7 @@ test("context metadata import review identifies unavailable integrations before 
 
 test("account identity mismatch review is limited to backend identity evidence", () => {
 	assert.equal(
-		hasAccountIdentityMismatch({
+			hasAccountIdentityMismatch({
 			confidence: {
 				checks: [{ component: "identity", severity: "needs_attention" }],
 			},
@@ -260,7 +260,7 @@ test("account identity mismatch review is limited to backend identity evidence",
 		true,
 	);
 	assert.equal(
-		hasAccountIdentityMismatch({
+			hasAccountIdentityMismatch({
 			confidence: {
 				checks: [{ component: "provider", severity: "needs_attention" }],
 			},
@@ -2714,6 +2714,7 @@ test("selector confidence summary renders selected context readiness", () => {
 							severity: "needs_attention",
 							label: "VS Code",
 							message: "Review VS Code.",
+							retryable: true,
 						},
 						{
 							component: "isolation",
@@ -2724,6 +2725,7 @@ test("selector confidence summary renders selected context readiness", () => {
 					],
 				},
 			},
+			onRetryDetection: () => {},
 		}),
 	);
 	const empty = renderToStaticMarkup(SelectorConfidenceSummary({}));
@@ -2737,6 +2739,7 @@ test("selector confidence summary renders selected context readiness", () => {
 	assert.ok(selected.includes("Isolation"));
 	assert.ok(selected.includes("Protected"));
 	assert.ok(selected.includes("Needs attention"));
+	assert.ok(selected.includes("Check again"));
 	assert.ok(empty.includes("Select a context to review launch readiness."));
 	assert.deepEqual(
 		["ready", "needs_attention", "blocked"].map(
