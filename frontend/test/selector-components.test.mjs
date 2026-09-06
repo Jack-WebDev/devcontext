@@ -33,6 +33,8 @@ import {
 	formatHistoryCategory,
 	formatHistoryEvent,
 	groupHistoryEntriesByDate,
+	historyFilterIncludes,
+	HistoryEventDetails,
 	HistoryView,
 } from "../.tmp-test/src/components/history/HistoryView.js";
 import {
@@ -544,7 +546,7 @@ test("history groups entries by date and presents project, context, event, and t
 	assert.match(html, /<time[^>]*dateTime="2026-08-14T12:45:00Z"/);
 });
 
-test("history filters by backend category and searches only project and context", () => {
+test("history filters map every normalized category to a planned product filter", () => {
 	const entries = [
 		{
 			event: "launch_succeeded",
@@ -571,12 +573,47 @@ test("history filters by backend category and searches only project and context"
 		},
 	];
 
-	assert.deepEqual(filterHistoryEntries(entries, "launch", ""), [entries[0]]);
+	assert.deepEqual(filterHistoryEntries(entries, "launches", ""), [
+		entries[0],
+		entries[2],
+	]);
+	assert.equal(historyFilterIncludes("context", "context"), true);
+	assert.equal(historyFilterIncludes("project", "binding"), true);
+	assert.equal(historyFilterIncludes("repair", "repair"), true);
+	assert.equal(historyFilterIncludes("authentication", "authentication"), true);
+	assert.equal(historyFilterIncludes("launches", "workspace"), true);
+	assert.equal(historyFilterIncludes("launches", "override"), true);
+	assert.equal(historyFilterIncludes("repair", "authentication"), false);
 	assert.deepEqual(filterHistoryEntries(entries, "all", "PERSONAL"), [
 		entries[1],
 		entries[2],
 	]);
-	assert.deepEqual(filterHistoryEntries(entries, "warning", "api"), []);
+	assert.deepEqual(filterHistoryEntries(entries, "repair", "api"), []);
+});
+
+test("history event details show user-facing fields and disclose only the tool identifier", () => {
+	const html = renderToStaticMarkup(
+		createElement(HistoryEventDetails, {
+			entry: {
+				event: "launch_process_failure",
+				category: "warning",
+				timestamp: "2026-08-14T08:30:00Z",
+				projectPath: "/work/api",
+				contextId: "company",
+				toolId: "cursor",
+				message: "Launch could not start the selected coding tool.",
+			},
+			onClose: () => {},
+		}),
+	);
+
+	assert.ok(html.includes("Activity details"));
+	assert.ok(html.includes("Result"));
+	assert.ok(html.includes("/work/api"));
+	assert.ok(html.includes("company"));
+	assert.ok(html.includes("Technical details"));
+	assert.ok(html.includes("cursor"));
+	assert.ok(!html.includes("launch_process_failure"));
 });
 
 test("history presents an empty activity state", () => {
