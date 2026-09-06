@@ -93,9 +93,17 @@ func ToolConfidenceCheck(toolID codingtool.ID, displayName string, executable co
 // an adapter can safely explain how it resolved a launchable executable.
 func ToolConfidenceCheckWithDetection(toolID codingtool.ID, displayName string, detection codingtool.ExecutableDetection, err error) ConfidenceCheck {
 	check := ToolConfidenceCheck(toolID, displayName, detection.Executable, err)
-	if detection.Platform != "windows" {
+	switch detection.Platform {
+	case "windows":
+		return windowsToolConfidenceCheck(check, detection, err)
+	case "linux":
+		return linuxToolConfidenceCheck(check, detection, err)
+	default:
 		return check
 	}
+}
+
+func windowsToolConfidenceCheck(check ConfidenceCheck, detection codingtool.ExecutableDetection, err error) ConfidenceCheck {
 	if err != nil {
 		if detection.Source == codingtool.ExecutableDetectionConfigured {
 			check.Message = "The executable selected for " + check.Label + " cannot be used."
@@ -110,6 +118,32 @@ func ToolConfidenceCheckWithDetection(toolID codingtool.ID, displayName string, 
 	switch detection.Source {
 	case codingtool.ExecutableDetectionInstalled:
 		check.Message = check.Label + " is installed, but its command is not on PATH. Dev Context will open the installed application."
+		check.ActionHint = "Add the " + check.Label + " command to PATH if you also want to launch it from a terminal."
+	case codingtool.ExecutableDetectionConfigured:
+		check.Message = check.Label + " will use the executable selected for this context."
+	}
+	return check
+}
+
+func linuxToolConfidenceCheck(check ConfidenceCheck, detection codingtool.ExecutableDetection, err error) ConfidenceCheck {
+	if err != nil {
+		switch {
+		case errors.Is(err, codingtool.ErrExecutableNotExecutable):
+			check.Message = "Dev Context does not have permission to run " + check.Label + "."
+			check.ActionHint = "Check the executable permissions or select a different " + check.Label + " executable for this context."
+		case detection.Source == codingtool.ExecutableDetectionConfigured:
+			check.Message = "The executable selected for " + check.Label + " was not found."
+			check.ActionHint = "Select a valid " + check.Label + " executable for this context."
+		case errors.Is(err, codingtool.ErrExecutableNotFound):
+			check.Message = check.Label + " was not found in a standard location or on PATH."
+			check.ActionHint = "Install " + check.Label + ", add its command to PATH, or select its executable for this context."
+		}
+		return check
+	}
+
+	switch detection.Source {
+	case codingtool.ExecutableDetectionInstalled:
+		check.Message = check.Label + " is installed, but its command is not on PATH. Dev Context will use the installed executable."
 		check.ActionHint = "Add the " + check.Label + " command to PATH if you also want to launch it from a terminal."
 	case codingtool.ExecutableDetectionConfigured:
 		check.Message = check.Label + " will use the executable selected for this context."

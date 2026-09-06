@@ -87,6 +87,11 @@ type VSCodeEditor struct {
 	// It exists primarily for deterministic tests and packaged deployments with
 	// a known installation directory.
 	WindowsInstallPaths []string
+
+	// LinuxInstallPaths augments the standard Linux installation locations.
+	// It exists primarily for deterministic tests and packaged deployments with
+	// a known installation directory.
+	LinuxInstallPaths []string
 }
 
 var _ CodingTool = VSCodeEditor{}
@@ -110,7 +115,7 @@ func (e VSCodeEditor) DetectExecutable(config Config) (Executable, error) {
 }
 
 // DetectExecutableDetailed locates VS Code and records whether it was found
-// through PATH, a Windows application installation, or explicit configuration.
+// through PATH, a known application installation, or explicit configuration.
 func (e VSCodeEditor) DetectExecutableDetailed(config Config) (ExecutableDetection, error) {
 	probe := e.resolveProbe()
 	goos := e.resolveOperatingSystem()
@@ -135,14 +140,22 @@ func (e VSCodeEditor) DetectExecutableDetailed(config Config) (ExecutableDetecti
 			}, nil
 		}
 	}
-	for _, path := range e.windowsInstallPaths(goos) {
+	for _, path := range e.installedExecutablePaths(goos) {
 		info, err := probe.Stat(path)
-		if err == nil && isUsableExecutable(info, goos) {
-			return ExecutableDetection{
-				Executable: Executable(path),
-				Platform:   goos,
-				Source:     ExecutableDetectionInstalled,
-			}, nil
+		if err == nil {
+			if isUsableExecutable(info, goos) {
+				return ExecutableDetection{
+					Executable: Executable(path),
+					Platform:   goos,
+					Source:     ExecutableDetectionInstalled,
+				}, nil
+			}
+			if goos == "linux" {
+				return ExecutableDetection{Platform: goos, Source: ExecutableDetectionInstalled}, &ExecutableNotExecutableError{
+					ToolID: VSCodeID,
+					Path:   path,
+				}
+			}
 		}
 		candidates = append(candidates, path)
 	}
@@ -153,10 +166,18 @@ func (e VSCodeEditor) DetectExecutableDetailed(config Config) (ExecutableDetecti
 	}
 }
 
-func (e VSCodeEditor) windowsInstallPaths(goos string) []string {
-	if goos != "windows" {
+func (e VSCodeEditor) installedExecutablePaths(goos string) []string {
+	switch goos {
+	case "windows":
+		return e.windowsInstallPaths()
+	case "linux":
+		return e.linuxInstallPaths()
+	default:
 		return nil
 	}
+}
+
+func (e VSCodeEditor) windowsInstallPaths() []string {
 	paths := append([]string(nil), e.WindowsInstallPaths...)
 	for _, root := range []string{
 		os.Getenv("LOCALAPPDATA"),
@@ -169,6 +190,15 @@ func (e VSCodeEditor) windowsInstallPaths(goos string) []string {
 		paths = append(paths, filepath.Join(root, "Microsoft VS Code", "Code.exe"))
 	}
 	return paths
+}
+
+func (e VSCodeEditor) linuxInstallPaths() []string {
+	paths := append([]string(nil), e.LinuxInstallPaths...)
+	return append(paths,
+		"/usr/share/code/code",
+		"/snap/bin/code",
+		"/var/lib/flatpak/exports/bin/com.visualstudio.code",
+	)
 }
 
 // BuildLaunchCommand returns the structured VS Code command for one project.

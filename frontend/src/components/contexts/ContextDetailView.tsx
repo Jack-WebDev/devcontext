@@ -876,8 +876,7 @@ function ContextLaunchPreferences({
 					<span>
 						Use a specific executable for this context.
 						<span className="mt-1 block text-muted-foreground">
-							Useful when a Windows coding-tool command is not available on
-							PATH.
+							Useful when the coding-tool command is not available on PATH.
 						</span>
 					</span>
 				</label>
@@ -891,7 +890,7 @@ function ContextLaunchPreferences({
 							id="context-executable-override"
 							type="text"
 							className="h-10 border border-input bg-background px-3 text-sm text-foreground"
-							placeholder="C:\\Program Files\\Microsoft VS Code\\Code.exe"
+							placeholder="/path/to/code"
 							value={executableOverride}
 							onChange={(event) =>
 								setExecutableOverride(event.currentTarget.value)
