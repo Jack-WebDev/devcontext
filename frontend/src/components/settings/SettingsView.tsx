@@ -1,7 +1,8 @@
 import type { DisplayError, SettingsState } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
-import { Label } from "../ui/label";
+import { Label } from "../ui/label.js";
 import { Switch } from "../ui/switch.js";
+import { settingsSections, type SupportedSetting } from "./settings-sections.js";
 
 interface SettingsViewProps {
 	settings: SettingsState;
@@ -11,38 +12,8 @@ interface SettingsViewProps {
 	onReplayOnboarding: () => void;
 }
 
-const sections = [
-	{
-		title: "General",
-		description: "Choose how Dev Context prepares launches.",
-		fields: ["launchVerification", "closeAfterLaunch"] as const,
-	},
-	{
-		title: "Projects",
-		description: "Control project-context suggestions.",
-		fields: ["rememberProjects"] as const,
-	},
-	{
-		title: "Application",
-		description: "Control background application behavior.",
-		fields: ["trayEnabled"] as const,
-	},
-	{
-		title: "Advanced",
-		description:
-			"Advanced preferences will appear here as capabilities are added.",
-		fields: [] as const,
-	},
-	{
-		title: "About",
-		description:
-			"Dev Context keeps coding-tool and provider state isolated per context.",
-		fields: [] as const,
-	},
-];
-
 const labels: Record<
-	keyof SettingsState,
+	SupportedSetting,
 	{ label: string; description: string }
 > = {
 	closeAfterLaunch: {
@@ -53,16 +24,6 @@ const labels: Record<
 		label: "Show launch verification",
 		description:
 			"Show verification progress while Dev Context prepares a launch.",
-	},
-	rememberProjects: {
-		label: "Remember project contexts",
-		description:
-			"Offer the last selected context as a suggestion for a project.",
-	},
-	trayEnabled: {
-		label: "Enable system tray",
-		description:
-			"Keep Dev Context available from the system tray when supported.",
 	},
 };
 
@@ -86,7 +47,22 @@ function SettingsView({
 					{error.message}
 				</p>
 			) : null}
-			{sections.map((section) => (
+			<section
+				className="border-b border-border pb-6"
+				aria-labelledby="settings-general"
+			>
+				<h3 id="settings-general" className="font-semibold">
+					General
+				</h3>
+				<p className="mt-1 text-sm text-muted-foreground">
+					Revisit the introduction to development contexts and local isolation.
+				</p>
+				<OnboardingReplayAction
+					disabled={pending}
+					onReplay={onReplayOnboarding}
+				/>
+			</section>
+			{settingsSections.map((section) => (
 				<section
 					key={section.title}
 					className="border-b border-border pb-6"
@@ -114,12 +90,6 @@ function SettingsView({
 							))}
 						</div>
 					) : null}
-					{section.title === "General" ? (
-						<OnboardingReplayAction
-							disabled={pending}
-							onReplay={onReplayOnboarding}
-						/>
-					) : null}
 				</section>
 			))}
 		</section>
@@ -132,7 +102,7 @@ function SettingToggle({
 	disabled,
 	onChange,
 }: {
-	field: keyof SettingsState;
+	field: SupportedSetting;
 	settings: SettingsState;
 	disabled: boolean;
 	onChange: (settings: SettingsState) => void;

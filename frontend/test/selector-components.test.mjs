@@ -99,6 +99,7 @@ import {
 	verificationStepPresentation,
 } from "../.tmp-test/src/components/selector/LaunchVerificationProgress.js";
 import { PreflightReviewView } from "../.tmp-test/src/components/selector/PreflightReviewView.js";
+import { settingsSections } from "../.tmp-test/src/components/settings/settings-sections.js";
 import {
 	createLaunchRequestGuard,
 	launchSelectedContext,
@@ -4028,6 +4029,16 @@ function preflightLaunchProjectResult() {
 		},
 	};
 }
+
+test("settings navigation includes only functional settings", () => {
+	assert.deepEqual(settingsSections, [
+		{
+			title: "Launching",
+			description: "Choose how Dev Context handles a successful launch.",
+			fields: ["launchVerification", "closeAfterLaunch"],
+		},
+	]);
+});
 
 function apiError(code, message, recovery, contextMismatch) {
 	return {
