@@ -49,7 +49,7 @@ import {
 	homeConfidenceSummary,
 } from "../.tmp-test/src/components/home/HomeView.js";
 import { RecentProjectConfirmationDialog } from "../.tmp-test/src/components/home/RecentProjectConfirmationDialog.js";
-import { notificationPresentation } from "../.tmp-test/src/components/notifications/notification-policy.js";
+import { isToastEligible, notificationPresentation } from "../.tmp-test/src/components/notifications/notification-policy.js";
 import {
 	ProjectContextChangeDialog,
 	safetyImplication,
@@ -415,6 +415,27 @@ test("notification policy permits only meaningful provider, tool, and update eve
 			description: "Dev Context 1.2.3 is ready to install.",
 			severity: "info",
 		},
+	);
+});
+
+test("notification policy keeps action-required provider failures out of toasts", () => {
+	assert.equal(
+		isToastEligible({
+			kind: "provider_attention",
+			providerName: "Example Provider",
+			contextName: "Work",
+			message: "Sign in again.",
+		}),
+		false,
+	);
+	assert.equal(
+		isToastEligible({
+			kind: "tool_launched",
+			projectName: "api",
+			contextName: "Work",
+			toolName: "Editor",
+		}),
+		true,
 	);
 });
 

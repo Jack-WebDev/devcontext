@@ -2,17 +2,20 @@ import { useState } from "react";
 import type { RunningEnvironmentState, WorkspaceRevealResult } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
+import { EmptyState } from "../ui/collection-state.js";
 
 interface RunningViewProps {
 	environments: RunningEnvironmentState[];
 	onReveal?: (environment: RunningEnvironmentState, targetId?: string) => Promise<WorkspaceRevealResult | undefined>;
 	onStop?: (environment: RunningEnvironmentState) => void;
+	onLaunchProject?: () => void;
 }
 
 function RunningView({
 	environments,
 	onReveal,
 	onStop,
+	onLaunchProject,
 }: RunningViewProps) {
 	const [choice, setChoice] = useState<{ workspace: RunningEnvironmentState; targets: WorkspaceRevealResult["targets"] }>();
 	async function reveal(workspace: RunningEnvironmentState, targetId?: string) {
@@ -32,12 +35,7 @@ function RunningView({
 			</div>
 
 			{environments.length === 0 ? (
-				<Card as="section" hierarchy="secondary" className="py-0">
-					<CardContent className="p-5 text-sm text-muted-foreground">
-						No active workspaces are recorded. Launch a project to create an
-						isolated coding-tool workspace.
-					</CardContent>
-				</Card>
+				<EmptyState title="No active workspaces" description="Launch a project to create an isolated coding-tool workspace." actionLabel="View projects" onAction={onLaunchProject} />
 			) : (
 				<div className="space-y-4">
 					{environments.map((environment) => (

@@ -45,6 +45,7 @@ import {
 	projectDetailRouteFromHash,
 } from "./components/shell/routes";
 import { AppStatusBar } from "./components/status/AppStatusBar";
+import { DestructiveConfirmationDialog } from "./components/ui/destructive-confirmation-dialog";
 import {
 	type ApiResult,
 	type ApplicationMode,
@@ -57,6 +58,7 @@ import {
 	type ProjectListItem,
 	type RecentProjectState,
 	type RunningEnvironmentConflict,
+	type RunningEnvironmentsState,
 	type SettingsState,
 } from "./lib/devctx-api";
 
@@ -181,6 +183,11 @@ function ManagementApp() {
 		useState(false);
 	const [projectBindingRemovalError, setProjectBindingRemovalError] =
 		useState<DisplayError>();
+	const [projectToForget, setProjectToForget] = useState<ProjectListItem>();
+	const [workspaceToStop, setWorkspaceToStop] = useState<
+		RunningEnvironmentsState["environments"][number]
+	>();
+	const [workspaceStopError, setWorkspaceStopError] = useState<DisplayError>();
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 	const [commandPaletteLaunchPending, setCommandPaletteLaunchPending] =
 		useState(false);
@@ -542,10 +549,13 @@ function ManagementApp() {
 		}
 	}
 
-	async function handleProjectForget(project: ProjectListItem) {
-		if (!window.confirm(`Forget ${project.project.name} from Dev Context? Project files and folders are never deleted.`)) {
-			return;
-		}
+	function handleProjectForget(project: ProjectListItem) {
+		setProjectToForget(project);
+	}
+
+	async function confirmProjectForget() {
+		if (projectToForget === undefined) return;
+		const project = projectToForget;
 		const result = await devContextApi.forgetProject({
 			projectPath: project.project.path,
 		});
@@ -554,8 +564,22 @@ function ManagementApp() {
 			setProjectErrorPath(project.project.path);
 			return;
 		}
+		setProjectToForget(undefined);
 		await Promise.all([refreshProjects(), refreshHomeDashboard(), refreshRecentProjects(), refreshContexts()]);
 		handleNavigate("projects");
+	}
+
+	async function confirmWorkspaceStop() {
+		if (workspaceToStop === undefined) return;
+		const workspace = workspaceToStop;
+		setWorkspaceStopError(undefined);
+		const result = await devContextApi.stopWorkspace({ workspaceId: workspace.id });
+		if (result.ok) {
+			setWorkspaceToStop(undefined);
+			await refreshRunningEnvironments();
+			return;
+		}
+		setWorkspaceStopError(result.error);
 	}
 
 	async function handleProjectLocate(project: ProjectListItem) {
@@ -809,6 +833,7 @@ function ManagementApp() {
 							onLaunch={handleProjectLaunch}
 							onOpenFolder={handleProjectOpenFolder}
 							onOpenDetail={navigateToProjectDetail}
+							onStartLaunch={() => handleNavigate("contexts")}
 						/>
 					)}
 					{projectContextChange && contexts.status === "loaded" ? (
@@ -855,12 +880,16 @@ function ManagementApp() {
 					}
 				/>
 			) : activeRoute === "history" ? (
-				<HistoryContent history={history} />
+				<HistoryContent history={history} onOpenProjects={() => handleNavigate("projects")} />
 			) : activeRoute === "running" ? (
 				<RunningContent
 					running={running}
+					onLaunchProject={() => handleNavigate("projects")}
 					onReveal={async (workspace, targetId) => { const result = await devContextApi.revealWorkspace({ workspaceId: workspace.id, targetId }); if (result.ok) return result.data; return undefined; }}
-					onStop={(workspace) => { if (window.confirm(`Stop ${workspace.project.name}? Unsaved work in the coding tool may be lost.`)) void devContextApi.stopWorkspace({ workspaceId: workspace.id }).then(() => refreshRunningEnvironments()); }}
+					onStop={(workspace) => {
+						setWorkspaceStopError(undefined);
+						setWorkspaceToStop(workspace);
+					}}
 				/>
 			) : activeRoute === "settings" ? (
 				settings.status === "loaded" ? (
@@ -882,6 +911,12 @@ function ManagementApp() {
 			) : (
 				<PlaceholderScreen route={activeRoute} />
 			)}
+			{projectToForget ? (
+				<DestructiveConfirmationDialog title="Forget project?" objectName={projectToForget.project.name} impact="Dev Context will remove this project from its local history and bindings." nonDeletionAssurance="Project files and folders are never deleted." confirmLabel="Forget project" onCancel={() => setProjectToForget(undefined)} onConfirm={() => void confirmProjectForget()} />
+			) : null}
+			{workspaceToStop ? (
+				<DestructiveConfirmationDialog title="Stop workspace?" objectName={workspaceToStop.project.name} impact="The coding-tool workspace will be stopped. Unsaved work in the coding tool may be lost." nonDeletionAssurance="Project files and folders are never deleted." confirmLabel="Stop workspace" error={workspaceStopError} onCancel={() => { setWorkspaceToStop(undefined); setWorkspaceStopError(undefined); }} onConfirm={() => void confirmWorkspaceStop()} />
+			) : null}
 			{commandPaletteLaunchError ? (
 				<GuiErrorNotice error={commandPaletteLaunchError} />
 			) : null}
