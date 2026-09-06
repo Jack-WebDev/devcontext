@@ -25,6 +25,11 @@ const labels: Record<
 		description:
 			"Show verification progress while Dev Context prepares a launch.",
 	},
+	rememberProjects: {
+		label: "Remember project contexts",
+		description:
+			"Allow the selected context to be remembered for a project when you choose it.",
+	},
 };
 
 function SettingsView({

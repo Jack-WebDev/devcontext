@@ -205,6 +205,7 @@ export function SelectorContent({
 				settings?.closeAfterLaunch === false ? "keep_open" : "close_selector"
 			}
 			showLaunchVerification={settings?.launchVerification ?? true}
+			projectMemoryEnabled={settings?.rememberProjects ?? true}
 			showOnboardingReplay={showOnboardingReplay}
 			onDismissOnboardingReplay={onDismissOnboardingReplay}
 		/>

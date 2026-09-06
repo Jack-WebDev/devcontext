@@ -5,6 +5,7 @@ import type {
 	CreateContextRequest,
 	CreateContextResult,
 	LaunchState,
+	SettingsState,
 } from "../../lib/devctx-api";
 import { devContextApi } from "../../lib/devctx-api.js";
 import { devContextWindow } from "../../lib/devctx-window.js";
@@ -23,6 +24,7 @@ interface LauncherFlowProps {
 }
 
 type ProjectLaunchState = LoadState<LaunchState> & { projectPath: string };
+type LauncherSettingsState = LoadState<SettingsState>;
 
 // LauncherFlow is intentionally separate from the management shell. Later
 // launcher phases add resolution and selection states inside this focused
@@ -38,11 +40,15 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 		projectPath: activeProjectPath,
 		status: "loading",
 	});
+	const [settings, setSettings] = useState<LauncherSettingsState>({
+		status: "loading",
+	});
 	const [choosingFolder, setChoosingFolder] = useState(false);
 	const [creatingFirstContext, setCreatingFirstContext] = useState(false);
 	const resolving =
 		launchState.projectPath !== activeProjectPath ||
-		launchState.status === "loading";
+		launchState.status === "loading" ||
+		settings.status === "loading";
 
 	useEffect(() => {
 		setHostProjectPath(projectPath);
@@ -66,6 +72,18 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 			active = false;
 		};
 	}, [activeProjectPath]);
+
+	useEffect(() => {
+		let active = true;
+		void devContextApi.getSettings().then((result) => {
+			if (active) {
+				setSettings(loadStateFromResult(result));
+			}
+		});
+		return () => {
+			active = false;
+		};
+	}, []);
 
 	async function createContext(
 		request: CreateContextRequest,
@@ -117,6 +135,8 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 				/>
 			) : launchState.status === "error" ? (
 				<GuiErrorNotice error={launchState.error} />
+			) : settings.status === "error" ? (
+				<GuiErrorNotice error={settings.error} />
 			) : (
 				<SelectorView
 					launchState={launchState.data}
@@ -127,6 +147,11 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 					onCancel={devContextWindow.closeSelector}
 					onCreateContext={createContext}
 					onStartContextCreation={() => setCreatingFirstContext(true)}
+					launchSuccessCloseBehavior={
+						settings.data.closeAfterLaunch ? "close_selector" : "keep_open"
+					}
+					showLaunchVerification={settings.data.launchVerification}
+					projectMemoryEnabled={settings.data.rememberProjects}
 					onCodingToolLaunched={(result) =>
 						notifyCodingToolLaunched({
 							projectName: result.project.name,
