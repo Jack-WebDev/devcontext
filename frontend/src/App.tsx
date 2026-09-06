@@ -647,6 +647,7 @@ function ManagementApp() {
 					launchState={
 						launchState.status === "loaded" ? launchState.data : undefined
 					}
+					onOpenSystemHealth={() => handleNavigate("diagnostics")}
 				/>
 			}
 		>

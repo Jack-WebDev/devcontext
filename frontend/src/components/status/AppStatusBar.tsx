@@ -1,20 +1,26 @@
 import { ShieldCheck } from "lucide-react";
 import type { LaunchState } from "../../lib/devctx-api";
 
-function AppStatusBar({ launchState }: { launchState?: LaunchState }) {
+function AppStatusBar({
+	launchState,
+	onOpenSystemHealth,
+}: {
+	launchState?: LaunchState;
+	onOpenSystemHealth: () => void;
+}) {
 	const setupRequired = launchState?.firstRun === true;
 	const checkingIsolation =
 		launchState === undefined ||
 		(!setupRequired && launchState.confidence === undefined);
 	const needsAttention =
-		!checkingIsolation && !setupRequired &&
+		!checkingIsolation &&
+		!setupRequired &&
 		(launchState?.confidence?.status !== "ready" ||
 			(launchState?.warnings.length ?? 0) > 0);
-	const isolation =
-		checkingIsolation
-			? "Checking isolation"
-			: setupRequired
-				? "Isolation will be checked after setup"
+	const isolation = checkingIsolation
+		? "Checking isolation"
+		: setupRequired
+			? "Isolation will be checked after setup"
 			: launchState?.confidence?.status !== "ready"
 				? "Isolation needs attention"
 				: "Isolation ready";
@@ -25,18 +31,22 @@ function AppStatusBar({ launchState }: { launchState?: LaunchState }) {
 					<ShieldCheck className="size-4" />
 					{isolation}
 				</div>
-				<div className="flex items-center gap-2 px-5">
+				<button
+					type="button"
+					className="flex h-full items-center gap-2 px-5 transition-colors hover:bg-[#f3f1ed] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+					onClick={onOpenSystemHealth}
+				>
 					<span
 						className={`size-2 rounded-full ${checkingIsolation ? "bg-muted-foreground" : setupRequired || needsAttention ? "bg-warning" : "bg-success"}`}
 					/>
 					{setupRequired
 						? "Setup required"
 						: needsAttention
-						? "System needs attention"
-						: checkingIsolation
-							? "Checking system status"
-							: "All systems operational"}
-				</div>
+							? "System needs attention"
+							: checkingIsolation
+								? "Checking system status"
+								: "All systems operational"}
+				</button>
 			</div>
 		</footer>
 	);
