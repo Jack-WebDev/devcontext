@@ -14,7 +14,8 @@ import (
 
 func TestRunningEnvironmentStatePreservesSafeLaunchAndRuntimeMetadata(t *testing.T) {
 	pid := 4128
-	state := runningEnvironmentState(coreRunning.Environment{
+	service := newApplicationFixture(t).service()
+	state := service.runningEnvironmentState(coreRunning.Environment{
 		ID:        "environment-1",
 		Project:   coreRunning.ProjectIdentity{Path: project.Path("/work/api"), Name: "api"},
 		Context:   coreRunning.ContextIdentity{ID: devcontext.MustID("company"), Name: "Company"},
@@ -33,6 +34,9 @@ func TestRunningEnvironmentStatePreservesSafeLaunchAndRuntimeMetadata(t *testing
 	}
 	if state.Launch.Source != "gui" || state.Launch.ResolutionSource != "explicit" {
 		t.Fatalf("running environment launch state = %#v", state.Launch)
+	}
+	if state.Lifecycle.State != "active" || state.Lifecycle.Focusable || state.Lifecycle.Revealable || state.Lifecycle.Stoppable {
+		t.Fatalf("workspace lifecycle = %#v", state.Lifecycle)
 	}
 }
 
@@ -63,6 +67,24 @@ func TestGetRunningEnvironmentsRefreshesProcessStateAndRecordsStoppedEvent(t *te
 	}
 	if got := applicationEventNames(logger.events); len(got) != 1 || got[0] != devlog.EventEnvironmentStopped {
 		t.Fatalf("history events = %#v, want environment stopped", got)
+	}
+}
+
+func TestGetRunningEnvironmentsIncludesAnActiveAdapterSession(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	environment := testRunningEnvironment(fixture, "session-active", 0)
+	environment.Process = coreRunning.Process{State: coreRunning.ProcessStateUnknown}
+	environment.Session = coreRunning.Session{ID: "adapter-session", State: coreRunning.SessionStateActive}
+	if _, err := coreRunning.NewRepository(fixture.runningPath).Record(environment); err != nil {
+		t.Fatalf("record environment: %v", err)
+	}
+
+	state, appErr := fixture.service().GetRunningEnvironments()
+	if appErr != nil {
+		t.Fatalf("get running environments: %v", appErr)
+	}
+	if len(state.Environments) != 1 || state.Environments[0].Lifecycle.State != "active" {
+		t.Fatalf("active session workspaces = %#v", state.Environments)
 	}
 }
 

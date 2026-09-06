@@ -37,7 +37,7 @@ const appRoutes: AppRouteDefinition[] = [
 	{ id: "home", label: "Home" },
 	{ id: "contexts", label: "Contexts" },
 	{ id: "projects", label: "Projects" },
-	{ id: "running", label: "Running" },
+	{ id: "running", label: "Workspaces" },
 	{ id: "history", label: "History" },
 	{ id: "settings", label: "Settings" },
 	{ id: "trust", label: "Trust Center" },

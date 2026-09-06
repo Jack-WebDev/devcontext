@@ -447,13 +447,13 @@ function RunningSummary({
 }) {
 	return (
 		<Panel
-			title="Running environments"
+			title="Active workspaces"
 			action="View all"
 			labelledBy="home-running-heading"
 			fill
 		>
 			{running.count === 0 ? (
-				<p className="text-xs text-muted-foreground">No active environments.</p>
+				<p className="text-xs text-muted-foreground">No active workspaces.</p>
 			) : (
 				<ul className="divide-y divide-border">
 					{running.contextCounts.map((item) => (

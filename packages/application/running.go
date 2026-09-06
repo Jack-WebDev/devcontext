@@ -4,6 +4,7 @@ import (
 	"sort"
 	"time"
 
+	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
 	devlog "devctx/packages/core/logging"
 	"devctx/packages/core/project"
@@ -17,7 +18,7 @@ func (s *Service) getRunningEnvironments() (RunningEnvironmentsState, error) {
 	}
 	states := make([]RunningEnvironmentState, len(environments))
 	for index, environment := range environments {
-		states[index] = runningEnvironmentState(environment)
+		states[index] = s.runningEnvironmentState(environment)
 	}
 	return RunningEnvironmentsState{Environments: states}, nil
 }
@@ -32,7 +33,7 @@ func (s *Service) refreshRunningEnvironments() ([]coreRunning.Environment, error
 	}
 	active := make([]coreRunning.Environment, 0, len(result.Environments))
 	for _, environment := range result.Environments {
-		if environment.Process.State == coreRunning.ProcessStateRunning {
+		if environment.Lifecycle(codingtool.WorkspaceCapabilities{}).State == coreRunning.WorkspaceStateActive {
 			active = append(active, environment)
 		}
 	}
@@ -71,10 +72,10 @@ func (s *Service) runningEnvironmentConflict(projectPath project.Path, contextID
 			continue
 		}
 		if environment.Context.ID == contextID {
-			return &RunningEnvironmentConflict{Kind: "same_context", Environment: runningEnvironmentState(environment)}, nil
+			return &RunningEnvironmentConflict{Kind: "same_context", Environment: s.runningEnvironmentState(environment)}, nil
 		}
 		if differentContext == nil {
-			differentContext = &RunningEnvironmentConflict{Kind: "different_context", Environment: runningEnvironmentState(environment)}
+			differentContext = &RunningEnvironmentConflict{Kind: "different_context", Environment: s.runningEnvironmentState(environment)}
 		}
 	}
 	return differentContext, nil
@@ -90,7 +91,8 @@ func environmentStoppedEvent(environment coreRunning.Environment, timestamp time
 	})
 }
 
-func runningEnvironmentState(environment coreRunning.Environment) RunningEnvironmentState {
+func (s *Service) runningEnvironmentState(environment coreRunning.Environment) RunningEnvironmentState {
+	lifecycle := environment.Lifecycle(s.dependencies.ToolRegistry.WorkspaceCapabilities(environment.Tool.ID))
 	return RunningEnvironmentState{
 		ID:        string(environment.ID),
 		Project:   ProjectState{Name: environment.Project.Name, Path: string(environment.Project.Path)},
@@ -100,6 +102,12 @@ func runningEnvironmentState(environment coreRunning.Environment) RunningEnviron
 		Process:   RunningEnvironmentProcessState{State: string(environment.Process.State), PID: copyProcessID(environment.Process.PID)},
 		Session:   RunningEnvironmentSessionState{ID: environment.Session.ID, State: string(environment.Session.State)},
 		Launch:    RunningEnvironmentLaunchState{Source: string(environment.Launch.Source), ResolutionSource: string(environment.Launch.ResolutionSource)},
+		Lifecycle: WorkspaceLifecycleState{
+			State:      string(lifecycle.State),
+			Focusable:  lifecycle.Focusable,
+			Revealable: lifecycle.Revealable,
+			Stoppable:  lifecycle.Stoppable,
+		},
 	}
 }
 

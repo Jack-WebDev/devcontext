@@ -145,3 +145,18 @@ func (r Registry) HasCapability(id ID, capability Capability) bool {
 	}
 	return false
 }
+
+// WorkspaceCapabilities returns the existing-workspace actions implemented by
+// a tool adapter. Tools without the optional WorkspaceTool contract expose no
+// actions rather than implying that process state grants control over them.
+func (r Registry) WorkspaceCapabilities(id ID) WorkspaceCapabilities {
+	tool, ok := r.Get(id)
+	if !ok {
+		return WorkspaceCapabilities{}
+	}
+	workspaceTool, ok := tool.(WorkspaceTool)
+	if !ok {
+		return WorkspaceCapabilities{}
+	}
+	return workspaceTool.WorkspaceCapabilities()
+}

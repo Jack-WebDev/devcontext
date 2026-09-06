@@ -595,13 +595,19 @@ test("running environments show immutable launch context and tool action entry p
 			process: { state: "running" },
 			session: { state: "unknown" },
 			launch: { source: "gui", resolutionSource: "explicit" },
+			lifecycle: {
+				state: "active",
+				focusable: false,
+				revealable: false,
+				stoppable: false,
+			},
 		},
 	];
 	const html = renderToStaticMarkup(
 		createElement(RunningView, { environments }),
 	);
 
-	assert.ok(html.includes("Running"));
+	assert.ok(html.includes("Workspaces"));
 	assert.ok(html.includes("Company"));
 	assert.ok(html.includes("Second Tool"));
 	assert.ok(html.includes("Reveal"));
@@ -1208,7 +1214,7 @@ test("app shell exposes stable navigation, current project state, and a responsi
 			"Home",
 			"Contexts",
 			"Projects",
-			"Running",
+			"Workspaces",
 			"History",
 			"Settings",
 			"Trust Center",
@@ -1409,7 +1415,7 @@ test("Projects lists known projects with safe launch and management entry points
 	assert.ok(html.includes("Unassigned"));
 	assert.ok(html.includes("Choose a context before launching."));
 	assert.ok(html.includes("Company"));
-	assert.ok(html.includes("Running"));
+	assert.ok(html.includes("Active"));
 	assert.ok(html.includes("Launch Company"));
 	assert.doesNotMatch(html, /Change context/);
 	assert.ok(html.includes("Open folder"));

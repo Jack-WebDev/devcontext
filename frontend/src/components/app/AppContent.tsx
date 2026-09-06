@@ -59,7 +59,7 @@ export function RunningContent({
 	running: LoadState<RunningEnvironmentsState>;
 }) {
 	if (running.status === "loading")
-		return <LoadingMessage>Refreshing active environments...</LoadingMessage>;
+		return <LoadingMessage>Refreshing active workspaces...</LoadingMessage>;
 	if (running.status === "error")
 		return <GuiErrorNotice error={running.error} />;
 	return <RunningView environments={running.data.environments} />;

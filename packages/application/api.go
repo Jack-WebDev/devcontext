@@ -824,8 +824,8 @@ const (
 )
 
 // RunningEnvironmentState is the presentation-safe model for one immutable
-// coding-tool environment. Population and status refresh follow in later
-// running-environment phases.
+// coding-tool workspace. The legacy name preserves the established API and
+// local persistence contract while management UI calls these workspaces.
 type RunningEnvironmentState struct {
 	ID        string                         `json:"id"`
 	Project   ProjectState                   `json:"project"`
@@ -835,6 +835,16 @@ type RunningEnvironmentState struct {
 	Process   RunningEnvironmentProcessState `json:"process"`
 	Session   RunningEnvironmentSessionState `json:"session"`
 	Launch    RunningEnvironmentLaunchState  `json:"launch"`
+	Lifecycle WorkspaceLifecycleState        `json:"lifecycle"`
+}
+
+// WorkspaceLifecycleState separates the backend's observed lifecycle state
+// from actions that the selected coding-tool adapter supports.
+type WorkspaceLifecycleState struct {
+	State      string `json:"state"`
+	Focusable  bool   `json:"focusable"`
+	Revealable bool   `json:"revealable"`
+	Stoppable  bool   `json:"stoppable"`
 }
 
 // RunningEnvironmentContextState identifies the immutable context selected at launch.

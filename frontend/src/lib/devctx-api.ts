@@ -602,6 +602,14 @@ export interface RunningEnvironmentState {
 	process: RunningEnvironmentProcessState;
 	session: RunningEnvironmentSessionState;
 	launch: RunningEnvironmentLaunchState;
+	lifecycle: WorkspaceLifecycleState;
+}
+
+export interface WorkspaceLifecycleState {
+	state: "active" | "stopped" | "unknown";
+	focusable: boolean;
+	revealable: boolean;
+	stoppable: boolean;
 }
 export interface RunningEnvironmentContextState {
 	id: string;
@@ -1790,6 +1798,20 @@ function normalizeRunningEnvironmentState(
 		process: normalizeRunningEnvironmentProcessState(object.process),
 		session: normalizeRunningEnvironmentSessionState(object.session),
 		launch: normalizeRunningEnvironmentLaunchState(object.launch),
+		lifecycle: normalizeWorkspaceLifecycleState(object.lifecycle),
+	};
+}
+function normalizeWorkspaceLifecycleState(value: unknown): WorkspaceLifecycleState {
+	const object = objectValue(value);
+	const state = stringValue(object.state);
+	return {
+		state:
+			state === "active" || state === "stopped" || state === "unknown"
+				? state
+				: "unknown",
+		focusable: booleanValue(object.focusable),
+		revealable: booleanValue(object.revealable),
+		stoppable: booleanValue(object.stoppable),
 	};
 }
 function normalizeRunningEnvironmentContextState(

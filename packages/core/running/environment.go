@@ -26,6 +26,47 @@ type Environment struct {
 	Launch    LaunchIdentity
 }
 
+// WorkspaceState is Dev Context's best-known lifecycle state for a workspace.
+// Unknown is retained when neither the process nor adapter session can be
+// observed, rather than treating a recorded launch as proof it is still active.
+type WorkspaceState string
+
+const (
+	WorkspaceStateUnknown WorkspaceState = "unknown"
+	WorkspaceStateActive  WorkspaceState = "active"
+	WorkspaceStateStopped WorkspaceState = "stopped"
+)
+
+// WorkspaceLifecycle combines observed workspace state with the actions its
+// tool adapter declares. Capabilities do not assert that an action is possible
+// at this instant; callers must also require an active workspace.
+type WorkspaceLifecycle struct {
+	State      WorkspaceState
+	Focusable  bool
+	Revealable bool
+	Stoppable  bool
+}
+
+// Lifecycle reports the workspace lifecycle without performing adapter work.
+func (e Environment) Lifecycle(capabilities codingtool.WorkspaceCapabilities) WorkspaceLifecycle {
+	return WorkspaceLifecycle{
+		State:      workspaceState(e.Process.State, e.Session.State),
+		Focusable:  capabilities.Focusable,
+		Revealable: capabilities.Revealable,
+		Stoppable:  capabilities.Stoppable,
+	}
+}
+
+func workspaceState(processState ProcessState, sessionState SessionState) WorkspaceState {
+	if processState == ProcessStateStopped || sessionState == SessionStateEnded {
+		return WorkspaceStateStopped
+	}
+	if processState == ProcessStateRunning || sessionState == SessionStateActive {
+		return WorkspaceStateActive
+	}
+	return WorkspaceStateUnknown
+}
+
 // ProjectIdentity identifies the project opened by an environment.
 type ProjectIdentity struct {
 	Path project.Path

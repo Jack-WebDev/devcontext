@@ -16,22 +16,22 @@ function RunningView({
 	onStop,
 }: RunningViewProps) {
 	return (
-		<section aria-labelledby="running-heading" className="space-y-6">
+		<section aria-labelledby="workspaces-heading" className="space-y-6">
 			<div>
-				<p className="text-sm text-muted-foreground">Active coding tools</p>
-				<h2 id="running-heading" className="text-2xl font-semibold">
-					Running
+				<p className="text-sm text-muted-foreground">Active coding work</p>
+				<h2 id="workspaces-heading" className="text-2xl font-semibold">
+					Workspaces
 				</h2>
 				<p className="mt-1 text-sm text-muted-foreground">
-					Each environment keeps the context selected when it was launched.
+					Each workspace keeps the context selected when it was launched.
 				</p>
 			</div>
 
 			{environments.length === 0 ? (
 				<Card as="section" hierarchy="secondary" className="py-0">
 					<CardContent className="p-5 text-sm text-muted-foreground">
-						No active environments are recorded. Launch a project to create an
-						isolated coding-tool environment.
+						No active workspaces are recorded. Launch a project to create an
+						isolated coding-tool workspace.
 					</CardContent>
 				</Card>
 			) : (
@@ -87,7 +87,7 @@ function RunningEnvironmentCard({
 						</p>
 					</div>
 					<span className="shrink-0 text-sm font-medium text-accent-company">
-						Running
+						Active
 					</span>
 				</div>
 				<dl className="grid gap-3 border-t border-border pt-4 text-sm sm:grid-cols-3">

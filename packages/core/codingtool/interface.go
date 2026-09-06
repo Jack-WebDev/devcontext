@@ -40,3 +40,22 @@ type CodingTool interface {
 	DetectExecutable(Config) (Executable, error)
 	BuildLaunchCommand(CommandRequest) (Command, error)
 }
+
+// WorkspaceCapabilities describes the actions a coding-tool integration can
+// safely perform for an already launched workspace. These capabilities are
+// intentionally separate from observed process and session state: an adapter
+// may know that a workspace is active without being able to focus, reveal, or
+// stop it.
+type WorkspaceCapabilities struct {
+	Focusable  bool
+	Revealable bool
+	Stoppable  bool
+}
+
+// WorkspaceTool is an optional extension for integrations that can operate on
+// an existing workspace. Actions themselves remain adapter-owned; this
+// contract only advertises which requests a future caller may make.
+type WorkspaceTool interface {
+	CodingTool
+	WorkspaceCapabilities() WorkspaceCapabilities
+}

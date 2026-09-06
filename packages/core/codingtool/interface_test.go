@@ -33,6 +33,10 @@ func (fakeEditor) BuildLaunchCommand(request codingtool.CommandRequest) (codingt
 	}, nil
 }
 
+func (fakeEditor) WorkspaceCapabilities() codingtool.WorkspaceCapabilities {
+	return codingtool.WorkspaceCapabilities{Focusable: true, Revealable: true}
+}
+
 func TestEditorInterfaceAllowsGenericEditorUse(t *testing.T) {
 	var implementation codingtool.CodingTool = fakeEditor{}
 	config := codingtool.Config{
@@ -74,5 +78,13 @@ func TestEditorInterfaceAllowsGenericEditorUse(t *testing.T) {
 	}
 	if !reflect.DeepEqual(command, want) {
 		t.Fatalf("command = %#v, want %#v", command, want)
+	}
+}
+
+func TestWorkspaceToolSeparatesExistingWorkspaceCapabilities(t *testing.T) {
+	var implementation codingtool.WorkspaceTool = fakeEditor{}
+	capabilities := implementation.WorkspaceCapabilities()
+	if !capabilities.Focusable || !capabilities.Revealable || capabilities.Stoppable {
+		t.Fatalf("workspace capabilities = %#v", capabilities)
 	}
 }

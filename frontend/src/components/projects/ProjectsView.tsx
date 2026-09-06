@@ -191,7 +191,7 @@ function ProjectCard({
 					/>
 					<ProjectDetail
 						label="Workspace"
-						value={project.running ? "Running" : "Not running"}
+						value={project.running ? "Active" : "Not active"}
 					/>
 				</dl>
 
