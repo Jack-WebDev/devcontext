@@ -513,6 +513,7 @@ export namespace application {
 	    launchVerification: boolean;
 	    rememberProjects: boolean;
 	    trayEnabled: boolean;
+	    warnOnContextMismatch: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new UpdateSettingsRequest(source);
@@ -524,6 +525,7 @@ export namespace application {
 	        this.launchVerification = source["launchVerification"];
 	        this.rememberProjects = source["rememberProjects"];
 	        this.trayEnabled = source["trayEnabled"];
+	        this.warnOnContextMismatch = source["warnOnContextMismatch"];
 	    }
 	}
 	export class ValidateProjectDirectoryRequest {

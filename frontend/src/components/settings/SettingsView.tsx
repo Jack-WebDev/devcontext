@@ -3,6 +3,7 @@ import { Button } from "../ui/button.js";
 import { Label } from "../ui/label.js";
 import { Switch } from "../ui/switch.js";
 import { AppearanceSettings } from "./AppearanceSettings.js";
+import { PrivacySettings } from "./PrivacySettings.js";
 import {
 	settingsSections,
 	type SafetySetting,
@@ -108,6 +109,7 @@ function SettingsView({
 				</section>
 			))}
 			<AppearanceSettings />
+			<PrivacySettings />
 		</section>
 	);
 }

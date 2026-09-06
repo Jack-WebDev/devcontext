@@ -101,6 +101,7 @@ import {
 import { PreflightReviewView } from "../.tmp-test/src/components/selector/PreflightReviewView.js";
 import { settingsSections } from "../.tmp-test/src/components/settings/settings-sections.js";
 import { appearanceOptions } from "../.tmp-test/src/components/settings/AppearanceSettings.js";
+import { privacyStatements } from "../.tmp-test/src/components/settings/privacy-statements.js";
 import { projectMemoryBindingContextId } from "../.tmp-test/src/components/selector/project-memory.js";
 import {
 	createLaunchRequestGuard,
@@ -4094,6 +4095,20 @@ test("appearance offers persisted system and explicit color themes", () => {
 		{ value: "light", label: "Light" },
 		{ value: "dark", label: "Dark" },
 	]);
+});
+
+test("privacy settings describe implemented local data boundaries", () => {
+	assert.deepEqual(
+		privacyStatements.map((statement) => statement.title),
+		[
+			"Stored on this device",
+			"Project paths",
+			"Credentials stay with integrations",
+			"Portable exports",
+		],
+	);
+	assert.match(privacyStatements[1].description, /only when you choose/);
+	assert.match(privacyStatements[3].description, /do not include credentials/);
 });
 
 function apiError(code, message, recovery, contextMismatch) {
