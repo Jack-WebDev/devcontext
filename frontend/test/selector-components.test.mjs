@@ -1433,6 +1433,31 @@ test("Home lists recent projects for review and requires confirmation before lau
 	assert.match(dialogHtml, /role="dialog"/);
 });
 
+test("Home running summary does not assume a particular coding tool", () => {
+	const html = renderToStaticMarkup(
+		HomeView({
+			dashboard: {
+				project: { name: "api", path: "/work/api" },
+				recentProjects: [],
+				running: {
+					count: 1,
+					contextCounts: [
+						{ contextId: "company", contextName: "Company", count: 1 },
+					],
+					isolationProtected: true,
+				},
+				activity: { count: 0 },
+			},
+			launchPending: false,
+			onQuickLaunch: () => {},
+			onReviewLaunchOptions: () => {},
+		}),
+	);
+
+	assert.ok(html.includes("Running"));
+	assert.equal(html.includes("VS Code"), false);
+});
+
 test("Projects lists known projects with safe launch and management entry points", () => {
 	const html = renderToStaticMarkup(
 		ProjectsView({

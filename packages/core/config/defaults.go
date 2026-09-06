@@ -9,9 +9,13 @@ const (
 
 // DefaultGlobalConfig returns the safe configuration for a new installation.
 func DefaultGlobalConfig() GlobalConfig {
+	defaultTool := codingtool.BuiltInRegistry().DefaultID()
+
 	return GlobalConfig{
-		Version:     CurrentSchemaVersion,
-		DefaultTool: codingtool.TypeVSCode,
+		Version: CurrentSchemaVersion,
+		// The registry owns which built-in tool is selected by default. Global
+		// configuration persists that ID without making a tool-specific choice.
+		DefaultTool: defaultTool,
 		UI: UISettings{
 			RememberWindowPosition: true,
 			CloseAfterLaunch:       true,
