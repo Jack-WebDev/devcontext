@@ -123,6 +123,7 @@ export interface UpdateContextAppearanceRequest {
 export interface UpdateContextDevelopmentToolsRequest {
 	contextId: string;
 	enabledDevelopmentToolIds: string[];
+	executableOverride?: string;
 }
 export interface ArchiveContextRequest {
 	contextId: string;

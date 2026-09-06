@@ -107,6 +107,51 @@ func TestVSCodeEditorDetectsWindowsInstalledApplication(t *testing.T) {
 	}
 }
 
+func TestVSCodeEditorReportsHowWindowsExecutableWasResolved(t *testing.T) {
+	installed := `C:\\Users\\Alex\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe`
+	tests := []struct {
+		name   string
+		config codingtool.Config
+		probe  fakeExecutableProbe
+		paths  []string
+		want   codingtool.ExecutableDetectionSource
+	}{
+		{
+			name:  "PATH command",
+			probe: fakeExecutableProbe{paths: map[string]string{"code": `C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd`}},
+			want:  codingtool.ExecutableDetectionPath,
+		},
+		{
+			name:  "installed application without PATH command",
+			probe: fakeExecutableProbe{files: map[string]os.FileInfo{installed: fakeFileInfo{mode: 0o644}}},
+			paths: []string{installed},
+			want:  codingtool.ExecutableDetectionInstalled,
+		},
+		{
+			name:   "configured executable",
+			config: codingtool.Config{ExecutableOverride: installed},
+			probe:  fakeExecutableProbe{files: map[string]os.FileInfo{installed: fakeFileInfo{mode: 0o644}}},
+			want:   codingtool.ExecutableDetectionConfigured,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			detection, err := (codingtool.VSCodeEditor{
+				Probe:               &tt.probe,
+				OperatingSystem:     "windows",
+				WindowsInstallPaths: tt.paths,
+			}).DetectExecutableDetailed(tt.config)
+			if err != nil {
+				t.Fatalf("detect executable: %v", err)
+			}
+			if detection.Platform != "windows" || detection.Source != tt.want || detection.Executable == "" {
+				t.Fatalf("detection = %#v", detection)
+			}
+		})
+	}
+}
+
 func TestVSCodeEditorReportsTypedExecutableNotFoundError(t *testing.T) {
 	probe := fakeExecutableProbe{}
 

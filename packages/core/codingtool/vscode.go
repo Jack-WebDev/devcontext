@@ -103,12 +103,24 @@ func (VSCodeEditor) StatusDataFileName() string {
 	return "devctx-status.json"
 }
 
-// DetectExecutable locates the VS Code command available through PATH.
+// DetectExecutable locates a launchable VS Code command.
 func (e VSCodeEditor) DetectExecutable(config Config) (Executable, error) {
+	detection, err := e.DetectExecutableDetailed(config)
+	return detection.Executable, err
+}
+
+// DetectExecutableDetailed locates VS Code and records whether it was found
+// through PATH, a Windows application installation, or explicit configuration.
+func (e VSCodeEditor) DetectExecutableDetailed(config Config) (ExecutableDetection, error) {
 	probe := e.resolveProbe()
 	goos := e.resolveOperatingSystem()
 	if override := strings.TrimSpace(config.ExecutableOverride); override != "" {
-		return validateConfiguredExecutable(probe, goos, VSCodeID, override)
+		executable, err := validateConfiguredExecutable(probe, goos, VSCodeID, override)
+		return ExecutableDetection{
+			Executable: executable,
+			Platform:   goos,
+			Source:     ExecutableDetectionConfigured,
+		}, err
 	}
 
 	candidates := vscodeExecutableCandidates(goos)
@@ -116,18 +128,26 @@ func (e VSCodeEditor) DetectExecutable(config Config) (Executable, error) {
 	for _, candidate := range candidates {
 		path, err := probe.LookPath(candidate)
 		if err == nil {
-			return Executable(path), nil
+			return ExecutableDetection{
+				Executable: Executable(path),
+				Platform:   goos,
+				Source:     ExecutableDetectionPath,
+			}, nil
 		}
 	}
 	for _, path := range e.windowsInstallPaths(goos) {
 		info, err := probe.Stat(path)
 		if err == nil && isUsableExecutable(info, goos) {
-			return Executable(path), nil
+			return ExecutableDetection{
+				Executable: Executable(path),
+				Platform:   goos,
+				Source:     ExecutableDetectionInstalled,
+			}, nil
 		}
 		candidates = append(candidates, path)
 	}
 
-	return "", &ExecutableNotFoundError{
+	return ExecutableDetection{Platform: goos, Source: ExecutableDetectionUnavailable}, &ExecutableNotFoundError{
 		ToolID:     VSCodeID,
 		Candidates: candidates,
 	}

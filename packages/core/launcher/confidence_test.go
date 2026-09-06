@@ -435,6 +435,89 @@ func TestToolConfidenceCheckMapsExecutableReadiness(t *testing.T) {
 	}
 }
 
+func TestToolConfidenceCheckExplainsWindowsPATHAndConfiguredExecutables(t *testing.T) {
+	tests := []struct {
+		name      string
+		detection codingtool.ExecutableDetection
+		want      launcher.ConfidenceCheck
+	}{
+		{
+			name: "installed application when CLI is missing from PATH",
+			detection: codingtool.ExecutableDetection{
+				Executable: `C:\\Program Files\\Microsoft VS Code\\Code.exe`,
+				Platform:   "windows",
+				Source:     codingtool.ExecutableDetectionInstalled,
+			},
+			want: launcher.ConfidenceCheck{
+				Component:  launcher.ConfidenceCheckTool,
+				ToolID:     "vscode",
+				Severity:   launcher.ConfidenceReady,
+				Label:      "VS Code",
+				Message:    "VS Code is installed, but its command is not on PATH. Dev Context will open the installed application.",
+				ActionHint: "Add the VS Code command to PATH if you also want to launch it from a terminal.",
+			},
+		},
+		{
+			name: "configured executable",
+			detection: codingtool.ExecutableDetection{
+				Executable: `D:\\Tools\\Code.exe`,
+				Platform:   "windows",
+				Source:     codingtool.ExecutableDetectionConfigured,
+			},
+			want: launcher.ConfidenceCheck{
+				Component: launcher.ConfidenceCheckTool,
+				ToolID:    "vscode",
+				Severity:  launcher.ConfidenceReady,
+				Label:     "VS Code",
+				Message:   "VS Code will use the executable selected for this context.",
+			},
+		},
+		{
+			name: "missing installed application and PATH command",
+			detection: codingtool.ExecutableDetection{
+				Platform: "windows",
+				Source:   codingtool.ExecutableDetectionUnavailable,
+			},
+			want: launcher.ConfidenceCheck{
+				Component:  launcher.ConfidenceCheckTool,
+				ToolID:     "vscode",
+				Severity:   launcher.ConfidenceBlocked,
+				Label:      "VS Code",
+				Message:    "VS Code is not installed in a standard location and its command is not on PATH.",
+				ActionHint: "Install VS Code, add its command to PATH, or select its executable for this context.",
+			},
+		},
+		{
+			name: "unusable configured executable",
+			detection: codingtool.ExecutableDetection{
+				Platform: "windows",
+				Source:   codingtool.ExecutableDetectionConfigured,
+			},
+			want: launcher.ConfidenceCheck{
+				Component:  launcher.ConfidenceCheckTool,
+				ToolID:     "vscode",
+				Severity:   launcher.ConfidenceBlocked,
+				Label:      "VS Code",
+				Message:    "The executable selected for VS Code cannot be used.",
+				ActionHint: "Select a valid VS Code executable for this context.",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var err error
+			if tt.detection.Source == codingtool.ExecutableDetectionUnavailable || tt.detection.Source == codingtool.ExecutableDetectionConfigured && tt.detection.Executable == "" {
+				err = &codingtool.ExecutableNotFoundError{ToolID: codingtool.VSCodeID}
+			}
+			got := launcher.ToolConfidenceCheckWithDetection("vscode", "VS Code", tt.detection, err)
+			if got != tt.want {
+				t.Fatalf("check = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestIsolationConfidenceChecksRepresentStorageReadiness(t *testing.T) {
 	root := t.TempDir()
 	paths := filesystem.ContextPaths{

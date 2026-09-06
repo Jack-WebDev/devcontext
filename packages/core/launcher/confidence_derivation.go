@@ -89,6 +89,34 @@ func ToolConfidenceCheck(toolID codingtool.ID, displayName string, executable co
 	return check
 }
 
+// ToolConfidenceCheckWithDetection adds platform-specific recovery copy when
+// an adapter can safely explain how it resolved a launchable executable.
+func ToolConfidenceCheckWithDetection(toolID codingtool.ID, displayName string, detection codingtool.ExecutableDetection, err error) ConfidenceCheck {
+	check := ToolConfidenceCheck(toolID, displayName, detection.Executable, err)
+	if detection.Platform != "windows" {
+		return check
+	}
+	if err != nil {
+		if detection.Source == codingtool.ExecutableDetectionConfigured {
+			check.Message = "The executable selected for " + check.Label + " cannot be used."
+			check.ActionHint = "Select a valid " + check.Label + " executable for this context."
+		} else if errors.Is(err, codingtool.ErrExecutableNotFound) {
+			check.Message = check.Label + " is not installed in a standard location and its command is not on PATH."
+			check.ActionHint = "Install " + check.Label + ", add its command to PATH, or select its executable for this context."
+		}
+		return check
+	}
+
+	switch detection.Source {
+	case codingtool.ExecutableDetectionInstalled:
+		check.Message = check.Label + " is installed, but its command is not on PATH. Dev Context will open the installed application."
+		check.ActionHint = "Add the " + check.Label + " command to PATH if you also want to launch it from a terminal."
+	case codingtool.ExecutableDetectionConfigured:
+		check.Message = check.Label + " will use the executable selected for this context."
+	}
+	return check
+}
+
 // IsolationConfidenceChecks derives readiness checks for the context-owned
 // isolation storage required by launch. Provider checks are generated from the
 // enabled registered providers passed by the application layer.
