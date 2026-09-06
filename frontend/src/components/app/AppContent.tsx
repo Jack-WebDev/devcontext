@@ -55,14 +55,18 @@ export function HistoryContent({
 
 export function RunningContent({
 	running,
+	onReveal,
+	onStop,
 }: {
 	running: LoadState<RunningEnvironmentsState>;
+	onReveal: (environment: RunningEnvironmentsState["environments"][number]) => void;
+	onStop: (environment: RunningEnvironmentsState["environments"][number]) => void;
 }) {
 	if (running.status === "loading")
 		return <LoadingMessage>Refreshing active workspaces...</LoadingMessage>;
 	if (running.status === "error")
 		return <GuiErrorNotice error={running.error} />;
-	return <RunningView environments={running.data.environments} />;
+	return <RunningView environments={running.data.environments} onReveal={onReveal} onStop={onStop} />;
 }
 
 export function ContextsContent({

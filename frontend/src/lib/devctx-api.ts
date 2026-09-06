@@ -604,6 +604,7 @@ export interface RunningEnvironmentState {
 	launch: RunningEnvironmentLaunchState;
 	lifecycle: WorkspaceLifecycleState;
 }
+export interface WorkspaceActionRequest { workspaceId: string; }
 
 export interface WorkspaceLifecycleState {
 	state: "active" | "stopped" | "unknown";
@@ -714,6 +715,8 @@ export interface DevContextApi {
 	): Promise<ApiResult<RunRepairActionResult>>;
 	getHistory(): Promise<ApiResult<HistoryState>>;
 	getRunningEnvironments(): Promise<ApiResult<RunningEnvironmentsState>>;
+	revealWorkspace(request: WorkspaceActionRequest): Promise<ApiResult<unknown>>;
+	stopWorkspace(request: WorkspaceActionRequest): Promise<ApiResult<unknown>>;
 	getSettings(): Promise<ApiResult<SettingsState>>;
 	updateSettings(
 		request: UpdateSettingsRequest,
@@ -765,6 +768,8 @@ export interface WailsBindings {
 	runRepairAction(request: RunRepairActionRequest): Promise<unknown>;
 	getHistory(): Promise<unknown>;
 	getRunningEnvironments(): Promise<unknown>;
+	revealWorkspace(request: WorkspaceActionRequest): Promise<unknown>;
+	stopWorkspace(request: WorkspaceActionRequest): Promise<unknown>;
 	getSettings(): Promise<unknown>;
 	updateSettings(request: UpdateSettingsRequest): Promise<unknown>;
 }
@@ -972,6 +977,8 @@ export function createDevContextApi(
 				normalizeRunningEnvironmentsState,
 			);
 		},
+		revealWorkspace(request) { return callBinding(() => bindings.revealWorkspace(request), (value) => value); },
+		stopWorkspace(request) { return callBinding(() => bindings.stopWorkspace(request), (value) => value); },
 		getSettings() {
 			return callBinding(() => bindings.getSettings(), normalizeSettingsState);
 		},
@@ -1132,6 +1139,14 @@ const generatedBindings: WailsBindings = {
 	async getRunningEnvironments() {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
 		return bindings.GetRunningEnvironments();
+	},
+	async revealWorkspace(request) {
+		const bindings = await import("../../wailsjs/go/wailsapp/App");
+		return bindings.RevealWorkspace(request);
+	},
+	async stopWorkspace(request) {
+		const bindings = await import("../../wailsjs/go/wailsapp/App");
+		return bindings.StopWorkspace(request);
 	},
 	async getSettings() {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");

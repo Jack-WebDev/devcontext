@@ -103,7 +103,7 @@ function RunningEnvironmentCard({
 						type="button"
 						variant="outline"
 						size="sm"
-						disabled={onReveal === undefined}
+						disabled={!environment.lifecycle.revealable || onReveal === undefined}
 						title={
 							onReveal === undefined
 								? "Revealing an environment is not available for this coding tool yet."
@@ -131,7 +131,7 @@ function RunningEnvironmentCard({
 						type="button"
 						variant="destructive"
 						size="sm"
-						disabled={onStop === undefined}
+						disabled={!environment.lifecycle.stoppable || onStop === undefined}
 						title={
 							onStop === undefined
 								? "Stopping an environment is not available for this coding tool yet."

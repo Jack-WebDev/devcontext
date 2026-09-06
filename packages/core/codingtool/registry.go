@@ -1,6 +1,8 @@
 package codingtool
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // RegisteredTool describes one registered coding-tool integration and its user-facing name.
 // The name belongs in the registry so callers do not need integration-specific
@@ -159,4 +161,28 @@ func (r Registry) WorkspaceCapabilities(id ID) WorkspaceCapabilities {
 		return WorkspaceCapabilities{}
 	}
 	return workspaceTool.WorkspaceCapabilities()
+}
+
+func (r Registry) RevealWorkspace(id ID, workspace WorkspaceReference) error {
+	tool, ok := r.Get(id)
+	if !ok {
+		return fmt.Errorf("workspace tool %q is not registered", id)
+	}
+	revealer, ok := tool.(WorkspaceRevealer)
+	if !ok {
+		return fmt.Errorf("workspace reveal is not supported by %q", id)
+	}
+	return revealer.RevealWorkspace(workspace)
+}
+
+func (r Registry) StopWorkspace(id ID, workspace WorkspaceReference) error {
+	tool, ok := r.Get(id)
+	if !ok {
+		return fmt.Errorf("workspace tool %q is not registered", id)
+	}
+	stopper, ok := tool.(WorkspaceStopper)
+	if !ok {
+		return fmt.Errorf("workspace stop is not supported by %q", id)
+	}
+	return stopper.StopWorkspace(workspace)
 }

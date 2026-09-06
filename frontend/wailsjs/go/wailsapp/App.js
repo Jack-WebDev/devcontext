@@ -81,6 +81,8 @@ export function GetRepairActions(arg1) {
 export function GetRunningEnvironments() {
   return window['go']['wailsapp']['App']['GetRunningEnvironments']();
 }
+export function RevealWorkspace(arg1) { return window['go']['wailsapp']['App']['RevealWorkspace'](arg1); }
+export function StopWorkspace(arg1) { return window['go']['wailsapp']['App']['StopWorkspace'](arg1); }
 
 export function GetSettings() {
   return window['go']['wailsapp']['App']['GetSettings']();

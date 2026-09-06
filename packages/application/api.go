@@ -876,6 +876,10 @@ type RunningEnvironmentsState struct {
 	Environments []RunningEnvironmentState `json:"environments"`
 }
 
+type WorkspaceActionRequest struct {
+	WorkspaceID string `json:"workspaceId"`
+}
+
 // ProviderCredentialSessionState describes a detected global provider session
 // using only non-secret metadata that helps the user classify the session.
 type ProviderCredentialSessionState struct {

@@ -42,6 +42,8 @@ export function GetRecentProjects():Promise<any>;
 export function GetRepairActions(arg1:application.GetRepairActionsRequest):Promise<any>;
 
 export function GetRunningEnvironments():Promise<any>;
+export function RevealWorkspace(arg1:any):Promise<any>;
+export function StopWorkspace(arg1:any):Promise<any>;
 
 export function GetSettings():Promise<any>;
 

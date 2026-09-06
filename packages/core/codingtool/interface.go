@@ -59,3 +59,19 @@ type WorkspaceTool interface {
 	CodingTool
 	WorkspaceCapabilities() WorkspaceCapabilities
 }
+
+// WorkspaceReference contains the safe, adapter-relevant identity of an
+// existing workspace. It deliberately excludes credentials and launch args.
+type WorkspaceReference struct {
+	ID          string
+	ProjectPath string
+	SessionID   string
+	ProcessID   *int
+}
+
+type WorkspaceRevealer interface {
+	RevealWorkspace(WorkspaceReference) error
+}
+type WorkspaceStopper interface {
+	StopWorkspace(WorkspaceReference) error
+}

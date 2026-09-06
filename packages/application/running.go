@@ -1,6 +1,7 @@
 package application
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
@@ -21,6 +22,56 @@ func (s *Service) getRunningEnvironments() (RunningEnvironmentsState, error) {
 		states[index] = s.runningEnvironmentState(environment)
 	}
 	return RunningEnvironmentsState{Environments: states}, nil
+}
+
+func (s *Service) revealWorkspace(request WorkspaceActionRequest) error {
+	environment, err := s.activeWorkspace(request.WorkspaceID)
+	if err != nil {
+		return err
+	}
+	if !s.dependencies.ToolRegistry.WorkspaceCapabilities(environment.Tool.ID).Revealable {
+		return fmt.Errorf("workspace reveal is not available")
+	}
+	return s.dependencies.ToolRegistry.RevealWorkspace(environment.Tool.ID, workspaceReference(environment))
+}
+
+func (s *Service) stopWorkspace(request WorkspaceActionRequest) error {
+	environment, err := s.activeWorkspace(request.WorkspaceID)
+	if err != nil {
+		return err
+	}
+	if !s.dependencies.ToolRegistry.WorkspaceCapabilities(environment.Tool.ID).Stoppable {
+		return fmt.Errorf("workspace stop is not available")
+	}
+	if err := s.dependencies.ToolRegistry.StopWorkspace(environment.Tool.ID, workspaceReference(environment)); err != nil {
+		return err
+	}
+	stopped, err := s.dependencies.RunningEnvironments.MarkStopped(environment.ID)
+	if err != nil {
+		return err
+	}
+	s.recordHistoryEvent(environmentStoppedEvent(stopped, s.now()))
+	return nil
+}
+
+func (s *Service) activeWorkspace(id string) (coreRunning.Environment, error) {
+	if id == "" {
+		return coreRunning.Environment{}, fmt.Errorf("workspace ID is required")
+	}
+	environments, err := s.refreshRunningEnvironments()
+	if err != nil {
+		return coreRunning.Environment{}, err
+	}
+	for _, environment := range environments {
+		if string(environment.ID) == id {
+			return environment, nil
+		}
+	}
+	return coreRunning.Environment{}, fmt.Errorf("active workspace %q does not exist", id)
+}
+
+func workspaceReference(environment coreRunning.Environment) codingtool.WorkspaceReference {
+	return codingtool.WorkspaceReference{ID: string(environment.ID), ProjectPath: string(environment.Project.Path), SessionID: environment.Session.ID, ProcessID: copyProcessID(environment.Process.PID)}
 }
 
 func (s *Service) refreshRunningEnvironments() ([]coreRunning.Environment, error) {

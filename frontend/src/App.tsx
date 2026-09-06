@@ -852,7 +852,11 @@ function ManagementApp() {
 			) : activeRoute === "history" ? (
 				<HistoryContent history={history} />
 			) : activeRoute === "running" ? (
-				<RunningContent running={running} />
+				<RunningContent
+					running={running}
+					onReveal={(workspace) => { void devContextApi.revealWorkspace({ workspaceId: workspace.id }).then(() => refreshRunningEnvironments()); }}
+					onStop={(workspace) => { if (window.confirm(`Stop ${workspace.project.name}? Unsaved work in the coding tool may be lost.`)) void devContextApi.stopWorkspace({ workspaceId: workspace.id }).then(() => refreshRunningEnvironments()); }}
+				/>
 			) : activeRoute === "settings" ? (
 				settings.status === "loaded" ? (
 					<SettingsView
