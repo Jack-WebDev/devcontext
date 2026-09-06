@@ -32,7 +32,7 @@ function AppShell({
 }: AppShellProps) {
 	return (
 		<div
-			className="app-shell grid h-screen grid-rows-[minmax(0,1fr)_48px] overflow-hidden text-foreground"
+			className="app-shell grid h-full grid-rows-[minmax(0,1fr)_48px] overflow-hidden text-foreground"
 			data-app-shell
 		>
 			<div className="app-shell-grid grid min-h-0 overflow-hidden">
