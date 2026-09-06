@@ -158,6 +158,9 @@ type UpdateContextAppearanceRequest struct {
 type UpdateContextDevelopmentToolsRequest struct {
 	ContextID                 string   `json:"contextId"`
 	EnabledDevelopmentToolIDs []string `json:"enabledDevelopmentToolIds"`
+	// ExecutableOverride optionally sets the selected coding tool's manual
+	// executable. An omitted value preserves the existing selection.
+	ExecutableOverride *string `json:"executableOverride,omitempty"`
 }
 
 type ArchiveContextRequest struct {

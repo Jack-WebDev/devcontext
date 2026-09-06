@@ -190,7 +190,7 @@ function ContextDetailView({
 				<ContextLaunchPreferences
 					context={context}
 					onCancel={() => onNavigate("overview")}
-					onSave={async (toolId) => {
+					onSave={async ({ toolId, executableOverride }) => {
 						const enabledDevelopmentToolIds = [
 							toolId,
 							...(context.developmentTools
@@ -200,6 +200,9 @@ function ContextDetailView({
 						const saved = await updateDevelopmentTools({
 							contextId,
 							enabledDevelopmentToolIds,
+							...(executableOverride === undefined
+								? {}
+								: { executableOverride }),
 						});
 						if (saved.ok) {
 							applyUpdatedContext(saved.data);
@@ -810,14 +813,22 @@ function ContextLaunchPreferences({
 }: {
 	context: ContextState;
 	onCancel: () => void;
-	onSave: (toolId: string) => Promise<ApiResult<ContextState>>;
+	onSave: (selection: {
+		toolId: string;
+		executableOverride?: string;
+	}) => Promise<ApiResult<ContextState>>;
 }) {
 	const [toolId, setToolId] = useState(context.tool.id);
+	const [useCustomExecutable, setUseCustomExecutable] = useState(false);
+	const [executableOverride, setExecutableOverride] = useState("");
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState<string>();
 	async function submit() {
 		setPending(true);
-		const result = await onSave(toolId);
+		const result = await onSave({
+			toolId,
+			...(useCustomExecutable ? { executableOverride } : {}),
+		});
 		setPending(false);
 		if (!result.ok) {
 			setError(result.error.message);
@@ -851,6 +862,42 @@ function ContextLaunchPreferences({
 						{tool.name}
 					</Button>
 				))}
+			</fieldset>
+			<fieldset className="space-y-2 border-t border-border pt-5">
+				<legend className="text-sm font-medium">Custom executable</legend>
+				<label className="flex items-start gap-3 text-sm">
+					<input
+						type="checkbox"
+						checked={useCustomExecutable}
+						onChange={(event) =>
+							setUseCustomExecutable(event.currentTarget.checked)
+						}
+					/>
+					<span>
+						Use a specific executable for this context.
+						<span className="mt-1 block text-muted-foreground">
+							Useful when the coding-tool command is not available on PATH.
+						</span>
+					</span>
+				</label>
+				{useCustomExecutable ? (
+					<label
+						className="grid gap-2 text-sm font-medium"
+						htmlFor="context-executable-override"
+					>
+						Executable path
+						<input
+							id="context-executable-override"
+							type="text"
+							className="h-10 border border-input bg-background px-3 text-sm text-foreground"
+							placeholder="/path/to/code"
+							value={executableOverride}
+							onChange={(event) =>
+								setExecutableOverride(event.currentTarget.value)
+							}
+						/>
+					</label>
+				) : null}
 			</fieldset>
 			{error ? (
 				<p role="alert" className="text-sm text-destructive">

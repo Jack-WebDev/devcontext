@@ -497,6 +497,7 @@ export namespace application {
 	export class UpdateContextDevelopmentToolsRequest {
 	    contextId: string;
 	    enabledDevelopmentToolIds: string[];
+	    executableOverride?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new UpdateContextDevelopmentToolsRequest(source);
@@ -506,6 +507,7 @@ export namespace application {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.contextId = source["contextId"];
 	        this.enabledDevelopmentToolIds = source["enabledDevelopmentToolIds"];
+	        this.executableOverride = source["executableOverride"];
 	    }
 	}
 	export class UpdateSettingsRequest {

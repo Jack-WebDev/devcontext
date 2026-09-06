@@ -71,6 +71,13 @@ func ToolConfidenceCheck(toolID codingtool.ID, displayName string, executable co
 		check.Message = name + " is available for launch."
 		return check
 	}
+	if errors.Is(err, codingtool.ErrExecutableDetectionTimedOut) {
+		check.Severity = ConfidenceNeedsAttention
+		check.Message = name + " is taking longer than expected to check."
+		check.ActionHint = "Check again, continue without detection, or review diagnostics."
+		check.Retryable = true
+		return check
+	}
 
 	check.Severity = ConfidenceBlocked
 	check.ActionHint = "Install " + name + " or configure its executable."
@@ -86,6 +93,96 @@ func ToolConfidenceCheck(toolID codingtool.ID, displayName string, executable co
 		check.Message = name + " readiness could not be checked."
 	}
 
+	return check
+}
+
+// ToolConfidenceCheckWithDetection adds platform-specific recovery copy when
+// an adapter can safely explain how it resolved a launchable executable.
+func ToolConfidenceCheckWithDetection(toolID codingtool.ID, displayName string, detection codingtool.ExecutableDetection, err error) ConfidenceCheck {
+	check := ToolConfidenceCheck(toolID, displayName, detection.Executable, err)
+	switch detection.Platform {
+	case "windows":
+		return windowsToolConfidenceCheck(check, detection, err)
+	case "linux":
+		return linuxToolConfidenceCheck(check, detection, err)
+	case "darwin":
+		return macOSToolConfidenceCheck(check, detection, err)
+	default:
+		return check
+	}
+}
+
+func windowsToolConfidenceCheck(check ConfidenceCheck, detection codingtool.ExecutableDetection, err error) ConfidenceCheck {
+	if err != nil {
+		if detection.Source == codingtool.ExecutableDetectionConfigured {
+			check.Message = "The executable selected for " + check.Label + " cannot be used."
+			check.ActionHint = "Select a valid " + check.Label + " executable for this context."
+		} else if errors.Is(err, codingtool.ErrExecutableNotFound) {
+			check.Message = check.Label + " is not installed in a standard location and its command is not on PATH."
+			check.ActionHint = "Install " + check.Label + ", add its command to PATH, or select its executable for this context."
+		}
+		return check
+	}
+
+	switch detection.Source {
+	case codingtool.ExecutableDetectionInstalled:
+		check.Message = check.Label + " is installed, but its command is not on PATH. Dev Context will open the installed application."
+		check.ActionHint = "Add the " + check.Label + " command to PATH if you also want to launch it from a terminal."
+	case codingtool.ExecutableDetectionConfigured:
+		check.Message = check.Label + " will use the executable selected for this context."
+	}
+	return check
+}
+
+func linuxToolConfidenceCheck(check ConfidenceCheck, detection codingtool.ExecutableDetection, err error) ConfidenceCheck {
+	if err != nil {
+		switch {
+		case errors.Is(err, codingtool.ErrExecutableNotExecutable):
+			check.Message = "Dev Context does not have permission to run " + check.Label + "."
+			check.ActionHint = "Check the executable permissions or select a different " + check.Label + " executable for this context."
+		case detection.Source == codingtool.ExecutableDetectionConfigured:
+			check.Message = "The executable selected for " + check.Label + " was not found."
+			check.ActionHint = "Select a valid " + check.Label + " executable for this context."
+		case errors.Is(err, codingtool.ErrExecutableNotFound):
+			check.Message = check.Label + " was not found in a standard location or on PATH."
+			check.ActionHint = "Install " + check.Label + ", add its command to PATH, or select its executable for this context."
+		}
+		return check
+	}
+
+	switch detection.Source {
+	case codingtool.ExecutableDetectionInstalled:
+		check.Message = check.Label + " is installed, but its command is not on PATH. Dev Context will use the installed executable."
+		check.ActionHint = "Add the " + check.Label + " command to PATH if you also want to launch it from a terminal."
+	case codingtool.ExecutableDetectionConfigured:
+		check.Message = check.Label + " will use the executable selected for this context."
+	}
+	return check
+}
+
+func macOSToolConfidenceCheck(check ConfidenceCheck, detection codingtool.ExecutableDetection, err error) ConfidenceCheck {
+	if err != nil {
+		switch {
+		case errors.Is(err, codingtool.ErrExecutableNotExecutable):
+			check.Message = "macOS could not run " + check.Label + "."
+			check.ActionHint = "Check the app permissions and macOS security settings, or select a different " + check.Label + " executable for this context."
+		case detection.Source == codingtool.ExecutableDetectionConfigured:
+			check.Message = "The executable selected for " + check.Label + " was not found."
+			check.ActionHint = "Select a valid " + check.Label + " executable for this context."
+		case errors.Is(err, codingtool.ErrExecutableNotFound):
+			check.Message = check.Label + " was not found in Applications or on PATH."
+			check.ActionHint = "Install " + check.Label + ", add its command to PATH, or select its executable for this context."
+		}
+		return check
+	}
+
+	switch detection.Source {
+	case codingtool.ExecutableDetectionInstalled:
+		check.Message = check.Label + " is installed, but its command is not on PATH. Dev Context will use the application bundle."
+		check.ActionHint = "Install the " + check.Label + " shell command if you also want to launch it from a terminal."
+	case codingtool.ExecutableDetectionConfigured:
+		check.Message = check.Label + " will use the executable selected for this context."
+	}
 	return check
 }
 

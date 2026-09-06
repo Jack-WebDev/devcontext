@@ -41,6 +41,33 @@ type CodingTool interface {
 	BuildLaunchCommand(CommandRequest) (Command, error)
 }
 
+// ExecutableDetection describes how a tool executable was resolved. It is an
+// optional extension because most tool adapters only need the base CodingTool
+// contract to launch successfully.
+type ExecutableDetection struct {
+	Executable Executable
+	Platform   string
+	Source     ExecutableDetectionSource
+}
+
+// ExecutableDetectionSource is a bounded, presentation-safe explanation for
+// an executable resolution result.
+type ExecutableDetectionSource string
+
+const (
+	ExecutableDetectionPath        ExecutableDetectionSource = "path"
+	ExecutableDetectionInstalled   ExecutableDetectionSource = "installed_application"
+	ExecutableDetectionConfigured  ExecutableDetectionSource = "configured"
+	ExecutableDetectionUnavailable ExecutableDetectionSource = "unavailable"
+)
+
+// DetailedExecutableDetector is implemented by tools that can explain how
+// executable detection succeeded without exposing implementation-specific
+// probing details to application callers.
+type DetailedExecutableDetector interface {
+	DetectExecutableDetailed(Config) (ExecutableDetection, error)
+}
+
 // WorkspaceCapabilities describes the actions a coding-tool integration can
 // safely perform for an already launched workspace. These capabilities are
 // intentionally separate from observed process and session state: an adapter

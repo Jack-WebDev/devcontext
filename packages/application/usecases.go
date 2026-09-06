@@ -1,6 +1,7 @@
 package application
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -644,6 +645,11 @@ func (s *Service) updateContextDevelopmentTools(request UpdateContextDevelopment
 	}
 	if _, ok := ctx.Tool.Tools[toolID]; !ok {
 		ctx.Tool.Tools[toolID] = codingtool.Config{}
+	}
+	if request.ExecutableOverride != nil {
+		config := ctx.Tool.Tools[toolID]
+		config.ExecutableOverride = strings.TrimSpace(*request.ExecutableOverride)
+		ctx.Tool.Tools[toolID] = config
 	}
 	ctx.Tool.DefaultTool = toolID
 	providers := make(provider.Configs, len(selection.EnabledProviderIDs))
@@ -2017,15 +2023,15 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 	toolConfig := ctx.Tool.ConfigFor(toolID)
 	registeredTool, registered := s.dependencies.ToolRegistry.Lookup(toolID)
 	toolName := string(toolID)
-	var executable codingtool.Executable
+	var detection codingtool.ExecutableDetection
 	var toolErr error
 	if !registered {
 		toolErr = fmt.Errorf("selected coding tool %q is not registered", toolID)
 	} else {
 		toolName = registeredTool.DisplayName
-		executable, toolErr = registeredTool.Integration.DetectExecutable(toolConfig)
+		detection, toolErr = codingtool.DetectExecutableDetailedWithin(context.Background(), s.dependencies.ExecutableDetectionTimeout, registeredTool.Integration, toolConfig)
 	}
-	checks = append(checks, launcher.ToolConfidenceCheck(toolID, toolName, executable, toolErr))
+	checks = append(checks, launcher.ToolConfidenceCheckWithDetection(toolID, toolName, detection, toolErr))
 
 	contextPaths, pathsErr := filesystem.DeriveContextPaths(s.dependencies.Paths, ctx.ID)
 	if pathsErr != nil {

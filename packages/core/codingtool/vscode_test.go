@@ -107,6 +107,171 @@ func TestVSCodeEditorDetectsWindowsInstalledApplication(t *testing.T) {
 	}
 }
 
+func TestVSCodeEditorReportsHowWindowsExecutableWasResolved(t *testing.T) {
+	installed := `C:\\Users\\Alex\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe`
+	tests := []struct {
+		name   string
+		config codingtool.Config
+		probe  fakeExecutableProbe
+		paths  []string
+		want   codingtool.ExecutableDetectionSource
+	}{
+		{
+			name:  "PATH command",
+			probe: fakeExecutableProbe{paths: map[string]string{"code": `C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd`}},
+			want:  codingtool.ExecutableDetectionPath,
+		},
+		{
+			name:  "installed application without PATH command",
+			probe: fakeExecutableProbe{files: map[string]os.FileInfo{installed: fakeFileInfo{mode: 0o644}}},
+			paths: []string{installed},
+			want:  codingtool.ExecutableDetectionInstalled,
+		},
+		{
+			name:   "configured executable",
+			config: codingtool.Config{ExecutableOverride: installed},
+			probe:  fakeExecutableProbe{files: map[string]os.FileInfo{installed: fakeFileInfo{mode: 0o644}}},
+			want:   codingtool.ExecutableDetectionConfigured,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			detection, err := (codingtool.VSCodeEditor{
+				Probe:               &tt.probe,
+				OperatingSystem:     "windows",
+				WindowsInstallPaths: tt.paths,
+			}).DetectExecutableDetailed(tt.config)
+			if err != nil {
+				t.Fatalf("detect executable: %v", err)
+			}
+			if detection.Platform != "windows" || detection.Source != tt.want || detection.Executable == "" {
+				t.Fatalf("detection = %#v", detection)
+			}
+		})
+	}
+}
+
+func TestVSCodeEditorReportsHowLinuxExecutableWasResolved(t *testing.T) {
+	installed := "/opt/visual-studio-code/code"
+	tests := []struct {
+		name   string
+		config codingtool.Config
+		probe  fakeExecutableProbe
+		paths  []string
+		want   codingtool.ExecutableDetectionSource
+	}{
+		{
+			name:  "PATH command",
+			probe: fakeExecutableProbe{paths: map[string]string{"code": "/usr/local/bin/code"}},
+			want:  codingtool.ExecutableDetectionPath,
+		},
+		{
+			name:  "installed application without PATH command",
+			probe: fakeExecutableProbe{files: map[string]os.FileInfo{installed: fakeFileInfo{mode: 0o755}}},
+			paths: []string{installed},
+			want:  codingtool.ExecutableDetectionInstalled,
+		},
+		{
+			name:   "configured executable",
+			config: codingtool.Config{ExecutableOverride: installed},
+			probe:  fakeExecutableProbe{files: map[string]os.FileInfo{installed: fakeFileInfo{mode: 0o755}}},
+			want:   codingtool.ExecutableDetectionConfigured,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			detection, err := (codingtool.VSCodeEditor{
+				Probe:             &tt.probe,
+				OperatingSystem:   "linux",
+				LinuxInstallPaths: tt.paths,
+			}).DetectExecutableDetailed(tt.config)
+			if err != nil {
+				t.Fatalf("detect executable: %v", err)
+			}
+			if detection.Platform != "linux" || detection.Source != tt.want || detection.Executable == "" {
+				t.Fatalf("detection = %#v", detection)
+			}
+		})
+	}
+}
+
+func TestVSCodeEditorReportsNonExecutableLinuxInstallation(t *testing.T) {
+	installed := "/opt/visual-studio-code/code"
+	detection, err := (codingtool.VSCodeEditor{
+		Probe:             &fakeExecutableProbe{files: map[string]os.FileInfo{installed: fakeFileInfo{mode: 0o644}}},
+		OperatingSystem:   "linux",
+		LinuxInstallPaths: []string{installed},
+	}).DetectExecutableDetailed(codingtool.DefaultConfig())
+	if !errors.Is(err, codingtool.ErrExecutableNotExecutable) {
+		t.Fatalf("error = %v, want %v", err, codingtool.ErrExecutableNotExecutable)
+	}
+	if detection.Platform != "linux" || detection.Source != codingtool.ExecutableDetectionInstalled {
+		t.Fatalf("detection = %#v", detection)
+	}
+}
+
+func TestVSCodeEditorReportsHowMacOSExecutableWasResolved(t *testing.T) {
+	bundleCommand := "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+	tests := []struct {
+		name   string
+		config codingtool.Config
+		probe  fakeExecutableProbe
+		paths  []string
+		want   codingtool.ExecutableDetectionSource
+	}{
+		{
+			name:  "PATH command",
+			probe: fakeExecutableProbe{paths: map[string]string{"code": "/usr/local/bin/code"}},
+			want:  codingtool.ExecutableDetectionPath,
+		},
+		{
+			name:  "application bundle without shell command",
+			probe: fakeExecutableProbe{files: map[string]os.FileInfo{bundleCommand: fakeFileInfo{mode: 0o755}}},
+			paths: []string{bundleCommand},
+			want:  codingtool.ExecutableDetectionInstalled,
+		},
+		{
+			name:   "configured executable",
+			config: codingtool.Config{ExecutableOverride: bundleCommand},
+			probe:  fakeExecutableProbe{files: map[string]os.FileInfo{bundleCommand: fakeFileInfo{mode: 0o755}}},
+			want:   codingtool.ExecutableDetectionConfigured,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			detection, err := (codingtool.VSCodeEditor{
+				Probe:             &tt.probe,
+				OperatingSystem:   "darwin",
+				MacOSInstallPaths: tt.paths,
+			}).DetectExecutableDetailed(tt.config)
+			if err != nil {
+				t.Fatalf("detect executable: %v", err)
+			}
+			if detection.Platform != "darwin" || detection.Source != tt.want || detection.Executable == "" {
+				t.Fatalf("detection = %#v", detection)
+			}
+		})
+	}
+}
+
+func TestVSCodeEditorReportsUnusableMacOSApplicationBundle(t *testing.T) {
+	bundleCommand := "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+	detection, err := (codingtool.VSCodeEditor{
+		Probe:             &fakeExecutableProbe{files: map[string]os.FileInfo{bundleCommand: fakeFileInfo{mode: 0o644}}},
+		OperatingSystem:   "darwin",
+		MacOSInstallPaths: []string{bundleCommand},
+	}).DetectExecutableDetailed(codingtool.DefaultConfig())
+	if !errors.Is(err, codingtool.ErrExecutableNotExecutable) {
+		t.Fatalf("error = %v, want %v", err, codingtool.ErrExecutableNotExecutable)
+	}
+	if detection.Platform != "darwin" || detection.Source != codingtool.ExecutableDetectionInstalled {
+		t.Fatalf("detection = %#v", detection)
+	}
+}
+
 func TestVSCodeEditorReportsTypedExecutableNotFoundError(t *testing.T) {
 	probe := fakeExecutableProbe{}
 

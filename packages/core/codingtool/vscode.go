@@ -87,6 +87,16 @@ type VSCodeEditor struct {
 	// It exists primarily for deterministic tests and packaged deployments with
 	// a known installation directory.
 	WindowsInstallPaths []string
+
+	// LinuxInstallPaths augments the standard Linux installation locations.
+	// It exists primarily for deterministic tests and packaged deployments with
+	// a known installation directory.
+	LinuxInstallPaths []string
+
+	// MacOSInstallPaths augments the standard macOS application bundle paths.
+	// It exists primarily for deterministic tests and packaged deployments with
+	// a known installation directory.
+	MacOSInstallPaths []string
 }
 
 var _ CodingTool = VSCodeEditor{}
@@ -103,12 +113,24 @@ func (VSCodeEditor) StatusDataFileName() string {
 	return "devctx-status.json"
 }
 
-// DetectExecutable locates the VS Code command available through PATH.
+// DetectExecutable locates a launchable VS Code command.
 func (e VSCodeEditor) DetectExecutable(config Config) (Executable, error) {
+	detection, err := e.DetectExecutableDetailed(config)
+	return detection.Executable, err
+}
+
+// DetectExecutableDetailed locates VS Code and records whether it was found
+// through PATH, a known application installation, or explicit configuration.
+func (e VSCodeEditor) DetectExecutableDetailed(config Config) (ExecutableDetection, error) {
 	probe := e.resolveProbe()
 	goos := e.resolveOperatingSystem()
 	if override := strings.TrimSpace(config.ExecutableOverride); override != "" {
-		return validateConfiguredExecutable(probe, goos, VSCodeID, override)
+		executable, err := validateConfiguredExecutable(probe, goos, VSCodeID, override)
+		return ExecutableDetection{
+			Executable: executable,
+			Platform:   goos,
+			Source:     ExecutableDetectionConfigured,
+		}, err
 	}
 
 	candidates := vscodeExecutableCandidates(goos)
@@ -116,27 +138,53 @@ func (e VSCodeEditor) DetectExecutable(config Config) (Executable, error) {
 	for _, candidate := range candidates {
 		path, err := probe.LookPath(candidate)
 		if err == nil {
-			return Executable(path), nil
+			return ExecutableDetection{
+				Executable: Executable(path),
+				Platform:   goos,
+				Source:     ExecutableDetectionPath,
+			}, nil
 		}
 	}
-	for _, path := range e.windowsInstallPaths(goos) {
+	for _, path := range e.installedExecutablePaths(goos) {
 		info, err := probe.Stat(path)
-		if err == nil && isUsableExecutable(info, goos) {
-			return Executable(path), nil
+		if err == nil {
+			if isUsableExecutable(info, goos) {
+				return ExecutableDetection{
+					Executable: Executable(path),
+					Platform:   goos,
+					Source:     ExecutableDetectionInstalled,
+				}, nil
+			}
+			if goos == "linux" || goos == "darwin" {
+				return ExecutableDetection{Platform: goos, Source: ExecutableDetectionInstalled}, &ExecutableNotExecutableError{
+					ToolID: VSCodeID,
+					Path:   path,
+				}
+			}
 		}
 		candidates = append(candidates, path)
 	}
 
-	return "", &ExecutableNotFoundError{
+	return ExecutableDetection{Platform: goos, Source: ExecutableDetectionUnavailable}, &ExecutableNotFoundError{
 		ToolID:     VSCodeID,
 		Candidates: candidates,
 	}
 }
 
-func (e VSCodeEditor) windowsInstallPaths(goos string) []string {
-	if goos != "windows" {
+func (e VSCodeEditor) installedExecutablePaths(goos string) []string {
+	switch goos {
+	case "windows":
+		return e.windowsInstallPaths()
+	case "linux":
+		return e.linuxInstallPaths()
+	case "darwin":
+		return e.macOSInstallPaths()
+	default:
 		return nil
 	}
+}
+
+func (e VSCodeEditor) windowsInstallPaths() []string {
 	paths := append([]string(nil), e.WindowsInstallPaths...)
 	for _, root := range []string{
 		os.Getenv("LOCALAPPDATA"),
@@ -149,6 +197,20 @@ func (e VSCodeEditor) windowsInstallPaths(goos string) []string {
 		paths = append(paths, filepath.Join(root, "Microsoft VS Code", "Code.exe"))
 	}
 	return paths
+}
+
+func (e VSCodeEditor) linuxInstallPaths() []string {
+	paths := append([]string(nil), e.LinuxInstallPaths...)
+	return append(paths,
+		"/usr/share/code/code",
+		"/snap/bin/code",
+		"/var/lib/flatpak/exports/bin/com.visualstudio.code",
+	)
+}
+
+func (e VSCodeEditor) macOSInstallPaths() []string {
+	paths := append([]string(nil), e.MacOSInstallPaths...)
+	return append(paths, "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code")
 }
 
 // BuildLaunchCommand returns the structured VS Code command for one project.

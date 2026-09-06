@@ -69,6 +69,7 @@ type ConfidenceCheck struct {
 	Label      string                   `json:"label"`
 	Message    string                   `json:"message"`
 	ActionHint string                   `json:"actionHint,omitempty"`
+	Retryable  bool                     `json:"retryable,omitempty"`
 }
 
 // Valid reports whether check has a known component, known severity, and the

@@ -109,6 +109,7 @@ interface SelectorViewProps {
 	showOnboardingReplay?: boolean;
 	onDismissOnboardingReplay?: () => void;
 	onStartContextCreation?: () => void;
+	onRetryDetection?: () => void;
 }
 
 function SelectorView({
@@ -128,6 +129,7 @@ function SelectorView({
 	showOnboardingReplay = false,
 	onDismissOnboardingReplay,
 	onStartContextCreation,
+	onRetryDetection,
 }: SelectorViewProps) {
 	const [launcherState, setLauncherState] = useState<LauncherState>(() =>
 		initialLauncherState(launchState),
@@ -657,6 +659,7 @@ function SelectorView({
 							<SelectorConfidenceSummary
 								context={selectedContext}
 								project={launchState.project}
+								onRetryDetection={onRetryDetection}
 							/>
 						)
 					}
