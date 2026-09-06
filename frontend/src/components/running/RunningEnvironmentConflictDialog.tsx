@@ -72,9 +72,9 @@ function RunningEnvironmentConflictDialog({
 						type="button"
 						variant="outline"
 						disabled
-						title="Switching to an existing window is not available for this coding tool yet."
+						title="Revealing an existing window is not available for this coding tool yet."
 					>
-						Switch to existing window
+						Reveal existing window
 					</Button>
 					<Button
 						type="button"

@@ -81,8 +81,6 @@ export function GetRepairActions(arg1) {
 export function GetRunningEnvironments() {
   return window['go']['wailsapp']['App']['GetRunningEnvironments']();
 }
-export function RevealWorkspace(arg1) { return window['go']['wailsapp']['App']['RevealWorkspace'](arg1); }
-export function StopWorkspace(arg1) { return window['go']['wailsapp']['App']['StopWorkspace'](arg1); }
 
 export function GetSettings() {
   return window['go']['wailsapp']['App']['GetSettings']();
@@ -116,8 +114,16 @@ export function RestoreContext(arg1) {
   return window['go']['wailsapp']['App']['RestoreContext'](arg1);
 }
 
+export function RevealWorkspace(arg1) {
+  return window['go']['wailsapp']['App']['RevealWorkspace'](arg1);
+}
+
 export function RunRepairAction(arg1) {
   return window['go']['wailsapp']['App']['RunRepairAction'](arg1);
+}
+
+export function StopWorkspace(arg1) {
+  return window['go']['wailsapp']['App']['StopWorkspace'](arg1);
 }
 
 export function UnbindProject(arg1) {

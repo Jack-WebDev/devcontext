@@ -470,7 +470,7 @@ function RunningSummary({
 									{item.contextName}
 								</span>
 								<span className="block text-[10px] text-muted-foreground">
-									{item.count} active environment{item.count === 1 ? "" : "s"}
+									{item.count} active workspace{item.count === 1 ? "" : "s"}
 								</span>
 							</span>
 							<span className="text-right text-[10px] text-muted-foreground">

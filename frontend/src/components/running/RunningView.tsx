@@ -6,14 +6,12 @@ import { Card, CardContent } from "../ui/card.js";
 interface RunningViewProps {
 	environments: RunningEnvironmentState[];
 	onReveal?: (environment: RunningEnvironmentState, targetId?: string) => Promise<WorkspaceRevealResult | undefined>;
-	onSwitchTo?: (environment: RunningEnvironmentState) => void;
 	onStop?: (environment: RunningEnvironmentState) => void;
 }
 
 function RunningView({
 	environments,
 	onReveal,
-	onSwitchTo,
 	onStop,
 }: RunningViewProps) {
 	const [choice, setChoice] = useState<{ workspace: RunningEnvironmentState; targets: WorkspaceRevealResult["targets"] }>();
@@ -29,7 +27,7 @@ function RunningView({
 					Workspaces
 				</h2>
 				<p className="mt-1 text-sm text-muted-foreground">
-					Each workspace keeps the context selected when it was launched.
+					Workspaces run independently and keep the context selected when each was launched.
 				</p>
 			</div>
 
@@ -47,7 +45,6 @@ function RunningView({
 							key={environment.id}
 							environment={environment}
 							onReveal={reveal}
-							onSwitchTo={onSwitchTo}
 							onStop={onStop}
 						/>
 					))}
@@ -61,12 +58,10 @@ function RunningView({
 function RunningEnvironmentCard({
 	environment,
 	onReveal,
-	onSwitchTo,
 	onStop,
 }: {
 	environment: RunningEnvironmentState;
 	onReveal?: (environment: RunningEnvironmentState) => void;
-	onSwitchTo?: (environment: RunningEnvironmentState) => void;
 	onStop?: (environment: RunningEnvironmentState) => void;
 }) {
 	return (
@@ -119,20 +114,6 @@ function RunningEnvironmentCard({
 						onClick={() => onReveal?.(environment)}
 					>
 						Reveal
-					</Button>
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						disabled={onSwitchTo === undefined}
-						title={
-							onSwitchTo === undefined
-								? "Switching to an environment is not available for this coding tool yet."
-								: undefined
-						}
-						onClick={() => onSwitchTo?.(environment)}
-					>
-						Switch to
 					</Button>
 					<Button
 						type="button"
