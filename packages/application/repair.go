@@ -104,14 +104,6 @@ func (s *Service) runRepairAction(request RunRepairActionRequest) (RunRepairActi
 	if err != nil {
 		return RunRepairActionResult{}, err
 	}
-	if _, ok := repairProviderID(request.ActionID); ok {
-		s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{
-			Name:      devlog.EventProviderReset,
-			Timestamp: s.now(),
-			ContextID: ctx.ID.String(),
-			ToolID:    string(ctx.Tool.DefaultTool),
-		}))
-	}
 	s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{
 		Name:      devlog.EventRepairCompleted,
 		Timestamp: s.now(),

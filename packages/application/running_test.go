@@ -65,7 +65,7 @@ func TestGetRunningEnvironmentsRefreshesProcessStateAndRecordsStoppedEvent(t *te
 	if len(state.Environments) != 1 || state.Environments[0].Context.ID != "active" || state.Environments[0].Process.State != "running" {
 		t.Fatalf("active running environments = %#v", state.Environments)
 	}
-	if got := applicationEventNames(logger.events); len(got) != 1 || got[0] != devlog.EventEnvironmentStopped {
+	if got := applicationEventNames(logger.events); len(got) != 1 || got[0] != devlog.EventWorkspaceStopped {
 		t.Fatalf("history events = %#v, want environment stopped", got)
 	}
 }

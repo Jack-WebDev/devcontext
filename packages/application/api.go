@@ -818,9 +818,14 @@ type HistoryEntry struct {
 type HistoryCategory string
 
 const (
-	HistoryCategoryLaunch        HistoryCategory = "launch"
-	HistoryCategoryConfiguration HistoryCategory = "configuration"
-	HistoryCategoryWarning       HistoryCategory = "warning"
+	HistoryCategoryLaunch         HistoryCategory = "launch"
+	HistoryCategoryContext        HistoryCategory = "context"
+	HistoryCategoryBinding        HistoryCategory = "binding"
+	HistoryCategoryRepair         HistoryCategory = "repair"
+	HistoryCategoryAuthentication HistoryCategory = "authentication"
+	HistoryCategoryWorkspace      HistoryCategory = "workspace"
+	HistoryCategoryOverride       HistoryCategory = "override"
+	HistoryCategoryWarning        HistoryCategory = "warning"
 )
 
 // RunningEnvironmentState is the presentation-safe model for one immutable

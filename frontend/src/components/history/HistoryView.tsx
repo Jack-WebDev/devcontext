@@ -49,7 +49,12 @@ function HistoryView({ entries }: HistoryViewProps) {
 					>
 						<option value="all">All activity</option>
 						<option value="launch">Launches</option>
-						<option value="configuration">Configuration</option>
+						<option value="context">Context changes</option>
+						<option value="binding">Project bindings</option>
+						<option value="repair">Repairs</option>
+						<option value="authentication">Authentication</option>
+						<option value="workspace">Workspaces</option>
+						<option value="override">Overrides</option>
 						<option value="warning">Warnings</option>
 					</select>
 				</label>
@@ -121,7 +126,7 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
 				<div>
 					<h4 className="font-medium">{entry.message}</h4>
 					<p className="mt-1 text-sm text-muted-foreground">
-						{formatHistoryEvent(entry.event)}
+						{formatHistoryCategory(entry.category)}
 					</p>
 				</div>
 				<time
@@ -143,7 +148,10 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
 						<ProjectSafetyLabel contextName={entry.contextId} />
 					</dd>
 				</div>
-				<HistoryDetail label="Event" value={formatHistoryEvent(entry.event)} />
+				<HistoryDetail
+					label="Activity"
+					value={formatHistoryCategory(entry.category)}
+				/>
 			</dl>
 		</article>
 	);
@@ -265,6 +273,20 @@ function formatHistoryEvent(event: string): string {
 		.join(" ");
 }
 
+function formatHistoryCategory(category: HistoryCategory): string {
+	const labels: Record<HistoryCategory, string> = {
+		launch: "Launch",
+		context: "Context change",
+		binding: "Project binding",
+		repair: "Repair",
+		authentication: "Authentication",
+		workspace: "Workspace",
+		override: "Context override",
+		warning: "Warning",
+	};
+	return labels[category];
+}
+
 function historyEntryKey(entry: HistoryEntry, index: number): string {
 	return `${entry.timestamp}:${entry.event}:${entry.projectPath ?? ""}:${entry.contextId ?? ""}:${index}`;
 }
@@ -273,6 +295,7 @@ export type { HistoryDateGroup, HistoryFilter, HistoryViewProps };
 export {
 	filterHistoryEntries,
 	formatHistoryDate,
+	formatHistoryCategory,
 	formatHistoryEvent,
 	formatHistoryTime,
 	groupHistoryEntriesByDate,

@@ -1893,6 +1893,8 @@ func TestLaunchProjectRequiresMismatchConfirmation(t *testing.T) {
 
 func TestLaunchProjectAcceptsConfirmedMismatch(t *testing.T) {
 	fixture := newApplicationFixture(t)
+	logger := &applicationRecordingLogger{}
+	fixture.logger = logger
 	fixture.writeContext(t, fixture.context("personal", "Personal"))
 	fixture.writeContext(t, fixture.context("company", "Company"))
 	fixture.writeBindings(t, project.Binding{
@@ -1914,6 +1916,13 @@ func TestLaunchProjectAcceptsConfirmedMismatch(t *testing.T) {
 	}
 	if len(fixture.process.requests) != 1 {
 		t.Fatalf("process request count = %d, want 1", len(fixture.process.requests))
+	}
+	if got, want := applicationEventNames(logger.events), []devlog.EventName{
+		devlog.EventContextResolution,
+		devlog.EventContextOverrideAccepted,
+		devlog.EventLaunchSucceeded,
+	}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("event names = %#v, want %#v", got, want)
 	}
 
 	bindings, err := project.ReadProjectBindingsFile(fixture.bindingsPath)
@@ -2048,7 +2057,7 @@ func TestProjectBindingChangesRecordHistoryEvents(t *testing.T) {
 		t.Fatalf("repeat unbind project: %v", appErr)
 	}
 
-	want := []devlog.EventName{devlog.EventProjectBindingChanged, devlog.EventProjectBindingChanged}
+	want := []devlog.EventName{devlog.EventProjectBound, devlog.EventProjectUnbound}
 	if got := applicationEventNames(logger.events); !reflect.DeepEqual(got, want) {
 		t.Fatalf("event names = %#v, want %#v", got, want)
 	}

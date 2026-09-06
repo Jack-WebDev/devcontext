@@ -30,6 +30,7 @@ import { parseContextMetadataExport } from "../.tmp-test/src/components/contexts
 import { renderDiagnostics } from "../.tmp-test/src/components/diagnostics/DiagnosticsView.js";
 import {
 	filterHistoryEntries,
+	formatHistoryCategory,
 	formatHistoryEvent,
 	groupHistoryEntriesByDate,
 	HistoryView,
@@ -511,14 +512,14 @@ test("history groups entries by date and presents project, context, event, and t
 		},
 		{
 			event: "context_created",
-			category: "configuration",
+			category: "context",
 			timestamp: "2026-08-13T15:00:00Z",
 			contextId: "personal",
 			message: "Context created.",
 		},
 		{
 			event: "project_binding_changed",
-			category: "configuration",
+			category: "binding",
 			timestamp: "2026-08-14T12:45:00Z",
 			projectPath: "/work/web",
 			contextId: "personal",
@@ -531,12 +532,14 @@ test("history groups entries by date and presents project, context, event, and t
 	assert.equal(groups[0].date, "2026-08-14");
 	assert.equal(groups[0].entries[0].event, "project_binding_changed");
 	assert.equal(formatHistoryEvent("provider_reset"), "Provider Reset");
+	assert.equal(formatHistoryCategory("binding"), "Project binding");
 
 	const html = renderToStaticMarkup(createElement(HistoryView, { entries }));
 	assert.ok(html.includes("History"));
 	assert.ok(html.includes("/work/api"));
 	assert.ok(html.includes("company"));
-	assert.ok(html.includes("Launch Succeeded"));
+	assert.ok(html.includes("Launch"));
+	assert.ok(html.includes("Project binding"));
 	assert.ok(html.includes("Project context binding changed."));
 	assert.match(html, /<time[^>]*dateTime="2026-08-14T12:45:00Z"/);
 });
@@ -553,7 +556,7 @@ test("history filters by backend category and searches only project and context"
 		},
 		{
 			event: "provider_reset",
-			category: "configuration",
+			category: "repair",
 			timestamp: "2026-08-14T08:30:00Z",
 			contextId: "personal",
 			message: "Provider storage reset.",
