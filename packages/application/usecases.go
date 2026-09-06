@@ -1053,32 +1053,53 @@ func (s *Service) exportContextMetadata(request ExportContextMetadataRequest) (C
 	providers := make([]ContextTransferProvider, 0, len(ctx.Providers))
 	for _, providerID := range sortedProviderConfigIDs(ctx.Providers) {
 		config := ctx.Providers[providerID]
-		providers = append(providers, ContextTransferProvider{ID: string(providerID), Enabled: config.Enabled, Options: cloneStringMap(config.Options)})
+		exported := ContextTransferProvider{ID: string(providerID), Enabled: config.Enabled}
+		if request.Options.IncludeProviderOptions {
+			exported.Options = cloneStringMap(config.Options)
+		}
+		providers = append(providers, exported)
 	}
 	tools := make([]ContextTransferTool, 0, len(ctx.Tool.Tools))
 	for _, toolID := range sortedToolConfigIDs(ctx.Tool.Tools) {
 		config := ctx.Tool.Tools[toolID]
-		tools = append(tools, ContextTransferTool{ID: string(toolID), Options: cloneStringMap(config.Options)})
+		exported := ContextTransferTool{ID: string(toolID)}
+		if request.Options.IncludeToolOptions {
+			exported.Options = cloneStringMap(config.Options)
+		}
+		tools = append(tools, exported)
+	}
+	metadata := map[string]string(nil)
+	if request.Options.IncludeMetadata {
+		metadata = cloneStringMap(ctx.Metadata)
 	}
 
 	return ContextMetadataExport{
 		Version: ContextTransferVersion,
 		Context: ContextTransferMetadata{
-			Name: ctx.Name, Metadata: cloneStringMap(ctx.Metadata), Providers: providers,
+			Name: ctx.Name, Metadata: metadata, Providers: providers,
 			LaunchTarget: ContextTransferLaunchTarget{DefaultTool: string(ctx.Tool.DefaultTool), Tools: tools},
 		},
 	}, nil
 }
 
 func (s *Service) importContextMetadata(request ImportContextMetadataRequest) (ImportContextMetadataResult, error) {
+	name := strings.TrimSpace(request.Name)
+	if name == "" {
+		name = request.Export.Context.Name
+	}
+	if err := s.ensureContextNameAvailable(name); err != nil {
+		return ImportContextMetadataResult{}, err
+	}
 	contextID, err := s.contextIDForCreateRequest(CreateContextRequest{
 		ContextID: request.ContextID,
-		Name:      request.Export.Context.Name,
+		Name:      name,
 	})
 	if err != nil {
 		return ImportContextMetadataResult{}, err
 	}
-	ctx, err := s.contextFromMetadataExport(contextID, request.Export)
+	exported := request.Export
+	exported.Context.Name = name
+	ctx, err := s.contextFromMetadataExport(contextID, exported)
 	if err != nil {
 		return ImportContextMetadataResult{}, err
 	}
@@ -1093,6 +1114,19 @@ func (s *Service) importContextMetadata(request ImportContextMetadataRequest) (I
 	}
 	s.recordHistoryEvent(devlog.NewEvent(devlog.EventInput{Name: devlog.EventContextCreated, Timestamp: s.now(), ContextID: ctx.ID.String(), ToolID: string(ctx.Tool.DefaultTool)}))
 	return ImportContextMetadataResult{Context: s.contextState(ctx)}, nil
+}
+
+func (s *Service) ensureContextNameAvailable(name string) error {
+	contexts, err := s.dependencies.Contexts.List()
+	if err != nil {
+		return fmt.Errorf("list contexts while checking imported context name: %w", err)
+	}
+	for _, ctx := range contexts {
+		if strings.EqualFold(strings.TrimSpace(ctx.Name), strings.TrimSpace(name)) {
+			return fmt.Errorf("%w: context name %q already exists", devcontext.ErrInvalidContextConfig, strings.TrimSpace(name))
+		}
+	}
+	return nil
 }
 
 func (s *Service) contextFromMetadataExport(contextID devcontext.ID, exported ContextMetadataExport) (devcontext.Context, error) {

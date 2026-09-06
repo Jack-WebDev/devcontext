@@ -634,10 +634,20 @@ type DuplicateContextResult struct {
 // The format intentionally excludes credentials and integration-owned storage.
 const ContextTransferVersion = 1
 
+// ContextMetadataExportOptions controls optional, portable configuration. All
+// fields remain safe metadata; credentials, runtime state, and project paths
+// are never exportable.
+type ContextMetadataExportOptions struct {
+	IncludeMetadata        bool `json:"includeMetadata"`
+	IncludeProviderOptions bool `json:"includeProviderOptions"`
+	IncludeToolOptions     bool `json:"includeToolOptions"`
+}
+
 // ExportContextMetadataRequest identifies the context whose portable safe
 // configuration should be exported.
 type ExportContextMetadataRequest struct {
-	ContextID string `json:"contextId"`
+	ContextID string                       `json:"contextId"`
+	Options   ContextMetadataExportOptions `json:"options"`
 }
 
 // ContextMetadataExport is a versioned, portable context configuration. It is
@@ -684,8 +694,11 @@ type ContextTransferTool struct {
 // export. When ContextID is empty, the service generates an internal ID from
 // the imported name. Export documents never carry an internal ID.
 type ImportContextMetadataRequest struct {
-	ContextID string                `json:"contextId,omitempty"`
-	Export    ContextMetadataExport `json:"export"`
+	ContextID string `json:"contextId,omitempty"`
+	// Name is an optional receiving-user choice. It lets an import create a
+	// distinct identity without editing the portable source document.
+	Name   string                `json:"name,omitempty"`
+	Export ContextMetadataExport `json:"export"`
 }
 
 // ImportContextMetadataResult describes the fresh isolated context created

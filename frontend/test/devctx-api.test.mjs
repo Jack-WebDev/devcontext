@@ -259,11 +259,18 @@ test("adapter normalizes safe context metadata export and import", async () => {
 	};
 	const api = createDevContextApi({
 		async exportContextMetadata(request) {
-			assert.deepEqual(request, { contextId: "personal" });
+			assert.deepEqual(request, {
+				contextId: "personal",
+				options: {
+					includeMetadata: true,
+					includeProviderOptions: true,
+					includeToolOptions: true,
+				},
+			});
 			return exported;
 		},
 		async importContextMetadata(request) {
-			assert.deepEqual(request, { contextId: "imported", export: exported });
+			assert.deepEqual(request, { contextId: "imported", name: "Imported", export: exported });
 			return {
 				context: {
 					id: "imported",
@@ -277,13 +284,16 @@ test("adapter normalizes safe context metadata export and import", async () => {
 		},
 	});
 
-	assert.deepEqual(await api.exportContextMetadata({ contextId: "personal" }), {
+	assert.deepEqual(await api.exportContextMetadata({ contextId: "personal", options: {
+		includeMetadata: true, includeProviderOptions: true, includeToolOptions: true,
+	} }), {
 		ok: true,
 		data: exported,
 	});
 	assert.deepEqual(
 		await api.importContextMetadata({
 			contextId: "imported",
+			name: "Imported",
 			export: exported,
 		}),
 		{

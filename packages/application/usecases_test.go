@@ -1625,7 +1625,12 @@ func TestExportContextMetadataIncludesOnlyPortableSafeConfiguration(t *testing.T
 	}
 	writeFile(t, filepath.Join(sourcePaths.ProviderStorageDir("fake"), "credential.json"), []byte(`{"token":"secret"}`))
 
-	exported, appErr := fixture.service().ExportContextMetadata(ExportContextMetadataRequest{ContextID: "personal"})
+	exported, appErr := fixture.service().ExportContextMetadata(ExportContextMetadataRequest{
+		ContextID: "personal",
+		Options: ContextMetadataExportOptions{
+			IncludeMetadata: true, IncludeProviderOptions: true, IncludeToolOptions: true,
+		},
+	})
 	if appErr != nil {
 		t.Fatalf("export context metadata: %v", appErr)
 	}
@@ -1639,6 +1644,32 @@ func TestExportContextMetadataIncludesOnlyPortableSafeConfiguration(t *testing.T
 	}
 	if !reflect.DeepEqual(exported, want) {
 		t.Fatalf("export = %#v, want %#v", exported, want)
+	}
+	serialized, err := json.Marshal(exported)
+	if err != nil {
+		t.Fatalf("serialize export: %v", err)
+	}
+	for _, forbidden := range []string{"secret", "credential.json", "/private/bin/code"} {
+		if strings.Contains(string(serialized), forbidden) {
+			t.Fatalf("export contains excluded value %q: %s", forbidden, serialized)
+		}
+	}
+}
+
+func TestExportContextMetadataSafeDefaultsExcludeOptionalSettings(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	source := fixture.context("personal", "Personal")
+	source.Metadata = devcontext.Metadata{"private_note": "do not export"}
+	source.Tool.Tools[source.Tool.DefaultTool] = codingtool.Config{Options: map[string]string{"profile": "personal"}}
+	source.Providers["fake"] = provider.Config{Enabled: true, Options: map[string]string{"region": "south"}}
+	fixture.writeContext(t, source)
+
+	exported, appErr := fixture.service().ExportContextMetadata(ExportContextMetadataRequest{ContextID: "personal"})
+	if appErr != nil {
+		t.Fatalf("export context metadata: %v", appErr)
+	}
+	if exported.Context.Metadata != nil || exported.Context.Providers[0].Options != nil || exported.Context.LaunchTarget.Tools[0].Options != nil {
+		t.Fatalf("safe default export included optional settings: %#v", exported)
 	}
 }
 
@@ -1691,6 +1722,21 @@ func TestImportContextMetadataGeneratesInternalIDFromImportedName(t *testing.T) 
 	}
 	if result.Context.ID != "imported-personal" {
 		t.Fatalf("generated context ID = %q, want imported-personal", result.Context.ID)
+	}
+}
+
+func TestImportContextMetadataRejectsAnExistingNameWithoutOverwrite(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	exported := ContextMetadataExport{Version: ContextTransferVersion, Context: ContextTransferMetadata{
+		Name: "personal", LaunchTarget: ContextTransferLaunchTarget{DefaultTool: "fake-editor"},
+	}}
+	if _, appErr := fixture.service().ImportContextMetadata(ImportContextMetadataRequest{Export: exported}); appErr == nil {
+		t.Fatal("import with existing name succeeded")
+	}
+	result, appErr := fixture.service().ImportContextMetadata(ImportContextMetadataRequest{Name: "Personal copy", Export: exported})
+	if appErr != nil || result.Context.Name != "Personal copy" {
+		t.Fatalf("import as copy = %#v, %v", result, appErr)
 	}
 }
 

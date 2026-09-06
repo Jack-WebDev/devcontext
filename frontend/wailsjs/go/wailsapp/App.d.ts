@@ -7,9 +7,9 @@ export function ArchiveContext(arg1:application.ArchiveContextRequest):Promise<a
 
 export function BindProject(arg1:application.BindProjectRequest):Promise<any>;
 
-export function ChooseProjectDirectory():Promise<any>;
-
 export function ChooseContextMetadataImport():Promise<any>;
+
+export function ChooseProjectDirectory():Promise<any>;
 
 export function CreateContext(arg1:application.CreateContextRequest):Promise<any>;
 

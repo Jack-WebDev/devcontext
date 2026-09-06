@@ -482,6 +482,12 @@ export interface DuplicateContextResult {
 }
 export interface ExportContextMetadataRequest {
 	contextId: string;
+	options: ContextMetadataExportOptions;
+}
+export interface ContextMetadataExportOptions {
+	includeMetadata: boolean;
+	includeProviderOptions: boolean;
+	includeToolOptions: boolean;
 }
 export interface ContextMetadataExport {
 	version: number;
@@ -509,6 +515,7 @@ export interface ContextTransferTool {
 export interface ImportContextMetadataRequest {
 	/** Internal IDs are generated from the imported name when omitted. */
 	contextId?: string;
+	name?: string;
 	export: ContextMetadataExport;
 }
 export interface ImportContextMetadataResult {
@@ -1123,8 +1130,13 @@ const generatedBindings: WailsBindings = {
 		return bindings.DuplicateContext(request);
 	},
 	async exportContextMetadata(request) {
-		const bindings = await import("../../wailsjs/go/wailsapp/App");
-		return bindings.ExportContextMetadata(request);
+		const [bindings, models] = await Promise.all([
+			import("../../wailsjs/go/wailsapp/App"),
+			import("../../wailsjs/go/models"),
+		]);
+		return bindings.ExportContextMetadata(
+			models.application.ExportContextMetadataRequest.createFrom(request),
+		);
 	},
 	async importContextMetadata(request) {
 		const [bindings, models] = await Promise.all([
