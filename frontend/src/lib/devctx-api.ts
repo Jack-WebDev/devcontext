@@ -602,6 +602,17 @@ export interface RunningEnvironmentState {
 	process: RunningEnvironmentProcessState;
 	session: RunningEnvironmentSessionState;
 	launch: RunningEnvironmentLaunchState;
+	lifecycle: WorkspaceLifecycleState;
+}
+export interface WorkspaceActionRequest { workspaceId: string; }
+export interface WorkspaceRevealTarget { id: string; label: string; }
+export interface WorkspaceRevealResult { targets: WorkspaceRevealTarget[]; revealed: boolean; }
+
+export interface WorkspaceLifecycleState {
+	state: "active" | "stopped" | "unknown";
+	focusable: boolean;
+	revealable: boolean;
+	stoppable: boolean;
 }
 export interface RunningEnvironmentContextState {
 	id: string;
@@ -706,6 +717,8 @@ export interface DevContextApi {
 	): Promise<ApiResult<RunRepairActionResult>>;
 	getHistory(): Promise<ApiResult<HistoryState>>;
 	getRunningEnvironments(): Promise<ApiResult<RunningEnvironmentsState>>;
+	revealWorkspace(request: WorkspaceActionRequest & { targetId?: string }): Promise<ApiResult<WorkspaceRevealResult>>;
+	stopWorkspace(request: WorkspaceActionRequest): Promise<ApiResult<unknown>>;
 	getSettings(): Promise<ApiResult<SettingsState>>;
 	updateSettings(
 		request: UpdateSettingsRequest,
@@ -757,6 +770,8 @@ export interface WailsBindings {
 	runRepairAction(request: RunRepairActionRequest): Promise<unknown>;
 	getHistory(): Promise<unknown>;
 	getRunningEnvironments(): Promise<unknown>;
+	revealWorkspace(request: WorkspaceActionRequest & { targetId?: string }): Promise<unknown>;
+	stopWorkspace(request: WorkspaceActionRequest): Promise<unknown>;
 	getSettings(): Promise<unknown>;
 	updateSettings(request: UpdateSettingsRequest): Promise<unknown>;
 }
@@ -964,6 +979,8 @@ export function createDevContextApi(
 				normalizeRunningEnvironmentsState,
 			);
 		},
+		revealWorkspace(request) { return callBinding(() => bindings.revealWorkspace(request), normalizeWorkspaceRevealResult); },
+		stopWorkspace(request) { return callBinding(() => bindings.stopWorkspace(request), (value) => value); },
 		getSettings() {
 			return callBinding(() => bindings.getSettings(), normalizeSettingsState);
 		},
@@ -1124,6 +1141,14 @@ const generatedBindings: WailsBindings = {
 	async getRunningEnvironments() {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
 		return bindings.GetRunningEnvironments();
+	},
+	async revealWorkspace(request) {
+		const bindings = await import("../../wailsjs/go/wailsapp/App");
+		return bindings.RevealWorkspace(request);
+	},
+	async stopWorkspace(request) {
+		const bindings = await import("../../wailsjs/go/wailsapp/App");
+		return bindings.StopWorkspace(request);
 	},
 	async getSettings() {
 		const bindings = await import("../../wailsjs/go/wailsapp/App");
@@ -1777,6 +1802,10 @@ function normalizeRunningEnvironmentsState(
 		),
 	};
 }
+function normalizeWorkspaceRevealResult(value: unknown): WorkspaceRevealResult {
+	const object = objectValue(value);
+	return { revealed: booleanValue(object.revealed), targets: arrayValue(object.targets).map((target) => { const item = objectValue(target); return { id: stringValue(item.id), label: stringValue(item.label) }; }) };
+}
 function normalizeRunningEnvironmentState(
 	value: unknown,
 ): RunningEnvironmentState {
@@ -1790,6 +1819,20 @@ function normalizeRunningEnvironmentState(
 		process: normalizeRunningEnvironmentProcessState(object.process),
 		session: normalizeRunningEnvironmentSessionState(object.session),
 		launch: normalizeRunningEnvironmentLaunchState(object.launch),
+		lifecycle: normalizeWorkspaceLifecycleState(object.lifecycle),
+	};
+}
+function normalizeWorkspaceLifecycleState(value: unknown): WorkspaceLifecycleState {
+	const object = objectValue(value);
+	const state = stringValue(object.state);
+	return {
+		state:
+			state === "active" || state === "stopped" || state === "unknown"
+				? state
+				: "unknown",
+		focusable: booleanValue(object.focusable),
+		revealable: booleanValue(object.revealable),
+		stoppable: booleanValue(object.stoppable),
 	};
 }
 function normalizeRunningEnvironmentContextState(

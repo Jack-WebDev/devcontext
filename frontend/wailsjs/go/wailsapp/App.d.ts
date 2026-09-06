@@ -59,7 +59,11 @@ export function PreviewDeleteContext(arg1:application.DeleteContextPreviewReques
 
 export function RestoreContext(arg1:application.RestoreContextRequest):Promise<any>;
 
+export function RevealWorkspace(arg1:application.WorkspaceActionRequest):Promise<any>;
+
 export function RunRepairAction(arg1:application.RunRepairActionRequest):Promise<any>;
+
+export function StopWorkspace(arg1:application.WorkspaceActionRequest):Promise<any>;
 
 export function UnbindProject(arg1:application.UnbindProjectRequest):Promise<any>;
 

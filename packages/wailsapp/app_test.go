@@ -462,6 +462,13 @@ func (s *fakeService) GetRunningEnvironments() (application.RunningEnvironmentsS
 	return s.runningEnvironments, s.runningEnvironmentsErr
 }
 
+func (s *fakeService) RevealWorkspace(application.WorkspaceActionRequest) (application.WorkspaceRevealResult, *application.Error) {
+	return application.WorkspaceRevealResult{}, nil
+}
+func (s *fakeService) StopWorkspace(application.WorkspaceActionRequest) *application.Error {
+	return nil
+}
+
 func (s *fakeService) PreflightLaunchProject(request application.PreflightLaunchProjectRequest) (application.PreflightLaunchProjectResult, *application.Error) {
 	s.preflightRequest = request
 	return s.preflightResult, s.preflightErr

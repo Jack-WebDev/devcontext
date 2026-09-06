@@ -595,20 +595,43 @@ test("running environments show immutable launch context and tool action entry p
 			process: { state: "running" },
 			session: { state: "unknown" },
 			launch: { source: "gui", resolutionSource: "explicit" },
+			lifecycle: {
+				state: "active",
+				focusable: false,
+				revealable: false,
+				stoppable: false,
+			},
 		},
 	];
 	const html = renderToStaticMarkup(
 		createElement(RunningView, { environments }),
 	);
 
-	assert.ok(html.includes("Running"));
+	assert.ok(html.includes("Workspaces"));
 	assert.ok(html.includes("Company"));
 	assert.ok(html.includes("Second Tool"));
 	assert.ok(html.includes("Reveal"));
-	assert.ok(html.includes("Switch to"));
+	assert.doesNotMatch(html, /Switch to/);
 	assert.ok(html.includes("Stop"));
 	assert.match(html, /disabled=""/);
 	assert.notEqual(formatRunningTime("invalid"), "Invalid Date");
+});
+
+test("workspaces present concurrent contexts as independent sessions", () => {
+	const environments = ["Personal", "Company"].map((name, index) => ({
+		id: `workspace-${index}`,
+		project: { name: `project-${index}`, path: `/work/project-${index}` },
+		context: { id: name.toLowerCase(), name },
+		tool: { id: "tool", name: "Tool" },
+		startedAt: "2026-08-28T10:30:00Z",
+		process: { state: "running" }, session: { state: "unknown" },
+		launch: { source: "gui", resolutionSource: "explicit" },
+		lifecycle: { state: "active", focusable: false, revealable: false, stoppable: false },
+	}));
+	const html = renderToStaticMarkup(createElement(RunningView, { environments }));
+	assert.ok(html.includes("Workspaces run independently"));
+	assert.ok(html.includes("Personal"));
+	assert.ok(html.includes("Company"));
 });
 
 test("project identity presents the current project name and path in a compact block", () => {
@@ -1208,7 +1231,7 @@ test("app shell exposes stable navigation, current project state, and a responsi
 			"Home",
 			"Contexts",
 			"Projects",
-			"Running",
+			"Workspaces",
 			"History",
 			"Settings",
 			"Trust Center",
@@ -1409,7 +1432,7 @@ test("Projects lists known projects with safe launch and management entry points
 	assert.ok(html.includes("Unassigned"));
 	assert.ok(html.includes("Choose a context before launching."));
 	assert.ok(html.includes("Company"));
-	assert.ok(html.includes("Running"));
+	assert.ok(html.includes("Active"));
 	assert.ok(html.includes("Launch Company"));
 	assert.doesNotMatch(html, /Change context/);
 	assert.ok(html.includes("Open folder"));

@@ -97,8 +97,8 @@ function ProjectDetailView({
 				<ProjectDetailSection title="Workspace">
 					<p className="text-sm text-muted-foreground">
 						{project.running
-							? "This project is currently running in a Dev Context workspace."
-							: "This project is not currently running in a Dev Context workspace."}
+							? "This project has an active Dev Context workspace."
+							: "This project has no active Dev Context workspace."}
 					</p>
 				</ProjectDetailSection>
 				<ProjectDetailSection title="Activity">

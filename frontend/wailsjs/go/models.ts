@@ -246,6 +246,18 @@ export namespace application {
 	        this.contextId = source["contextId"];
 	    }
 	}
+	export class ForgetProjectRequest {
+	    projectPath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ForgetProjectRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectPath = source["projectPath"];
+	    }
+	}
 	export class GetContextDetailsRequest {
 	    contextId: string;
 	
@@ -410,19 +422,6 @@ export namespace application {
 	        this.projectPath = source["projectPath"];
 	    }
 	}
-
-	export class ForgetProjectRequest {
-		projectPath: string;
-
-		static createFrom(source: any = {}) {
-			return new ForgetProjectRequest(source);
-		}
-
-		constructor(source: any = {}) {
-			if (typeof source === 'string') source = JSON.parse(source);
-			this.projectPath = source["projectPath"];
-		}
-	}
 	export class UpdateContextAppearanceRequest {
 	    contextId: string;
 	    icon?: string;
@@ -501,6 +500,20 @@ export namespace application {
 	        this.projectPath = source["projectPath"];
 	    }
 	}
+	export class WorkspaceActionRequest {
+	    workspaceId: string;
+	    targetId?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkspaceActionRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.workspaceId = source["workspaceId"];
+	        this.targetId = source["targetId"];
+	    }
+	}
 
 }
 
@@ -522,3 +535,4 @@ export namespace wailsapp {
 	}
 
 }
+

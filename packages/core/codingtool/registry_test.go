@@ -66,7 +66,37 @@ func TestRegistryRejectsInvalidDefinitions(t *testing.T) {
 	}
 }
 
+func TestRegistryGetsWorkspaceCapabilitiesOnlyFromWorkspaceTools(t *testing.T) {
+	registry := codingtool.MustNewRegistry([]codingtool.RegisteredTool{
+		{Integration: registryFakeWorkspaceEditor{id: "workspace"}, DisplayName: "Workspace"},
+		{Integration: registryFakeEditor{id: "basic"}, DisplayName: "Basic"},
+	}, "workspace")
+
+	if got := registry.WorkspaceCapabilities("workspace"); !got.Focusable || !got.Revealable || got.Stoppable {
+		t.Fatalf("workspace tool capabilities = %#v", got)
+	}
+	if got := registry.WorkspaceCapabilities("basic"); got != (codingtool.WorkspaceCapabilities{}) {
+		t.Fatalf("basic tool capabilities = %#v, want none", got)
+	}
+}
+
 type registryFakeEditor struct{ id codingtool.ID }
+
+type registryFakeWorkspaceEditor struct{ id codingtool.ID }
+
+func (e registryFakeWorkspaceEditor) ID() codingtool.ID { return e.id }
+
+func (registryFakeWorkspaceEditor) DetectExecutable(codingtool.Config) (codingtool.Executable, error) {
+	return "/usr/local/bin/workspace", nil
+}
+
+func (registryFakeWorkspaceEditor) BuildLaunchCommand(request codingtool.CommandRequest) (codingtool.Command, error) {
+	return codingtool.Command{Executable: request.Executable}, nil
+}
+
+func (registryFakeWorkspaceEditor) WorkspaceCapabilities() codingtool.WorkspaceCapabilities {
+	return codingtool.WorkspaceCapabilities{Focusable: true, Revealable: true}
+}
 
 func (e registryFakeEditor) ID() codingtool.ID { return e.id }
 

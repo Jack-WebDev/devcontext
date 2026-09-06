@@ -345,6 +345,7 @@ test("adapter normalizes active running environments", async () => {
 						process: { state: "running" },
 						session: { state: "unknown" },
 						launch: { source: "gui", resolutionSource: "explicit" },
+						lifecycle: { state: "active", focusable: false, revealable: false, stoppable: false },
 					},
 				],
 			};
@@ -364,6 +365,7 @@ test("adapter normalizes active running environments", async () => {
 					process: { state: "running" },
 					session: { state: "unknown" },
 					launch: { source: "gui", resolutionSource: "explicit" },
+					lifecycle: { state: "active", focusable: false, revealable: false, stoppable: false },
 				},
 			],
 		},

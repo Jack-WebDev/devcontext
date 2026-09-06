@@ -1,37 +1,41 @@
-import type { RunningEnvironmentState } from "../../lib/devctx-api";
+import { useState } from "react";
+import type { RunningEnvironmentState, WorkspaceRevealResult } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 
 interface RunningViewProps {
 	environments: RunningEnvironmentState[];
-	onReveal?: (environment: RunningEnvironmentState) => void;
-	onSwitchTo?: (environment: RunningEnvironmentState) => void;
+	onReveal?: (environment: RunningEnvironmentState, targetId?: string) => Promise<WorkspaceRevealResult | undefined>;
 	onStop?: (environment: RunningEnvironmentState) => void;
 }
 
 function RunningView({
 	environments,
 	onReveal,
-	onSwitchTo,
 	onStop,
 }: RunningViewProps) {
+	const [choice, setChoice] = useState<{ workspace: RunningEnvironmentState; targets: WorkspaceRevealResult["targets"] }>();
+	async function reveal(workspace: RunningEnvironmentState, targetId?: string) {
+		const result = await onReveal?.(workspace, targetId);
+		setChoice(result && !result.revealed && result.targets.length > 1 ? { workspace, targets: result.targets } : undefined);
+	}
 	return (
-		<section aria-labelledby="running-heading" className="space-y-6">
+		<section aria-labelledby="workspaces-heading" className="space-y-6">
 			<div>
-				<p className="text-sm text-muted-foreground">Active coding tools</p>
-				<h2 id="running-heading" className="text-2xl font-semibold">
-					Running
+				<p className="text-sm text-muted-foreground">Active coding work</p>
+				<h2 id="workspaces-heading" className="text-2xl font-semibold">
+					Workspaces
 				</h2>
 				<p className="mt-1 text-sm text-muted-foreground">
-					Each environment keeps the context selected when it was launched.
+					Workspaces run independently and keep the context selected when each was launched.
 				</p>
 			</div>
 
 			{environments.length === 0 ? (
 				<Card as="section" hierarchy="secondary" className="py-0">
 					<CardContent className="p-5 text-sm text-muted-foreground">
-						No active environments are recorded. Launch a project to create an
-						isolated coding-tool environment.
+						No active workspaces are recorded. Launch a project to create an
+						isolated coding-tool workspace.
 					</CardContent>
 				</Card>
 			) : (
@@ -40,11 +44,11 @@ function RunningView({
 						<RunningEnvironmentCard
 							key={environment.id}
 							environment={environment}
-							onReveal={onReveal}
-							onSwitchTo={onSwitchTo}
+							onReveal={reveal}
 							onStop={onStop}
 						/>
 					))}
+					{choice ? <section role="dialog" aria-label="Choose workspace window" className="rounded-md border border-border p-4 text-sm"><p className="mb-3 font-medium">Choose a window for {choice.workspace.project.name}</p>{choice.targets.map((target) => <Button key={target.id} type="button" variant="outline" size="sm" className="mr-2" onClick={() => void reveal(choice.workspace, target.id)}>{target.label}</Button>)}</section> : null}
 				</div>
 			)}
 		</section>
@@ -54,12 +58,10 @@ function RunningView({
 function RunningEnvironmentCard({
 	environment,
 	onReveal,
-	onSwitchTo,
 	onStop,
 }: {
 	environment: RunningEnvironmentState;
 	onReveal?: (environment: RunningEnvironmentState) => void;
-	onSwitchTo?: (environment: RunningEnvironmentState) => void;
 	onStop?: (environment: RunningEnvironmentState) => void;
 }) {
 	return (
@@ -87,7 +89,7 @@ function RunningEnvironmentCard({
 						</p>
 					</div>
 					<span className="shrink-0 text-sm font-medium text-accent-company">
-						Running
+						Active
 					</span>
 				</div>
 				<dl className="grid gap-3 border-t border-border pt-4 text-sm sm:grid-cols-3">
@@ -103,7 +105,7 @@ function RunningEnvironmentCard({
 						type="button"
 						variant="outline"
 						size="sm"
-						disabled={onReveal === undefined}
+						disabled={!environment.lifecycle.revealable || onReveal === undefined}
 						title={
 							onReveal === undefined
 								? "Revealing an environment is not available for this coding tool yet."
@@ -115,23 +117,9 @@ function RunningEnvironmentCard({
 					</Button>
 					<Button
 						type="button"
-						variant="outline"
-						size="sm"
-						disabled={onSwitchTo === undefined}
-						title={
-							onSwitchTo === undefined
-								? "Switching to an environment is not available for this coding tool yet."
-								: undefined
-						}
-						onClick={() => onSwitchTo?.(environment)}
-					>
-						Switch to
-					</Button>
-					<Button
-						type="button"
 						variant="destructive"
 						size="sm"
-						disabled={onStop === undefined}
+						disabled={!environment.lifecycle.stoppable || onStop === undefined}
 						title={
 							onStop === undefined
 								? "Stopping an environment is not available for this coding tool yet."

@@ -1,6 +1,8 @@
 package codingtool
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // RegisteredTool describes one registered coding-tool integration and its user-facing name.
 // The name belongs in the registry so callers do not need integration-specific
@@ -144,4 +146,55 @@ func (r Registry) HasCapability(id ID, capability Capability) bool {
 		}
 	}
 	return false
+}
+
+// WorkspaceCapabilities returns the existing-workspace actions implemented by
+// a tool adapter. Tools without the optional WorkspaceTool contract expose no
+// actions rather than implying that process state grants control over them.
+func (r Registry) WorkspaceCapabilities(id ID) WorkspaceCapabilities {
+	tool, ok := r.Get(id)
+	if !ok {
+		return WorkspaceCapabilities{}
+	}
+	workspaceTool, ok := tool.(WorkspaceTool)
+	if !ok {
+		return WorkspaceCapabilities{}
+	}
+	return workspaceTool.WorkspaceCapabilities()
+}
+
+func (r Registry) RevealTargets(id ID, workspace WorkspaceReference) ([]WorkspaceTarget, error) {
+	tool, ok := r.Get(id)
+	if !ok {
+		return nil, fmt.Errorf("workspace tool %q is not registered", id)
+	}
+	revealer, ok := tool.(WorkspaceRevealer)
+	if !ok {
+		return nil, fmt.Errorf("workspace reveal is not supported by %q", id)
+	}
+	return revealer.RevealTargets(workspace)
+}
+
+func (r Registry) RevealWorkspace(id ID, workspace WorkspaceReference, targetID string) error {
+	tool, ok := r.Get(id)
+	if !ok {
+		return fmt.Errorf("workspace tool %q is not registered", id)
+	}
+	revealer, ok := tool.(WorkspaceRevealer)
+	if !ok {
+		return fmt.Errorf("workspace reveal is not supported by %q", id)
+	}
+	return revealer.RevealWorkspace(workspace, targetID)
+}
+
+func (r Registry) StopWorkspace(id ID, workspace WorkspaceReference) error {
+	tool, ok := r.Get(id)
+	if !ok {
+		return fmt.Errorf("workspace tool %q is not registered", id)
+	}
+	stopper, ok := tool.(WorkspaceStopper)
+	if !ok {
+		return fmt.Errorf("workspace stop is not supported by %q", id)
+	}
+	return stopper.StopWorkspace(workspace)
 }

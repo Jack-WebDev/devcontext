@@ -11,6 +11,7 @@ import type {
 	ProjectsState,
 	RecentProjectState,
 	RunningEnvironmentsState,
+	WorkspaceRevealResult,
 	SettingsState,
 	TrustCenterState,
 } from "../../lib/devctx-api";
@@ -55,14 +56,18 @@ export function HistoryContent({
 
 export function RunningContent({
 	running,
+	onReveal,
+	onStop,
 }: {
 	running: LoadState<RunningEnvironmentsState>;
+	onReveal: (environment: RunningEnvironmentsState["environments"][number], targetId?: string) => Promise<WorkspaceRevealResult | undefined>;
+	onStop: (environment: RunningEnvironmentsState["environments"][number]) => void;
 }) {
 	if (running.status === "loading")
-		return <LoadingMessage>Refreshing active environments...</LoadingMessage>;
+		return <LoadingMessage>Refreshing active workspaces...</LoadingMessage>;
 	if (running.status === "error")
 		return <GuiErrorNotice error={running.error} />;
-	return <RunningView environments={running.data.environments} />;
+	return <RunningView environments={running.data.environments} onReveal={onReveal} onStop={onStop} />;
 }
 
 export function ContextsContent({

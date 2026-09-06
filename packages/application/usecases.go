@@ -380,6 +380,21 @@ func (s *Service) GetRunningEnvironments() (RunningEnvironmentsState, *Error) {
 	return state, nil
 }
 
+func (s *Service) RevealWorkspace(request WorkspaceActionRequest) (WorkspaceRevealResult, *Error) {
+	result, err := s.revealWorkspace(request)
+	if err != nil {
+		return WorkspaceRevealResult{}, NewError(err)
+	}
+	return result, nil
+}
+
+func (s *Service) StopWorkspace(request WorkspaceActionRequest) *Error {
+	if err := s.stopWorkspace(request); err != nil {
+		return NewError(err)
+	}
+	return nil
+}
+
 func (s *Service) getLaunchState(request GetLaunchStateRequest) (LaunchState, error) {
 	projectPath, err := s.validatedProjectPath(request.ProjectPath)
 	if err != nil {

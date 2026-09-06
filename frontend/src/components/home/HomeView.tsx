@@ -447,13 +447,13 @@ function RunningSummary({
 }) {
 	return (
 		<Panel
-			title="Running environments"
+			title="Active workspaces"
 			action="View all"
 			labelledBy="home-running-heading"
 			fill
 		>
 			{running.count === 0 ? (
-				<p className="text-xs text-muted-foreground">No active environments.</p>
+				<p className="text-xs text-muted-foreground">No active workspaces.</p>
 			) : (
 				<ul className="divide-y divide-border">
 					{running.contextCounts.map((item) => (
@@ -470,7 +470,7 @@ function RunningSummary({
 									{item.contextName}
 								</span>
 								<span className="block text-[10px] text-muted-foreground">
-									{item.count} active environment{item.count === 1 ? "" : "s"}
+									{item.count} active workspace{item.count === 1 ? "" : "s"}
 								</span>
 							</span>
 							<span className="text-right text-[10px] text-muted-foreground">

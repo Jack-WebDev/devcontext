@@ -38,6 +38,8 @@ type service interface {
 	RunRepairAction(application.RunRepairActionRequest) (application.RunRepairActionResult, *application.Error)
 	GetHistory() (application.HistoryState, *application.Error)
 	GetRunningEnvironments() (application.RunningEnvironmentsState, *application.Error)
+	RevealWorkspace(application.WorkspaceActionRequest) (application.WorkspaceRevealResult, *application.Error)
+	StopWorkspace(application.WorkspaceActionRequest) *application.Error
 	GetSettings() (application.SettingsState, *application.Error)
 	UpdateSettings(application.UpdateSettingsRequest) (application.SettingsState, *application.Error)
 	GetTrayState() (application.TrayState, *application.Error)
@@ -116,6 +118,21 @@ func (a *App) GetRunningEnvironments() any {
 		return err
 	}
 	return environments
+}
+
+func (a *App) RevealWorkspace(request application.WorkspaceActionRequest) any {
+	result, err := a.service.RevealWorkspace(request)
+	if err != nil {
+		return err
+	}
+	return result
+}
+
+func (a *App) StopWorkspace(request application.WorkspaceActionRequest) any {
+	if err := a.service.StopWorkspace(request); err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetHomeDashboard returns the Home screen state for the requested project.

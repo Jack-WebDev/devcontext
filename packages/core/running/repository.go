@@ -103,6 +103,26 @@ func (r Repository) Record(environment Environment) (Environment, error) {
 	return environment, nil
 }
 
+// MarkStopped records that an adapter has stopped exactly one workspace.
+func (r Repository) MarkStopped(id ID) (Environment, error) {
+	environments, err := r.List()
+	if err != nil {
+		return Environment{}, err
+	}
+	for index := range environments {
+		if environments[index].ID != id {
+			continue
+		}
+		environments[index].Process.State = ProcessStateStopped
+		environments[index].Session.State = SessionStateEnded
+		if err := r.write(environments); err != nil {
+			return Environment{}, err
+		}
+		return environments[index], nil
+	}
+	return Environment{}, fmt.Errorf("workspace %q does not exist", id)
+}
+
 // RefreshProcessStates marks running environments stopped when their recorded
 // PID is no longer active. Records without a PID remain unchanged because their
 // process state cannot be observed safely.

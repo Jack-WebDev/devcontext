@@ -47,6 +47,34 @@ func TestRepositoryRecordUpdatesMatchingProjectAndContext(t *testing.T) {
 	}
 }
 
+func TestRepositoryMarkStoppedChangesOnlySelectedWorkspace(t *testing.T) {
+	repository := running.NewRepository(filepath.Join(t.TempDir(), "running.toml"))
+	first, err := repository.Record(runningEnvironment("/work/api", "company", time.Now()))
+	if err != nil {
+		t.Fatalf("record first: %v", err)
+	}
+	second, err := repository.Record(runningEnvironment("/work/web", "personal", time.Now()))
+	if err != nil {
+		t.Fatalf("record second: %v", err)
+	}
+	stopped, err := repository.MarkStopped(first.ID)
+	if err != nil {
+		t.Fatalf("mark stopped: %v", err)
+	}
+	if stopped.ID != first.ID || stopped.Process.State != running.ProcessStateStopped || stopped.Session.State != running.SessionStateEnded {
+		t.Fatalf("stopped workspace = %#v", stopped)
+	}
+	all, err := repository.List()
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	for _, environment := range all {
+		if environment.ID == second.ID && environment.Process.State != running.ProcessStateRunning {
+			t.Fatalf("other workspace changed: %#v", environment)
+		}
+	}
+}
+
 func runningEnvironment(projectPath, contextID string, startedAt time.Time) running.Environment {
 	return running.Environment{
 		Project:   running.ProjectIdentity{Path: project.Path(projectPath), Name: "api"},
