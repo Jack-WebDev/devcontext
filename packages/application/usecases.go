@@ -1071,7 +1071,10 @@ func (s *Service) exportContextMetadata(request ExportContextMetadataRequest) (C
 }
 
 func (s *Service) importContextMetadata(request ImportContextMetadataRequest) (ImportContextMetadataResult, error) {
-	contextID, err := devcontext.NewID(request.ContextID)
+	contextID, err := s.contextIDForCreateRequest(CreateContextRequest{
+		ContextID: request.ContextID,
+		Name:      request.Export.Context.Name,
+	})
 	if err != nil {
 		return ImportContextMetadataResult{}, err
 	}

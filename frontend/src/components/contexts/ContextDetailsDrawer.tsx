@@ -20,7 +20,10 @@ import {
 	SheetTitle,
 } from "../ui/sheet.js";
 import { ContextField } from "./ContextField";
-import { parseContextMetadataExport } from "./context-transfer";
+import {
+	contextMetadataImportReview,
+	parseContextMetadataExport,
+} from "./context-transfer";
 
 interface ContextDetailsDrawerProps {
 	contextId: string;
@@ -35,6 +38,7 @@ interface ContextDetailsDrawerProps {
 	importMetadata: (
 		request: ImportContextMetadataRequest,
 	) => Promise<ApiResult<ImportContextMetadataResult>>;
+	chooseImportFile: () => Promise<ApiResult<string | undefined>>;
 }
 
 export function ContextDetailsDrawer({
@@ -44,6 +48,7 @@ export function ContextDetailsDrawer({
 	duplicate,
 	exportMetadata,
 	importMetadata,
+	chooseImportFile,
 }: ContextDetailsDrawerProps) {
 	const [result, setResult] = useState<ApiResult<ContextDetailsState>>();
 	const [duplicateID, setDuplicateID] = useState("");
@@ -53,8 +58,8 @@ export function ContextDetailsDrawer({
 	const [exportedMetadata, setExportedMetadata] = useState("");
 	const [exportError, setExportError] = useState<DisplayError>();
 	const [exportPending, setExportPending] = useState(false);
-	const [importedMetadata, setImportedMetadata] = useState("");
-	const [importID, setImportID] = useState("");
+	const [importedMetadata, setImportedMetadata] =
+		useState<ContextMetadataExport>();
 	const [importError, setImportError] = useState<string>();
 	const [importPending, setImportPending] = useState(false);
 
@@ -66,7 +71,6 @@ export function ContextDetailsDrawer({
 		if (result?.ok) {
 			setDuplicateID(`${result.data.context.id}-copy`);
 			setDuplicateName(`${result.data.context.name} copy`);
-			setImportID(`${result.data.context.id}-imported`);
 		}
 	}, [result]);
 
@@ -104,19 +108,28 @@ export function ContextDetailsDrawer({
 		setExportedMetadata(JSON.stringify(exported.data, null, 2));
 	}
 
-	async function submitImport() {
-		let exported: ContextMetadataExport;
-		try {
-			exported = parseContextMetadataExport(importedMetadata);
-		} catch {
-			setImportError("Paste a valid context metadata export before importing.");
+	async function chooseImport() {
+		setImportError(undefined);
+		const selected = await chooseImportFile();
+		if (!selected.ok) {
+			setImportError(selected.error.message);
 			return;
 		}
+		if (!selected.data) return;
+		try {
+			setImportedMetadata(parseContextMetadataExport(selected.data));
+		} catch {
+			setImportedMetadata(undefined);
+			setImportError("Choose a valid context metadata export file.");
+		}
+	}
+
+	async function submitImport() {
+		if (!importedMetadata) return;
 		setImportPending(true);
 		setImportError(undefined);
 		const imported = await importMetadata({
-			contextId: importID,
-			export: exported,
+			export: importedMetadata,
 		});
 		setImportPending(false);
 		if (!imported.ok) {
@@ -237,32 +250,32 @@ export function ContextDetailsDrawer({
 										/>
 									</label>
 								) : null}
-								<label className="block text-sm">
-									Import context metadata
-									<textarea
-										aria-label="Import context metadata"
-										className="mt-1 min-h-40 w-full border p-2 font-mono text-xs"
-										value={importedMetadata}
-										onChange={(event) =>
-											setImportedMetadata(event.target.value)
-										}
-										placeholder="Paste a safe context metadata export"
+								<Button
+									type="button"
+									variant="outline"
+									disabled={importPending}
+									onClick={() => void chooseImport()}
+								>
+									Choose context export file
+								</Button>
+								{importedMetadata ? (
+									<ContextMetadataImportReviewCard
+										exported={importedMetadata}
+										availableTools={result.data.context.availableTools.map((tool) => tool.id)}
+										availableProviders={result.data.context.providers.map(
+											(provider) => provider.id,
+										)}
 									/>
-								</label>
-								<ContextField
-									label="New context ID"
-									value={importID}
-									onChange={setImportID}
-								/>
+								) : null}
 								{importError ? (
 									<p className="text-destructive">{importError}</p>
 								) : null}
 								<Button
 									type="button"
-									disabled={importPending || !importID || !importedMetadata}
+									disabled={importPending || !importedMetadata}
 									onClick={() => void submitImport()}
 								>
-									{importPending ? "Importing..." : "Import as new context"}
+									{importPending ? "Importing..." : "Confirm import"}
 								</Button>
 							</section>
 						</>
@@ -270,6 +283,49 @@ export function ContextDetailsDrawer({
 				</div>
 			</SheetContent>
 		</Sheet>
+	);
+}
+
+function ContextMetadataImportReviewCard({
+	exported,
+	availableTools,
+	availableProviders,
+}: {
+	exported: ContextMetadataExport;
+	availableTools: string[];
+	availableProviders: string[];
+}) {
+	const review = contextMetadataImportReview(exported, {
+		toolIds: availableTools,
+		providerIds: availableProviders,
+	});
+	return (
+		<section
+			className="space-y-2 rounded-md border border-border p-3 text-sm"
+			aria-label="Import review"
+		>
+			<h4 className="font-medium">Review import</h4>
+			<Detail label="Name" value={review.name} />
+			<Detail label="Tools" value={review.tools.join(", ") || "None"} />
+			<Detail
+				label="Preferences"
+				value={`Default coding tool: ${review.defaultTool || "None"}`}
+			/>
+			<Detail
+				label="Project paths"
+				value="Not included. This context will not be linked to any projects."
+			/>
+			<Detail
+				label="Missing integrations"
+				value={
+					review.missingIntegrations.join(", ") ||
+					"None detected on this device."
+				}
+			/>
+			<p className="text-muted-foreground">
+				Confirming creates a new isolated context with a generated internal ID.
+			</p>
+		</section>
 	);
 }
 

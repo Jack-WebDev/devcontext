@@ -681,10 +681,10 @@ type ContextTransferTool struct {
 }
 
 // ImportContextMetadataRequest creates a new context from a safe metadata
-// export. ContextID is always supplied by the receiving user and is never
-// taken from an export document.
+// export. When ContextID is empty, the service generates an internal ID from
+// the imported name. Export documents never carry an internal ID.
 type ImportContextMetadataRequest struct {
-	ContextID string                `json:"contextId"`
+	ContextID string                `json:"contextId,omitempty"`
 	Export    ContextMetadataExport `json:"export"`
 }
 

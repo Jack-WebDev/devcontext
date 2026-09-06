@@ -1676,6 +1676,24 @@ func TestImportContextMetadataCreatesFreshStorageWithoutCredentials(t *testing.T
 	}
 }
 
+func TestImportContextMetadataGeneratesInternalIDFromImportedName(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	exported := ContextMetadataExport{
+		Version: ContextTransferVersion,
+		Context: ContextTransferMetadata{
+			Name:         "Imported Personal",
+			LaunchTarget: ContextTransferLaunchTarget{DefaultTool: "fake-editor"},
+		},
+	}
+	result, appErr := fixture.service().ImportContextMetadata(ImportContextMetadataRequest{Export: exported})
+	if appErr != nil {
+		t.Fatalf("import context metadata: %v", appErr)
+	}
+	if result.Context.ID != "imported-personal" {
+		t.Fatalf("generated context ID = %q, want imported-personal", result.Context.ID)
+	}
+}
+
 func TestImportContextMetadataRejectsUnsupportedVersionAndUnknownIntegration(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	base := ContextMetadataExport{Version: ContextTransferVersion, Context: ContextTransferMetadata{Name: "Imported", LaunchTarget: ContextTransferLaunchTarget{DefaultTool: "fake-editor"}}}

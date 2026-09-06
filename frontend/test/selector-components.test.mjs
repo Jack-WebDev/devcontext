@@ -26,7 +26,10 @@ import {
 	ContextAppearanceEditor,
 	ContextNamePurposeEditor,
 } from "../.tmp-test/src/components/contexts/ContextDetailView.js";
-import { parseContextMetadataExport } from "../.tmp-test/src/components/contexts/context-transfer.js";
+import {
+	contextMetadataImportReview,
+	parseContextMetadataExport,
+} from "../.tmp-test/src/components/contexts/context-transfer.js";
 import { renderDiagnostics } from "../.tmp-test/src/components/diagnostics/DiagnosticsView.js";
 import {
 	filterHistoryEntries,
@@ -216,6 +219,26 @@ test("context metadata import requires a JSON export document", () => {
 	assert.throws(() =>
 		parseContextMetadataExport(JSON.stringify({ version: "1", context: {} })),
 	);
+});
+
+test("context metadata import review identifies unavailable integrations before confirmation", () => {
+	const review = contextMetadataImportReview(
+		{
+			version: 1,
+			context: {
+				name: "Personal",
+				providers: [{ id: "codex", enabled: true }],
+				launchTarget: {
+					defaultTool: "cursor",
+					tools: [{ id: "cursor" }, { id: "missing-tool" }],
+				},
+			},
+		},
+		{ toolIds: ["cursor"], providerIds: [] },
+	);
+	assert.equal(review.name, "Personal");
+	assert.deepEqual(review.tools, ["cursor", "missing-tool"]);
+	assert.deepEqual(review.missingIntegrations, ["missing-tool", "codex"]);
 });
 
 test("account identity mismatch review is limited to backend identity evidence", () => {

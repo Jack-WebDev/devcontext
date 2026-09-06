@@ -14,6 +14,10 @@ export function ChooseProjectDirectory() {
   return window['go']['wailsapp']['App']['ChooseProjectDirectory']();
 }
 
+export function ChooseContextMetadataImport() {
+  return window['go']['wailsapp']['App']['ChooseContextMetadataImport']();
+}
+
 export function CreateContext(arg1) {
   return window['go']['wailsapp']['App']['CreateContext'](arg1);
 }
