@@ -52,6 +52,7 @@ export interface SettingsState {
 	launchVerification: boolean;
 	rememberProjects: boolean;
 	trayEnabled: boolean;
+	warnOnContextMismatch: boolean;
 }
 export type UpdateSettingsRequest = SettingsState;
 
@@ -1200,6 +1201,7 @@ function normalizeSettingsState(value: unknown): SettingsState {
 		launchVerification: booleanValue(object.launchVerification),
 		rememberProjects: booleanValue(object.rememberProjects),
 		trayEnabled: booleanValue(object.trayEnabled),
+		warnOnContextMismatch: booleanValue(object.warnOnContextMismatch),
 	};
 }
 

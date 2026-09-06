@@ -152,6 +152,9 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 					}
 					showLaunchVerification={settings.data.launchVerification}
 					projectMemoryEnabled={settings.data.rememberProjects}
+					requireContextMismatchConfirmation={
+						settings.data.warnOnContextMismatch
+					}
 					onCodingToolLaunched={(result) =>
 						notifyCodingToolLaunched({
 							projectName: result.project.name,

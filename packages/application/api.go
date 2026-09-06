@@ -9,10 +9,11 @@ type GetLaunchStateRequest struct {
 
 // SettingsState contains user-configurable application behavior.
 type SettingsState struct {
-	CloseAfterLaunch   bool `json:"closeAfterLaunch"`
-	LaunchVerification bool `json:"launchVerification"`
-	RememberProjects   bool `json:"rememberProjects"`
-	TrayEnabled        bool `json:"trayEnabled"`
+	CloseAfterLaunch      bool `json:"closeAfterLaunch"`
+	LaunchVerification    bool `json:"launchVerification"`
+	RememberProjects      bool `json:"rememberProjects"`
+	TrayEnabled           bool `json:"trayEnabled"`
+	WarnOnContextMismatch bool `json:"warnOnContextMismatch"`
 }
 
 // LaunchFailureDetails contains presentation-safe diagnostics for a failed

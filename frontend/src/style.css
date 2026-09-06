@@ -76,6 +76,44 @@
   --sidebar-ring: oklch(0.714 0.014 41.2);
 }
 
+.dark {
+  --app-background: #1b1b19;
+  --sidebar-background: #20201e;
+  --surface: #282825;
+  --surface-subtle: #242421;
+  --foreground-secondary: #c4c1ba;
+  --foreground-muted: #aaa69e;
+  --border-subtle: #3b3935;
+  --nav-active: #35332f;
+  --hover: #302f2b;
+  --background: #1b1b19;
+  --foreground: #f4f1e9;
+  --card: #282825;
+  --card-foreground: #f4f1e9;
+  --popover: #282825;
+  --popover-foreground: #f4f1e9;
+  --primary: #f4f1e9;
+  --primary-foreground: #252521;
+  --secondary: #35332f;
+  --secondary-foreground: #f4f1e9;
+  --muted: #35332f;
+  --muted-foreground: #c4c1ba;
+  --accent: #35332f;
+  --accent-foreground: #f4f1e9;
+  --surface-muted: #242421;
+  --border: #46433e;
+  --input: #46433e;
+  --ring: #c4c1ba;
+  --sidebar: #20201e;
+  --sidebar-foreground: #f4f1e9;
+  --sidebar-primary: #f4f1e9;
+  --sidebar-primary-foreground: #252521;
+  --sidebar-accent: #35332f;
+  --sidebar-accent-foreground: #f4f1e9;
+  --sidebar-border: #46433e;
+  --sidebar-ring: #c4c1ba;
+}
+
 .desktop-shell {
   min-width: var(--layout-min-window-width);
   background: var(--app-background);

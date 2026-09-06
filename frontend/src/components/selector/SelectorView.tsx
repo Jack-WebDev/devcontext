@@ -105,6 +105,7 @@ interface SelectorViewProps {
 	onCodingToolLaunched?: (result: LaunchProjectResult) => void;
 	showLaunchVerification?: boolean;
 	projectMemoryEnabled?: boolean;
+	requireContextMismatchConfirmation?: boolean;
 	showOnboardingReplay?: boolean;
 	onDismissOnboardingReplay?: () => void;
 	onStartContextCreation?: () => void;
@@ -123,6 +124,7 @@ function SelectorView({
 	onCodingToolLaunched,
 	showLaunchVerification = true,
 	projectMemoryEnabled = true,
+	requireContextMismatchConfirmation = true,
 	showOnboardingReplay = false,
 	onDismissOnboardingReplay,
 	onStartContextCreation,
@@ -346,7 +348,8 @@ function SelectorView({
 						rememberProject,
 						selectedContextId: contextId,
 					}),
-					confirmContextMismatch,
+					confirmContextMismatch:
+						confirmContextMismatch || !requireContextMismatchConfirmation,
 					allowExistingEnvironmentLaunch,
 					onPreflightComplete: (preflight) => {
 						if (

@@ -100,6 +100,7 @@ import {
 } from "../.tmp-test/src/components/selector/LaunchVerificationProgress.js";
 import { PreflightReviewView } from "../.tmp-test/src/components/selector/PreflightReviewView.js";
 import { settingsSections } from "../.tmp-test/src/components/settings/settings-sections.js";
+import { appearanceOptions } from "../.tmp-test/src/components/settings/AppearanceSettings.js";
 import { projectMemoryBindingContextId } from "../.tmp-test/src/components/selector/project-memory.js";
 import {
 	createLaunchRequestGuard,
@@ -4079,6 +4080,19 @@ test("settings navigation includes only functional settings", () => {
 				"closeAfterLaunch",
 			],
 		},
+		{
+			title: "Safety",
+			description: "Keep context overrides deliberate.",
+			fields: ["warnOnContextMismatch"],
+		},
+	]);
+});
+
+test("appearance offers persisted system and explicit color themes", () => {
+	assert.deepEqual(appearanceOptions, [
+		{ value: "system", label: "System" },
+		{ value: "light", label: "Light" },
+		{ value: "dark", label: "Dark" },
 	]);
 });
 

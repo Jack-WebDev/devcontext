@@ -102,6 +102,7 @@ func (s *Service) updateSettings(request UpdateSettingsRequest) (SettingsState, 
 	globalConfig.UI.LaunchVerification = request.LaunchVerification
 	globalConfig.UI.RememberProjects = request.RememberProjects
 	globalConfig.UI.TrayEnabled = request.TrayEnabled
+	globalConfig.Safety.WarnOnContextMismatch = request.WarnOnContextMismatch
 	if err := config.WriteGlobalConfigFileWithPermissions(s.dependencies.ConfigPath, globalConfig, s.dependencies.StoragePermissions); err != nil {
 		return SettingsState{}, err
 	}
@@ -109,7 +110,7 @@ func (s *Service) updateSettings(request UpdateSettingsRequest) (SettingsState, 
 }
 
 func settingsState(globalConfig config.GlobalConfig) SettingsState {
-	return SettingsState{CloseAfterLaunch: globalConfig.UI.CloseAfterLaunch, LaunchVerification: globalConfig.UI.LaunchVerification, RememberProjects: globalConfig.UI.RememberProjects, TrayEnabled: globalConfig.UI.TrayEnabled}
+	return SettingsState{CloseAfterLaunch: globalConfig.UI.CloseAfterLaunch, LaunchVerification: globalConfig.UI.LaunchVerification, RememberProjects: globalConfig.UI.RememberProjects, TrayEnabled: globalConfig.UI.TrayEnabled, WarnOnContextMismatch: globalConfig.Safety.WarnOnContextMismatch}
 }
 
 // GetHomeDashboard returns the backend-owned summary for the Home screen.

@@ -3,6 +3,8 @@ export type SupportedSetting =
 	| "launchVerification"
 	| "rememberProjects";
 
+export type SafetySetting = "warnOnContextMismatch";
+
 export const settingsSections = [
 	{
 		title: "Launching",
@@ -12,5 +14,10 @@ export const settingsSections = [
 			"rememberProjects",
 			"closeAfterLaunch",
 		] as const,
+	},
+	{
+		title: "Safety",
+		description: "Keep context overrides deliberate.",
+		fields: ["warnOnContextMismatch"] as const,
 	},
 ] as const;

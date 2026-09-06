@@ -206,6 +206,9 @@ export function SelectorContent({
 			}
 			showLaunchVerification={settings?.launchVerification ?? true}
 			projectMemoryEnabled={settings?.rememberProjects ?? true}
+			requireContextMismatchConfirmation={
+				settings?.warnOnContextMismatch ?? true
+			}
 			showOnboardingReplay={showOnboardingReplay}
 			onDismissOnboardingReplay={onDismissOnboardingReplay}
 		/>

@@ -2,7 +2,12 @@ import type { DisplayError, SettingsState } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Label } from "../ui/label.js";
 import { Switch } from "../ui/switch.js";
-import { settingsSections, type SupportedSetting } from "./settings-sections.js";
+import { AppearanceSettings } from "./AppearanceSettings.js";
+import {
+	settingsSections,
+	type SafetySetting,
+	type SupportedSetting,
+} from "./settings-sections.js";
 
 interface SettingsViewProps {
 	settings: SettingsState;
@@ -13,7 +18,7 @@ interface SettingsViewProps {
 }
 
 const labels: Record<
-	SupportedSetting,
+	SupportedSetting | SafetySetting,
 	{ label: string; description: string }
 > = {
 	closeAfterLaunch: {
@@ -29,6 +34,11 @@ const labels: Record<
 		label: "Remember project contexts",
 		description:
 			"Allow the selected context to be remembered for a project when you choose it.",
+	},
+	warnOnContextMismatch: {
+		label: "Confirm temporary context overrides",
+		description:
+			"Ask before launching a project with a context other than its remembered context.",
 	},
 };
 
@@ -97,6 +107,7 @@ function SettingsView({
 					) : null}
 				</section>
 			))}
+			<AppearanceSettings />
 		</section>
 	);
 }
@@ -107,7 +118,7 @@ function SettingToggle({
 	disabled,
 	onChange,
 }: {
-	field: SupportedSetting;
+	field: SupportedSetting | SafetySetting;
 	settings: SettingsState;
 	disabled: boolean;
 	onChange: (settings: SettingsState) => void;
