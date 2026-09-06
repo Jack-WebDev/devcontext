@@ -90,10 +90,10 @@ confirm_unbound_projects = true
 			wantMessage: "missing version",
 		},
 		{
-			name: "unsupported default editor",
+			name: "empty default editor",
 			input: `
 version = 1
-default_editor = "unknown"
+default_editor = ""
 
 [ui]
 remember_window_position = true
@@ -102,7 +102,7 @@ remember_window_position = true
 warn_on_context_mismatch = true
 confirm_unbound_projects = true
 `,
-			wantMessage: `unsupported default_editor "unknown"`,
+			wantMessage: "empty default_editor",
 		},
 		{
 			name: "missing ui setting",
@@ -250,7 +250,7 @@ func TestEncodeGlobalConfigTOMLRoundTripsThroughDecoder(t *testing.T) {
 	}
 }
 
-func TestEncodeGlobalConfigTOMLRejectsUnsupportedValues(t *testing.T) {
+func TestEncodeGlobalConfigTOMLRejectsInvalidValues(t *testing.T) {
 	_, err := config.EncodeGlobalConfigTOML(config.GlobalConfig{
 		Version:     config.SchemaVersion(99),
 		DefaultTool: codingtool.TypeVSCode,
@@ -261,9 +261,31 @@ func TestEncodeGlobalConfigTOMLRejectsUnsupportedValues(t *testing.T) {
 
 	_, err = config.EncodeGlobalConfigTOML(config.GlobalConfig{
 		Version:     config.CurrentSchemaVersion,
-		DefaultTool: codingtool.Type("unknown"),
+		DefaultTool: "",
 	})
 	if !errors.Is(err, config.ErrInvalidGlobalConfig) {
 		t.Fatalf("error = %v, want %v", err, config.ErrInvalidGlobalConfig)
+	}
+}
+
+func TestGlobalConfigPreservesRegisteredFutureToolIDs(t *testing.T) {
+	input := []byte(`
+version = 1
+default_editor = "future-tool"
+
+[ui]
+remember_window_position = true
+
+[safety]
+warn_on_context_mismatch = true
+confirm_unbound_projects = true
+`)
+
+	globalConfig, err := config.DecodeGlobalConfigTOML(input)
+	if err != nil {
+		t.Fatalf("decode global config: %v", err)
+	}
+	if globalConfig.DefaultTool != codingtool.Type("future-tool") {
+		t.Fatalf("default editor = %q, want future-tool", globalConfig.DefaultTool)
 	}
 }

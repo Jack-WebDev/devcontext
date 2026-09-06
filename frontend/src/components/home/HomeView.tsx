@@ -470,8 +470,6 @@ function RunningSummary({
 								</span>
 							</span>
 							<span className="text-right text-[10px] text-muted-foreground">
-								VS Code
-								<br />
 								Running
 							</span>
 							<MoreVertical className="size-4 text-muted-foreground" />

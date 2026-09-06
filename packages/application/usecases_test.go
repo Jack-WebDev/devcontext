@@ -511,6 +511,73 @@ func TestCreateContextRejectsUnknownGenericDevelopmentTool(t *testing.T) {
 	}
 }
 
+func TestUpdateContextDevelopmentToolsKeepsOtherContextPreferencesIndependent(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	secondTool := &applicationSecondTool{}
+	secondProvider := &applicationFakeProvider{id: "second-provider"}
+	fixture.toolRegistry = codingtool.MustNewRegistry([]codingtool.RegisteredTool{
+		{Integration: fixture.editor, DisplayName: "Fake Tool"},
+		{Integration: secondTool, DisplayName: "Second Tool"},
+	}, fixture.editor.ID())
+	fixture.providerRegistry = provider.MustNewRegistry([]provider.Provider{
+		fixture.provider,
+		secondProvider,
+	})
+
+	personal := fixture.context("personal", "Personal")
+	personal.Tool.Tools[fixture.editor.ID()] = codingtool.Config{
+		ExecutableOverride: "/tools/personal",
+		Options:            map[string]string{"profile": "personal"},
+	}
+	personal.Providers = provider.Configs{
+		fixture.provider.ID(): {Enabled: true, Options: map[string]string{"account": "personal"}},
+	}
+	company := fixture.context("company", "Company")
+	company.Tool = codingtool.LaunchTarget{
+		DefaultTool: secondTool.ID(),
+		Tools: map[codingtool.ID]codingtool.Config{
+			secondTool.ID(): {
+				ExecutableOverride: "/tools/company",
+				Options:            map[string]string{"profile": "company"},
+			},
+		},
+	}
+	company.Providers = provider.Configs{
+		secondProvider.ID(): {Enabled: true, Options: map[string]string{"account": "company"}},
+	}
+	fixture.writeContext(t, personal)
+	fixture.writeContext(t, company)
+
+	override := "/tools/personal-updated"
+	_, appErr := fixture.service().UpdateContextDevelopmentTools(UpdateContextDevelopmentToolsRequest{
+		ContextID:                 "personal",
+		EnabledDevelopmentToolIDs: []string{string(fixture.editor.ID()), string(fixture.provider.ID())},
+		ExecutableOverride:        &override,
+	})
+	if appErr != nil {
+		t.Fatalf("update personal development tools: %v", appErr)
+	}
+
+	contexts := devcontext.NewRepository(fixture.contextsDir)
+	updatedPersonal, err := contexts.Get(personal.ID)
+	if err != nil {
+		t.Fatalf("get personal context: %v", err)
+	}
+	unchangedCompany, err := contexts.Get(company.ID)
+	if err != nil {
+		t.Fatalf("get company context: %v", err)
+	}
+	if got := updatedPersonal.Tool.ConfigFor(fixture.editor.ID()).ExecutableOverride; got != override {
+		t.Fatalf("personal executable override = %q, want %q", got, override)
+	}
+	if got := unchangedCompany.Tool; !reflect.DeepEqual(got, company.Tool) {
+		t.Fatalf("company tool preferences = %#v, want %#v", got, company.Tool)
+	}
+	if got := unchangedCompany.Providers; !reflect.DeepEqual(got, company.Providers) {
+		t.Fatalf("company provider preferences = %#v, want %#v", got, company.Providers)
+	}
+}
+
 func TestSecondRegisteredToolWorksAcrossStateAndLaunch(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	secondTool := &applicationSecondTool{}
