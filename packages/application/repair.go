@@ -34,11 +34,13 @@ func (s *Service) getRepairActions(request GetRepairActionsRequest) (RepairActio
 			Description: "Re-run provider file and identity checks without changing stored files.",
 			Targets:     []RepairTarget{},
 		},
-		{
+	}
+	if targets := s.missingStorageTargets(ctx, paths); len(targets) > 0 {
+		actions = append(actions, RepairAction{
 			ID: repairActionRecreateMissingDirectories, Label: "Recreate missing directories",
 			Description: "Create missing context, provider, and selected-tool storage directories without deleting credentials.",
-			Targets:     s.missingStorageTargets(ctx, paths),
-		},
+			Targets:     targets,
+		})
 	}
 
 	for _, providerID := range enabledProviderIDs(ctx) {

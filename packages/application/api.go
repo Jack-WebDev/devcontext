@@ -720,8 +720,8 @@ type ProjectListItem struct {
 	Running        bool         `json:"running"`
 }
 
-// GetDiagnosticsRequest identifies the context that diagnostics should inspect.
-// An empty ContextID reserves application-wide diagnostics for a later phase.
+// GetDiagnosticsRequest optionally identifies a context to inspect. An empty
+// ContextID returns application-wide diagnostics.
 type GetDiagnosticsRequest struct {
 	ContextID string `json:"contextId,omitempty"`
 }
@@ -742,11 +742,12 @@ type DiagnosticGroup struct {
 
 // DiagnosticCheck describes one backend-derived diagnostic result.
 type DiagnosticCheck struct {
-	ID       string             `json:"id"`
-	Severity DiagnosticSeverity `json:"severity"`
-	Label    string             `json:"label"`
-	Message  string             `json:"message"`
-	Details  []DiagnosticDetail `json:"details,omitempty"`
+	ID         string             `json:"id"`
+	Severity   DiagnosticSeverity `json:"severity"`
+	Label      string             `json:"label"`
+	Message    string             `json:"message"`
+	Details    []DiagnosticDetail `json:"details,omitempty"`
+	ActionHint string             `json:"actionHint,omitempty"`
 }
 
 // DiagnosticSeverity uses the shared UI status vocabulary for diagnostic

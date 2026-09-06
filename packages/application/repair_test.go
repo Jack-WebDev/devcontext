@@ -82,6 +82,23 @@ func TestRecreateMissingDirectoriesDoesNotDeleteProviderFiles(t *testing.T) {
 	}
 }
 
+func TestRecreateMissingDirectoriesIsAvailableOnlyWhenStorageIsMissing(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	ctx := fixture.context("personal", "Personal")
+	fixture.writeContext(t, ctx)
+
+	actions, appErr := fixture.service().GetRepairActions(GetRepairActionsRequest{ContextID: ctx.ID.String()})
+	if appErr != nil {
+		t.Fatalf("get repair actions: %v", appErr)
+	}
+	if _, found := repairActionByID(actions.Actions, repairActionRecreateMissingDirectories); found {
+		t.Fatalf("healthy context advertised recreate action: %#v", actions)
+	}
+	if _, appErr := fixture.service().RunRepairAction(RunRepairActionRequest{ContextID: ctx.ID.String(), ActionID: repairActionRecreateMissingDirectories}); appErr == nil {
+		t.Fatal("unadvertised recreate action succeeded")
+	}
+}
+
 func repairActionForTest(t *testing.T, actions []RepairAction, id string) RepairAction {
 	t.Helper()
 	action, ok := repairActionByID(actions, id)

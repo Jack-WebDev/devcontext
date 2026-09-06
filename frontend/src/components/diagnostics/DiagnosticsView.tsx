@@ -38,7 +38,7 @@ function DiagnosticsView({
 	loadRepairActions,
 	runRepairAction,
 }: DiagnosticsViewProps) {
-	const [contextID, setContextID] = useState(contexts[0]?.context.id ?? "");
+	const [contextID, setContextID] = useState("");
 	const [diagnostics, setDiagnostics] = useState<DiagnosticsLoad>({
 		status: "loading",
 	});
@@ -46,18 +46,15 @@ function DiagnosticsView({
 	const [repairAction, setRepairAction] = useState<RepairAction>();
 	const [repairPending, setRepairPending] = useState(false);
 	const [repairError, setRepairError] = useState<DisplayError>();
+	const [reportStatus, setReportStatus] = useState<"copied" | "error">();
 
 	useEffect(() => {
-		if (!contexts.some((item) => item.context.id === contextID)) {
-			setContextID(contexts[0]?.context.id ?? "");
+		if (contextID !== "" && !contexts.some((item) => item.context.id === contextID)) {
+			setContextID("");
 		}
 	}, [contextID, contexts]);
 
 	useEffect(() => {
-		if (contextID === "") {
-			setDiagnostics({ status: "loaded", data: { groups: [] } });
-			return;
-		}
 		let active = true;
 		setDiagnostics({ status: "loading" });
 		load(contextID).then((result) => {
@@ -112,6 +109,23 @@ function DiagnosticsView({
 		}
 	}
 
+	async function copyReport() {
+		if (diagnostics.status !== "loaded") {
+			return;
+		}
+		try {
+			await navigator.clipboard.writeText(
+				createDiagnosticReport(
+					diagnostics.data,
+					contexts.find((item) => item.context.id === contextID)?.context.name,
+				),
+			);
+			setReportStatus("copied");
+		} catch {
+			setReportStatus("error");
+		}
+	}
+
 	return (
 		<section aria-labelledby="diagnostics-heading" className="space-y-6">
 			<div>
@@ -120,8 +134,8 @@ function DiagnosticsView({
 					Diagnostics
 				</h2>
 				<p className="mt-1 text-sm text-muted-foreground">
-					Review local context storage, provider setup, and coding-tool
-					readiness.
+					Review application health or select a context to troubleshoot its
+					files, isolation, tools, bindings, and environment.
 				</p>
 			</div>
 
@@ -134,9 +148,9 @@ function DiagnosticsView({
 					id="diagnostics-context-select"
 					className="h-10 border border-input bg-background px-3 text-sm text-foreground"
 					value={contextID}
-					disabled={contexts.length === 0}
 					onChange={(event) => setContextID(event.currentTarget.value)}
 				>
+					<option value="">System health</option>
 					{contexts.map((item) => (
 						<option key={item.context.id} value={item.context.id}>
 							{item.context.name}
@@ -145,7 +159,13 @@ function DiagnosticsView({
 				</select>
 			</label>
 
-			{renderDiagnostics(diagnostics, contexts.length)}
+			{diagnostics.status === "loaded" ? (
+				<DiagnosticReportAction
+					status={reportStatus}
+					onCopy={() => void copyReport()}
+				/>
+			) : null}
+			{renderDiagnostics(diagnostics)}
 			{repairActions.length > 0 ? (
 				<RepairActions
 					actions={repairActions}
@@ -253,11 +273,15 @@ function RepairConfirmation({
 						No files are currently present.
 					</p>
 				) : (
-					<ul className="max-h-48 space-y-1 overflow-y-auto border border-border p-3 font-mono text-xs">
-						{action.targets.map((target) => (
-							<li key={target.path}>{target.path}</li>
-						))}
-					</ul>
+					<Disclosure summary={`Show ${action.targets.length} affected paths`}>
+						<ul className="mt-3 max-h-48 space-y-1 overflow-y-auto border border-border p-3 font-mono text-xs">
+							{action.targets.map((target) => (
+								<li key={target.path}>
+									{target.label} ({target.kind}): {target.path}
+								</li>
+							))}
+						</ul>
+					</Disclosure>
 				)}
 				{error ? (
 					<p className="text-sm text-destructive" role="alert">
@@ -287,12 +311,7 @@ function RepairConfirmation({
 	);
 }
 
-function renderDiagnostics(diagnostics: DiagnosticsLoad, contextCount: number) {
-	if (contextCount === 0) {
-		return (
-			<EmptyDiagnostics message="Create a context before running diagnostics." />
-		);
-	}
+function renderDiagnostics(diagnostics: DiagnosticsLoad) {
 	if (diagnostics.status === "loading") {
 		return (
 			<p className="text-sm text-muted-foreground">Running diagnostics...</p>
@@ -317,6 +336,51 @@ function renderDiagnostics(diagnostics: DiagnosticsLoad, contextCount: number) {
 			))}
 		</div>
 	);
+}
+
+function DiagnosticReportAction({
+	status,
+	onCopy,
+}: {
+	status?: "copied" | "error";
+	onCopy: () => void;
+}) {
+	return (
+		<div className="flex flex-wrap items-center gap-3">
+			<Button type="button" variant="outline" size="sm" onClick={onCopy}>
+				Copy diagnostic report
+			</Button>
+			{status === "copied" ? (
+				<p className="text-sm text-muted-foreground" role="status">
+					Diagnostic report copied.
+				</p>
+			) : null}
+			{status === "error" ? (
+				<p className="text-sm text-destructive" role="alert">
+					Could not copy the diagnostic report. Try again.
+				</p>
+			) : null}
+		</div>
+	);
+}
+
+function createDiagnosticReport(
+	diagnostics: DiagnosticsState,
+	contextName?: string,
+): string {
+	const scope = contextName ? `Context: ${contextName}` : "System health";
+	const lines = ["Dev Context diagnostic report", scope, ""];
+	for (const group of diagnostics.groups) {
+		lines.push(group.label);
+		for (const check of group.checks) {
+			lines.push(`- [${check.severity}] ${check.label}: ${check.message}`);
+			if (check.actionHint) {
+				lines.push(`  Next step: ${check.actionHint}`);
+			}
+		}
+		lines.push("");
+	}
+	return lines.join("\n").trimEnd();
 }
 
 function DiagnosticGroupCard({
@@ -372,6 +436,9 @@ function DiagnosticCheckRow({
 					<DiagnosticDetails details={pathDetails} className="mt-3" />
 				</Disclosure>
 			) : null}
+			{check.actionHint ? (
+				<p className="text-sm text-muted-foreground">Next step: {check.actionHint}</p>
+			) : null}
 		</li>
 	);
 }
@@ -412,6 +479,7 @@ function EmptyDiagnostics({ message }: { message: string }) {
 
 export {
 	DiagnosticCheckRow,
+	createDiagnosticReport,
 	DiagnosticsView,
 	RepairConfirmation,
 	renderDiagnostics,

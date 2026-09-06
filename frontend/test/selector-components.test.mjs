@@ -30,7 +30,10 @@ import {
 	contextMetadataImportReview,
 	parseContextMetadataExport,
 } from "../.tmp-test/src/components/contexts/context-transfer.js";
-import { renderDiagnostics } from "../.tmp-test/src/components/diagnostics/DiagnosticsView.js";
+import {
+	createDiagnosticReport,
+	renderDiagnostics,
+} from "../.tmp-test/src/components/diagnostics/DiagnosticsView.js";
 import {
 	filterHistoryEntries,
 	formatHistoryCategory,
@@ -1615,6 +1618,7 @@ test("Diagnostics groups backend checks and keeps paths in a disclosure", () => 
 									severity: "ready",
 									label: "Context directory",
 									message: "Context directory is available.",
+									actionHint: "Inspect this context when its storage changes.",
 									details: [
 										{ label: "Mode", value: "-rwx------", isPath: false },
 										{
@@ -1637,8 +1641,42 @@ test("Diagnostics groups backend checks and keeps paths in a disclosure", () => 
 	assert.ok(html.includes("Context directory is available."));
 	assert.ok(html.includes("Mode"));
 	assert.ok(html.includes("Show paths"));
+	assert.ok(html.includes("Next step: Inspect this context when its storage changes."));
 	assert.match(html, /<details/);
 	assert.doesNotMatch(html, /<details open/);
+});
+
+test("diagnostic report includes presentation-safe findings without paths or metadata", () => {
+	const report = createDiagnosticReport(
+		{
+			groups: [
+				{
+					id: "environment",
+					label: "Environment",
+					checks: [
+						{
+							id: "provider-auth",
+							severity: "needs_attention",
+							label: "Provider credentials",
+							message: "Credentials need attention.",
+							actionHint: "Sign in again.",
+							details: [
+								{ label: "Location", value: "/private/context/auth.json", isPath: true },
+								{ label: "Email", value: "developer@example.com", isPath: false },
+							],
+						},
+					],
+				},
+			],
+		},
+		"Personal",
+	);
+
+	assert.match(report, /Dev Context diagnostic report/);
+	assert.match(report, /Context: Personal/);
+	assert.match(report, /Credentials need attention/);
+	assert.match(report, /Next step: Sign in again/);
+	assert.doesNotMatch(report, /private\/context|developer@example\.com|Location|Email/);
 });
 
 test("Contexts screen lists backend-owned identity summaries and reserves creation", () => {

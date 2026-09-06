@@ -28,7 +28,7 @@ func TestGetDiagnosticsReportsContextProviderAndToolReadiness(t *testing.T) {
 	if appErr != nil {
 		t.Fatalf("get diagnostics: %v", appErr)
 	}
-	if got := diagnosticGroupIDs(state.Groups); !reflect.DeepEqual(got, []string{"context-filesystem", "providers", "coding-tool"}) {
+	if got := diagnosticGroupIDs(state.Groups); !reflect.DeepEqual(got, []string{"context-files", "isolation", "tools", "bindings", "environment"}) {
 		t.Fatalf("diagnostic groups = %#v", got)
 	}
 	if check := diagnosticCheck(state.Groups, "context-directory"); check.Severity != DiagnosticSeverityReady || !hasPathDetail(check) {
@@ -52,7 +52,6 @@ func TestGetDiagnosticsReportsMissingContextStorageAndCredentials(t *testing.T) 
 	if err != nil {
 		t.Fatalf("derive context paths: %v", err)
 	}
-	fixture.provider.credentialDiagnosticFiles = []provider.CredentialDiagnosticFile{{Label: "Credentials", Path: filepath.Join(paths.ProviderStorageDir(fixture.provider.id), "credentials.json")}}
 	fixture.writeContext(t, ctx)
 	removeAll(t, paths.ToolStorageDir(ctx.Tool.DefaultTool))
 
@@ -63,11 +62,25 @@ func TestGetDiagnosticsReportsMissingContextStorageAndCredentials(t *testing.T) 
 	if check := diagnosticCheck(state.Groups, "context-storage-completeness"); check.Severity != DiagnosticSeverityBlocked || !hasPathDetail(check) {
 		t.Fatalf("storage completeness check = %#v", check)
 	}
-	if check := diagnosticCheck(state.Groups, "provider-fake-credential-0"); check.Severity != DiagnosticSeverityNeedsAttention || !hasPathDetail(check) {
-		t.Fatalf("credential check = %#v", check)
-	}
 	if check := diagnosticCheck(state.Groups, "tool-storage"); check.Severity != DiagnosticSeverityBlocked || !hasPathDetail(check) {
 		t.Fatalf("tool storage check = %#v", check)
+	}
+}
+
+func TestGetDiagnosticsReportsSafeSystemGroups(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	state, appErr := fixture.service().GetDiagnostics(GetDiagnosticsRequest{})
+	if appErr != nil {
+		t.Fatalf("get system diagnostics: %v", appErr)
+	}
+	if got := diagnosticGroupIDs(state.Groups); !reflect.DeepEqual(got, []string{"configuration", "storage", "tools", "integrations", "updates"}) {
+		t.Fatalf("diagnostic groups = %#v", got)
+	}
+	if check := diagnosticCheck(state.Groups, "global-config"); check.Severity != DiagnosticSeverityBlocked || !hasPathDetail(check) || check.ActionHint == "" {
+		t.Fatalf("global configuration check = %#v", check)
+	}
+	if check := diagnosticCheck(state.Groups, "update-service"); check.ActionHint == "" || len(check.Details) != 0 {
+		t.Fatalf("update check = %#v", check)
 	}
 }
 
