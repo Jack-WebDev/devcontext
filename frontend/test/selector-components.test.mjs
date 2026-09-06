@@ -32,7 +32,9 @@ import {
 } from "../.tmp-test/src/components/contexts/context-transfer.js";
 import {
 	createDiagnosticReport,
+	diagnosticGroupStatus,
 	renderDiagnostics,
+	SystemHealthSummary,
 } from "../.tmp-test/src/components/diagnostics/DiagnosticsView.js";
 import {
 	filterHistoryEntries,
@@ -102,6 +104,7 @@ import { PreflightReviewView } from "../.tmp-test/src/components/selector/Prefli
 import { settingsSections } from "../.tmp-test/src/components/settings/settings-sections.js";
 import { appearanceOptions } from "../.tmp-test/src/components/settings/AppearanceSettings.js";
 import { privacyStatements } from "../.tmp-test/src/components/settings/privacy-statements.js";
+import { AppStatusBar } from "../.tmp-test/src/components/status/AppStatusBar.js";
 import { projectMemoryBindingContextId } from "../.tmp-test/src/components/selector/project-memory.js";
 import {
 	createLaunchRequestGuard,
@@ -211,7 +214,6 @@ import {
 	StatusIndicator,
 	statusPresentation,
 } from "../.tmp-test/src/components/status/StatusIndicator.js";
-import { TrustCenterView } from "../.tmp-test/src/components/trust/TrustCenterView.js";
 import { Card } from "../.tmp-test/src/components/ui/card.js";
 import { createDevContextWindow } from "../.tmp-test/src/lib/devctx-window.js";
 
@@ -558,7 +560,10 @@ test("history groups entries by date and presents project, context, event, and t
 	const groups = groupHistoryEntriesByDate(entries);
 	assert.equal(groups.length, 2);
 	assert.equal(groups[0].date, "2026-08-14");
-	assert.equal(groups[0].entries[0].message, "Project context binding changed.");
+	assert.equal(
+		groups[0].entries[0].message,
+		"Project context binding changed.",
+	);
 	assert.equal(formatHistoryCategory("binding"), "Project binding");
 
 	const html = renderToStaticMarkup(createElement(HistoryView, { entries }));
@@ -684,11 +689,19 @@ test("workspaces present concurrent contexts as independent sessions", () => {
 		context: { id: name.toLowerCase(), name },
 		tool: { id: "tool", name: "Tool" },
 		startedAt: "2026-08-28T10:30:00Z",
-		process: { state: "running" }, session: { state: "unknown" },
+		process: { state: "running" },
+		session: { state: "unknown" },
 		launch: { source: "gui", resolutionSource: "explicit" },
-		lifecycle: { state: "active", focusable: false, revealable: false, stoppable: false },
+		lifecycle: {
+			state: "active",
+			focusable: false,
+			revealable: false,
+			stoppable: false,
+		},
 	}));
-	const html = renderToStaticMarkup(createElement(RunningView, { environments }));
+	const html = renderToStaticMarkup(
+		createElement(RunningView, { environments }),
+	);
 	assert.ok(html.includes("Workspaces run independently"));
 	assert.ok(html.includes("Personal"));
 	assert.ok(html.includes("Company"));
@@ -1287,20 +1300,13 @@ test("app shell exposes stable navigation, current project state, and a responsi
 	assert.ok(html.includes("/work/api"));
 	assert.deepEqual(
 		appRoutes.map((route) => route.label),
-		[
-			"Home",
-			"Contexts",
-			"Projects",
-			"Workspaces",
-			"History",
-			"Settings",
-			"Trust Center",
-		],
+		["Home", "Contexts", "Projects", "Workspaces", "History", "Settings"],
 	);
 	assert.equal(appRouteFromHash("#projects"), "projects");
 	assert.equal(appRouteFromHash("#projects%2Fapi"), "home");
 	assert.equal(appRouteFromHash("#projects/%2Fwork%2Fapi"), "projects");
 	assert.equal(appRouteFromHash("#contexts/company/appearance"), "contexts");
+	assert.equal(appRouteFromHash("#trust"), "home");
 	assert.deepEqual(
 		contextDetailRouteFromHash("#contexts/company/name-purpose"),
 		{
@@ -1320,63 +1326,6 @@ test("app shell exposes stable navigation, current project state, and a responsi
 		"projects/%2Fwork%2FClient%20A",
 	);
 	assert.equal(appRouteFromHash("#unknown"), "home");
-});
-
-test("Trust Center presents actual isolation, mappings, integration boundaries, and credential-sync state", () => {
-	const html = renderToStaticMarkup(
-		createElement(TrustCenterView, {
-			state: {
-				contexts: [
-					{
-						id: "personal",
-						name: "Personal",
-						providers: [
-							{
-								id: "codex",
-								name: "Codex",
-								isolation: {
-									status: "ready",
-									message: "Codex isolation storage is ready.",
-								},
-							},
-						],
-						tool: {
-							id: "vscode",
-							name: "VS Code",
-							isolation: {
-								status: "ready",
-								message: "VS Code isolation storage is ready.",
-							},
-						},
-					},
-				],
-				projectMappings: [
-					{
-						project: { name: "api", path: "/work/api" },
-						contextId: "personal",
-						contextName: "Personal",
-					},
-				],
-				credentialSync: {
-					enabled: false,
-					message: "Dev Context does not sync credentials.",
-				},
-				integrationBoundaries: [
-					{
-						toolId: "vscode",
-						toolName: "VS Code",
-						statusDataAvailable: true,
-						message: "Safe status data stays in tool storage.",
-					},
-				],
-			},
-		}),
-	);
-	assert.ok(html.includes("Trust Center"));
-	assert.ok(html.includes("Credential sync"));
-	assert.ok(html.includes("Codex isolation storage is ready."));
-	assert.ok(html.includes("Suggested context: Personal"));
-	assert.ok(html.includes("Safe status data available"));
 });
 
 test("Home shows project, selected context, and context-named quick launch", () => {
@@ -1645,10 +1594,66 @@ test("Diagnostics groups backend checks and keeps paths in a disclosure", () => 
 	assert.ok(html.includes("Context directory is available."));
 	assert.ok(html.includes("Mode"));
 	assert.ok(html.includes("Show paths"));
-	assert.ok(html.includes("Next step: Inspect this context when its storage changes."));
+	assert.ok(
+		html.includes("Next step: Inspect this context when its storage changes."),
+	);
 	assert.match(html, /<details/);
 	assert.doesNotMatch(html, /<details open/);
 });
+
+test("System Health summarizes application groups separately from context health", () => {
+	const groups = [
+		{
+			id: "configuration",
+			label: "Configuration",
+			checks: [{ severity: "ready" }],
+		},
+		{ id: "storage", label: "Storage", checks: [{ severity: "blocked" }] },
+	];
+	assert.equal(diagnosticGroupStatus(groups[0]), "ready");
+	assert.equal(diagnosticGroupStatus(groups[1]), "blocked");
+	const html = renderToStaticMarkup(
+		createElement(SystemHealthSummary, {
+			groups,
+			contexts: [{ context: { id: "personal", name: "Personal" } }],
+			onOpenContext: () => {},
+		}),
+	);
+	assert.ok(html.includes("Application health"));
+	assert.ok(html.includes("Configuration"));
+	assert.ok(html.includes("Storage"));
+	assert.ok(html.includes("Context health"));
+	assert.ok(html.includes("Open Personal health"));
+});
+
+test("footer status opens System Health", () => {
+	let opened = false;
+	const statusBar = AppStatusBar({
+		onOpenSystemHealth: () => {
+			opened = true;
+		},
+	});
+	const button = findElementByType(statusBar, "button");
+	assert.ok(button);
+	button.props.onClick();
+	assert.equal(opened, true);
+	const html = renderToStaticMarkup(statusBar);
+	assert.match(html, /<button/);
+	assert.ok(html.includes("Checking system status"));
+});
+
+function findElementByType(element, type) {
+	if (Array.isArray(element)) {
+		for (const child of element) {
+			const match = findElementByType(child, type);
+			if (match) return match;
+		}
+		return undefined;
+	}
+	if (!element || typeof element !== "object") return undefined;
+	if (element.type === type) return element;
+	return findElementByType(element.props?.children, type);
+}
 
 test("diagnostic report includes presentation-safe findings without paths or metadata", () => {
 	const report = createDiagnosticReport(
@@ -1665,8 +1670,16 @@ test("diagnostic report includes presentation-safe findings without paths or met
 							message: "Credentials need attention.",
 							actionHint: "Sign in again.",
 							details: [
-								{ label: "Location", value: "/private/context/auth.json", isPath: true },
-								{ label: "Email", value: "developer@example.com", isPath: false },
+								{
+									label: "Location",
+									value: "/private/context/auth.json",
+									isPath: true,
+								},
+								{
+									label: "Email",
+									value: "developer@example.com",
+									isPath: false,
+								},
 							],
 						},
 					],
@@ -1680,7 +1693,10 @@ test("diagnostic report includes presentation-safe findings without paths or met
 	assert.match(report, /Context: Personal/);
 	assert.match(report, /Credentials need attention/);
 	assert.match(report, /Next step: Sign in again/);
-	assert.doesNotMatch(report, /private\/context|developer@example\.com|Location|Email/);
+	assert.doesNotMatch(
+		report,
+		/private\/context|developer@example\.com|Location|Email/,
+	);
 });
 
 test("Contexts screen lists backend-owned identity summaries and reserves creation", () => {
@@ -4075,11 +4091,7 @@ test("settings navigation includes only functional settings", () => {
 		{
 			title: "Launching",
 			description: "Choose how Dev Context handles a successful launch.",
-			fields: [
-				"launchVerification",
-				"rememberProjects",
-				"closeAfterLaunch",
-			],
+			fields: ["launchVerification", "rememberProjects", "closeAfterLaunch"],
 		},
 		{
 			title: "Safety",
@@ -4108,6 +4120,7 @@ test("privacy settings describe implemented local data boundaries", () => {
 		],
 	);
 	assert.match(privacyStatements[1].description, /only when you choose/);
+	assert.match(privacyStatements[2].description, /does not store or sync/);
 	assert.match(privacyStatements[3].description, /do not include credentials/);
 });
 

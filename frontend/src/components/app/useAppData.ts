@@ -9,7 +9,6 @@ import type {
 	RecentProjectState,
 	RunningEnvironmentsState,
 	SettingsState,
-	TrustCenterState,
 } from "../../lib/devctx-api";
 import { devContextApi } from "../../lib/devctx-api";
 import type { AppRoute } from "../shell/routes";
@@ -38,9 +37,6 @@ export function useAppData(activeRoute: AppRoute) {
 		status: "loading",
 	});
 	const [settings, setSettings] = useState<LoadState<SettingsState>>({
-		status: "loading",
-	});
-	const [trustCenter, setTrustCenter] = useState<LoadState<TrustCenterState>>({
 		status: "loading",
 	});
 
@@ -86,10 +82,6 @@ export function useAppData(activeRoute: AppRoute) {
 		setSettings(loadStateFromResult(await devContextApi.getSettings()));
 	}
 
-	async function refreshTrustCenter() {
-		setTrustCenter(loadStateFromResult(await devContextApi.getTrustCenter()));
-	}
-
 	useEffect(() => {
 		let active = true;
 		void devContextApi.getLaunchState().then((result) => {
@@ -117,9 +109,6 @@ export function useAppData(activeRoute: AppRoute) {
 		if (activeRoute === "running") {
 			void refreshRunningEnvironments();
 		}
-		if (activeRoute === "trust") {
-			void refreshTrustCenter();
-		}
 	}, [activeRoute]);
 
 	return {
@@ -132,13 +121,11 @@ export function useAppData(activeRoute: AppRoute) {
 		history,
 		running,
 		settings,
-		trustCenter,
 		refreshHomeDashboard,
 		refreshRecentProjects,
 		refreshContexts,
 		refreshProjects,
 		refreshRunningEnvironments,
 		setSettings,
-		refreshTrustCenter,
 	};
 }

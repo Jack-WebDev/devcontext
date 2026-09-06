@@ -27,6 +27,7 @@
 		"src/components/diagnostics/*.tsx",
 		"src/components/history/*.tsx",
 		"src/components/running/*.tsx",
+		"src/components/status/*.tsx",
 		"src/components/trust/*.tsx",
 		"src/components/settings/*.tsx"
 	]

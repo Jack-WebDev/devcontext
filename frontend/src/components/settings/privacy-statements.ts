@@ -12,7 +12,7 @@ const privacyStatements = [
 	{
 		title: "Credentials stay with integrations",
 		description:
-			"Provider credentials are handled in context-owned integration storage. Dev Context does not store passwords, tokens, or cloud accounts itself.",
+			"Provider credentials and safe integration data stay in context-owned integration storage. Dev Context does not store or sync passwords, tokens, or cloud accounts itself.",
 	},
 	{
 		title: "Portable exports",

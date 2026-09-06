@@ -6,7 +6,6 @@ import {
 	Layers3,
 	Plus,
 	Settings,
-	ShieldCheck,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -133,8 +132,6 @@ function NavIcon({ route }: { route: AppRoute }) {
 			return <Clock3 className={className} />;
 		case "settings":
 			return <Settings className={className} />;
-		case "trust":
-			return <ShieldCheck className={className} />;
 		case "diagnostics":
 			return <Plus className={className} />;
 	}

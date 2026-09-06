@@ -13,7 +13,6 @@ import type {
 	RunningEnvironmentsState,
 	WorkspaceRevealResult,
 	SettingsState,
-	TrustCenterState,
 } from "../../lib/devctx-api";
 import type { ContextListAction } from "../contexts/ContextsView";
 import { devContextApi } from "../../lib/devctx-api";
@@ -27,20 +26,7 @@ import { RunningView } from "../running/RunningView";
 import { GuiErrorNotice } from "../selector/GuiErrorNotice";
 import { SelectorView } from "../selector/SelectorView";
 import { type AppRoute, appRouteDefinition } from "../shell/routes";
-import { TrustCenterView } from "../trust/TrustCenterView";
 import type { LoadState } from "./load-state";
-
-export function TrustCenterContent({
-	trustCenter,
-}: {
-	trustCenter: LoadState<TrustCenterState>;
-}) {
-	if (trustCenter.status === "loading")
-		return <LoadingMessage>Loading Trust Center...</LoadingMessage>;
-	if (trustCenter.status === "error")
-		return <GuiErrorNotice error={trustCenter.error} />;
-	return <TrustCenterView state={trustCenter.data} />;
-}
 
 export function HistoryContent({
 	history,

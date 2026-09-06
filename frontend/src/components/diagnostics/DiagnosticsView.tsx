@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type {
 	ApiResult,
 	ContextListItem,
+	DiagnosticCheck,
 	DiagnosticsState,
 	DisplayError,
 	RepairAction,
@@ -49,7 +50,10 @@ function DiagnosticsView({
 	const [reportStatus, setReportStatus] = useState<"copied" | "error">();
 
 	useEffect(() => {
-		if (contextID !== "" && !contexts.some((item) => item.context.id === contextID)) {
+		if (
+			contextID !== "" &&
+			!contexts.some((item) => item.context.id === contextID)
+		) {
 			setContextID("");
 		}
 	}, [contextID, contexts]);
@@ -129,13 +133,13 @@ function DiagnosticsView({
 	return (
 		<section aria-labelledby="diagnostics-heading" className="space-y-6">
 			<div>
-				<p className="text-sm text-muted-foreground">Technical checks</p>
+				<p className="text-sm text-muted-foreground">Application readiness</p>
 				<h2 id="diagnostics-heading" className="text-2xl font-semibold">
-					Diagnostics
+					System Health
 				</h2>
 				<p className="mt-1 text-sm text-muted-foreground">
-					Review application health or select a context to troubleshoot its
-					files, isolation, tools, bindings, and environment.
+					Review application-wide readiness, or open a context to check its
+					isolation, files, tools, bindings, and environment.
 				</p>
 			</div>
 
@@ -159,6 +163,13 @@ function DiagnosticsView({
 				</select>
 			</label>
 
+			{diagnostics.status === "loaded" && contextID === "" ? (
+				<SystemHealthSummary
+					groups={diagnostics.data.groups}
+					contexts={contexts}
+					onOpenContext={setContextID}
+				/>
+			) : null}
 			{diagnostics.status === "loaded" ? (
 				<DiagnosticReportAction
 					status={reportStatus}
@@ -186,6 +197,110 @@ function DiagnosticsView({
 			) : null}
 		</section>
 	);
+}
+
+function SystemHealthSummary({
+	groups,
+	contexts,
+	onOpenContext,
+}: {
+	groups: DiagnosticsState["groups"];
+	contexts: ContextListItem[];
+	onOpenContext: (contextID: string) => void;
+}) {
+	return (
+		<Card
+			as="section"
+			hierarchy="secondary"
+			className="py-0"
+			aria-labelledby="system-health-summary-heading"
+		>
+			<CardContent className="space-y-5 p-5">
+				<div>
+					<h3
+						id="system-health-summary-heading"
+						className="text-lg font-semibold"
+					>
+						Application health
+					</h3>
+					<p className="mt-1 text-sm text-muted-foreground">
+						Configuration, storage, tools, integrations, and updates for this
+						app.
+					</p>
+				</div>
+				<div className="grid gap-3 sm:grid-cols-2">
+					{groups.map((group) => (
+						<SystemHealthGroup key={group.id} group={group} />
+					))}
+				</div>
+				<section
+					className="border-t border-border pt-4"
+					aria-labelledby="context-health-heading"
+				>
+					<h4 id="context-health-heading" className="font-medium">
+						Context health
+					</h4>
+					<p className="mt-1 text-sm text-muted-foreground">
+						Context-specific checks, including isolation, are kept separate from
+						application health.
+					</p>
+					{contexts.length === 0 ? (
+						<p className="mt-3 text-sm text-muted-foreground">
+							No contexts are configured.
+						</p>
+					) : (
+						<div className="mt-3 flex flex-wrap gap-2">
+							{contexts.map((item) => (
+								<Button
+									key={item.context.id}
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={() => onOpenContext(item.context.id)}
+								>
+									Open {item.context.name} health
+								</Button>
+							))}
+						</div>
+					)}
+				</section>
+			</CardContent>
+		</Card>
+	);
+}
+
+function SystemHealthGroup({
+	group,
+}: {
+	group: DiagnosticsState["groups"][number];
+}) {
+	const status = diagnosticGroupStatus(group);
+	const issueCount = group.checks.filter(
+		(check) => check.severity !== "ready",
+	).length;
+	return (
+		<div className="border border-border p-4">
+			<div className="flex items-center justify-between gap-3">
+				<h4 className="font-medium">{group.label}</h4>
+				<StatusIndicator status={status} />
+			</div>
+			<p className="mt-2 text-sm text-muted-foreground">
+				{issueCount === 0
+					? "Ready"
+					: `${issueCount} item${issueCount === 1 ? "" : "s"} needs attention`}
+			</p>
+		</div>
+	);
+}
+
+function diagnosticGroupStatus(
+	group: DiagnosticsState["groups"][number],
+): DiagnosticCheck["severity"] {
+	if (group.checks.some((check) => check.severity === "blocked"))
+		return "blocked";
+	if (group.checks.some((check) => check.severity === "needs_attention"))
+		return "needs_attention";
+	return "ready";
 }
 
 function RepairActions({
@@ -437,7 +552,9 @@ function DiagnosticCheckRow({
 				</Disclosure>
 			) : null}
 			{check.actionHint ? (
-				<p className="text-sm text-muted-foreground">Next step: {check.actionHint}</p>
+				<p className="text-sm text-muted-foreground">
+					Next step: {check.actionHint}
+				</p>
 			) : null}
 		</li>
 	);
@@ -480,7 +597,9 @@ function EmptyDiagnostics({ message }: { message: string }) {
 export {
 	DiagnosticCheckRow,
 	createDiagnosticReport,
+	diagnosticGroupStatus,
 	DiagnosticsView,
 	RepairConfirmation,
 	renderDiagnostics,
+	SystemHealthSummary,
 };
