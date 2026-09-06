@@ -4,9 +4,11 @@ import { ProjectSafetyLabel } from "../projects/ProjectSafetyLabel.js";
 import { Card, CardContent } from "../ui/card.js";
 import { Disclosure } from "../ui/disclosure.js";
 import { Button } from "../ui/button.js";
+import { EmptyState } from "../ui/collection-state.js";
 
 interface HistoryViewProps {
 	entries: HistoryEntry[];
+	onOpenProjects?: () => void;
 }
 
 interface HistoryDateGroup {
@@ -22,7 +24,7 @@ type HistoryFilter =
 	| "repair"
 	| "authentication";
 
-function HistoryView({ entries }: HistoryViewProps) {
+function HistoryView({ entries, onOpenProjects }: HistoryViewProps) {
 	const [filter, setFilter] = useState<HistoryFilter>("all");
 	const [search, setSearch] = useState("");
 	const [selectedEntry, setSelectedEntry] = useState<HistoryEntry>();
@@ -81,13 +83,11 @@ function HistoryView({ entries }: HistoryViewProps) {
 			</div>
 
 			{groups.length === 0 ? (
-				<Card as="section" hierarchy="secondary" className="py-0">
-					<CardContent className="p-5 text-sm text-muted-foreground">
-						{entries.length === 0
-							? "No activity has been recorded yet. Launches and context changes will appear here."
-							: "No activity matches the selected filter or search."}
-					</CardContent>
-				</Card>
+				<EmptyState
+					title={entries.length === 0 ? "No activity yet" : "No matching activity"}
+					description={entries.length === 0 ? "No activity has been recorded yet. Launches and context changes will appear here." : "No activity matches the selected filter or search."}
+					{...(entries.length === 0 ? { actionLabel: "View projects", onAction: onOpenProjects } : {})}
+				/>
 			) : (
 				<div className="space-y-6">
 					{groups.map((group) => (

@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ProjectListItem } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
+import { EmptyState } from "../ui/collection-state.js";
 
 interface ProjectsViewProps {
 	projects: ProjectListItem[];
@@ -12,6 +13,7 @@ interface ProjectsViewProps {
 	onOpenFolder?: (project: ProjectListItem) => void;
 	onOpenDetail?: (project: ProjectListItem) => void;
 	onForget?: (project: ProjectListItem) => void;
+	onStartLaunch?: () => void;
 }
 
 type ProjectAssignmentFilter = "all" | "assigned" | "unassigned";
@@ -25,6 +27,7 @@ function ProjectsView({
 	onOpenFolder,
 	onOpenDetail,
 	onForget,
+	onStartLaunch,
 }: ProjectsViewProps) {
 	return (
 		<section aria-labelledby="projects-heading" className="space-y-6">
@@ -47,6 +50,7 @@ function ProjectsView({
 				onOpenFolder={onOpenFolder}
 				onOpenDetail={onOpenDetail}
 				onForget={onForget}
+				onStartLaunch={onStartLaunch}
 			/>
 		</section>
 	);
@@ -88,11 +92,13 @@ function FilteredProjects(props: ProjectsViewProps) {
 			) : null}
 
 			{visibleProjects.length === 0 ? (
-				<Card as="section" hierarchy="secondary" className="py-0">
-					<CardContent className="p-5 text-sm text-muted-foreground">
-						{emptyMessage}
-					</CardContent>
-				</Card>
+				<EmptyState
+					title={props.projects.length === 0 ? "No projects yet" : "No matching projects"}
+					description={emptyMessage}
+					{...(props.projects.length === 0
+						? { actionLabel: "Launch a project", onAction: props.onStartLaunch }
+						: {})}
+				/>
 			) : (
 				<div className="space-y-4">
 					{visibleProjects.map((project, index) => (

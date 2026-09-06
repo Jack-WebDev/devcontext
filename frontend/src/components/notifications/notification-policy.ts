@@ -42,6 +42,12 @@ interface NotificationPresentation {
 	severity: "success" | "warning" | "info";
 }
 
+function isToastEligible(notification: AppNotification): boolean {
+	// A warning that requires a repair belongs on the affected screen, where its
+	// recovery action remains available. Toasts only confirm non-critical events.
+	return notification.kind !== "provider_attention";
+}
+
 // Keep this list deliberately small. Notifications are reserved for changes
 // that require acknowledgement outside the current screen, not routine work
 // such as preflight checks, refreshes, or saved preferences.
@@ -81,4 +87,4 @@ function notificationPresentation(
 }
 
 export type { AppNotification, NotificationKind, NotificationPresentation };
-export { notificationPresentation };
+export { isToastEligible, notificationPresentation };

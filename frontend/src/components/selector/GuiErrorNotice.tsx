@@ -1,5 +1,6 @@
 import type { DisplayError } from "../../lib/devctx-api";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert.js";
+import { Disclosure } from "../ui/disclosure.js";
 
 interface GuiErrorNoticeProps {
 	error: DisplayError;
@@ -17,6 +18,11 @@ function GuiErrorNotice({ error }: GuiErrorNoticeProps) {
 					{errorImpact(error.code)}
 				</ErrorSection>
 				<ErrorSection label="What to do">{error.recovery}</ErrorSection>
+				{error.technicalDetails ? (
+					<Disclosure summary="Technical details">
+						<pre className="overflow-x-auto whitespace-pre-wrap font-mono text-xs">{error.technicalDetails}</pre>
+					</Disclosure>
+				) : null}
 			</AlertDescription>
 		</Alert>
 	);

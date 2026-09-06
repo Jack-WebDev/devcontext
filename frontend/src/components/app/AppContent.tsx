@@ -25,35 +25,40 @@ import { ProjectsView } from "../projects/ProjectsView";
 import { RunningView } from "../running/RunningView";
 import { GuiErrorNotice } from "../selector/GuiErrorNotice";
 import { SelectorView } from "../selector/SelectorView";
+import { CollectionSkeleton } from "../ui/collection-state";
 import { type AppRoute, appRouteDefinition } from "../shell/routes";
 import type { LoadState } from "./load-state";
 
 export function HistoryContent({
 	history,
+	onOpenProjects,
 }: {
 	history: LoadState<HistoryState>;
+	onOpenProjects?: () => void;
 }) {
 	if (history.status === "loading")
-		return <LoadingMessage>Loading history...</LoadingMessage>;
+		return <CollectionSkeleton label="Loading history" />;
 	if (history.status === "error")
 		return <GuiErrorNotice error={history.error} />;
-	return <HistoryView entries={history.data.entries} />;
+	return <HistoryView entries={history.data.entries} onOpenProjects={onOpenProjects} />;
 }
 
 export function RunningContent({
 	running,
 	onReveal,
 	onStop,
+	onLaunchProject,
 }: {
 	running: LoadState<RunningEnvironmentsState>;
 	onReveal: (environment: RunningEnvironmentsState["environments"][number], targetId?: string) => Promise<WorkspaceRevealResult | undefined>;
 	onStop: (environment: RunningEnvironmentsState["environments"][number]) => void;
+	onLaunchProject?: () => void;
 }) {
 	if (running.status === "loading")
-		return <LoadingMessage>Refreshing active workspaces...</LoadingMessage>;
+		return <CollectionSkeleton label="Loading active workspaces" />;
 	if (running.status === "error")
 		return <GuiErrorNotice error={running.error} />;
-	return <RunningView environments={running.data.environments} onReveal={onReveal} onStop={onStop} />;
+	return <RunningView environments={running.data.environments} onReveal={onReveal} onStop={onStop} onLaunchProject={onLaunchProject} />;
 }
 
 export function ContextsContent({
@@ -68,7 +73,7 @@ export function ContextsContent({
 	onAction?: (id: string, action: ContextListAction) => void;
 }) {
 	if (contexts.status === "loading")
-		return <LoadingMessage>Loading contexts...</LoadingMessage>;
+		return <CollectionSkeleton label="Loading contexts" />;
 	if (contexts.status === "error")
 		return <GuiErrorNotice error={contexts.error} />;
 	return (
@@ -89,6 +94,7 @@ export function ProjectsContent({
 	onLaunch,
 	onOpenFolder,
 	onOpenDetail,
+	onStartLaunch,
 }: {
 	projects: LoadState<ProjectsState>;
 	launchingProjectPath?: string;
@@ -97,9 +103,10 @@ export function ProjectsContent({
 	onLaunch: (project: ProjectListItem) => void;
 	onOpenFolder: (project: ProjectListItem) => void;
 	onOpenDetail: (project: ProjectListItem) => void;
+	onStartLaunch?: () => void;
 }) {
 	if (projects.status === "loading")
-		return <LoadingMessage>Loading projects...</LoadingMessage>;
+		return <CollectionSkeleton label="Loading projects" />;
 	if (projects.status === "error")
 		return <GuiErrorNotice error={projects.error} />;
 	return (
@@ -111,6 +118,7 @@ export function ProjectsContent({
 			onLaunch={onLaunch}
 			onOpenFolder={onOpenFolder}
 			onOpenDetail={onOpenDetail}
+			onStartLaunch={onStartLaunch}
 		/>
 	);
 }

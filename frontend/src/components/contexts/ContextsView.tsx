@@ -7,6 +7,7 @@ import {
 import { StatusIndicator } from "../status/StatusIndicator.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
+import { EmptyState } from "../ui/collection-state.js";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -62,12 +63,12 @@ function ContextsView({
 			</div>
 
 			{contexts.length === 0 ? (
-				<Card as="section" hierarchy="secondary" className="py-0">
-					<CardContent className="inset-group text-sm text-muted-foreground">
-						No contexts are configured yet. Create a context to set up an
-						isolated development identity.
-					</CardContent>
-				</Card>
+				<EmptyState
+					title="No contexts yet"
+					description="Create a context to set up an isolated development identity."
+					actionLabel="Create context"
+					onAction={onNew}
+				/>
 			) : (
 				<div className="grid gap-4 lg:grid-cols-2">
 					{contexts.map((item) => (
