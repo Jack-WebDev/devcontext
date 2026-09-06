@@ -35,10 +35,10 @@ function AppShell({
 			data-app-shell
 		>
 			<div className="app-shell-grid grid min-h-0 overflow-hidden">
-				<aside className="flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border bg-[#fbfaf8] text-sidebar-foreground">
+				<aside className="flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
 					<div className="px-7 pt-9 pb-8">
 						<h1 className="flex items-center gap-3 text-lg font-semibold tracking-tight">
-							<span className="grid size-8 place-items-center rounded-md bg-[#566d5a] text-white">
+							<span className="grid size-8 place-items-center rounded-md bg-primary text-primary-foreground">
 								<Layers3 className="size-5" />
 							</span>
 							Dev Context
@@ -54,7 +54,7 @@ function AppShell({
 								<button
 									key={route.id}
 									type="button"
-									className="flex h-[38px] min-w-0 items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-[#f3f1ed] hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 data-[active=true]:bg-[#efede9] data-[active=true]:text-foreground motion-reduce:transition-none"
+									className="flex h-[38px] min-w-0 items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 data-[active=true]:bg-sidebar-accent data-[active=true]:text-foreground motion-reduce:transition-none"
 									data-active={activeRoute === route.id}
 									aria-current={activeRoute === route.id ? "page" : undefined}
 									onClick={() => onNavigate(route.id)}
@@ -67,7 +67,7 @@ function AppShell({
 					<div className="mx-5 mt-5 border-t border-sidebar-border pt-4">
 						<button
 							type="button"
-							className="flex h-[38px] w-full items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-[#f3f1ed] hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 data-[active=true]:bg-[#efede9] data-[active=true]:text-foreground motion-reduce:transition-none"
+							className="flex h-[38px] w-full items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 data-[active=true]:bg-sidebar-accent data-[active=true]:text-foreground motion-reduce:transition-none"
 							data-active={activeRoute === "settings"}
 							onClick={() => onNavigate("settings")}
 						>
@@ -96,7 +96,7 @@ function SidebarShortcuts() {
 	return (
 		<div className="mt-auto px-3 pb-5">
 			<section
-				className="rounded-lg border border-border bg-[#faf9f7] p-3"
+				className="rounded-lg border border-sidebar-border bg-sidebar-accent p-3"
 				aria-label="Keyboard shortcuts"
 			>
 				<p className="mb-2.5 text-[11px] font-semibold">Keyboard shortcuts</p>
@@ -110,7 +110,7 @@ function Shortcut({ label, keycap }: { label: string; keycap: string }) {
 	return (
 		<div className="flex h-[29px] items-center justify-between text-[11px] text-muted-foreground">
 			<span>{label}</span>
-			<kbd className="min-w-9 rounded border border-border bg-white px-1.5 py-0.5 text-center text-[10px] text-foreground">
+			<kbd className="min-w-9 rounded border border-sidebar-border bg-sidebar px-1.5 py-0.5 text-center text-[10px] text-foreground">
 				{keycap}
 			</kbd>
 		</div>

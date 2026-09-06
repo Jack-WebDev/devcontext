@@ -25,7 +25,7 @@ function AppStatusBar({
 				? "Isolation needs attention"
 				: "Isolation ready";
 	return (
-		<footer className="h-12 border-t border-border bg-[#faf9f7]">
+		<footer className="h-12 border-t border-border bg-surface-muted">
 			<div className="flex h-full items-center text-[11px] text-muted-foreground">
 				<div className="flex h-full w-59.5 items-center gap-2 border-r border-border px-5">
 					<ShieldCheck className="size-4" aria-hidden="true" />
@@ -33,7 +33,7 @@ function AppStatusBar({
 				</div>
 				<button
 					type="button"
-					className="flex h-full items-center gap-2 px-5 transition-colors hover:bg-[#f3f1ed] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+					className="flex h-full items-center gap-2 px-5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
 					onClick={onOpenSystemHealth}
 				>
 					<span

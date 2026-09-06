@@ -13,6 +13,7 @@ test("UXF-05 overlay primitives define modal focus, calm surfaces, and disclosur
 		dialog,
 		sheet,
 		alertDialog,
+		styles,
 		menu,
 		disclosure,
 		failure,
@@ -22,6 +23,7 @@ test("UXF-05 overlay primitives define modal focus, calm surfaces, and disclosur
 		source("components/ui/dialog.tsx"),
 		source("components/ui/sheet.tsx"),
 		source("components/ui/alert-dialog.tsx"),
+		source("style.css"),
 		source("components/ui/dropdown-menu.tsx"),
 		source("components/ui/disclosure.tsx"),
 		source("components/selector/LaunchFailureView.tsx"),
@@ -31,6 +33,11 @@ test("UXF-05 overlay primitives define modal focus, calm surfaces, and disclosur
 
 	assert.match(dialog, /modal = true/);
 	assert.match(sheet, /modal = true/);
+	for (const overlay of [dialog, sheet, alertDialog]) {
+		assert.match(overlay, /overlay-backdrop/);
+		assert.match(overlay, /overlay-surface/);
+		assert.match(overlay, /finalFocus = true/);
+	}
 	for (const overlay of [dialog, alertDialog]) {
 		assert.match(overlay, /rounded-2xl/);
 	}
@@ -45,4 +52,18 @@ test("UXF-05 overlay primitives define modal focus, calm surfaces, and disclosur
 	assert.match(failure, /<Disclosure/);
 	assert.match(explanation, /<Disclosure/);
 	assert.match(diagnostics, /<Disclosure/);
+	assert.match(styles, /--motion-fast:/);
+	assert.match(styles, /--motion-standard:/);
+	assert.match(styles, /\.overlay-backdrop\s*\{/);
+	assert.match(styles, /\.overlay-surface\s*\{/);
+	assert.equal((styles.match(/\.dark\s*\{/g) ?? []).length, 1);
+	for (const token of [
+		"--surface",
+		"--border",
+		"--success",
+		"--warning",
+		"--green-soft",
+	]) {
+		assert.match(styles, new RegExp(`\\.dark\\s*\\{[\\s\\S]*?${token}:`));
+	}
 });

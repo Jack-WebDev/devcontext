@@ -27,6 +27,9 @@ body,
   --layout-card-padding: 1.5rem;
   --layout-card-padding-compact: 1rem;
   --layout-control-gap: 0.75rem;
+  --motion-fast: 120ms;
+  --motion-standard: 180ms;
+  --motion-easing: cubic-bezier(0.2, 0, 0, 1);
   --layout-list-row-min-height: 3.5rem;
   --layout-launcher-width: 58rem;
   --layout-launcher-padding: clamp(2rem, 6vw, 5rem);
@@ -121,6 +124,23 @@ body,
   --sidebar-accent-foreground: #f4f1e9;
   --sidebar-border: #46433e;
   --sidebar-ring: #e8e4db;
+  --destructive: oklch(0.704 0.191 22.216);
+  --success: oklch(0.696 0.145 153.1);
+  --warning: oklch(0.82 0.14 83.1);
+  --accent-personal: oklch(0.696 0.145 153.1);
+  --accent-company: oklch(0.68 0.18 264.376);
+  --accent-freelance: oklch(0.82 0.14 83.1);
+  --accent-custom: oklch(0.72 0.2 293.009);
+  --green: #639b71;
+  --green-strong: #8bc49a;
+  --green-soft: #243d2b;
+  --company-accent: #c1b49d;
+  --company-soft: #3a352e;
+  --chart-1: oklch(0.868 0.007 39.5);
+  --chart-2: oklch(0.547 0.021 43.1);
+  --chart-3: oklch(0.438 0.017 39.3);
+  --chart-4: oklch(0.367 0.016 35.7);
+  --chart-5: oklch(0.268 0.011 36.5);
 }
 
 /* Native controls remain in a few focused flows. Give them the same visible
@@ -181,6 +201,22 @@ textarea:not([data-slot="textarea"]):focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: var(--layout-control-gap);
+}
+.overlay-backdrop {
+  opacity: 1;
+  transition: opacity var(--motion-fast) var(--motion-easing);
+}
+.overlay-surface {
+  opacity: 1;
+  transition:
+    opacity var(--motion-standard) var(--motion-easing),
+    transform var(--motion-standard) var(--motion-easing);
+}
+.overlay-backdrop[data-starting-style],
+.overlay-backdrop[data-ending-style],
+.overlay-surface[data-starting-style],
+.overlay-surface[data-ending-style] {
+  opacity: 0;
 }
 .list-row {
   min-height: var(--layout-list-row-min-height);
@@ -371,53 +407,11 @@ textarea:not([data-slot="textarea"]):focus-visible {
 }
 .home-context-badge-personal {
   background: var(--company-soft);
-  color: #5f594e;
+  color: var(--foreground-secondary);
 }
 .home-statusbar {
   height: 55px;
   background: var(--surface-subtle);
-}
-
-.dark {
-  --background: oklch(0.147 0.004 49.3);
-  --foreground: oklch(0.986 0.002 67.8);
-  --card: oklch(0.214 0.009 43.1);
-  --card-foreground: oklch(0.986 0.002 67.8);
-  --popover: oklch(0.214 0.009 43.1);
-  --popover-foreground: oklch(0.986 0.002 67.8);
-  --primary: oklch(0.922 0.005 34.3);
-  --primary-foreground: oklch(0.214 0.009 43.1);
-  --secondary: oklch(0.268 0.011 36.5);
-  --secondary-foreground: oklch(0.986 0.002 67.8);
-  --muted: oklch(0.268 0.011 36.5);
-  --muted-foreground: oklch(0.714 0.014 41.2);
-  --accent: oklch(0.268 0.011 36.5);
-  --accent-foreground: oklch(0.986 0.002 67.8);
-  --destructive: oklch(0.704 0.191 22.216);
-  --success: oklch(0.696 0.145 153.1);
-  --warning: oklch(0.82 0.14 83.1);
-  --surface: oklch(0.214 0.009 43.1);
-  --surface-muted: oklch(0.268 0.011 36.5);
-  --accent-personal: oklch(0.696 0.145 153.1);
-  --accent-company: oklch(0.68 0.18 264.376);
-  --accent-freelance: oklch(0.82 0.14 83.1);
-  --accent-custom: oklch(0.72 0.2 293.009);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.547 0.021 43.1);
-  --chart-1: oklch(0.868 0.007 39.5);
-  --chart-2: oklch(0.547 0.021 43.1);
-  --chart-3: oklch(0.438 0.017 39.3);
-  --chart-4: oklch(0.367 0.016 35.7);
-  --chart-5: oklch(0.268 0.011 36.5);
-  --sidebar: oklch(0.214 0.009 43.1);
-  --sidebar-foreground: oklch(0.986 0.002 67.8);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.986 0.002 67.8);
-  --sidebar-accent: oklch(0.268 0.011 36.5);
-  --sidebar-accent-foreground: oklch(0.986 0.002 67.8);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.547 0.021 43.1);
 }
 
 @theme inline {
