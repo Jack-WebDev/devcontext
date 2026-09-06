@@ -24,15 +24,35 @@ func (s *Service) getRunningEnvironments() (RunningEnvironmentsState, error) {
 	return RunningEnvironmentsState{Environments: states}, nil
 }
 
-func (s *Service) revealWorkspace(request WorkspaceActionRequest) error {
+func (s *Service) revealWorkspace(request WorkspaceActionRequest) (WorkspaceRevealResult, error) {
 	environment, err := s.activeWorkspace(request.WorkspaceID)
 	if err != nil {
-		return err
+		return WorkspaceRevealResult{}, err
 	}
 	if !s.dependencies.ToolRegistry.WorkspaceCapabilities(environment.Tool.ID).Revealable {
-		return fmt.Errorf("workspace reveal is not available")
+		return WorkspaceRevealResult{}, fmt.Errorf("workspace reveal is not available")
 	}
-	return s.dependencies.ToolRegistry.RevealWorkspace(environment.Tool.ID, workspaceReference(environment))
+	targets, err := s.dependencies.ToolRegistry.RevealTargets(environment.Tool.ID, workspaceReference(environment))
+	if err != nil {
+		return WorkspaceRevealResult{}, err
+	}
+	result := WorkspaceRevealResult{Targets: make([]WorkspaceRevealTarget, len(targets))}
+	for i, target := range targets {
+		result.Targets[i] = WorkspaceRevealTarget{ID: target.ID, Label: target.Label}
+	}
+	if len(targets) != 1 && request.TargetID == "" {
+		return result, nil
+	}
+	targetID := request.TargetID
+	if targetID == "" {
+		targetID = targets[0].ID
+	}
+	for _, target := range targets {
+		if target.ID == targetID {
+			return result, s.dependencies.ToolRegistry.RevealWorkspace(environment.Tool.ID, workspaceReference(environment), targetID)
+		}
+	}
+	return WorkspaceRevealResult{}, fmt.Errorf("workspace reveal target does not exist")
 }
 
 func (s *Service) stopWorkspace(request WorkspaceActionRequest) error {

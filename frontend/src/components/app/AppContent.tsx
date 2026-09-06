@@ -11,6 +11,7 @@ import type {
 	ProjectsState,
 	RecentProjectState,
 	RunningEnvironmentsState,
+	WorkspaceRevealResult,
 	SettingsState,
 	TrustCenterState,
 } from "../../lib/devctx-api";
@@ -59,7 +60,7 @@ export function RunningContent({
 	onStop,
 }: {
 	running: LoadState<RunningEnvironmentsState>;
-	onReveal: (environment: RunningEnvironmentsState["environments"][number]) => void;
+	onReveal: (environment: RunningEnvironmentsState["environments"][number], targetId?: string) => Promise<WorkspaceRevealResult | undefined>;
 	onStop: (environment: RunningEnvironmentsState["environments"][number]) => void;
 }) {
 	if (running.status === "loading")

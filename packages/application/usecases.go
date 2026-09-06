@@ -380,11 +380,12 @@ func (s *Service) GetRunningEnvironments() (RunningEnvironmentsState, *Error) {
 	return state, nil
 }
 
-func (s *Service) RevealWorkspace(request WorkspaceActionRequest) *Error {
-	if err := s.revealWorkspace(request); err != nil {
-		return NewError(err)
+func (s *Service) RevealWorkspace(request WorkspaceActionRequest) (WorkspaceRevealResult, *Error) {
+	result, err := s.revealWorkspace(request)
+	if err != nil {
+		return WorkspaceRevealResult{}, NewError(err)
 	}
-	return nil
+	return result, nil
 }
 
 func (s *Service) StopWorkspace(request WorkspaceActionRequest) *Error {

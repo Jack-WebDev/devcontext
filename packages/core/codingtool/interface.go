@@ -69,8 +69,15 @@ type WorkspaceReference struct {
 	ProcessID   *int
 }
 
+// WorkspaceTarget identifies one adapter-owned window eligible for focus.
+type WorkspaceTarget struct {
+	ID    string
+	Label string
+}
+
 type WorkspaceRevealer interface {
-	RevealWorkspace(WorkspaceReference) error
+	RevealTargets(WorkspaceReference) ([]WorkspaceTarget, error)
+	RevealWorkspace(WorkspaceReference, string) error
 }
 type WorkspaceStopper interface {
 	StopWorkspace(WorkspaceReference) error

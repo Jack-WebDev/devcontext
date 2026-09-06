@@ -1,10 +1,11 @@
-import type { RunningEnvironmentState } from "../../lib/devctx-api";
+import { useState } from "react";
+import type { RunningEnvironmentState, WorkspaceRevealResult } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 
 interface RunningViewProps {
 	environments: RunningEnvironmentState[];
-	onReveal?: (environment: RunningEnvironmentState) => void;
+	onReveal?: (environment: RunningEnvironmentState, targetId?: string) => Promise<WorkspaceRevealResult | undefined>;
 	onSwitchTo?: (environment: RunningEnvironmentState) => void;
 	onStop?: (environment: RunningEnvironmentState) => void;
 }
@@ -15,6 +16,11 @@ function RunningView({
 	onSwitchTo,
 	onStop,
 }: RunningViewProps) {
+	const [choice, setChoice] = useState<{ workspace: RunningEnvironmentState; targets: WorkspaceRevealResult["targets"] }>();
+	async function reveal(workspace: RunningEnvironmentState, targetId?: string) {
+		const result = await onReveal?.(workspace, targetId);
+		setChoice(result && !result.revealed && result.targets.length > 1 ? { workspace, targets: result.targets } : undefined);
+	}
 	return (
 		<section aria-labelledby="workspaces-heading" className="space-y-6">
 			<div>
@@ -40,11 +46,12 @@ function RunningView({
 						<RunningEnvironmentCard
 							key={environment.id}
 							environment={environment}
-							onReveal={onReveal}
+							onReveal={reveal}
 							onSwitchTo={onSwitchTo}
 							onStop={onStop}
 						/>
 					))}
+					{choice ? <section role="dialog" aria-label="Choose workspace window" className="rounded-md border border-border p-4 text-sm"><p className="mb-3 font-medium">Choose a window for {choice.workspace.project.name}</p>{choice.targets.map((target) => <Button key={target.id} type="button" variant="outline" size="sm" className="mr-2" onClick={() => void reveal(choice.workspace, target.id)}>{target.label}</Button>)}</section> : null}
 				</div>
 			)}
 		</section>

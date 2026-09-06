@@ -605,6 +605,8 @@ export interface RunningEnvironmentState {
 	lifecycle: WorkspaceLifecycleState;
 }
 export interface WorkspaceActionRequest { workspaceId: string; }
+export interface WorkspaceRevealTarget { id: string; label: string; }
+export interface WorkspaceRevealResult { targets: WorkspaceRevealTarget[]; revealed: boolean; }
 
 export interface WorkspaceLifecycleState {
 	state: "active" | "stopped" | "unknown";
@@ -715,7 +717,7 @@ export interface DevContextApi {
 	): Promise<ApiResult<RunRepairActionResult>>;
 	getHistory(): Promise<ApiResult<HistoryState>>;
 	getRunningEnvironments(): Promise<ApiResult<RunningEnvironmentsState>>;
-	revealWorkspace(request: WorkspaceActionRequest): Promise<ApiResult<unknown>>;
+	revealWorkspace(request: WorkspaceActionRequest & { targetId?: string }): Promise<ApiResult<WorkspaceRevealResult>>;
 	stopWorkspace(request: WorkspaceActionRequest): Promise<ApiResult<unknown>>;
 	getSettings(): Promise<ApiResult<SettingsState>>;
 	updateSettings(
@@ -768,7 +770,7 @@ export interface WailsBindings {
 	runRepairAction(request: RunRepairActionRequest): Promise<unknown>;
 	getHistory(): Promise<unknown>;
 	getRunningEnvironments(): Promise<unknown>;
-	revealWorkspace(request: WorkspaceActionRequest): Promise<unknown>;
+	revealWorkspace(request: WorkspaceActionRequest & { targetId?: string }): Promise<unknown>;
 	stopWorkspace(request: WorkspaceActionRequest): Promise<unknown>;
 	getSettings(): Promise<unknown>;
 	updateSettings(request: UpdateSettingsRequest): Promise<unknown>;
@@ -977,7 +979,7 @@ export function createDevContextApi(
 				normalizeRunningEnvironmentsState,
 			);
 		},
-		revealWorkspace(request) { return callBinding(() => bindings.revealWorkspace(request), (value) => value); },
+		revealWorkspace(request) { return callBinding(() => bindings.revealWorkspace(request), normalizeWorkspaceRevealResult); },
 		stopWorkspace(request) { return callBinding(() => bindings.stopWorkspace(request), (value) => value); },
 		getSettings() {
 			return callBinding(() => bindings.getSettings(), normalizeSettingsState);
@@ -1799,6 +1801,10 @@ function normalizeRunningEnvironmentsState(
 			normalizeRunningEnvironmentState,
 		),
 	};
+}
+function normalizeWorkspaceRevealResult(value: unknown): WorkspaceRevealResult {
+	const object = objectValue(value);
+	return { revealed: booleanValue(object.revealed), targets: arrayValue(object.targets).map((target) => { const item = objectValue(target); return { id: stringValue(item.id), label: stringValue(item.label) }; }) };
 }
 function normalizeRunningEnvironmentState(
 	value: unknown,

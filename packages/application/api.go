@@ -878,6 +878,15 @@ type RunningEnvironmentsState struct {
 
 type WorkspaceActionRequest struct {
 	WorkspaceID string `json:"workspaceId"`
+	TargetID    string `json:"targetId,omitempty"`
+}
+type WorkspaceRevealTarget struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+type WorkspaceRevealResult struct {
+	Targets  []WorkspaceRevealTarget `json:"targets"`
+	Revealed bool                    `json:"revealed"`
 }
 
 // ProviderCredentialSessionState describes a detected global provider session

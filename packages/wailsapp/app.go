@@ -38,7 +38,7 @@ type service interface {
 	RunRepairAction(application.RunRepairActionRequest) (application.RunRepairActionResult, *application.Error)
 	GetHistory() (application.HistoryState, *application.Error)
 	GetRunningEnvironments() (application.RunningEnvironmentsState, *application.Error)
-	RevealWorkspace(application.WorkspaceActionRequest) *application.Error
+	RevealWorkspace(application.WorkspaceActionRequest) (application.WorkspaceRevealResult, *application.Error)
 	StopWorkspace(application.WorkspaceActionRequest) *application.Error
 	GetSettings() (application.SettingsState, *application.Error)
 	UpdateSettings(application.UpdateSettingsRequest) (application.SettingsState, *application.Error)
@@ -121,10 +121,11 @@ func (a *App) GetRunningEnvironments() any {
 }
 
 func (a *App) RevealWorkspace(request application.WorkspaceActionRequest) any {
-	if err := a.service.RevealWorkspace(request); err != nil {
+	result, err := a.service.RevealWorkspace(request)
+	if err != nil {
 		return err
 	}
-	return nil
+	return result
 }
 
 func (a *App) StopWorkspace(request application.WorkspaceActionRequest) any {
