@@ -31,7 +31,7 @@ function PreflightReviewView({
 				description={description}
 				groups={preflight.groups}
 			/>
-			<div className="flex flex-wrap justify-end gap-3">
+			<div className="control-cluster justify-end">
 				<Button type="button" variant="outline" onClick={onFixFirst}>
 					Fix first
 				</Button>

@@ -25,6 +25,8 @@ body,
   --layout-section-gap: 2.5rem;
   --layout-group-gap: 1rem;
   --layout-card-padding: 1.5rem;
+  --layout-card-padding-compact: 1rem;
+  --layout-control-gap: 0.75rem;
   --layout-list-row-min-height: 3.5rem;
   --layout-launcher-width: 58rem;
   --layout-launcher-padding: clamp(2rem, 6vw, 5rem);
@@ -175,6 +177,11 @@ textarea:not([data-slot="textarea"]):focus-visible {
 .inset-group {
   padding: var(--layout-card-padding);
 }
+.control-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--layout-control-gap);
+}
 .list-row {
   min-height: var(--layout-list-row-min-height);
 }
@@ -225,6 +232,10 @@ textarea:not([data-slot="textarea"]):focus-visible {
 .text-caption {
   font-size: 0.75rem;
   line-height: 1.4;
+}
+.text-detail {
+  font-size: 0.875rem;
+  line-height: 1.45;
 }
 .text-technical {
   font-family: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;

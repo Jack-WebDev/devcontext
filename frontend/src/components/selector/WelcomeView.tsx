@@ -12,34 +12,34 @@ function WelcomeView({ onCreateFirstContext }: WelcomeViewProps) {
 	return (
 		<section
 			aria-labelledby="welcome-title"
-			className="mx-auto max-w-xl space-y-6 py-8"
+			className="page-reading-column page-section-stack mx-auto py-8"
 		>
 			<div className="space-y-3">
-				<p className="text-sm font-medium text-muted-foreground">Dev Context</p>
-				<h2 id="welcome-title" className="text-2xl font-semibold">
+				<p className="text-label text-secondary">Dev Context</p>
+				<h2 id="welcome-title" className="text-page-title">
 					Welcome to Dev Context
 				</h2>
-				<p className="text-base text-muted-foreground">
+				<p className="text-body text-secondary">
 					Set up a development context to keep the work you do on this
 					computer organized from the start.
 				</p>
 			</div>
 
-			<Card size="sm" className="border border-border py-0">
-				<CardContent className="p-5">
-					<h3 className="text-base font-semibold">Your development identity</h3>
-					<p className="mt-2 text-sm text-muted-foreground">
+			<Card size="sm" hierarchy="secondary" className="py-0">
+				<CardContent className="inset-group">
+					<h3 className="text-section-title">Your development identity</h3>
+					<p className="mt-2 text-detail text-secondary">
 						A context is a development identity, not a provider profile. Use
 						one for Personal work, Work, a Client, or Open Source projects.
 					</p>
 				</CardContent>
 			</Card>
 
-			<details className="group rounded-lg border border-border bg-card">
-				<summary className="cursor-pointer px-5 py-4 text-sm font-semibold marker:content-none">
+			<details className="group rounded-xl border border-border bg-[var(--surface-subtle)]">
+				<summary className="cursor-pointer px-[var(--layout-card-padding)] py-4 text-detail font-semibold marker:content-none">
 					What stays separate
 				</summary>
-				<div className="border-t border-border px-5 py-4 text-sm text-muted-foreground">
+				<div className="border-t border-border px-[var(--layout-card-padding)] py-4 text-detail text-secondary">
 					<ul className="space-y-2">
 						<li>
 							Projects open with the context you choose for that launch.
@@ -54,13 +54,18 @@ function WelcomeView({ onCreateFirstContext }: WelcomeViewProps) {
 				</div>
 			</details>
 
-			<Card size="sm" className="border border-border py-0">
-				<CardContent className="p-5">
-					<h3 className="text-base font-semibold">Start with one context</h3>
-					<p className="mt-2 text-sm text-muted-foreground">
+			<Card size="sm" hierarchy="primary" className="py-0">
+				<CardContent className="inset-group">
+					<h3 className="text-section-title">Start with one context</h3>
+					<p className="mt-2 text-detail text-secondary">
 						You can add more contexts whenever your work needs them.
 					</p>
-					<Button type="button" className="mt-5" onClick={onCreateFirstContext}>
+					<Button
+						type="button"
+						variant="primary"
+						className="mt-5"
+						onClick={onCreateFirstContext}
+					>
 						Create Your First Context
 					</Button>
 				</CardContent>

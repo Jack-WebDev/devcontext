@@ -9,11 +9,12 @@ async function source(path) {
 }
 
 test("UXF-02 typography roles are defined and used by representative screens", async () => {
-	const [styles, home, contexts, launcher] = await Promise.all([
+	const [styles, home, contexts, launcher, welcome] = await Promise.all([
 		source("style.css"),
 		source("components/home/HomeView.tsx"),
 		source("components/contexts/ContextsView.tsx"),
 		source("components/launcher/LauncherSurface.tsx"),
+		source("components/selector/WelcomeView.tsx"),
 	]);
 
 	for (const role of [
@@ -25,6 +26,7 @@ test("UXF-02 typography roles are defined and used by representative screens", a
 		"text-label",
 		"text-status",
 		"text-caption",
+		"text-detail",
 		"text-technical",
 	]) {
 		assert.match(styles, new RegExp(`\\.${role}\\s*\\{`));
@@ -35,4 +37,6 @@ test("UXF-02 typography roles are defined and used by representative screens", a
 	assert.match(contexts, /text-page-title/);
 	assert.match(launcher, /text-launcher-title/);
 	assert.match(launcher, /text-technical/);
+	assert.match(welcome, /text-page-title/);
+	assert.match(welcome, /text-detail/);
 });

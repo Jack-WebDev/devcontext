@@ -21,6 +21,8 @@ test("UXF-01 layout primitives are defined and used by representative screens", 
 		"--layout-page-max-width",
 		"--layout-section-gap",
 		"--layout-card-padding",
+		"--layout-card-padding-compact",
+		"--layout-control-gap",
 		"--layout-list-row-min-height",
 		"--layout-sidebar-width",
 		"--layout-launcher-width",
@@ -33,4 +35,5 @@ test("UXF-01 layout primitives are defined and used by representative screens", 
 	assert.match(launcher, /launcher-container/);
 	assert.match(contexts, /page-content page-section-stack/);
 	assert.match(home, /home-content/);
+	assert.match(styles, /\.control-cluster\s*\{/);
 });
