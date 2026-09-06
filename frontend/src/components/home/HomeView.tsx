@@ -68,7 +68,6 @@ export function HomeView(props: HomeViewProps) {
 					projects={props.dashboard.recentProjects}
 					onSelect={props.onRecentProjectSelect}
 				/>
-				<RecentActivity projects={props.dashboard.recentProjects} />
 			</div>
 		</div>
 	);
@@ -253,7 +252,7 @@ function Overview({
 						<div className="mt-5 grid grid-cols-4">
 							{statusEntries.map((check, index) => (
 								<ProviderStatus
-									key={id}
+								key={`${id}-${check.label}`}
 									label={check.label}
 									detail={check.message}
 									status={check.severity}
@@ -549,17 +548,6 @@ function ContextLabel({ name }: { name: string }) {
 	);
 }
 
-function RecentActivity({
-	projects: _projects,
-}: {
-	projects: RecentProjectState[];
-}) {
-	return (
-		<Panel title="Recent activity" labelledBy="home-activity-heading" fill>
-			<p className="text-xs text-muted-foreground">No activity yet.</p>
-		</Panel>
-	);
-}
 function Panel({
 	title,
 	action,
