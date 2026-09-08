@@ -70,6 +70,35 @@ func TestNoopLoggerDropsEvents(t *testing.T) {
 	}
 }
 
+func TestRemoveEventsForProjectKeepsOtherProjectHistory(t *testing.T) {
+	logsDir := filepath.Join(t.TempDir(), "logs")
+	permissions := filesystem.NewDefaultStoragePermissions()
+	logger := devlog.NewLocalLogger(logsDir, permissions, time.Now)
+	forgottenProject := "/work/forgotten"
+	retainedProject := "/work/retained"
+	for _, event := range []devlog.Event{
+		{Name: devlog.EventLaunchSpawned, ProjectPath: forgottenProject},
+		{Name: devlog.EventProjectBound, ProjectPath: retainedProject},
+		{Name: devlog.EventWorkspaceStopped, ProjectPath: forgottenProject},
+	} {
+		if err := logger.Record(event); err != nil {
+			t.Fatalf("record event: %v", err)
+		}
+	}
+
+	if err := devlog.RemoveEventsForProject(logsDir, forgottenProject, permissions); err != nil {
+		t.Fatalf("remove project events: %v", err)
+	}
+
+	events, err := devlog.ReadLocalEvents(logsDir)
+	if err != nil {
+		t.Fatalf("read events: %v", err)
+	}
+	if len(events) != 1 || events[0].ProjectPath != retainedProject || events[0].Name != devlog.EventProjectBound {
+		t.Fatalf("events = %#v, want only retained project event", events)
+	}
+}
+
 func assertMode(t *testing.T, path string, want os.FileMode) {
 	t.Helper()
 

@@ -148,6 +148,63 @@ func TestLaunchProjectRecordsRecentProjectAfterSuccessfulLaunch(t *testing.T) {
 	}
 }
 
+func TestForgetProjectRemovesBindingsRecentsAndActivity(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.projectDir),
+		ContextID:   devcontext.MustID("personal"),
+		CreatedAt:   fixture.now,
+	})
+	otherProject := filepath.Join(fixture.root, "projects", "other")
+	if err := project.WriteRecentProjectsFile(fixture.recentsPath, []project.RecentProject{
+		{ProjectPath: project.Path(fixture.projectDir), ContextID: devcontext.MustID("personal"), LastLaunchedAt: fixture.now},
+		{ProjectPath: project.Path(otherProject), ContextID: devcontext.MustID("company"), LastLaunchedAt: fixture.now},
+	}); err != nil {
+		t.Fatalf("write recent projects: %v", err)
+	}
+	devContextHomeDir, err := fixture.paths.DevContextHomeDir()
+	if err != nil {
+		t.Fatalf("dev context home: %v", err)
+	}
+	logger := devlog.NewLocalLogger(filepath.Join(devContextHomeDir, "logs"), fixture.storagePermissions, func() time.Time {
+		return fixture.now
+	})
+	for _, event := range []devlog.Event{
+		{Name: devlog.EventLaunchSpawned, Timestamp: fixture.now, ProjectPath: fixture.projectDir},
+		{Name: devlog.EventProjectBound, Timestamp: fixture.now, ProjectPath: otherProject},
+	} {
+		if err := logger.Record(event); err != nil {
+			t.Fatalf("record event: %v", err)
+		}
+	}
+
+	if appErr := fixture.service().ForgetProject(ForgetProjectRequest{ProjectPath: fixture.projectDir}); appErr != nil {
+		t.Fatalf("forget project: %#v", appErr)
+	}
+
+	bindings, err := project.ReadProjectBindingsFile(fixture.bindingsPath)
+	if err != nil {
+		t.Fatalf("read bindings: %v", err)
+	}
+	if len(bindings) != 0 {
+		t.Fatalf("bindings = %#v, want none", bindings)
+	}
+	recents, err := project.NewRecentRepository(fixture.recentsPath).List()
+	if err != nil {
+		t.Fatalf("list recent projects: %v", err)
+	}
+	if len(recents) != 1 || recents[0].ProjectPath != project.Path(otherProject) {
+		t.Fatalf("recent projects = %#v, want only other project", recents)
+	}
+	history, appErr := fixture.service().GetHistory()
+	if appErr != nil {
+		t.Fatalf("get history: %#v", appErr)
+	}
+	if len(history.Entries) != 1 || history.Entries[0].ProjectPath != otherProject {
+		t.Fatalf("history = %#v, want only other project", history)
+	}
+}
+
 func TestGetRecentProjectsReturnsNewestFirstWithContextMetadata(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.writeContext(t, fixture.context("personal", "Personal"))

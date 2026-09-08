@@ -1025,7 +1025,7 @@ function ManagementApp() {
 				<PlaceholderScreen route={activeRoute} />
 			)}
 			{projectToForget ? (
-				<DestructiveConfirmationDialog title="Forget project?" objectName={projectToForget.project.name} impact="Dev Context will remove this project from its local history and bindings." nonDeletionAssurance="Project files and folders are never deleted." confirmLabel="Forget project" onCancel={() => setProjectToForget(undefined)} onConfirm={() => void confirmProjectForget()} />
+				<DestructiveConfirmationDialog title="Forget project?" objectName={projectToForget.project.name} impact="Dev Context will remove this project's remembered context, recent launch, and activity records." nonDeletionAssurance="Project files and folders are never deleted." confirmLabel="Forget project" onCancel={() => setProjectToForget(undefined)} onConfirm={() => void confirmProjectForget()} />
 			) : null}
 			{workspaceToStop ? (
 				<DestructiveConfirmationDialog title="Stop workspace?" objectName={workspaceToStop.project.name} impact="The coding-tool workspace will be stopped. Unsaved work in the coding tool may be lost." nonDeletionAssurance="Project files and folders are never deleted." confirmLabel="Stop workspace" error={workspaceStopError} onCancel={() => { setWorkspaceToStop(undefined); setWorkspaceStopError(undefined); }} onConfirm={() => void confirmWorkspaceStop()} />

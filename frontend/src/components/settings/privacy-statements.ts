@@ -7,12 +7,12 @@ const privacyStatements = [
 	{
 		title: "Project paths",
 		description:
-			"A project path is saved only when you choose to remember its context. Dev Context never changes or deletes your project folder.",
+			"Dev Context stores project paths for remembered contexts, recent launches, active workspaces, and local activity. Forgetting a project removes its remembered context, recent launch, and activity records. Dev Context never changes or deletes your project folder.",
 	},
 	{
-		title: "Credentials stay with integrations",
+		title: "Credential handling",
 		description:
-			"Provider credentials and safe integration data stay in context-owned integration storage. Dev Context does not store or sync passwords, tokens, or cloud accounts itself.",
+			"Normal launches use context-owned integration storage and never sync credentials. When you explicitly choose to import a provider session, Dev Context copies the provider's local credential file into that context and reads only allowlisted identity metadata; it never displays, logs, uploads, or exports credential contents.",
 	},
 	{
 		title: "Portable exports",

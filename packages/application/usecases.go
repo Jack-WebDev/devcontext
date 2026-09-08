@@ -262,7 +262,8 @@ func (s *Service) UnbindProject(request UnbindProjectRequest) (ProjectBindingSta
 	return state, nil
 }
 
-// ForgetProject removes both the remembered binding and recent-launch record.
+// ForgetProject removes the remembered binding, recent-launch record, and
+// local activity records for one project.
 // It never reads, changes, or deletes the project folder.
 func (s *Service) ForgetProject(request ForgetProjectRequest) *Error {
 	projectPath, err := s.canonicalProjectPath(request.ProjectPath)
@@ -273,6 +274,13 @@ func (s *Service) ForgetProject(request ForgetProjectRequest) *Error {
 		return NewError(err)
 	}
 	if err := s.dependencies.RecentProjects.Remove(projectPath); err != nil {
+		return NewError(err)
+	}
+	homeDir, err := s.dependencies.Paths.DevContextHomeDir()
+	if err != nil {
+		return NewError(err)
+	}
+	if err := devlog.RemoveEventsForProject(filepath.Join(homeDir, "logs"), string(projectPath), s.dependencies.StoragePermissions); err != nil {
 		return NewError(err)
 	}
 	return nil

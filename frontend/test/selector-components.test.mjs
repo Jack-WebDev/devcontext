@@ -4197,12 +4197,14 @@ test("privacy settings describe implemented local data boundaries", () => {
 		[
 			"Stored on this device",
 			"Project paths",
-			"Credentials stay with integrations",
+			"Credential handling",
 			"Portable exports",
 		],
 	);
-	assert.match(privacyStatements[1].description, /only when you choose/);
-	assert.match(privacyStatements[2].description, /does not store or sync/);
+	assert.match(privacyStatements[1].description, /recent launches, active workspaces, and local activity/);
+	assert.match(privacyStatements[1].description, /Forgetting a project removes/);
+	assert.match(privacyStatements[2].description, /explicitly choose to import/);
+	assert.match(privacyStatements[2].description, /never displays, logs, uploads, or exports credential contents/);
 	assert.match(privacyStatements[3].description, /do not include credentials/);
 });
 
