@@ -300,7 +300,7 @@ export interface ProviderState {
 export type ProviderSetupState =
 	| "open_and_configure"
 	| "waiting_for_sign_in"
-	| "verified";
+	| "identity_observed";
 
 export interface ProviderSetupAction {
 	state: ProviderSetupState;
@@ -309,13 +309,13 @@ export interface ProviderSetupAction {
 }
 
 export type ProviderReadinessState =
-	| "ready"
+	| "local_state"
 	| "not_configured"
 	| "directory_missing"
 	| "unavailable";
 
 export type ProviderIdentityStatus =
-	| "verified"
+	| "observed"
 	| "unavailable"
 	| "none"
 	| "mismatch_evidence";
@@ -2118,7 +2118,7 @@ function normalizeProviderSetupState(value: unknown): ProviderSetupState {
 	switch (value) {
 		case "open_and_configure":
 		case "waiting_for_sign_in":
-		case "verified":
+		case "identity_observed":
 			return value;
 		default:
 			throw new Error("Invalid Dev Context response.");
@@ -2129,7 +2129,7 @@ function normalizeProviderReadinessState(
 	value: unknown,
 ): ProviderReadinessState {
 	switch (value) {
-		case "ready":
+		case "local_state":
 		case "not_configured":
 		case "directory_missing":
 		case "unavailable":
@@ -2156,7 +2156,7 @@ function normalizeProviderIdentityStatus(
 	value: unknown,
 ): ProviderIdentityStatus {
 	switch (value) {
-		case "verified":
+		case "observed":
 		case "unavailable":
 		case "none":
 		case "mismatch_evidence":

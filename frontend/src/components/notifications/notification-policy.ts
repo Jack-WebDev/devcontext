@@ -1,11 +1,11 @@
 type NotificationKind =
-	| "provider_verified"
+	| "provider_identity_observed"
 	| "provider_attention"
 	| "tool_launched"
 	| "update_available";
 
-interface ProviderVerifiedNotification {
-	kind: "provider_verified";
+interface ProviderIdentityObservedNotification {
+	kind: "provider_identity_observed";
 	providerName: string;
 	contextName: string;
 }
@@ -30,7 +30,7 @@ interface UpdateAvailableNotification {
 }
 
 type AppNotification =
-	| ProviderVerifiedNotification
+	| ProviderIdentityObservedNotification
 	| ProviderAttentionNotification
 	| ToolLaunchedNotification
 	| UpdateAvailableNotification;
@@ -55,12 +55,12 @@ function notificationPresentation(
 	notification: AppNotification,
 ): NotificationPresentation {
 	switch (notification.kind) {
-		case "provider_verified":
+		case "provider_identity_observed":
 			return {
 				kind: notification.kind,
-				title: `${notification.providerName} verified`,
-				description: `${notification.providerName} is ready in ${notification.contextName}.`,
-				severity: "success",
+				title: `${notification.providerName} identity observed`,
+				description: `${notification.providerName} account metadata was found locally in ${notification.contextName}.`,
+				severity: "info",
 			};
 		case "provider_attention":
 			return {
@@ -72,9 +72,9 @@ function notificationPresentation(
 		case "tool_launched":
 			return {
 				kind: notification.kind,
-				title: `${notification.toolName} launched`,
-				description: `${notification.projectName} opened in ${notification.contextName}.`,
-				severity: "success",
+				title: `${notification.toolName} started`,
+				description: `Started for ${notification.projectName} in ${notification.contextName}.`,
+				severity: "info",
 			};
 		case "update_available":
 			return {

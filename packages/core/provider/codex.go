@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
@@ -69,7 +70,7 @@ func (CodexProvider) InheritedAuthenticationEnvironmentVariables() []string {
 
 // Status returns local provider readiness.
 func (p CodexProvider) Status(ctx RuntimeContext) (Status, error) {
-	return detectLocalStatus(p.Probe, p.DisplayName(), ctx.Paths.StorageDir)
+	return detectLocalStatus(p.Probe, p.DisplayName(), ctx.Paths.StorageDir, "auth.json")
 }
 
 // DetectGlobalCredentialSession identifies the local Codex session without
@@ -126,6 +127,7 @@ type codexIDTokenClaims struct {
 	Email            string `json:"email"`
 	ChatGPTPlanType  string `json:"chatgpt_plan_type"`
 	ChatGPTAccountID string `json:"chatgpt_account_id"`
+	ExpiresAt        int64  `json:"exp"`
 }
 
 func codexMetadataFromFile(path string) ([]MetadataField, bool, bool, error) {
@@ -154,6 +156,9 @@ func codexMetadataFromFile(path string) ([]MetadataField, bool, bool, error) {
 	}
 	var claims codexIDTokenClaims
 	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil, false, true, nil
+	}
+	if claims.ExpiresAt > 0 && claims.ExpiresAt <= time.Now().Unix() {
 		return nil, false, true, nil
 	}
 	fields := metadataFields(

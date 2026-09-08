@@ -86,6 +86,7 @@ func TestHistoryEventMessageDescribesKnownUserOutcomes(t *testing.T) {
 		want  string
 	}{
 		{event: devlog.EventContextResolution, want: "Launch context resolved."},
+		{event: devlog.EventLaunchSpawned, want: "Coding-tool process started."},
 		{event: devlog.EventProjectBound, want: "Project bound to context."},
 		{event: devlog.EventProjectUnbound, want: "Project binding removed."},
 		{event: devlog.EventProviderAuthenticated, want: "Provider authenticated."},

@@ -17,7 +17,11 @@ import (
 type EventName string
 
 const (
-	EventContextResolution       EventName = "context_resolution"
+	EventContextResolution EventName = "context_resolution"
+	// EventLaunchSpawned records that Dev Context started the coding-tool
+	// process. It does not assert that the tool opened the requested project.
+	EventLaunchSpawned EventName = "launch_spawned"
+	// EventLaunchSucceeded is retained to read history written by older builds.
 	EventLaunchSucceeded         EventName = "launch_succeeded"
 	EventLaunchMissingEditor     EventName = "launch_missing_editor"
 	EventLaunchConfigError       EventName = "launch_configuration_error"

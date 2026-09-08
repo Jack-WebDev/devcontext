@@ -1,10 +1,10 @@
 import type { ContextState, LaunchState } from "../../lib/devctx-api";
 
-type ContextRecommendationCategory = "remembered" | "verified" | "conflict";
+type ContextRecommendationCategory = "remembered" | "checked" | "conflict";
 
 interface ContextRecommendation {
 	category: ContextRecommendationCategory;
-	label: "Remembered" | "Verified" | "Conflict";
+	label: "Remembered" | "Checks passed" | "Conflict";
 	detail: string;
 	reasons: string[];
 }
@@ -38,9 +38,9 @@ function contextRecommendation(
 
 	if (context.confidence?.status === "ready") {
 		return {
-			category: "verified",
-			label: "Verified",
-			detail: "Dev Context verified the required launch checks.",
+			category: "checked",
+			label: "Checks passed",
+			detail: "Dev Context completed the required launch checks.",
 			reasons: verificationReasons(context),
 		};
 	}

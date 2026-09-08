@@ -313,7 +313,7 @@ func TestRunnerRootLaunchWritesLifecycleEvents(t *testing.T) {
 	wantNames := []devlog.EventName{
 		devlog.EventContextResolution,
 		devlog.EventLaunchProviderMissing,
-		devlog.EventLaunchSucceeded,
+		devlog.EventLaunchSpawned,
 	}
 	if got := eventNames(events); !reflect.DeepEqual(got, wantNames) {
 		t.Fatalf("event names = %#v, want %#v", got, wantNames)

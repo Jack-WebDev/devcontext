@@ -27,7 +27,7 @@ func (s *Service) getHistory() (HistoryState, error) {
 
 func historyEventCategory(name devlog.EventName) HistoryCategory {
 	switch name {
-	case devlog.EventContextResolution, devlog.EventLaunchSucceeded:
+	case devlog.EventContextResolution, devlog.EventLaunchSpawned, devlog.EventLaunchSucceeded:
 		return HistoryCategoryLaunch
 	case devlog.EventLaunchMissingEditor, devlog.EventLaunchConfigError, devlog.EventLaunchProviderMissing, devlog.EventLaunchProcessFailure:
 		return HistoryCategoryWarning
@@ -50,8 +50,10 @@ func historyEventMessage(event devlog.Event) string {
 	switch event.Name {
 	case devlog.EventContextResolution:
 		return "Launch context resolved."
+	case devlog.EventLaunchSpawned:
+		return "Coding-tool process started."
 	case devlog.EventLaunchSucceeded:
-		return "Launch succeeded."
+		return "Coding-tool process started."
 	case devlog.EventLaunchMissingEditor:
 		return "Launch could not find the selected coding tool."
 	case devlog.EventLaunchProviderMissing:

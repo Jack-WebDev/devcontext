@@ -66,7 +66,7 @@ func (ClaudeProvider) InheritedAuthenticationEnvironmentVariables() []string {
 
 // Status returns local provider readiness.
 func (p ClaudeProvider) Status(ctx RuntimeContext) (Status, error) {
-	return detectLocalStatus(p.Probe, p.DisplayName(), ctx.Paths.StorageDir)
+	return detectLocalStatus(p.Probe, p.DisplayName(), ctx.Paths.StorageDir, ".credentials.json")
 }
 
 // DetectGlobalCredentialSession identifies the local Claude session without
@@ -146,6 +146,7 @@ func claudeMetadataFromFile(path string) ([]MetadataField, bool, bool, error) {
 		return nil, false, true, nil
 	}
 	fields := metadataFields(
+		MetadataField{Label: "Email", Value: firstJSONFieldString(credentials, "email", "userEmail", "user_email")},
 		MetadataField{Label: "Subscription", Value: firstJSONFieldString(credentials, "subscriptionType", "subscription_type")},
 		MetadataField{Label: "Organization UUID", Value: firstJSONFieldString(credentials, "organizationUuid", "organizationUUID", "organization_uuid")},
 		MetadataField{Label: "Organization", Value: claudeOrganizationName(credentials)},

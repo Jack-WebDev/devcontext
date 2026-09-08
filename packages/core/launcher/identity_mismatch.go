@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// AccountIdentityEvidence is verified, presentation-safe identity metadata
+// AccountIdentityEvidence is locally observed, presentation-safe identity metadata
 // from one enabled provider. It intentionally contains no credential data.
 type AccountIdentityEvidence struct {
 	ProviderID string
@@ -20,7 +20,7 @@ type AccountIdentityField struct {
 }
 
 // AccountIdentityMismatchConfidenceCheck reports a launchable warning only
-// when two or more enabled providers have verified, valid Email fields with
+// when two or more enabled providers have observed, valid Email fields with
 // different values. Missing identity data, unsupported fields, a single
 // provider, and matching emails are unknown or consistent evidence, not a
 // mismatch.
@@ -31,7 +31,7 @@ func AccountIdentityMismatchConfidenceCheck(evidence []AccountIdentityEvidence) 
 			continue
 		}
 		for _, field := range providerEvidence.Fields {
-			if normalizedEmail, ok := verifiedEmailField(field); ok {
+			if normalizedEmail, ok := observedEmailField(field); ok {
 				if providerEmails[providerEvidence.ProviderID] == nil {
 					providerEmails[providerEvidence.ProviderID] = make(map[string]bool)
 				}
@@ -59,12 +59,12 @@ func AccountIdentityMismatchConfidenceCheck(evidence []AccountIdentityEvidence) 
 		Component:  ConfidenceCheckIdentity,
 		Severity:   ConfidenceNeedsAttention,
 		Label:      "Account identity",
-		Message:    "Verified provider email identities do not match for this context.",
+		Message:    "Observed provider email identities do not match for this context.",
 		ActionHint: "Review provider account configuration before launch.",
 	}, true
 }
 
-func verifiedEmailField(field AccountIdentityField) (string, bool) {
+func observedEmailField(field AccountIdentityField) (string, bool) {
 	if !strings.EqualFold(strings.TrimSpace(field.Label), "email") {
 		return "", false
 	}

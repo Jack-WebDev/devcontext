@@ -523,7 +523,7 @@ test("adapter normalizes context list summaries", async () => {
 								id: "provider",
 								name: "Provider",
 								enabled: true,
-								state: "ready",
+								state: "local_state",
 								identity: { status: "none", fields: [] },
 							},
 						],
@@ -552,7 +552,7 @@ test("adapter normalizes context list summaries", async () => {
 				id: "provider",
 				name: "Provider",
 				enabled: true,
-				state: "ready",
+				state: "local_state",
 				explanation: undefined,
 				identity: { status: "none", message: undefined, fields: [] },
 			},
@@ -640,15 +640,15 @@ test("adapter normalizes successful Wails calls", async () => {
 								id: "codex",
 								name: "Codex",
 								enabled: true,
-								state: "ready",
+								state: "local_state",
 								setupAction: {
-									state: "verified",
-									label: "Verified",
+									state: "identity_observed",
+									label: "Identity observed",
 									message:
-										"Codex account identity is verified for this context.",
+										"Codex account metadata was observed in this context's local storage.",
 								},
 								identity: {
-									status: "verified",
+									status: "observed",
 									fields: [
 										{ label: "Email", value: "user@company.com" },
 										{ label: "Plan", value: "Business" },
@@ -660,9 +660,9 @@ test("adapter normalizes successful Wails calls", async () => {
 								id: "claude",
 								name: "Claude",
 								enabled: true,
-								state: "ready",
+								state: "local_state",
 								identity: {
-									status: "verified",
+									status: "observed",
 									fields: [
 										{ label: "Subscription", value: "Pro" },
 										{ label: "Organization UUID", value: "e783" },
@@ -674,7 +674,7 @@ test("adapter normalizes successful Wails calls", async () => {
 								id: "internal",
 								name: "Internal Tool",
 								enabled: true,
-								state: "ready",
+								state: "local_state",
 								identity: {
 									status: "mismatch_evidence",
 									message: "Different account identity detected.",
@@ -878,15 +878,15 @@ test("adapter normalizes successful Wails calls", async () => {
 							id: "codex",
 							name: "Codex",
 							enabled: true,
-							state: "ready",
+							state: "local_state",
 							explanation: undefined,
 							setupAction: {
-								state: "verified",
-								label: "Verified",
-								message: "Codex account identity is verified for this context.",
+								state: "identity_observed",
+								label: "Identity observed",
+								message: "Codex account metadata was observed in this context's local storage.",
 							},
 							identity: {
-								status: "verified",
+								status: "observed",
 								message: undefined,
 								fields: [
 									{ label: "Email", value: "user@company.com" },
@@ -899,10 +899,10 @@ test("adapter normalizes successful Wails calls", async () => {
 							id: "claude",
 							name: "Claude",
 							enabled: true,
-							state: "ready",
+							state: "local_state",
 							explanation: undefined,
 							identity: {
-								status: "verified",
+								status: "observed",
 								message: undefined,
 								fields: [
 									{ label: "Subscription", value: "Pro" },
@@ -915,7 +915,7 @@ test("adapter normalizes successful Wails calls", async () => {
 							id: "internal",
 							name: "Internal Tool",
 							enabled: true,
-							state: "ready",
+							state: "local_state",
 							explanation: undefined,
 							identity: {
 								status: "mismatch_evidence",

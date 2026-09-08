@@ -1368,7 +1368,7 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 		return LaunchProjectResult{}, newLaunchFailureError(err, plan.Executable, plan.Environment, s.now())
 	}
 
-	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchSucceeded, plan, nil, s.now()))
+	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchSpawned, plan, nil, s.now()))
 	_ = s.dependencies.RecentProjects.Record(plan.ProjectPath, plan.Context.ID, s.now())
 	_, _ = s.dependencies.RunningEnvironments.Record(runningEnvironmentFromLaunchPlan(plan, s.now()))
 
@@ -1863,11 +1863,11 @@ func providerSetupAction(integration provider.Provider, enabled bool, status pro
 			Message: providerSetupMessage(integration, runtime),
 		}
 	case provider.StatusConfigured:
-		if identity.Status == ProviderIdentityVerified {
+		if identity.Status == ProviderIdentityObserved {
 			return &ProviderSetupAction{
-				State:   ProviderSetupVerified,
-				Label:   "Verified",
-				Message: integration.DisplayName() + " account identity is verified for this context.",
+				State:   ProviderSetupIdentityObserved,
+				Label:   "Identity observed",
+				Message: integration.DisplayName() + " account metadata was observed in this context's local storage.",
 			}
 		}
 		return &ProviderSetupAction{
@@ -1925,7 +1925,7 @@ func enabledProviderIDs(ctx devcontext.Context) []provider.ID {
 func providerReadinessState(status provider.Status) ProviderReadinessState {
 	switch status.State {
 	case provider.StatusConfigured:
-		return ProviderReadinessReady
+		return ProviderReadinessLocalState
 	case provider.StatusNotConfigured:
 		return ProviderReadinessNotConfigured
 	case provider.StatusDirectoryMissing:
@@ -1947,7 +1947,7 @@ func providerIdentityState(integration provider.Provider, enabled bool, status p
 		if pathsErr != nil {
 			return unavailableProviderIdentity()
 		}
-		return verifiedProviderIdentity(integration, runtime)
+		return observedProviderIdentity(integration, runtime)
 	case provider.StatusUnavailable:
 		return unavailableProviderIdentity()
 	default:
@@ -1955,7 +1955,7 @@ func providerIdentityState(integration provider.Provider, enabled bool, status p
 	}
 }
 
-func verifiedProviderIdentity(integration provider.Provider, runtime provider.RuntimeContext) ProviderIdentityState {
+func observedProviderIdentity(integration provider.Provider, runtime provider.RuntimeContext) ProviderIdentityState {
 	detector, ok := integration.(provider.ContextIdentityDetector)
 	if !ok {
 		return unavailableProviderIdentity()
@@ -1966,7 +1966,7 @@ func verifiedProviderIdentity(integration provider.Provider, runtime provider.Ru
 	}
 
 	return ProviderIdentityState{
-		Status: ProviderIdentityVerified,
+		Status: ProviderIdentityObserved,
 		Fields: providerMetadataFields(identity.Fields),
 	}
 }
@@ -2060,7 +2060,7 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 func identityEvidence(entries []providerStateEntry) []launcher.AccountIdentityEvidence {
 	evidence := make([]launcher.AccountIdentityEvidence, 0, len(entries))
 	for _, entry := range entries {
-		if !entry.state.Enabled || entry.state.Identity.Status != ProviderIdentityVerified {
+		if !entry.state.Enabled || entry.state.Identity.Status != ProviderIdentityObserved {
 			continue
 		}
 		fields := make([]launcher.AccountIdentityField, 0, len(entry.state.Identity.Fields))
@@ -2208,15 +2208,15 @@ func developmentToolStatusForProvider(state ProviderState) (DevelopmentToolStatu
 		switch state.SetupAction.State {
 		case ProviderSetupWaitingForSignIn:
 			return DevelopmentToolNeedsSignIn, state.SetupAction.Message, state.SetupAction.Label
-		case ProviderSetupVerified:
-			return DevelopmentToolConnected, state.SetupAction.Message, ""
+		case ProviderSetupIdentityObserved:
+			return DevelopmentToolNeedsSignIn, state.SetupAction.Message, "Sign in to this provider in the selected context."
 		case ProviderSetupOpenAndConfigure:
 			return DevelopmentToolNotConfigured, state.SetupAction.Message, state.SetupAction.Label
 		}
 	}
 	switch state.State {
-	case ProviderReadinessReady:
-		return DevelopmentToolConnected, state.Explanation, ""
+	case ProviderReadinessLocalState:
+		return DevelopmentToolNeedsSignIn, "Local provider state was found, but usable authentication has not been verified.", "Sign in to this provider in the selected context."
 	case ProviderReadinessNotConfigured:
 		return DevelopmentToolNotConfigured, state.Explanation, state.ActionHint
 	case ProviderReadinessDirectoryMissing:

@@ -79,7 +79,7 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 				ID:      "fake",
 				Name:    "Fake Provider",
 				Enabled: true,
-				State:   ProviderReadinessReady,
+				State:   ProviderReadinessLocalState,
 				SetupAction: &ProviderSetupAction{
 					State:   ProviderSetupWaitingForSignIn,
 					Label:   "Waiting for sign-in",
@@ -417,17 +417,17 @@ func TestGetLaunchStateDerivesProviderSetupActions(t *testing.T) {
 			wantLabel: "Open and configure",
 		},
 		{
-			name:      "configured provider awaits sign-in verification",
+			name:      "configured provider awaits local identity metadata",
 			status:    provider.ConfiguredStatus(),
 			wantState: ProviderSetupWaitingForSignIn,
 			wantLabel: "Waiting for sign-in",
 		},
 		{
-			name:        "configured verified provider is verified",
+			name:        "configured provider with observed identity",
 			status:      provider.ConfiguredStatus(),
 			hasIdentity: true,
-			wantState:   ProviderSetupVerified,
-			wantLabel:   "Verified",
+			wantState:   ProviderSetupIdentityObserved,
+			wantLabel:   "Identity observed",
 		},
 		{
 			name:         "unavailable provider has no setup action",
@@ -1058,7 +1058,7 @@ func TestGetLaunchStateIncludesRegisteredProviderIdentityMetadata(t *testing.T) 
 		t.Fatalf("get launch state: %v", appErr)
 	}
 	identity := state.Contexts[0].Providers[0].Identity
-	if identity.Status != ProviderIdentityVerified || metadataValueForTest(identity.Fields, "Workspace") != "Example" {
+	if identity.Status != ProviderIdentityObserved || metadataValueForTest(identity.Fields, "Workspace") != "Example" {
 		t.Fatalf("provider identity = %#v", identity)
 	}
 }
@@ -1099,9 +1099,9 @@ func TestGetLaunchStateNormalizesProviderReadinessForUI(t *testing.T) {
 		want   ProviderReadinessState
 	}{
 		{
-			name:   "configured maps to ready",
+			name:   "configured maps to local state",
 			status: provider.ConfiguredStatus(),
-			want:   ProviderReadinessReady,
+			want:   ProviderReadinessLocalState,
 		},
 		{
 			name:   "not configured",
@@ -1203,7 +1203,7 @@ func TestGetLaunchStateReturnsProviderIdentityContract(t *testing.T) {
 	}
 }
 
-func TestGetLaunchStateReturnsVerifiedProviderIdentitiesForIsolatedContexts(t *testing.T) {
+func TestGetLaunchStateReturnsLocallyObservedProviderIdentitiesForIsolatedContexts(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.providerRegistry = provider.MustNewRegistry([]provider.Provider{
 		applicationFakeProvider{
@@ -1264,8 +1264,8 @@ func TestGetLaunchStateReturnsVerifiedProviderIdentitiesForIsolatedContexts(t *t
 	}
 
 	codex := providersByID["codex"].Identity
-	if codex.Status != ProviderIdentityVerified {
-		t.Fatalf("codex identity = %#v, want verified codex identity", codex)
+	if codex.Status != ProviderIdentityObserved {
+		t.Fatalf("codex identity = %#v, want locally observed Codex identity", codex)
 	}
 	if metadataValueForTest(codex.Fields, "Email") != "user@company.com" ||
 		metadataValueForTest(codex.Fields, "ChatGPT plan") != "business" ||
@@ -1274,8 +1274,8 @@ func TestGetLaunchStateReturnsVerifiedProviderIdentitiesForIsolatedContexts(t *t
 	}
 
 	claude := providersByID["claude"].Identity
-	if claude.Status != ProviderIdentityVerified {
-		t.Fatalf("claude identity = %#v, want verified claude identity", claude)
+	if claude.Status != ProviderIdentityObserved {
+		t.Fatalf("claude identity = %#v, want locally observed Claude identity", claude)
 	}
 	if metadataValueForTest(claude.Fields, "Subscription") != "Pro" ||
 		metadataValueForTest(claude.Fields, "Organization UUID") != "e783-organization" ||
@@ -1333,8 +1333,8 @@ func TestGetLaunchStateDoesNotInferIdentityMismatchEvidenceFromContextName(t *te
 	}
 
 	identity := state.Contexts[0].Providers[0].Identity
-	if identity.Status != ProviderIdentityVerified {
-		t.Fatalf("identity status = %q, want verified without inferred mismatch evidence", identity.Status)
+	if identity.Status != ProviderIdentityObserved {
+		t.Fatalf("identity status = %q, want locally observed identity without inferred mismatch evidence", identity.Status)
 	}
 }
 
@@ -1902,7 +1902,7 @@ func TestLaunchProjectExportsSafeStatusForStatusAwareTool(t *testing.T) {
 	}
 	if !reflect.DeepEqual(status.Providers, []CodingToolStatusProvider{{
 		ID: "fake", Name: "Fake Provider", Identity: ProviderIdentityState{
-			Status: ProviderIdentityVerified,
+			Status: ProviderIdentityObserved,
 			Fields: []ProviderMetadataField{{Label: "Account", Value: "developer@example.com"}},
 		},
 	}}) {
@@ -1935,7 +1935,7 @@ func TestLaunchProjectRecordsLifecycleEvents(t *testing.T) {
 
 	wantNames := []devlog.EventName{
 		devlog.EventContextResolution,
-		devlog.EventLaunchSucceeded,
+		devlog.EventLaunchSpawned,
 	}
 	if got := applicationEventNames(logger.events); !reflect.DeepEqual(got, wantNames) {
 		t.Fatalf("event names = %#v, want %#v", got, wantNames)
@@ -2058,7 +2058,7 @@ func TestLaunchProjectAcceptsConfirmedMismatch(t *testing.T) {
 	if got, want := applicationEventNames(logger.events), []devlog.EventName{
 		devlog.EventContextResolution,
 		devlog.EventContextOverrideAccepted,
-		devlog.EventLaunchSucceeded,
+		devlog.EventLaunchSpawned,
 	}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("event names = %#v, want %#v", got, want)
 	}
@@ -2269,11 +2269,11 @@ func TestDevelopmentToolStatusProjectionUsesBoundedVocabulary(t *testing.T) {
 			wantStatus: DevelopmentToolAvailable,
 		},
 		{
-			name: "verified integration is connected",
+			name: "observed identity integration still needs sign-in verification",
 			state: ProviderState{Enabled: true, SetupAction: &ProviderSetupAction{
-				State: ProviderSetupVerified,
+				State: ProviderSetupIdentityObserved,
 			}},
-			wantStatus: DevelopmentToolConnected,
+			wantStatus: DevelopmentToolNeedsSignIn,
 		},
 		{
 			name: "waiting integration needs sign-in",

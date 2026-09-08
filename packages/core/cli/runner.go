@@ -135,7 +135,7 @@ func (r Runner) runRootLaunch(command RootLaunchCommand) Result {
 		return r.errorResult(err)
 	}
 
-	r.recordLaunchEvent(eventFromPlan(devlog.EventLaunchSucceeded, plan, nil, r.now()))
+	r.recordLaunchEvent(eventFromPlan(devlog.EventLaunchSpawned, plan, nil, r.now()))
 
 	output := renderLaunchPlan(plan)
 	if r.Debug {

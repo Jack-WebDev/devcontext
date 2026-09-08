@@ -37,7 +37,7 @@ function ProviderCredentialClassification({
 			<div>
 				<h4 className="text-sm font-semibold">Assign detected sessions</h4>
 				<p className="mt-1 text-sm text-muted-foreground">
-					Dev Context found signed-in local sessions. Assign a verified session
+					Dev Context found local provider session data. Assign a recognized session
 					to the context that should use it, or leave it unassigned.
 				</p>
 			</div>
@@ -114,7 +114,7 @@ function ProviderCredentialSessionCard({
 					</div>
 				) : (
 					<p className="mt-4 text-sm text-muted-foreground">
-						This session could not be verified, so it cannot be assigned.
+						This session has no usable metadata, so it cannot be assigned.
 					</p>
 				)}
 			</CardContent>

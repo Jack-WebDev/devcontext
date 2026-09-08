@@ -24,7 +24,7 @@ func resolveStatusProbe(probe StatusProbe) StatusProbe {
 	return defaultStatusProbe{}
 }
 
-func detectLocalStatus(probe StatusProbe, displayName string, directory string) (Status, error) {
+func detectLocalStatus(probe StatusProbe, displayName string, directory string, credentialFiles ...string) (Status, error) {
 	probe = resolveStatusProbe(probe)
 
 	if directory == "" {
@@ -38,9 +38,13 @@ func detectLocalStatus(probe StatusProbe, displayName string, directory string) 
 		}
 		return UnavailableStatus(fmt.Sprintf("%s context directory could not be inspected", displayName)), nil
 	}
-	if len(entries) == 0 {
-		return NotConfiguredStatus(fmt.Sprintf("%s isolated provider state was not found", displayName)), nil
+	for _, entry := range entries {
+		for _, credentialFile := range credentialFiles {
+			if entry.Name() == credentialFile && !entry.IsDir() {
+				return ConfiguredStatus(), nil
+			}
+		}
 	}
 
-	return ConfiguredStatus(), nil
+	return NotConfiguredStatus(fmt.Sprintf("%s credentials were not found in isolated provider storage", displayName)), nil
 }
