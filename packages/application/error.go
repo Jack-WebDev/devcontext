@@ -20,6 +20,12 @@ import (
 // ErrorCode identifies a presentation-safe application failure category.
 type ErrorCode string
 
+var (
+	// ErrPreflightReviewRequired prevents a GUI launch from bypassing
+	// non-blocking safety warnings without an explicit continuation decision.
+	ErrPreflightReviewRequired = errors.New("preflight review required")
+)
+
 const (
 	// ErrorCodeCanceled identifies a user-canceled application operation.
 	ErrorCodeCanceled ErrorCode = "canceled"
@@ -34,6 +40,10 @@ const (
 
 	// ErrorCodeLaunch identifies a failure to start the configured codingtool.
 	ErrorCodeLaunch ErrorCode = "launch_error"
+
+	// ErrorCodePreflightReview identifies a launch that needs an explicit
+	// continuation decision after non-blocking safety warnings.
+	ErrorCodePreflightReview ErrorCode = "preflight_review_required"
 
 	// ErrorCodeInternal identifies an unexpected application failure.
 	ErrorCodeInternal ErrorCode = "internal_error"
@@ -107,6 +117,13 @@ func NewError(err error) *Error {
 		}
 	case errors.Is(err, launcher.ErrContextMismatchRejected):
 		return applicationError(ErrorCodeCanceled, "Command canceled.", "Run the action again when you are ready.", err)
+	case errors.Is(err, ErrPreflightReviewRequired):
+		return applicationError(
+			ErrorCodePreflightReview,
+			"Launch needs review.",
+			"Review the launch checks and choose whether to continue.",
+			err,
+		)
 	case errors.As(err, &storagePermission):
 		return applicationError(
 			ErrorCodeValidation,

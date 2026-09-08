@@ -29,6 +29,7 @@ import { ProjectBindingRemovalDialog } from "./components/projects/ProjectBindin
 import { ProjectDetailView } from "./components/projects/ProjectDetailView";
 import { RunningEnvironmentConflictDialog } from "./components/running/RunningEnvironmentConflictDialog";
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
+import { PreflightReviewDialog } from "./components/selector/PreflightReviewDialog";
 import { createContextAndRefresh } from "./components/contexts/context-creation";
 import { LauncherFlow } from "./components/launcher/LauncherFlow";
 import { SettingsView } from "./components/settings/SettingsView";
@@ -56,6 +57,7 @@ import {
 	type ImportContextMetadataRequest,
 	type ImportContextMetadataResult,
 	type ProjectListItem,
+	type PreflightLaunchProjectResult,
 	type RecentProjectState,
 	type RunningEnvironmentConflict,
 	type RunningEnvironmentsState,
@@ -64,7 +66,16 @@ import {
 
 interface PendingRunningEnvironmentLaunch {
 	conflict: RunningEnvironmentConflict;
+	request: {
+		projectPath: string;
+		contextId: string;
+		confirmPreflightWarnings?: boolean;
+	};
+}
+
+interface PendingPreflightReview {
 	request: { projectPath: string; contextId: string };
+	preflight: PreflightLaunchProjectResult;
 }
 
 function App() {
@@ -143,6 +154,10 @@ function ManagementApp() {
 		useState(false);
 	const [runningEnvironmentLaunchError, setRunningEnvironmentLaunchError] =
 		useState<DisplayError>();
+	const [pendingPreflightReview, setPendingPreflightReview] =
+		useState<PendingPreflightReview>();
+	const [preflightReviewPending, setPreflightReviewPending] = useState(false);
+	const [preflightReviewError, setPreflightReviewError] = useState<DisplayError>();
 	const [contextDetailRoute, setContextDetailRoute] = useState(() =>
 		contextDetailRouteFromHash(window.location.hash),
 	);
@@ -269,6 +284,9 @@ function ManagementApp() {
 				setCommandPaletteLaunchError(preflight.error);
 				return;
 			}
+			if (deferPreflightReview(preflight.data, request)) {
+				return;
+			}
 			if (deferRunningEnvironmentConflict(preflight.data, request)) {
 				return;
 			}
@@ -382,6 +400,9 @@ function ManagementApp() {
 				setHomeLaunchError(preflight.error);
 				return;
 			}
+			if (deferPreflightReview(preflight.data, request)) {
+				return;
+			}
 			if (deferRunningEnvironmentConflict(preflight.data, request)) {
 				return;
 			}
@@ -428,6 +449,9 @@ function ManagementApp() {
 				setRecentProjectLaunchError(preflight.error);
 				return;
 			}
+			if (deferPreflightReview(preflight.data, request)) {
+				return;
+			}
 			if (deferRunningEnvironmentConflict(preflight.data, request)) {
 				return;
 			}
@@ -465,6 +489,9 @@ function ManagementApp() {
 			const preflight = await devContextApi.preflightLaunchProject(request);
 			if (!preflight.ok) {
 				setProjectLaunchError(preflight.error);
+				return;
+			}
+			if (deferPreflightReview(preflight.data, request)) {
 				return;
 			}
 			if (deferRunningEnvironmentConflict(preflight.data, request)) {
@@ -623,9 +650,57 @@ function ManagementApp() {
 		setRunningEnvironmentLaunchError(undefined);
 		setPendingRunningEnvironmentLaunch({
 			conflict: preflight.runningEnvironmentConflict,
-			request,
+			request: { ...request, confirmPreflightWarnings: true },
 		});
 		return true;
+	}
+
+	function deferPreflightReview(
+		preflight: PreflightLaunchProjectResult,
+		request: { projectPath: string; contextId: string },
+	) {
+		if (!preflight.groups.some((group) => group.status !== "ready")) {
+			return false;
+		}
+		setPreflightReviewError(undefined);
+		setPendingPreflightReview({ request, preflight });
+		return true;
+	}
+
+	async function handlePreflightReviewContinue() {
+		if (pendingPreflightReview === undefined || preflightReviewPending) {
+			return;
+		}
+
+		const request = {
+			...pendingPreflightReview.request,
+			confirmPreflightWarnings: true,
+		};
+		if (deferRunningEnvironmentConflict(pendingPreflightReview.preflight, request)) {
+			setPendingPreflightReview(undefined);
+			return;
+		}
+
+		setPreflightReviewPending(true);
+		setPreflightReviewError(undefined);
+		try {
+			const launch = await devContextApi.launchProject(request);
+			if (!launch.ok) {
+				setPreflightReviewError(launch.error);
+				return;
+			}
+			notifyLaunch(launch.data);
+			setPendingPreflightReview(undefined);
+			setRecentProjectToLaunch(undefined);
+			await Promise.all([
+				refreshHomeDashboard(),
+				refreshRecentProjects(),
+				refreshProjects(),
+				refreshRunningEnvironments(),
+			]);
+		} finally {
+			setPreflightReviewPending(false);
+		}
 	}
 
 	async function handleLaunchAnotherWindow() {
@@ -918,6 +993,20 @@ function ManagementApp() {
 			) : null}
 			{workspaceToStop ? (
 				<DestructiveConfirmationDialog title="Stop workspace?" objectName={workspaceToStop.project.name} impact="The coding-tool workspace will be stopped. Unsaved work in the coding tool may be lost." nonDeletionAssurance="Project files and folders are never deleted." confirmLabel="Stop workspace" error={workspaceStopError} onCancel={() => { setWorkspaceToStop(undefined); setWorkspaceStopError(undefined); }} onConfirm={() => void confirmWorkspaceStop()} />
+			) : null}
+			{pendingPreflightReview ? (
+				<PreflightReviewDialog
+					preflight={pendingPreflightReview.preflight}
+					pending={preflightReviewPending}
+					error={preflightReviewError}
+					onCancel={() => {
+						if (!preflightReviewPending) {
+							setPendingPreflightReview(undefined);
+							setPreflightReviewError(undefined);
+						}
+					}}
+					onContinue={() => void handlePreflightReviewContinue()}
+				/>
 			) : null}
 			{commandPaletteLaunchError ? (
 				<GuiErrorNotice error={commandPaletteLaunchError} />

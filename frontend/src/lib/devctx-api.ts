@@ -377,6 +377,7 @@ export interface LaunchProjectRequest {
 	projectPath?: string;
 	contextId: string;
 	confirmContextMismatch?: boolean;
+	confirmPreflightWarnings?: boolean;
 }
 
 export interface PreflightLaunchProjectRequest {
@@ -935,6 +936,7 @@ export function createDevContextApi(
 					bindings.launchProject({
 						...request,
 						confirmContextMismatch: request.confirmContextMismatch ?? false,
+						confirmPreflightWarnings: request.confirmPreflightWarnings ?? false,
 					}),
 				normalizeLaunchProjectResult,
 			);
@@ -1119,6 +1121,7 @@ const generatedBindings: WailsBindings = {
 		return bindings.LaunchProject({
 			...request,
 			confirmContextMismatch: request.confirmContextMismatch ?? false,
+			confirmPreflightWarnings: request.confirmPreflightWarnings ?? false,
 		});
 	},
 	async bindProject(request) {

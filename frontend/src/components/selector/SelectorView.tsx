@@ -353,6 +353,7 @@ function SelectorView({
 					confirmContextMismatch:
 						confirmContextMismatch || !requireContextMismatchConfirmation,
 					allowExistingEnvironmentLaunch,
+					confirmPreflightWarnings: skipPreflightReview,
 					onPreflightComplete: (preflight) => {
 						if (
 							!skipPreflightReview &&

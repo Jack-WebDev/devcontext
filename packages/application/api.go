@@ -966,6 +966,10 @@ type LaunchProjectRequest struct {
 	ProjectPath            string `json:"projectPath,omitempty"`
 	ContextID              string `json:"contextId"`
 	ConfirmContextMismatch bool   `json:"confirmContextMismatch"`
+	// ConfirmPreflightWarnings records a deliberate decision to continue after
+	// reviewing non-blocking preflight warnings. LaunchProject enforces this so
+	// callers cannot treat preflight as advisory.
+	ConfirmPreflightWarnings bool `json:"confirmPreflightWarnings"`
 }
 
 // LaunchProjectResult describes a completed editor launch.

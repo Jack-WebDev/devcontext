@@ -59,6 +59,16 @@ type Runner struct {
 	Now                func() time.Time
 	Debug              bool
 	Logger             devlog.Logger
+	// RootLaunchWorkflow lets the host route root launches through the
+	// application workflow, which owns status export and lifecycle recording.
+	// The core fallback remains available for focused CLI tests and embedders.
+	RootLaunchWorkflow RootLaunchWorkflow
+}
+
+// RootLaunchWorkflow executes a parsed CLI launch through a host-owned
+// workflow while preserving the CLI's rendering contract.
+type RootLaunchWorkflow interface {
+	LaunchCLIProject(launcher.LaunchRequest) (launcher.LaunchPlan, error)
 }
 
 // Run parses and executes one CLI command.
@@ -98,6 +108,17 @@ func (r Runner) runRootLaunch(command RootLaunchCommand) Result {
 			KnownEnvironment: r.parentEnvironment(),
 		}))
 		return r.errorResult(err)
+	}
+	if r.RootLaunchWorkflow != nil {
+		plan, err := r.RootLaunchWorkflow.LaunchCLIProject(request)
+		if err != nil {
+			return r.errorResult(err)
+		}
+		output := renderLaunchPlan(plan)
+		if r.Debug {
+			output += "\n" + renderDebugLaunchPlan(plan)
+		}
+		return successResult(output)
 	}
 
 	builder := launcher.LaunchPlanBuilder{
@@ -169,6 +190,12 @@ func (r Runner) runContext(command ContextCommand) Result {
 		if err := filesystem.CreateContextDirectoryTreeWithRegistriesCredentialsAndPermissions(paths, contextPaths, ctx, r.providerRegistry(), r.toolRegistry(), nil, r.storagePermissions()); err != nil {
 			return r.errorResult(err)
 		}
+		r.recordLaunchEvent(devlog.NewEvent(devlog.EventInput{
+			Name:      devlog.EventContextCreated,
+			Timestamp: r.now(),
+			ContextID: ctx.ID.String(),
+			ToolID:    string(ctx.Tool.DefaultTool),
+		}))
 		return successResult(renderContextCreate(ctx))
 	default:
 		return r.errorResult(fmt.Errorf("%w: context %s is not implemented", ErrInvalidCommand, command.Subcommand))
@@ -193,6 +220,12 @@ func (r Runner) runProject(command ProjectCommand) Result {
 		if err != nil {
 			return r.errorResult(err)
 		}
+		r.recordLaunchEvent(devlog.NewEvent(devlog.EventInput{
+			Name:        devlog.EventProjectBound,
+			Timestamp:   r.now(),
+			ProjectPath: string(binding.ProjectPath),
+			ContextID:   binding.ContextID.String(),
+		}))
 		return successResult(renderProjectBind(binding))
 	case ProjectUnbind:
 		if _, err := r.projectLookup(); err != nil {
@@ -201,6 +234,14 @@ func (r Runner) runProject(command ProjectCommand) Result {
 		result, err := r.Projects.Unbind(".", project.Path(r.WorkingDirectory))
 		if err != nil {
 			return r.errorResult(err)
+		}
+		if result.Removed {
+			r.recordLaunchEvent(devlog.NewEvent(devlog.EventInput{
+				Name:        devlog.EventProjectUnbound,
+				Timestamp:   r.now(),
+				ProjectPath: string(result.ProjectPath),
+				ContextID:   result.Binding.ContextID.String(),
+			}))
 		}
 		return successResult(renderProjectUnbind(result))
 	default:

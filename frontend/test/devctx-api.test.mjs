@@ -1156,6 +1156,7 @@ test("adapter normalizes successful Wails calls", async () => {
 				projectPath: "/work/api",
 				contextId: "personal",
 				confirmContextMismatch: false,
+				confirmPreflightWarnings: false,
 			},
 		],
 		["bindProject", { projectPath: "/work/api", contextId: "personal" }],

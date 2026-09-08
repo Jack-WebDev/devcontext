@@ -1331,6 +1331,18 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 		confirmation = launcher.ContextMismatchAccepted
 	}
 
+	preflight, err := s.preflightLaunchProject(PreflightLaunchProjectRequest{
+		ProjectPath:            string(projectPath),
+		ContextID:              contextID.String(),
+		ConfirmContextMismatch: request.ConfirmContextMismatch,
+	})
+	if err != nil {
+		return LaunchProjectResult{}, err
+	}
+	if preflightRequiresReview(preflight.Groups) && !request.ConfirmPreflightWarnings {
+		return LaunchProjectResult{}, ErrPreflightReviewRequired
+	}
+
 	plan, err := s.launchPlanBuilder().Build(launcher.LaunchRequest{
 		ProjectPath:          projectPath,
 		RequestedContext:     &contextID,
@@ -1350,27 +1362,9 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 		return LaunchProjectResult{}, err
 	}
 
-	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventContextResolution, plan, nil, s.now()))
-	if request.ConfirmContextMismatch && hasContextMismatchWarning(plan.Warnings) {
-		s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventContextOverrideAccepted, plan, nil, s.now()))
-	}
-	for range plan.MissingProviderIDs {
-		event := eventFromLaunchPlan(devlog.EventLaunchProviderMissing, plan, nil, s.now())
-		event.ErrorCategory = devlog.ErrorCategoryProvider
-		s.recordLaunchEvent(event)
-	}
-	if err := s.exportCodingToolStatus(plan); err != nil {
+	if err := s.executeLaunchPlan(plan, launcher.InvocationSourceGUI, request.ConfirmContextMismatch); err != nil {
 		return LaunchProjectResult{}, err
 	}
-
-	if err := s.processLauncher().Launch(processRequestFromLaunchPlan(plan, s.dependencies.DetachMode)); err != nil {
-		s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchProcessFailure, plan, err, s.now()))
-		return LaunchProjectResult{}, newLaunchFailureError(err, plan.Executable, plan.Environment, s.now())
-	}
-
-	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchSpawned, plan, nil, s.now()))
-	_ = s.dependencies.RecentProjects.Record(plan.ProjectPath, plan.Context.ID, s.now())
-	_, _ = s.dependencies.RunningEnvironments.Record(runningEnvironmentFromLaunchPlan(plan, s.now()))
 
 	return LaunchProjectResult{
 		Project:  projectState(plan.ProjectPath),
@@ -1379,7 +1373,61 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 	}, nil
 }
 
-func runningEnvironmentFromLaunchPlan(plan launcher.LaunchPlan, startedAt time.Time) coreRunning.Environment {
+// LaunchCLIProject runs the same launch recordkeeping and tool-status flow as
+// LaunchProject. CLI requests deliberately continue non-blocking warnings:
+// the command line is noninteractive, while blocking launch-plan failures are
+// still enforced by the shared builder.
+func (s *Service) LaunchCLIProject(request launcher.LaunchRequest) (launcher.LaunchPlan, error) {
+	plan, err := s.launchPlanBuilder().Preflight(request)
+	if err != nil {
+		s.recordLaunchEvent(devlog.NewEvent(devlog.EventInput{
+			Name:             devlog.LaunchEventNameForError(err),
+			Timestamp:        s.now(),
+			ProjectPath:      string(request.ProjectPath),
+			ContextID:        requestedLaunchContextID(request),
+			Err:              err,
+			KnownEnvironment: s.dependencies.ParentEnvironment,
+		}))
+		return launcher.LaunchPlan{}, err
+	}
+
+	// Evaluate application-owned confidence and workspace evidence even though
+	// the CLI intentionally has no review screen. This keeps detection behavior
+	// aligned with GUI launches without changing CLI's noninteractive contract.
+	_ = s.launchConfidenceState(&plan.Context)
+	if _, err := s.runningEnvironmentConflict(plan.ProjectPath, plan.Context.ID); err != nil {
+		return launcher.LaunchPlan{}, err
+	}
+	if err := s.executeLaunchPlan(plan, launcher.InvocationSourceCLI, request.MismatchConfirmation == launcher.ContextMismatchAccepted); err != nil {
+		return launcher.LaunchPlan{}, err
+	}
+	return plan, nil
+}
+
+func (s *Service) executeLaunchPlan(plan launcher.LaunchPlan, source launcher.InvocationSource, contextMismatchAccepted bool) error {
+	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventContextResolution, plan, nil, s.now()))
+	if contextMismatchAccepted && hasContextMismatchWarning(plan.Warnings) {
+		s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventContextOverrideAccepted, plan, nil, s.now()))
+	}
+	for range plan.MissingProviderIDs {
+		event := eventFromLaunchPlan(devlog.EventLaunchProviderMissing, plan, nil, s.now())
+		event.ErrorCategory = devlog.ErrorCategoryProvider
+		s.recordLaunchEvent(event)
+	}
+	if err := s.exportCodingToolStatus(plan); err != nil {
+		return err
+	}
+	if err := s.processLauncher().Launch(processRequestFromLaunchPlan(plan, s.dependencies.DetachMode)); err != nil {
+		s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchProcessFailure, plan, err, s.now()))
+		return newLaunchFailureError(err, plan.Executable, plan.Environment, s.now())
+	}
+	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchSpawned, plan, nil, s.now()))
+	_ = s.dependencies.RecentProjects.Record(plan.ProjectPath, plan.Context.ID, s.now())
+	_, _ = s.dependencies.RunningEnvironments.Record(runningEnvironmentFromLaunchPlan(plan, s.now(), source))
+	return nil
+}
+
+func runningEnvironmentFromLaunchPlan(plan launcher.LaunchPlan, startedAt time.Time, source launcher.InvocationSource) coreRunning.Environment {
 	return coreRunning.Environment{
 		Project:   coreRunning.ProjectIdentity{Path: plan.ProjectPath, Name: projectName(plan.ProjectPath)},
 		Context:   coreRunning.ContextIdentity{ID: plan.Context.ID, Name: plan.Context.Name},
@@ -1388,10 +1436,26 @@ func runningEnvironmentFromLaunchPlan(plan launcher.LaunchPlan, startedAt time.T
 		Process:   coreRunning.Process{State: coreRunning.ProcessStateUnknown},
 		Session:   coreRunning.Session{State: coreRunning.SessionStateUnknown},
 		Launch: coreRunning.LaunchIdentity{
-			Source:           launcher.InvocationSourceGUI,
+			Source:           source,
 			ResolutionSource: plan.ResolutionSource,
 		},
 	}
+}
+
+func preflightRequiresReview(groups []PreflightGroup) bool {
+	for _, group := range groups {
+		if group.Status == LaunchConfidenceNeedsAttention {
+			return true
+		}
+	}
+	return false
+}
+
+func requestedLaunchContextID(request launcher.LaunchRequest) string {
+	if request.RequestedContext == nil {
+		return ""
+	}
+	return request.RequestedContext.String()
 }
 
 func (s *Service) preflightLaunchProject(request PreflightLaunchProjectRequest) (PreflightLaunchProjectResult, error) {

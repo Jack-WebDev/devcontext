@@ -2042,9 +2042,10 @@ func TestLaunchProjectAcceptsConfirmedMismatch(t *testing.T) {
 	})
 
 	result, appErr := fixture.service().LaunchProject(LaunchProjectRequest{
-		ProjectPath:            fixture.projectDir,
-		ContextID:              "personal",
-		ConfirmContextMismatch: true,
+		ProjectPath:              fixture.projectDir,
+		ContextID:                "personal",
+		ConfirmContextMismatch:   true,
+		ConfirmPreflightWarnings: true,
 	})
 	if appErr != nil {
 		t.Fatalf("launch project: %v", appErr)
@@ -2074,6 +2075,63 @@ func TestLaunchProjectAcceptsConfirmedMismatch(t *testing.T) {
 	}}
 	if !reflect.DeepEqual(bindings, want) {
 		t.Fatalf("bindings = %#v, want unchanged company binding", bindings)
+	}
+}
+
+func TestLaunchProjectRequiresPreflightWarningConfirmation(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	fixture.writeContext(t, fixture.context("company", "Company"))
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.projectDir),
+		ContextID:   devcontext.MustID("company"),
+		CreatedAt:   fixture.now,
+	})
+
+	_, appErr := fixture.service().LaunchProject(LaunchProjectRequest{
+		ProjectPath:            fixture.projectDir,
+		ContextID:              "personal",
+		ConfirmContextMismatch: true,
+	})
+	if appErr == nil || appErr.Code != ErrorCodePreflightReview {
+		t.Fatalf("launch error = %#v, want preflight review requirement", appErr)
+	}
+	if len(fixture.process.requests) != 0 {
+		t.Fatalf("process requests = %#v, want none", fixture.process.requests)
+	}
+}
+
+func TestLaunchCLIProjectRecordsSharedLaunchState(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	logger := &applicationRecordingLogger{}
+	fixture.logger = logger
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	contextID := devcontext.MustID("personal")
+
+	_, err := fixture.service().LaunchCLIProject(launcher.LaunchRequest{
+		ProjectPath:      project.Path(fixture.projectDir),
+		RequestedContext: &contextID,
+		Source:           launcher.InvocationSourceCLI,
+	})
+	if err != nil {
+		t.Fatalf("launch CLI project: %v", err)
+	}
+	if len(fixture.process.requests) != 1 {
+		t.Fatalf("process request count = %d, want 1", len(fixture.process.requests))
+	}
+	recents, err := project.NewRecentRepository(fixture.recentsPath).List()
+	if err != nil || len(recents) != 1 || recents[0].ContextID != contextID {
+		t.Fatalf("recent projects = %#v, %v; want personal launch", recents, err)
+	}
+	environments, err := coreRunning.NewRepository(fixture.runningPath).List()
+	if err != nil || len(environments) != 1 || environments[0].Launch.Source != launcher.InvocationSourceCLI {
+		t.Fatalf("running environments = %#v, %v; want CLI launch", environments, err)
+	}
+	if got := applicationEventNames(logger.events); !reflect.DeepEqual(got, []devlog.EventName{
+		devlog.EventContextResolution,
+		devlog.EventLaunchSpawned,
+	}) {
+		t.Fatalf("events = %#v", got)
 	}
 }
 

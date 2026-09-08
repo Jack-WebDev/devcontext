@@ -140,19 +140,29 @@ func runCLI(args []string) cli.ExitCode {
 		fmt.Fprint(os.Stderr, cli.RenderError(err, debug))
 		return cli.ExitInternalError
 	}
+	service, err := application.NewDefaultService(application.DefaultOptions{
+		Paths:             paths,
+		ParentEnvironment: os.Environ(),
+		WorkingDirectory:  workingDirectory,
+	})
+	if err != nil {
+		fmt.Fprint(os.Stderr, cli.RenderError(err, debug))
+		return cli.ExitCodeForError(err)
+	}
 
 	runner := cli.Runner{
-		Contexts:          devcontext.NewRepository(layout.ContextsDir),
-		Projects:          project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
-		WorkingDirectory:  workingDirectory,
-		Paths:             paths,
-		ProviderRegistry:  provider.BuiltInRegistry(),
-		ToolRegistry:      codingtool.BuiltInRegistry(),
-		ProcessLauncher:   launcher.NativeProcessLauncher{},
-		ParentEnvironment: os.Environ(),
-		DetachMode:        launcher.DetachModeDetached,
-		Debug:             debug,
-		Logger:            devlog.NewLocalLogger(layout.LogsDir, filesystem.NewDefaultStoragePermissions(), nil),
+		Contexts:           devcontext.NewRepository(layout.ContextsDir),
+		Projects:           project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
+		WorkingDirectory:   workingDirectory,
+		Paths:              paths,
+		ProviderRegistry:   provider.BuiltInRegistry(),
+		ToolRegistry:       codingtool.BuiltInRegistry(),
+		ProcessLauncher:    launcher.NativeProcessLauncher{},
+		ParentEnvironment:  os.Environ(),
+		DetachMode:         launcher.DetachModeDetached,
+		Debug:              debug,
+		Logger:             devlog.NewLocalLogger(layout.LogsDir, filesystem.NewDefaultStoragePermissions(), nil),
+		RootLaunchWorkflow: service,
 	}
 	result := runner.Run(parsedArgs)
 	if err := result.Write(os.Stdout, os.Stderr); err != nil {

@@ -15,6 +15,7 @@ interface LaunchSelectorDependencies {
 	bindingContextId?: string;
 	confirmContextMismatch?: boolean;
 	allowExistingEnvironmentLaunch?: boolean;
+	confirmPreflightWarnings?: boolean;
 	onPreflightComplete?: (
 		result: PreflightLaunchProjectResult,
 	) => boolean | undefined | Promise<boolean | undefined>;
@@ -79,6 +80,9 @@ async function launchSelectedContext(
 		contextId,
 		...(dependencies.confirmContextMismatch
 			? { confirmContextMismatch: true }
+			: {}),
+		...(dependencies.confirmPreflightWarnings
+			? { confirmPreflightWarnings: true }
 			: {}),
 	};
 
