@@ -644,7 +644,8 @@ type ContextTemplateState struct {
 // ContextTemplatesState contains the built-in templates available to the
 // create-context flow.
 type ContextTemplatesState struct {
-	Templates []ContextTemplateState `json:"templates"`
+	Templates        []ContextTemplateState       `json:"templates"`
+	DevelopmentTools []DevelopmentToolIntegration `json:"developmentTools"`
 }
 
 // DuplicateContextRequest copies a context's safe configuration into a new

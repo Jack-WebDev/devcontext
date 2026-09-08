@@ -3821,15 +3821,27 @@ test("context creation progress and success present completed local work", () =>
 	assert.equal(creationStepLabel("skipped"), "Not needed");
 	const success = renderToStaticMarkup(
 		createElement(ContextCreateSuccessScreen, {
-			context: contextFixture("personal", "Personal"),
+			context: contextFixture("personal", "Personal", [
+				providerFixture(
+					"assistant",
+					"Assistant",
+					true,
+					"not_configured",
+					"Sign in to Assistant.",
+				),
+			]),
 			projectName: "api",
 			onOpenProject() {},
+			onRecheckContext() {},
 			onViewContext() {},
 			onCreateAnother() {},
 		}),
 	);
 	assert.match(success, /Personal is ready/);
 	assert.match(success, /Open api/);
+	assert.match(success, /Finish provider sign-in/);
+	assert.match(success, /Open context for sign-in/);
+	assert.match(success, /Recheck setup/);
 	assert.match(success, /View Context/);
 	assert.match(success, /Create Another Context/);
 });
@@ -3884,7 +3896,7 @@ test("context creation frames tool setup as development tools with generic categ
 	assert.match(html, /Sign in to continue/);
 	assert.match(html, /Continue/);
 	assert.match(html, /Disable/);
-	assert.match(html, /Set up/);
+	assert.match(html, /How setup works/);
 	assert.doesNotMatch(html, /Provider/);
 	assert.deepEqual(Object.keys(developmentToolStatusPresentation), [
 		"available",

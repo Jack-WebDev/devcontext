@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
 	ApiResult,
 	ContextListItem,
@@ -50,6 +50,7 @@ export function CreateContextDialog({
 	contexts,
 	onClose,
 	create,
+	loadCreationOptions,
 	bindProject,
 	verifyContext,
 	initialProjects = [],
@@ -62,14 +63,17 @@ export function CreateContextDialog({
 	create: (
 		request: CreateContextRequest,
 	) => Promise<ApiResult<CreateContextResult>>;
+	loadCreationOptions?: () => Promise<
+		ApiResult<{ developmentTools: DevelopmentToolIntegration[] }>
+	>;
 	bindProject?: (request: {
 		projectPath: string;
 		contextId: string;
 	}) => Promise<ApiResult<unknown>>;
-	verifyContext?: (context: ContextState) => Promise<ApiResult<unknown>>;
+	verifyContext?: (context: ContextState) => Promise<ApiResult<ContextState>>;
 	initialProjects?: ProjectState[];
 	projectName?: string;
-	onOpenProject?: () => void;
+	onOpenProject?: (context: ContextState) => void;
 	onViewContext?: (contextId: string) => void;
 }) {
 	const [flow, setFlow] = useState(() => ({
@@ -79,7 +83,45 @@ export function CreateContextDialog({
 	const [steps, setSteps] = useState(initialSteps);
 	const [error, setError] = useState<string>();
 	const [created, setCreated] = useState<ContextState>();
-	const integrations = uniqueIntegrations(contexts);
+	const [catalogIntegrations, setCatalogIntegrations] = useState<
+		DevelopmentToolIntegration[]
+	>();
+	const [catalogLoading, setCatalogLoading] = useState(
+		loadCreationOptions !== undefined,
+	);
+	const [catalogError, setCatalogError] = useState<string>();
+	const integrations = catalogIntegrations ?? uniqueIntegrations(contexts);
+
+	useEffect(() => {
+		let active = true;
+		if (!loadCreationOptions) {
+			return () => {
+				active = false;
+			};
+		}
+		void loadCreationOptions().then((result) => {
+			if (!active) return;
+			setCatalogLoading(false);
+			if (!result.ok) {
+				setCatalogError(result.error.message);
+				return;
+			}
+			setCatalogIntegrations(result.data.developmentTools);
+			setFlow((current) => {
+				if (current.draft.enabledDevelopmentToolIds !== undefined) {
+					return current;
+				}
+				return updateContextCreateDraft(current, {
+					enabledDevelopmentToolIds: result.data.developmentTools
+						.filter((integration) => integration.enabled)
+						.map((integration) => integration.id),
+				});
+			});
+		});
+		return () => {
+			active = false;
+		};
+	}, [loadCreationOptions]);
 
 	function updateStep(
 		id: CreationStep["id"],
@@ -185,6 +227,8 @@ export function CreateContextDialog({
 					{flow.status === "tools" ? (
 						<ContextCreateDevelopmentToolsScreen
 							integrations={integrations}
+							loading={catalogLoading}
+							error={catalogError}
 							enabledIntegrationIds={flow.draft.enabledDevelopmentToolIds}
 							onEnabledIntegrationIdsChange={(ids) =>
 								setFlow((current) =>
@@ -226,6 +270,11 @@ export function CreateContextDialog({
 							context={created}
 							projectName={projectName}
 							onOpenProject={onOpenProject}
+							onRecheckContext={(context) => {
+								void verifyContext?.(context).then((result) => {
+									if (result?.ok) setCreated(result.data);
+								});
+							}}
 							onViewContext={() => onViewContext?.(created.id)}
 							onCreateAnother={createAnother}
 						/>

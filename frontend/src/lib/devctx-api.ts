@@ -483,6 +483,7 @@ export interface ContextTemplateState {
 }
 export interface ContextTemplatesState {
 	templates: ContextTemplateState[];
+	developmentTools: DevelopmentToolIntegration[];
 }
 export interface DuplicateContextRequest {
 	sourceContextId: string;
@@ -1690,6 +1691,9 @@ function normalizeContextTemplatesState(value: unknown): ContextTemplatesState {
 	const object = objectValue(value);
 	return {
 		templates: arrayValue(object.templates).map(normalizeContextTemplateState),
+		developmentTools: arrayValue(object.developmentTools).map(
+			normalizeDevelopmentToolIntegration,
+		),
 	};
 }
 function normalizeContextTemplateState(value: unknown): ContextTemplateState {

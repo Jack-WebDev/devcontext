@@ -90,12 +90,14 @@ function ContextCreateSuccessScreen({
 	context,
 	projectName,
 	onOpenProject,
+	onRecheckContext,
 	onViewContext,
 	onCreateAnother,
 }: {
 	context: ContextState;
 	projectName?: string;
-	onOpenProject?: () => void;
+	onOpenProject?: (context: ContextState) => void;
+	onRecheckContext?: (context: ContextState) => void;
 	onViewContext?: () => void;
 	onCreateAnother: () => void;
 }) {
@@ -124,9 +126,38 @@ function ContextCreateSuccessScreen({
 					</p>
 				) : null}
 			</div>
+			{context.providers.some((provider) => provider.enabled) ? (
+				<div className="rounded-xl border bg-card p-4 text-sm">
+					<p className="font-medium">Finish provider sign-in</p>
+					<p className="mt-1 text-muted-foreground">
+						Open this context&apos;s project, sign in to each enabled provider,
+						then recheck its local setup.
+					</p>
+					<div className="mt-3 flex flex-wrap gap-2">
+						{onOpenProject ? (
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => onOpenProject(context)}
+							>
+								Open context for sign-in
+							</Button>
+						) : null}
+						{onRecheckContext ? (
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => onRecheckContext(context)}
+							>
+								Recheck setup
+							</Button>
+						) : null}
+					</div>
+				</div>
+			) : null}
 			<div className="flex flex-wrap gap-3">
 				{onOpenProject ? (
-					<Button type="button" onClick={onOpenProject}>
+					<Button type="button" onClick={() => onOpenProject(context)}>
 						{projectName ? `Open ${projectName}` : "Open a Project"}
 					</Button>
 				) : null}

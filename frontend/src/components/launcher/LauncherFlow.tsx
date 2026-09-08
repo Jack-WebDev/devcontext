@@ -173,6 +173,7 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 					projectName={launchState.data.project.name}
 					onClose={() => setCreatingFirstContext(false)}
 					create={devContextApi.createContext}
+					loadCreationOptions={devContextApi.getContextTemplates}
 					bindProject={devContextApi.bindProject}
 					verifyContext={async (context) => {
 						const result = await devContextApi.getLaunchState({
@@ -184,11 +185,10 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 								status: "loaded",
 								data: result.data,
 							});
-							if (
-								!result.data.contexts.some(
-									(candidate) => candidate.id === context.id,
-								)
-							) {
+							const verifiedContext = result.data.contexts.find(
+								(candidate) => candidate.id === context.id,
+							);
+							if (!verifiedContext) {
 								return {
 									ok: false,
 									error: {
@@ -198,10 +198,23 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 									},
 								};
 							}
+							return { ok: true, data: verifiedContext };
 						}
 						return result;
 					}}
-					onOpenProject={() => setCreatingFirstContext(false)}
+					onOpenProject={async (context) => {
+						const launched = await devContextApi.launchProject({
+							projectPath: activeProjectPath,
+							contextId: context.id,
+						});
+						if (!launched.ok) return;
+						notifyCodingToolLaunched({
+							projectName: launched.data.project.name,
+							contextName: launched.data.context.name,
+							toolName: launched.data.context.tool.name,
+						});
+						setCreatingFirstContext(false);
+					}}
 				/>
 			) : null}
 		</LauncherSurface>

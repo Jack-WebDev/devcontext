@@ -778,17 +778,19 @@ function ManagementApp() {
 									}
 									return result;
 								}}
+								loadCreationOptions={devContextApi.getContextTemplates}
 								bindProject={async (request) => {
 									const result = await devContextApi.bindProject(request);
 									if (result.ok) await refreshProjects();
 									return result;
 								}}
-								verifyContext={(context) =>
-									devContextApi.getContextDetails({ contextId: context.id })
-								}
-								onOpenProject={() => {
-									setCreatingContext(false);
-									setActiveRoute("projects");
+								verifyContext={async (context) => {
+									const result = await devContextApi.getContextDetails({
+										contextId: context.id,
+									});
+									return result.ok
+										? { ok: true, data: result.data.context }
+										: result;
 								}}
 								onViewContext={(contextId) => {
 									setCreatingContext(false);

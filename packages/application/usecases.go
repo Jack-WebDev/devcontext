@@ -297,7 +297,10 @@ func (s *Service) GetContextTemplates() ContextTemplatesState {
 			Icon: template.Icon, Accent: template.Accent,
 		}
 	}
-	return ContextTemplatesState{Templates: states}
+	return ContextTemplatesState{
+		Templates:        states,
+		DevelopmentTools: contextCreationDevelopmentTools(s.dependencies.ToolRegistry, s.dependencies.ProviderRegistry),
+	}
 }
 
 // DuplicateContext creates a new isolated context with the source context's
@@ -2139,6 +2142,35 @@ func developmentToolIntegrations(
 			Message:      message,
 			RecoveryHint: recoveryHint,
 			Enabled:      entry.state.Enabled,
+		})
+	}
+	return integrations
+}
+
+// contextCreationDevelopmentTools exposes every registered integration before
+// a context exists. It must not derive options from existing contexts because
+// a first-run user has none.
+func contextCreationDevelopmentTools(toolRegistry codingtool.Registry, providerRegistry provider.Registry) []DevelopmentToolIntegration {
+	tools := toolRegistry.All()
+	providers := providerRegistry.All()
+	integrations := make([]DevelopmentToolIntegration, 0, len(tools)+len(providers))
+	for _, tool := range tools {
+		integrations = append(integrations, DevelopmentToolIntegration{
+			ID:       string(tool.Integration.ID()),
+			Name:     tool.DisplayName,
+			Category: developmentToolCategory(tool.Category),
+			Status:   DevelopmentToolAvailable,
+			Message:  "Available to add to this context.",
+			Enabled:  tool.Integration.ID() == toolRegistry.DefaultID(),
+		})
+	}
+	for _, integration := range providers {
+		integrations = append(integrations, DevelopmentToolIntegration{
+			ID:       string(integration.ID()),
+			Name:     integration.DisplayName(),
+			Category: developmentToolCategory(providerRegistry.Category(integration.ID())),
+			Status:   DevelopmentToolAvailable,
+			Message:  "Available to add to this context.",
 		})
 	}
 	return integrations

@@ -1620,12 +1620,19 @@ func TestCreateContextReportsStorageWriteFailure(t *testing.T) {
 }
 
 func TestGetContextTemplatesReturnsBuiltInSafeDefaults(t *testing.T) {
-	templates := newApplicationFixture(t).service().GetContextTemplates().Templates
+	state := newApplicationFixture(t).service().GetContextTemplates()
+	templates := state.Templates
 	if got, want := len(templates), 6; got != want {
 		t.Fatalf("template count = %d, want %d", got, want)
 	}
 	if templates[0].ID != "personal" || templates[5].ID != "custom" {
 		t.Fatalf("templates = %#v", templates)
+	}
+	if !reflect.DeepEqual(state.DevelopmentTools, []DevelopmentToolIntegration{
+		{ID: "fake-editor", Name: "Fake Tool", Category: DevelopmentToolCategoryOther, Status: DevelopmentToolAvailable, Message: "Available to add to this context.", Enabled: true},
+		{ID: "fake", Name: "Fake Provider", Category: DevelopmentToolCategoryAI, Status: DevelopmentToolAvailable, Message: "Available to add to this context."},
+	}) {
+		t.Fatalf("development tools = %#v", state.DevelopmentTools)
 	}
 }
 

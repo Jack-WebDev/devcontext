@@ -6,6 +6,8 @@ import { developmentToolStatusPresentation } from "./development-tool-status.js"
 
 interface ContextCreateDevelopmentToolsScreenProps {
 	integrations?: DevelopmentToolIntegration[];
+	loading?: boolean;
+	error?: string;
 	enabledIntegrationIds?: string[];
 	onEnabledIntegrationIdsChange?: (ids: string[]) => void;
 	onBack?: () => void;
@@ -14,6 +16,8 @@ interface ContextCreateDevelopmentToolsScreenProps {
 
 function ContextCreateDevelopmentToolsScreen({
 	integrations = [],
+	loading = false,
+	error,
 	enabledIntegrationIds,
 	onEnabledIntegrationIdsChange,
 	onBack,
@@ -26,6 +30,9 @@ function ContextCreateDevelopmentToolsScreen({
 	);
 	const [setupIntegrationID, setSetupIntegrationID] = useState<string>();
 	const selectedIDs = enabledIntegrationIds ?? localEnabledIDs;
+	const hasSelectedCodingTool = selectedIDs.some(
+		(id) => integrations.find((integration) => integration.id === id)?.category === "coding",
+	);
 	function updateEnabled(id: string, enabled: boolean) {
 		const integration = integrations.find((item) => item.id === id);
 		let next = selectedIDs.filter((selectedID) => selectedID !== id);
@@ -78,6 +85,12 @@ function ContextCreateDevelopmentToolsScreen({
 			</div>
 
 			<div className="space-y-5" aria-label="Development tool categories">
+				{loading ? (
+					<p className="text-sm text-muted-foreground" role="status">
+						Loading registered development tools...
+					</p>
+				) : null}
+				{error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
 				{developmentToolCategories.map((category) => {
 					const categoryIntegrations = integrations.filter(
 						(integration) => integration.category === category.id,
@@ -127,7 +140,11 @@ function ContextCreateDevelopmentToolsScreen({
 				) : (
 					<span />
 				)}
-				<Button type="button" onClick={onContinue}>
+				<Button
+					type="button"
+					disabled={loading || error !== undefined || !hasSelectedCodingTool}
+					onClick={onContinue}
+				>
 					Continue
 				</Button>
 			</div>
@@ -178,7 +195,7 @@ function DevelopmentToolCard({
 				</Button>
 				{enabled && integration.status !== "connected" ? (
 					<Button type="button" variant="outline" size="sm" onClick={onSetup}>
-						Set up
+						How setup works
 					</Button>
 				) : null}
 			</div>
@@ -209,13 +226,13 @@ function DevelopmentToolSetupScreen({
 			</nav>
 			<div className="space-y-2">
 				<p className="text-sm font-medium text-muted-foreground">
-					Set up development tool
+					Development tool setup
 				</p>
 				<h2
 					id="development-tool-setup-title"
 					className="text-2xl font-semibold"
 				>
-					Set up {integration.name}
+					Prepare {integration.name}
 				</h2>
 				<p className="text-sm text-muted-foreground">
 					{integration.message || presentation.message}
@@ -225,8 +242,9 @@ function DevelopmentToolSetupScreen({
 				</p>
 			</div>
 			<p className="rounded-lg border bg-muted/30 p-4 text-sm">
-				This integration will remain enabled for this context. You can finish
-				its setup now or continue creating the context and return later.
+				This integration will remain enabled for this context. After the context
+				is created, open its project to sign in, then use Recheck setup to refresh
+				its local readiness.
 			</p>
 			<details className="rounded-lg border p-4 text-sm">
 				<summary className="cursor-pointer font-medium">
