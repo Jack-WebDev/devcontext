@@ -185,6 +185,57 @@ func TestLaunchPlanBuilderDoesNotRequireProviderCLICommands(t *testing.T) {
 	}
 }
 
+func TestLaunchPlanBuilderRemovesInheritedProviderAuthentication(t *testing.T) {
+	projectDir := t.TempDir()
+	context := devcontext.DefaultPersonalContext(time.Date(2026, 8, 13, 12, 30, 0, 0, time.UTC))
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatalf("resolve test executable: %v", err)
+	}
+	context.Tool.Tools[context.Tool.DefaultTool] = codingtool.Config{ExecutableOverride: executable}
+	platformPaths := fakePlanPlatformPaths{devContextHome: filepath.Join(t.TempDir(), ".devctx")}
+	contextPaths, err := filesystem.DeriveContextPaths(platformPaths, context.ID)
+	if err != nil {
+		t.Fatalf("derive context paths: %v", err)
+	}
+	createContextDirectories(t, contextPaths)
+
+	builder := launcher.LaunchPlanBuilder{
+		Resolver:         fakePlanResolver{result: launcher.ResolutionResult{Context: &context, Source: launcher.ResolutionSourceExplicit}},
+		PlatformPaths:    platformPaths,
+		ProviderRegistry: provider.BuiltInRegistry(),
+		Tool:             codingtool.VSCodeEditor{},
+		ParentEnvironment: []string{
+			"PATH=/usr/bin",
+			"ANTHROPIC_API_KEY=host-claude-key",
+			"ANTHROPIC_AUTH_TOKEN=host-claude-token",
+			"OPENAI_API_KEY=host-openai-key",
+			"CODEX_API_KEY=host-codex-key",
+			"CODEX_ACCESS_TOKEN=host-codex-token",
+			"UNRELATED_API_TOKEN=preserved",
+		},
+	}
+
+	plan, err := builder.Build(launcher.LaunchRequest{ProjectPath: project.Path(projectDir), RequestedContext: &context.ID})
+	if err != nil {
+		t.Fatalf("build launch plan: %v", err)
+	}
+	for _, key := range []string{
+		provider.ClaudeAPIKeyEnvVar,
+		provider.ClaudeAuthTokenEnvVar,
+		provider.OpenAIAPIKeyEnvVar,
+		provider.CodexAPIKeyEnvVar,
+		provider.CodexAccessTokenEnvVar,
+	} {
+		if _, ok := plan.Environment[key]; ok {
+			t.Fatalf("launch environment contains inherited authentication variable %q", key)
+		}
+	}
+	if plan.Environment["UNRELATED_API_TOKEN"] != "preserved" {
+		t.Fatalf("unrelated environment variable = %q, want preserved", plan.Environment["UNRELATED_API_TOKEN"])
+	}
+}
+
 func createContextDirectories(t *testing.T, paths filesystem.ContextPaths) {
 	t.Helper()
 

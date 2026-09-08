@@ -16,6 +16,18 @@ const (
 
 	// CodexHomeEnvVar is the environment variable Codex uses for its home.
 	CodexHomeEnvVar = "CODEX_HOME"
+
+	// OpenAIAPIKeyEnvVar supplies API-key authentication, which overrides
+	// context-owned Codex credentials.
+	OpenAIAPIKeyEnvVar = "OPENAI_API_KEY"
+
+	// CodexAPIKeyEnvVar supplies Codex API-key authentication, which overrides
+	// context-owned Codex credentials.
+	CodexAPIKeyEnvVar = "CODEX_API_KEY"
+
+	// CodexAccessTokenEnvVar supplies access-token authentication, which
+	// overrides context-owned Codex credentials.
+	CodexAccessTokenEnvVar = "CODEX_ACCESS_TOKEN"
 )
 
 // CodexProvider contributes isolated Codex process configuration.
@@ -24,6 +36,7 @@ type CodexProvider struct {
 }
 
 var _ Provider = CodexProvider{}
+var _ InheritedAuthenticationEnvironmentProvider = CodexProvider{}
 var _ GlobalCredentialDetector = CodexProvider{}
 var _ CredentialMetadataExtractor = CodexProvider{}
 var _ CredentialImporter = CodexProvider{}
@@ -46,6 +59,12 @@ func (CodexProvider) BuildEnvironment(ctx RuntimeContext) (EnvironmentContributi
 	return EnvironmentContribution{
 		CodexHomeEnvVar: ctx.Paths.StorageDir,
 	}, nil
+}
+
+// InheritedAuthenticationEnvironmentVariables identifies host credentials
+// that Codex gives precedence over its context-owned credentials.
+func (CodexProvider) InheritedAuthenticationEnvironmentVariables() []string {
+	return []string{OpenAIAPIKeyEnvVar, CodexAPIKeyEnvVar, CodexAccessTokenEnvVar}
 }
 
 // Status returns local provider readiness.

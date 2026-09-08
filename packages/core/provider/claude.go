@@ -16,6 +16,14 @@ const (
 	// ClaudeConfigDirEnvVar is the environment variable Claude Code uses for
 	// its configuration directory.
 	ClaudeConfigDirEnvVar = "CLAUDE_CONFIG_DIR"
+
+	// ClaudeAPIKeyEnvVar supplies API-key authentication, which overrides
+	// context-owned Claude credentials.
+	ClaudeAPIKeyEnvVar = "ANTHROPIC_API_KEY"
+
+	// ClaudeAuthTokenEnvVar supplies token authentication, which overrides
+	// context-owned Claude credentials.
+	ClaudeAuthTokenEnvVar = "ANTHROPIC_AUTH_TOKEN"
 )
 
 // ClaudeProvider contributes isolated Claude Code process configuration.
@@ -24,6 +32,7 @@ type ClaudeProvider struct {
 }
 
 var _ Provider = ClaudeProvider{}
+var _ InheritedAuthenticationEnvironmentProvider = ClaudeProvider{}
 var _ GlobalCredentialDetector = ClaudeProvider{}
 var _ CredentialMetadataExtractor = ClaudeProvider{}
 var _ CredentialImporter = ClaudeProvider{}
@@ -47,6 +56,12 @@ func (ClaudeProvider) BuildEnvironment(ctx RuntimeContext) (EnvironmentContribut
 	return EnvironmentContribution{
 		ClaudeConfigDirEnvVar: ctx.Paths.StorageDir,
 	}, nil
+}
+
+// InheritedAuthenticationEnvironmentVariables identifies host credentials
+// that Claude gives precedence over its context-owned credentials.
+func (ClaudeProvider) InheritedAuthenticationEnvironmentVariables() []string {
+	return []string{ClaudeAPIKeyEnvVar, ClaudeAuthTokenEnvVar}
 }
 
 // Status returns local provider readiness.

@@ -92,7 +92,8 @@ func (b LaunchPlanBuilder) Preflight(request LaunchRequest) (LaunchPlan, error) 
 	if err != nil {
 		return LaunchPlan{}, err
 	}
-	variables, err := environment.BuildForContext(b.ParentEnvironment, resolution.Context.ID, contributions...)
+	parentEnvironment := environment.WithoutKeys(b.ParentEnvironment, b.inheritedAuthenticationEnvironmentVariables(*resolution.Context, providerRegistry)...)
+	variables, err := environment.BuildForContext(parentEnvironment, resolution.Context.ID, contributions...)
 	if err != nil {
 		return LaunchPlan{}, err
 	}
@@ -185,6 +186,22 @@ func (b LaunchPlanBuilder) providerContributions(ctxContext devcontext.Context, 
 		missingProviderIDs = nil
 	}
 	return contributions, missingProviderIDs, nil
+}
+
+func (b LaunchPlanBuilder) inheritedAuthenticationEnvironmentVariables(ctxContext devcontext.Context, registry provider.Registry) []string {
+	var keys []string
+	for _, integration := range registry.All() {
+		config, ok := ctxContext.Providers[integration.ID()]
+		if !ok || !config.Enabled {
+			continue
+		}
+		providerWithAuthenticationEnvironment, ok := integration.(provider.InheritedAuthenticationEnvironmentProvider)
+		if !ok {
+			continue
+		}
+		keys = append(keys, providerWithAuthenticationEnvironment.InheritedAuthenticationEnvironmentVariables()...)
+	}
+	return keys
 }
 
 func (b LaunchPlanBuilder) providerRegistry() provider.Registry {
