@@ -25,6 +25,10 @@ var (
 
 	// ErrMissingProjectPath identifies a command request without a project path.
 	ErrMissingProjectPath = errors.New("missing project path")
+
+	// ErrMissingStorageDir identifies a command request without the selected
+	// context's tool storage directory.
+	ErrMissingStorageDir = errors.New("missing tool storage directory")
 )
 
 // ExecutableProbe finds executables and reads executable file metadata.
@@ -214,18 +218,35 @@ func (e VSCodeEditor) macOSInstallPaths() []string {
 }
 
 // BuildLaunchCommand returns the structured VS Code command for one project.
-func (VSCodeEditor) BuildLaunchCommand(request CommandRequest) (Command, error) {
+// User data and extension files are both scoped to the selected context so an
+// ordinary VS Code instance cannot supply state to a Dev Context launch.
+func (e VSCodeEditor) BuildLaunchCommand(request CommandRequest) (Command, error) {
 	if strings.TrimSpace(string(request.Executable)) == "" {
 		return Command{}, ErrMissingExecutable
 	}
 	if strings.TrimSpace(request.ProjectPath) == "" {
 		return Command{}, ErrMissingProjectPath
 	}
+	if strings.TrimSpace(request.Paths.StorageDir) == "" {
+		return Command{}, ErrMissingStorageDir
+	}
 
 	return Command{
 		Executable: request.Executable,
-		Arguments:  Arguments{request.ProjectPath},
+		Arguments: Arguments{
+			"--user-data-dir", request.Paths.StorageDir,
+			"--extensions-dir", vscodeExtensionsDir(request.Paths.StorageDir, e.resolveOperatingSystem()),
+			"--new-window",
+			request.ProjectPath,
+		},
 	}, nil
+}
+
+func vscodeExtensionsDir(storageDir, goos string) string {
+	if goos == "windows" {
+		return strings.TrimRight(storageDir, `\\/`) + `\extensions`
+	}
+	return filepath.Join(storageDir, "extensions")
 }
 
 func (e VSCodeEditor) resolveProbe() ExecutableProbe {

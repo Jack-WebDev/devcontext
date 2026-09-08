@@ -392,10 +392,16 @@ func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 				Config:      codingtool.DefaultConfig(),
 				Executable:  "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
 				ProjectPath: "/Users/Alex/Work/Client A/API",
+				Paths: codingtool.ContextPaths{
+					StorageDir: "/Users/Alex/.devctx/contexts/client-a/tools/vscode",
+				},
 			},
 			want: codingtool.Command{
 				Executable: "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
 				Arguments: codingtool.Arguments{
+					"--user-data-dir", "/Users/Alex/.devctx/contexts/client-a/tools/vscode",
+					"--extensions-dir", "/Users/Alex/.devctx/contexts/client-a/tools/vscode/extensions",
+					"--new-window",
 					"/Users/Alex/Work/Client A/API",
 				},
 			},
@@ -406,10 +412,16 @@ func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 				Config:      codingtool.DefaultConfig(),
 				Executable:  `C:\Users\Alex\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd`,
 				ProjectPath: `C:\Users\Alex\Projects\Client A\API`,
+				Paths: codingtool.ContextPaths{
+					StorageDir: `C:\Users\Alex\.devctx\contexts\client-a\tools\vscode`,
+				},
 			},
 			want: codingtool.Command{
 				Executable: `C:\Users\Alex\AppData\Local\Programs\Microsoft VS Code\bin\code.cmd`,
 				Arguments: codingtool.Arguments{
+					"--user-data-dir", `C:\Users\Alex\.devctx\contexts\client-a\tools\vscode`,
+					"--extensions-dir", `C:\Users\Alex\.devctx\contexts\client-a\tools\vscode\extensions`,
+					"--new-window",
 					`C:\Users\Alex\Projects\Client A\API`,
 				},
 			},
@@ -420,10 +432,16 @@ func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 				Config:      codingtool.DefaultConfig(),
 				Executable:  "/usr/local/bin/code",
 				ProjectPath: "/Users/Alex/équipe/Café Portal",
+				Paths: codingtool.ContextPaths{
+					StorageDir: "/Users/Alex/.devctx/contexts/equipe/tools/vscode",
+				},
 			},
 			want: codingtool.Command{
 				Executable: "/usr/local/bin/code",
 				Arguments: codingtool.Arguments{
+					"--user-data-dir", "/Users/Alex/.devctx/contexts/equipe/tools/vscode",
+					"--extensions-dir", "/Users/Alex/.devctx/contexts/equipe/tools/vscode/extensions",
+					"--new-window",
 					"/Users/Alex/équipe/Café Portal",
 				},
 			},
@@ -436,10 +454,16 @@ func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 				},
 				Executable:  "/opt/vscode-insiders/bin/code-insiders",
 				ProjectPath: "/work/app",
+				Paths: codingtool.ContextPaths{
+					StorageDir: "/home/alex/.devctx/contexts/personal/tools/vscode",
+				},
 			},
 			want: codingtool.Command{
 				Executable: "/opt/vscode-insiders/bin/code-insiders",
 				Arguments: codingtool.Arguments{
+					"--user-data-dir", "/home/alex/.devctx/contexts/personal/tools/vscode",
+					"--extensions-dir", "/home/alex/.devctx/contexts/personal/tools/vscode/extensions",
+					"--new-window",
 					"/work/app",
 				},
 			},
@@ -448,7 +472,11 @@ func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			command, err := codingtool.VSCodeEditor{}.BuildLaunchCommand(tt.request)
+			editor := codingtool.VSCodeEditor{}
+			if tt.name == "windows separators" {
+				editor.OperatingSystem = "windows"
+			}
+			command, err := editor.BuildLaunchCommand(tt.request)
 			if err != nil {
 				t.Fatalf("build launch command: %v", err)
 			}
@@ -460,11 +488,48 @@ func TestVSCodeEditorBuildsStructuredLaunchCommand(t *testing.T) {
 	}
 }
 
+func TestVSCodeEditorBuildLaunchCommandKeepsContextProfilesSeparate(t *testing.T) {
+	editor := codingtool.VSCodeEditor{}
+	personal, err := editor.BuildLaunchCommand(codingtool.CommandRequest{
+		Executable:  "/usr/local/bin/code",
+		ProjectPath: "/work/personal-project",
+		Paths: codingtool.ContextPaths{
+			StorageDir: "/home/alex/.devctx/contexts/personal/tools/vscode",
+		},
+	})
+	if err != nil {
+		t.Fatalf("build Personal command: %v", err)
+	}
+	company, err := editor.BuildLaunchCommand(codingtool.CommandRequest{
+		Executable:  "/usr/local/bin/code",
+		ProjectPath: "/work/company-project",
+		Paths: codingtool.ContextPaths{
+			StorageDir: "/home/alex/.devctx/contexts/company/tools/vscode",
+		},
+	})
+	if err != nil {
+		t.Fatalf("build Company command: %v", err)
+	}
+
+	if personal.Arguments[1] == company.Arguments[1] {
+		t.Fatalf("user-data directories must differ: %q", personal.Arguments[1])
+	}
+	if personal.Arguments[3] == company.Arguments[3] {
+		t.Fatalf("extension directories must differ: %q", personal.Arguments[3])
+	}
+	if personal.Arguments[4] != "--new-window" || company.Arguments[4] != "--new-window" {
+		t.Fatalf("commands must force separate windows: personal=%#v company=%#v", personal.Arguments, company.Arguments)
+	}
+}
+
 func TestVSCodeEditorBuildLaunchCommandRejectsMissingInputs(t *testing.T) {
 	validRequest := codingtool.CommandRequest{
 		Config:      codingtool.DefaultConfig(),
 		Executable:  "/usr/local/bin/code",
 		ProjectPath: "/work/client-a/api",
+		Paths: codingtool.ContextPaths{
+			StorageDir: "/home/alex/.devctx/contexts/personal/tools/vscode",
+		},
 	}
 
 	tests := []struct {
@@ -489,6 +554,15 @@ func TestVSCodeEditorBuildLaunchCommandRejectsMissingInputs(t *testing.T) {
 				Paths:      validRequest.Paths,
 			},
 			wantErr: codingtool.ErrMissingProjectPath,
+		},
+		{
+			name: "missing tool storage directory",
+			request: codingtool.CommandRequest{
+				Config:      validRequest.Config,
+				Executable:  validRequest.Executable,
+				ProjectPath: validRequest.ProjectPath,
+			},
+			wantErr: codingtool.ErrMissingStorageDir,
 		},
 	}
 

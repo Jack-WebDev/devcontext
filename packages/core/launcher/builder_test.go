@@ -168,8 +168,14 @@ func TestLaunchPlanBuilderDoesNotRequireProviderCLICommands(t *testing.T) {
 	if plan.Executable != launcher.Executable(executable) {
 		t.Fatalf("executable = %q, want %q", plan.Executable, executable)
 	}
-	if !reflect.DeepEqual(plan.Arguments, launcher.Arguments{projectDir}) {
-		t.Fatalf("arguments = %#v, want only project path", plan.Arguments)
+	wantArguments := launcher.Arguments{
+		"--user-data-dir", contextPaths.ToolStorageDir(codingtool.VSCodeID),
+		"--extensions-dir", filepath.Join(contextPaths.ToolStorageDir(codingtool.VSCodeID), "extensions"),
+		"--new-window",
+		projectDir,
+	}
+	if !reflect.DeepEqual(plan.Arguments, wantArguments) {
+		t.Fatalf("arguments = %#v, want %#v", plan.Arguments, wantArguments)
 	}
 	if plan.Environment[provider.CodexHomeEnvVar] != contextPaths.ProviderStorageDir(provider.CodexID) {
 		t.Fatalf("CODEX_HOME = %q, want %q", plan.Environment[provider.CodexHomeEnvVar], contextPaths.ProviderStorageDir(provider.CodexID))
