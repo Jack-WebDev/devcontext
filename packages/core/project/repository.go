@@ -113,30 +113,31 @@ func (r Repository) Bind(projectPath string, baseDir Path, contextID devcontext.
 		return Binding{}, fmt.Errorf("validate target context %q: %w", contextID.String(), err)
 	}
 
-	bindings, err := r.List()
-	if err != nil {
-		return Binding{}, err
-	}
-
 	binding := Binding{
 		ProjectPath: canonicalPath,
 		ContextID:   contextID,
 		CreatedAt:   createdAt.UTC(),
 	}
-
-	replaced := false
-	for i := range bindings {
-		if bindings[i].ProjectPath == canonicalPath {
-			bindings[i] = binding
-			replaced = true
-			break
+	if err := filesystem.WithExclusiveFileLock(r.path, func() error {
+		bindings, err := r.List()
+		if err != nil {
+			return err
 		}
-	}
-	if !replaced {
-		bindings = append(bindings, binding)
-	}
 
-	if err := WriteProjectBindingsFile(r.path, bindings); err != nil {
+		replaced := false
+		for i := range bindings {
+			if bindings[i].ProjectPath == canonicalPath {
+				bindings[i] = binding
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			bindings = append(bindings, binding)
+		}
+
+		return WriteProjectBindingsFile(r.path, bindings)
+	}); err != nil {
 		return Binding{}, err
 	}
 	return binding, nil
@@ -150,56 +151,57 @@ func (r Repository) Unbind(projectPath string, baseDir Path) (UnbindResult, erro
 		return UnbindResult{}, err
 	}
 
-	bindings, err := r.List()
-	if err != nil {
-		return UnbindResult{}, err
-	}
-
-	remaining := make([]Binding, 0, len(bindings))
-	var removed Binding
-	for _, binding := range bindings {
-		if binding.ProjectPath == canonicalPath {
-			removed = binding
-			continue
+	var result UnbindResult
+	if err := filesystem.WithExclusiveFileLock(r.path, func() error {
+		bindings, err := r.List()
+		if err != nil {
+			return err
 		}
-		remaining = append(remaining, binding)
-	}
 
-	result := UnbindResult{
-		ProjectPath: canonicalPath,
-		Binding:     removed,
-		Removed:     removed.ProjectPath != "",
-	}
-	if !result.Removed {
-		return result, nil
-	}
+		remaining := make([]Binding, 0, len(bindings))
+		var removed Binding
+		for _, binding := range bindings {
+			if binding.ProjectPath == canonicalPath {
+				removed = binding
+				continue
+			}
+			remaining = append(remaining, binding)
+		}
 
-	if err := WriteProjectBindingsFile(r.path, remaining); err != nil {
+		result = UnbindResult{ProjectPath: canonicalPath, Binding: removed, Removed: removed.ProjectPath != ""}
+		if !result.Removed {
+			return nil
+		}
+		return WriteProjectBindingsFile(r.path, remaining)
+	}); err != nil {
 		return UnbindResult{}, err
 	}
+
 	return result, nil
 }
 
 // UnbindContext removes every project binding for a context in one atomic
 // project-bindings write and returns the affected bindings.
 func (r Repository) UnbindContext(contextID devcontext.ID) ([]Binding, error) {
-	bindings, err := r.List()
-	if err != nil {
-		return nil, err
-	}
-	remaining := make([]Binding, 0, len(bindings))
 	removed := make([]Binding, 0)
-	for _, binding := range bindings {
-		if binding.ContextID == contextID {
-			removed = append(removed, binding)
-			continue
+	if err := filesystem.WithExclusiveFileLock(r.path, func() error {
+		bindings, err := r.List()
+		if err != nil {
+			return err
 		}
-		remaining = append(remaining, binding)
-	}
-	if len(removed) == 0 {
-		return removed, nil
-	}
-	if err := WriteProjectBindingsFile(r.path, remaining); err != nil {
+		remaining := make([]Binding, 0, len(bindings))
+		for _, binding := range bindings {
+			if binding.ContextID == contextID {
+				removed = append(removed, binding)
+				continue
+			}
+			remaining = append(remaining, binding)
+		}
+		if len(removed) == 0 {
+			return nil
+		}
+		return WriteProjectBindingsFile(r.path, remaining)
+	}); err != nil {
 		return nil, err
 	}
 	return removed, nil

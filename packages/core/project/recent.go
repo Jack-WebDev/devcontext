@@ -11,6 +11,7 @@ import (
 	"github.com/BurntSushi/toml"
 
 	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/filesystem"
 )
 
 // RecentProject records a successful launch without changing the project's
@@ -71,38 +72,42 @@ func (r RecentRepository) Record(projectPath Path, contextID devcontext.ID, laun
 		return fmt.Errorf("record recent project: invalid project, context, or launch time")
 	}
 
-	projects, err := r.List()
-	if err != nil {
-		return err
-	}
 	recent := RecentProject{ProjectPath: projectPath, ContextID: contextID, LastLaunchedAt: launchedAt.UTC()}
-	replaced := false
-	for index := range projects {
-		if projects[index].ProjectPath == projectPath {
-			projects[index] = recent
-			replaced = true
-			break
+	return filesystem.WithExclusiveFileLock(r.path, func() error {
+		projects, err := r.List()
+		if err != nil {
+			return err
 		}
-	}
-	if !replaced {
-		projects = append(projects, recent)
-	}
-	return WriteRecentProjectsFile(r.path, projects)
+		replaced := false
+		for index := range projects {
+			if projects[index].ProjectPath == projectPath {
+				projects[index] = recent
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			projects = append(projects, recent)
+		}
+		return WriteRecentProjectsFile(r.path, projects)
+	})
 }
 
 // Remove deletes Dev Context's recent-launch record for one project.
 func (r RecentRepository) Remove(projectPath Path) error {
-	projects, err := r.List()
-	if err != nil {
-		return err
-	}
-	remaining := projects[:0]
-	for _, recent := range projects {
-		if recent.ProjectPath != projectPath {
-			remaining = append(remaining, recent)
+	return filesystem.WithExclusiveFileLock(r.path, func() error {
+		projects, err := r.List()
+		if err != nil {
+			return err
 		}
-	}
-	return WriteRecentProjectsFile(r.path, remaining)
+		remaining := projects[:0]
+		for _, recent := range projects {
+			if recent.ProjectPath != projectPath {
+				remaining = append(remaining, recent)
+			}
+		}
+		return WriteRecentProjectsFile(r.path, remaining)
+	})
 }
 
 type recentProjectsDocument struct {
