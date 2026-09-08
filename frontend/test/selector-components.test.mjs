@@ -703,6 +703,31 @@ test("running environments show immutable launch context and tool action entry p
 	assert.notEqual(formatRunningTime("invalid"), "Invalid Date");
 });
 
+test("unknown workspaces disclose their lifecycle and disable unsupported actions", () => {
+	const environments = [{
+		id: "environment-unknown",
+		project: { name: "api", path: "/work/api" },
+		context: { id: "company", name: "Company" },
+		tool: { id: "vscode", name: "VS Code" },
+		startedAt: "2026-08-28T10:30:00Z",
+		process: { state: "unknown" },
+		session: { state: "unknown" },
+		launch: { source: "gui", resolutionSource: "explicit" },
+		lifecycle: { state: "unknown", focusable: false, revealable: false, stoppable: false },
+	}];
+	const html = renderToStaticMarkup(createElement(RunningView, {
+		environments,
+		onReveal: async () => ({ revealed: false, targets: [] }),
+		onStop: () => {},
+	}));
+
+	assert.ok(html.includes("Lifecycle unknown"));
+	assert.ok(html.includes("could not verify whether this workspace is still open"));
+	assert.ok(html.includes("cannot be revealed"));
+	assert.ok(html.includes("cannot be stopped"));
+	assert.match(html, /disabled=""/);
+});
+
 test("workspaces present concurrent contexts as independent sessions", () => {
 	const environments = ["Personal", "Company"].map((name, index) => ({
 		id: `workspace-${index}`,

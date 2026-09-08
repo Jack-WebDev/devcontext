@@ -920,7 +920,8 @@ type RunningEnvironmentLaunchState struct {
 	ResolutionSource string `json:"resolutionSource"`
 }
 
-// RunningEnvironmentsState contains active coding-tool environments.
+// RunningEnvironmentsState contains active and lifecycle-unknown coding-tool
+// workspace records. Stopped workspaces are omitted.
 type RunningEnvironmentsState struct {
 	Environments []RunningEnvironmentState `json:"environments"`
 }

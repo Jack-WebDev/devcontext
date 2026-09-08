@@ -380,8 +380,8 @@ func (s *Service) GetHistory() (HistoryState, *Error) {
 	return history, nil
 }
 
-// GetRunningEnvironments returns active coding-tool environments after
-// refreshing process state where a PID is available.
+// GetRunningEnvironments returns active and lifecycle-unknown coding-tool
+// workspace records after refreshing process state where a PID is available.
 func (s *Service) GetRunningEnvironments() (RunningEnvironmentsState, *Error) {
 	state, err := s.getRunningEnvironments()
 	if err != nil {
@@ -1385,7 +1385,7 @@ func runningEnvironmentFromLaunchPlan(plan launcher.LaunchPlan, startedAt time.T
 		Context:   coreRunning.ContextIdentity{ID: plan.Context.ID, Name: plan.Context.Name},
 		Tool:      coreRunning.ToolIdentity{ID: plan.Tool.ID, Name: plan.Tool.DisplayName},
 		StartedAt: startedAt.UTC(),
-		Process:   coreRunning.Process{State: coreRunning.ProcessStateRunning},
+		Process:   coreRunning.Process{State: coreRunning.ProcessStateUnknown},
 		Session:   coreRunning.Session{State: coreRunning.SessionStateUnknown},
 		Launch: coreRunning.LaunchIdentity{
 			Source:           launcher.InvocationSourceGUI,

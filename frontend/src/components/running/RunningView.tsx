@@ -25,17 +25,17 @@ function RunningView({
 	return (
 		<section aria-labelledby="workspaces-heading" className="space-y-6">
 			<div>
-				<p className="text-sm text-muted-foreground">Active coding work</p>
+				<p className="text-sm text-muted-foreground">Coding work</p>
 				<h2 id="workspaces-heading" className="text-2xl font-semibold">
 					Workspaces
 				</h2>
 				<p className="mt-1 text-sm text-muted-foreground">
-					Workspaces run independently and keep the context selected when each was launched.
+					Workspaces run independently and keep the context selected when each was launched. Lifecycle state is shown only when Dev Context can observe it.
 				</p>
 			</div>
 
 			{environments.length === 0 ? (
-				<EmptyState title="No active workspaces" description="Launch a project to create an isolated coding-tool workspace." actionLabel="View projects" onAction={onLaunchProject} />
+				<EmptyState title="No current workspaces" description="Launch a project to create an isolated coding-tool workspace." actionLabel="View projects" onAction={onLaunchProject} />
 			) : (
 				<div className="space-y-4">
 					{environments.map((environment) => (
@@ -87,9 +87,12 @@ function RunningEnvironmentCard({
 						</p>
 					</div>
 					<span className="shrink-0 text-sm font-medium text-accent-company">
-						Active
+						{environment.lifecycle.state === "active" ? "Active" : "Lifecycle unknown"}
 					</span>
 				</div>
+				{environment.lifecycle.state === "unknown" ? (
+					<p className="text-sm text-muted-foreground">Dev Context could not verify whether this workspace is still open.</p>
+				) : null}
 				<dl className="grid gap-3 border-t border-border pt-4 text-sm sm:grid-cols-3">
 					<RunningDetail label="Context" value={environment.context.name} />
 					<RunningDetail label="Coding tool" value={environment.tool.name} />
@@ -105,7 +108,9 @@ function RunningEnvironmentCard({
 						size="sm"
 						disabled={!environment.lifecycle.revealable || onReveal === undefined}
 						title={
-							onReveal === undefined
+							environment.lifecycle.state !== "active"
+								? "This workspace cannot be observed, so it cannot be revealed."
+								: onReveal === undefined
 								? "Revealing an environment is not available for this coding tool yet."
 								: undefined
 						}
@@ -119,7 +124,9 @@ function RunningEnvironmentCard({
 						size="sm"
 						disabled={!environment.lifecycle.stoppable || onStop === undefined}
 						title={
-							onStop === undefined
+							environment.lifecycle.state !== "active"
+								? "This workspace cannot be observed, so it cannot be stopped."
+								: onStop === undefined
 								? "Stopping an environment is not available for this coding tool yet."
 								: undefined
 						}

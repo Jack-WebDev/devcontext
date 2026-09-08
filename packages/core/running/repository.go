@@ -133,8 +133,9 @@ func (r Repository) MarkStopped(id ID) (Environment, error) {
 }
 
 // RefreshProcessStates marks running environments stopped when their recorded
-// PID is no longer active. Records without a PID remain unchanged because their
-// process state cannot be observed safely.
+// PID is no longer active. Legacy records that claimed a running process without
+// a PID or adapter session are changed to unknown because that claim cannot be
+// observed safely.
 func (r Repository) RefreshProcessStates(inspector ProcessInspector) (RefreshResult, error) {
 	if r.IsZero() {
 		return RefreshResult{}, fmt.Errorf("refresh running environments: repository is not configured")
@@ -152,6 +153,10 @@ func (r Repository) RefreshProcessStates(inspector ProcessInspector) (RefreshRes
 		changed := false
 		for index := range environments {
 			environment := &environments[index]
+			if environment.Process.State == ProcessStateRunning && environment.Process.PID == nil && environment.Session.State == SessionStateUnknown {
+				environment.Process.State = ProcessStateUnknown
+				changed = true
+			}
 			if environment.Process.State != ProcessStateRunning || environment.Process.PID == nil {
 				continue
 			}

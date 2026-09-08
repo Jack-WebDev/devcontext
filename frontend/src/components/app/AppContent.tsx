@@ -55,7 +55,7 @@ export function RunningContent({
 	onLaunchProject?: () => void;
 }) {
 	if (running.status === "loading")
-		return <CollectionSkeleton label="Loading active workspaces" />;
+		return <CollectionSkeleton label="Loading workspaces" />;
 	if (running.status === "error")
 		return <GuiErrorNotice error={running.error} />;
 	return <RunningView environments={running.data.environments} onReveal={onReveal} onStop={onStop} onLaunchProject={onLaunchProject} />;

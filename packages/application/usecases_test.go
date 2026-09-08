@@ -1974,7 +1974,7 @@ func TestLaunchProjectCreatesAndUpdatesRunningEnvironment(t *testing.T) {
 	if first.ID == "" || first.Project.Path != project.Path(fixture.projectDir) || first.Context.ID.String() != "personal" || first.Tool.Name != "Fake Tool" {
 		t.Fatalf("running environment = %#v", first)
 	}
-	if first.Process.State != coreRunning.ProcessStateRunning || first.Session.State != coreRunning.SessionStateUnknown {
+	if first.Process.State != coreRunning.ProcessStateUnknown || first.Session.State != coreRunning.SessionStateUnknown {
 		t.Fatalf("running environment state = %#v", first)
 	}
 
