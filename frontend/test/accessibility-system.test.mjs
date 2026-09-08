@@ -40,7 +40,8 @@ test("accessibility: primary keyboard paths expose visible focus and conventiona
 
 	assert.match(styles, /button:not\(\[data-slot="button"\]\):focus-visible/);
 	assert.match(styles, /outline: 2px solid var\(--ring\)/);
-	assert.match(shell, /focus-visible:outline-2 focus-visible:outline-ring/);
+	assert.match(shell, /focus-visible:outline-2 focus-visible:outline-sidebar-ring/);
+	assert.match(styles, /--color-sidebar-ring: var\(--sidebar-ring\)/);
 	assert.match(contextChoices, /<Input/);
 	assert.match(contextCard, /contextNavigationDirectionForKey/);
 	assert.match(contextCard, /event\.key === "Enter" && selected/);

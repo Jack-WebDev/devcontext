@@ -138,12 +138,24 @@ jobs:
                 exit 1
               fi
 
+              staging="$(mktemp -d)/devctx"
+              mkdir "${staging}"
+              app_name="$(basename "${app}")"
+              cp -R "${app}" "${staging}/${app_name}"
+              ln -s "/Applications/${app_name}/Contents/MacOS/devctx" "${staging}/devctx"
+              test -x "${staging}/${app_name}/Contents/MacOS/devctx"
+
               ditto \
                 -c \
                 -k \
                 --keepParent \
-                "${app}" \
+                "${staging}" \
                 "dist/devctx_${RELEASE_VERSION}_macos_universal.zip"
+
+              verification="$(mktemp -d)"
+              ditto -x -k "dist/devctx_${RELEASE_VERSION}_macos_universal.zip" "${verification}"
+              test -L "${verification}/devctx/devctx"
+              test "$(readlink "${verification}/devctx/devctx")" = "/Applications/${app_name}/Contents/MacOS/devctx"
 
     steps:
       - name: Check out repository
@@ -297,7 +309,12 @@ jobs:
           - macOS: \`devctx_${RELEASE_VERSION}_macos_universal.zip\`
           - Linux: \`devctx_${RELEASE_VERSION}_linux_amd64.tar.gz\`
 
-          After installing, verify:
+          Windows installers add Dev Context to PATH; open a new terminal after
+          installation. macOS archives contain a \`devctx\` symlink that should
+          be moved to \`/usr/local/bin\` after placing the app in \`/Applications\`.
+          Linux archives require moving the executable to PATH.
+
+          After installation, verify:
 
           \`\`\`bash
           devctx --version

@@ -374,8 +374,8 @@ Download:
 devctx_<version>_windows_amd64_installer.exe
 ```
 
-Run the installer and verify:
-Run the installer and verify:
+Run the installer. Open a new terminal so it receives the updated `PATH`, then
+verify:
 
 ```bash
 devctx --version
@@ -393,10 +393,12 @@ Download:
 devctx_<version>_macos_universal.zip
 ```
 
-Extract the archive and move Dev Context into:
+Extract the archive, then install the app and the included CLI symlink:
 
-```text
-/Applications
+```bash
+sudo mv devctx/devctx.app /Applications/
+sudo mkdir -p /usr/local/bin
+sudo mv devctx/devctx /usr/local/bin/devctx
 ```
 
 Then verify:
@@ -418,20 +420,17 @@ devctx_<version>_linux_amd64.tar.gz
 ```
 
 Extract:
-Extract:
 
 ```bash
 tar -xzf devctx_<version>_linux_amd64.tar.gz
 ```
 
 Move the executable onto your `PATH`:
-Move the executable onto your `PATH`:
 
 ```bash
 sudo mv devctx /usr/local/bin/devctx
 ```
 
-Verify:
 Verify:
 
 ```bash

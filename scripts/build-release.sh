@@ -16,6 +16,7 @@ fi
 commit="$(git rev-parse --short=12 HEAD)"
 build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 platform="${DEVCTX_WAILS_PLATFORM:-}"
+host_os="$(go env GOOS)"
 
 ldflags="-X devctx/packages/core/version.Version=${version} \
 -X devctx/packages/core/version.Commit=${commit} \
@@ -33,9 +34,9 @@ if [[ -n "${platform}" ]]; then
   args+=(-platform "${platform}")
 fi
 
-# Ubuntu 24.04 uses WebKitGTK 4.1.
-# This build tag should only be used for Linux builds.
-if [[ "${platform}" == linux/* ]]; then
+# Ubuntu 24.04 uses WebKitGTK 4.1. When no target is provided, Wails builds
+# for the current host, so detect Linux from Go rather than omitting the tag.
+if [[ "${platform}" == linux/* || ( -z "${platform}" && "${host_os}" == "linux" ) ]]; then
   args+=(-tags webkit2_41)
 fi
 

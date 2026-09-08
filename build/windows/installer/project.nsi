@@ -33,6 +33,65 @@ Unicode true
 ## Include the wails tools
 ####
 !include "wails_tools.nsh"
+!include "LogicLib.nsh"
+!include "StrFunc.nsh"
+!include "WinMessages.nsh"
+
+${StrStr}
+${StrRep}
+${UnStrRep}
+
+!macro devctx.addInstallDirectoryToPath root key
+    ReadRegStr $0 ${root} "${key}" "Path"
+    ${If} $0 == ""
+        WriteRegExpandStr ${root} "${key}" "Path" "$INSTDIR"
+    ${Else}
+        StrCpy $1 "$0;"
+        ${StrStr} $2 "$1" "$INSTDIR;"
+        ${If} $2 == ""
+            WriteRegExpandStr ${root} "${key}" "Path" "$0;$INSTDIR"
+        ${EndIf}
+    ${EndIf}
+!macroend
+
+!macro devctx.removeInstallDirectoryFromPath root key
+    ReadRegStr $0 ${root} "${key}" "Path"
+    ${If} $0 == "$INSTDIR"
+        DeleteRegValue ${root} "${key}" "Path"
+    ${ElseIf} $0 != ""
+        ${UnStrRep} $0 "$0" "$INSTDIR;" ""
+        ${UnStrRep} $0 "$0" ";$INSTDIR" ""
+        WriteRegExpandStr ${root} "${key}" "Path" "$0"
+    ${EndIf}
+!macroend
+
+!macro devctx.updatePath
+    SetRegView 64
+    !ifdef WAILS_INSTALL_SCOPE
+      !if "${WAILS_INSTALL_SCOPE}" == "user"
+        !insertmacro devctx.addInstallDirectoryToPath HKCU "Environment"
+      !else
+        !insertmacro devctx.addInstallDirectoryToPath HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
+      !endif
+    !else
+        !insertmacro devctx.addInstallDirectoryToPath HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
+    !endif
+    SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
+!macroend
+
+!macro devctx.removePath
+    SetRegView 64
+    !ifdef WAILS_INSTALL_SCOPE
+      !if "${WAILS_INSTALL_SCOPE}" == "user"
+        !insertmacro devctx.removeInstallDirectoryFromPath HKCU "Environment"
+      !else
+        !insertmacro devctx.removeInstallDirectoryFromPath HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
+      !endif
+    !else
+        !insertmacro devctx.removeInstallDirectoryFromPath HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
+    !endif
+    SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
+!macroend
 
 # The version information for this two must consist of 4 parts
 VIProductVersion "${INFO_PRODUCTVERSION}.0"
@@ -95,6 +154,7 @@ Section
     SetOutPath $INSTDIR
 
     !insertmacro wails.files
+    !insertmacro devctx.updatePath
 
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
     CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
@@ -107,6 +167,8 @@ SectionEnd
 
 Section "uninstall"
     !insertmacro wails.setShellContext
+
+    !insertmacro devctx.removePath
 
     RMDir /r "$AppData\${PRODUCT_EXECUTABLE}" # Remove the WebView2 DataPath
 
