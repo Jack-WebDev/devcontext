@@ -30,6 +30,7 @@ import { ProjectDetailView } from "./components/projects/ProjectDetailView";
 import { RunningEnvironmentConflictDialog } from "./components/running/RunningEnvironmentConflictDialog";
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
 import { PreflightReviewDialog } from "./components/selector/PreflightReviewDialog";
+import { FirstRunWelcome } from "./components/selector/FirstRunWelcome";
 import { createContextAndRefresh } from "./components/contexts/context-creation";
 import { LauncherFlow } from "./components/launcher/LauncherFlow";
 import { SettingsView } from "./components/settings/SettingsView";
@@ -147,7 +148,10 @@ function ManagementApp() {
 	} = useAppData(activeRoute);
 	const isFirstRun = contexts.status === "loaded" && contexts.data.length === 0;
 	const [settingsPending, setSettingsPending] = useState(false);
+	const [settingsSaveError, setSettingsSaveError] = useState<DisplayError>();
 	const [onboardingReplayVisible, setOnboardingReplayVisible] = useState(false);
+	const [managementLaunchProjectPath, setManagementLaunchProjectPath] =
+		useState<string>();
 	const [pendingRunningEnvironmentLaunch, setPendingRunningEnvironmentLaunch] =
 		useState<PendingRunningEnvironmentLaunch>();
 	const [runningEnvironmentLaunchPending, setRunningEnvironmentLaunchPending] =
@@ -348,6 +352,13 @@ function ManagementApp() {
 			}
 			return;
 		}
+		if (action === "restore") {
+			const restored = await devContextApi.restoreContext({ contextId });
+			if (restored.ok) {
+				await refreshContexts();
+			}
+			return;
+		}
 		if (action === "delete") {
 			const context =
 				contexts.status === "loaded"
@@ -369,12 +380,13 @@ function ManagementApp() {
 	async function handleSettingsChange(next: SettingsState) {
 		if (settingsPending) return;
 		setSettingsPending(true);
+		setSettingsSaveError(undefined);
 		const result = await devContextApi.updateSettings(next);
-		setSettings(
-			result.ok
-				? { status: "loaded", data: result.data }
-				: { status: "error", error: result.error },
-		);
+		if (result.ok) {
+			setSettings({ status: "loaded", data: result.data });
+		} else {
+			setSettingsSaveError(result.error);
+		}
 		setSettingsPending(false);
 	}
 
@@ -470,7 +482,16 @@ function ManagementApp() {
 	}
 
 	function handleReviewLaunchOptions() {
-		handleNavigate("contexts");
+		if (homeDashboard.status === "loaded") {
+			setManagementLaunchProjectPath(homeDashboard.data.project.path);
+		}
+	}
+
+	async function handleStartProjectLaunch() {
+		const selected = await devContextApi.chooseProjectDirectory();
+		if (selected.ok && selected.data !== undefined) {
+			setManagementLaunchProjectPath(selected.data);
+		}
 	}
 
 	async function handleProjectLaunch(project: ProjectListItem) {
@@ -610,9 +631,12 @@ function ManagementApp() {
 	}
 
 	async function handleProjectLocate(project: ProjectListItem) {
-		if (project.contextId === undefined) return;
 		const selected = await devContextApi.chooseProjectDirectory();
 		if (!selected.ok || selected.data === undefined || selected.data === project.project.path) return;
+		if (project.contextId === undefined) {
+			setManagementLaunchProjectPath(selected.data);
+			return;
+		}
 		const bound = await devContextApi.bindProject({
 			projectPath: selected.data,
 			contextId: project.contextId,
@@ -630,14 +654,6 @@ function ManagementApp() {
 		}
 		await Promise.all([refreshProjects(), refreshHomeDashboard(), refreshRecentProjects(), refreshContexts()]);
 		window.location.hash = projectDetailHash({ projectPath: selected.data });
-	}
-
-	function handleProjectOpenFolder(project: ProjectListItem) {
-		window.open(
-			new URL(project.project.path, "file://").href,
-			"_blank",
-			"noopener,noreferrer",
-		);
 	}
 
 	function deferRunningEnvironmentConflict(
@@ -733,6 +749,19 @@ function ManagementApp() {
 		}
 	}
 
+	if (managementLaunchProjectPath !== undefined) {
+		return (
+			<LauncherFlow
+				projectPath={managementLaunchProjectPath}
+				onCancel={() => setManagementLaunchProjectPath(undefined)}
+				onRunDiagnostics={() => {
+					setManagementLaunchProjectPath(undefined);
+					handleNavigate("diagnostics");
+				}}
+			/>
+		);
+	}
+
 	return (
 		<AppShell
 			activeRoute={activeRoute}
@@ -752,16 +781,24 @@ function ManagementApp() {
 		>
 			{activeRoute === "home" ? (
 				<section aria-labelledby="home-heading">
-					<HomeDashboardContent
-						dashboard={homeDashboard}
-						contexts={contexts}
-						recentProjects={recentProjects}
-						launchPending={homeLaunchPending}
-						launchError={homeLaunchError}
-						onQuickLaunch={handleHomeQuickLaunch}
-						onReviewLaunchOptions={handleReviewLaunchOptions}
-						onRecentProjectSelect={handleRecentProjectSelect}
-					/>
+					{onboardingReplayVisible && launchState.status === "loaded" ? (
+						<FirstRunWelcome
+							launchState={launchState.data}
+							replay
+							onContinue={() => setOnboardingReplayVisible(false)}
+						/>
+					) : (
+						<HomeDashboardContent
+							dashboard={homeDashboard}
+							contexts={contexts}
+							recentProjects={recentProjects}
+							launchPending={homeLaunchPending}
+							launchError={homeLaunchError}
+							onQuickLaunch={handleHomeQuickLaunch}
+							onReviewLaunchOptions={handleReviewLaunchOptions}
+							onRecentProjectSelect={handleRecentProjectSelect}
+						/>
+					)}
 					{recentProjectToLaunch ? (
 						<RecentProjectConfirmationDialog
 							project={recentProjectToLaunch}
@@ -890,7 +927,6 @@ function ManagementApp() {
 								)}
 								onBack={() => handleNavigate("projects")}
 								onLaunch={handleProjectLaunch}
-								onOpenFolder={handleProjectOpenFolder}
 								onChangeContext={
 									contexts.status === "loaded"
 										? handleProjectChangeContext
@@ -908,9 +944,8 @@ function ManagementApp() {
 							errorProjectPath={projectErrorPath}
 							launchError={projectLaunchError}
 							onLaunch={handleProjectLaunch}
-							onOpenFolder={handleProjectOpenFolder}
 							onOpenDetail={navigateToProjectDetail}
-							onStartLaunch={() => handleNavigate("contexts")}
+							onStartLaunch={() => void handleStartProjectLaunch()}
 						/>
 					)}
 					{projectContextChange && contexts.status === "loaded" ? (
@@ -973,6 +1008,7 @@ function ManagementApp() {
 					<SettingsView
 						settings={settings.data}
 						pending={settingsPending}
+						error={settingsSaveError}
 						onChange={(next) => void handleSettingsChange(next)}
 						onReplayOnboarding={() => {
 							setOnboardingReplayVisible(true);

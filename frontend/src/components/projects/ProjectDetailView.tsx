@@ -160,8 +160,7 @@ function ProjectDetailView({
 				<Button
 					type="button"
 					variant="outline"
-					disabled={!isAssigned || onLocate === undefined}
-					title={!isAssigned ? "Assign a context before relocating this project." : undefined}
+					disabled={onLocate === undefined}
 					onClick={() => onLocate?.(project)}
 				>
 					Locate project

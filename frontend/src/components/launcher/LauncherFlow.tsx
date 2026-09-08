@@ -21,6 +21,8 @@ import { type LoadState, loadStateFromResult } from "../app/load-state.js";
 
 interface LauncherFlowProps {
 	projectPath: string;
+	onCancel?: () => void;
+	onRunDiagnostics?: () => void;
 }
 
 type ProjectLaunchState = LoadState<LaunchState> & { projectPath: string };
@@ -29,7 +31,8 @@ type LauncherSettingsState = LoadState<SettingsState>;
 // LauncherFlow is intentionally separate from the management shell. Later
 // launcher phases add resolution and selection states inside this focused
 // surface without bringing management navigation into a project launch.
-function LauncherFlow({ projectPath }: LauncherFlowProps) {
+function LauncherFlow({ projectPath, onCancel, onRunDiagnostics }: LauncherFlowProps) {
+	const cancel = onCancel ?? (() => void devContextWindow.closeSelector());
 	const [requestedProjectPath, setRequestedProjectPath] = useState(projectPath);
 	const [hostProjectPath, setHostProjectPath] = useState(projectPath);
 	const projectPathChangedByHost = hostProjectPath !== projectPath;
@@ -132,7 +135,7 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 				<ProjectNotFoundView
 					choosingFolder={choosingFolder}
 					onChooseFolder={() => void chooseProjectFolder()}
-					onCancel={() => void devContextWindow.closeSelector()}
+					onCancel={cancel}
 				/>
 			) : launchState.status === "error" ? (
 				<GuiErrorNotice error={launchState.error} />
@@ -145,7 +148,8 @@ function LauncherFlow({ projectPath }: LauncherFlowProps) {
 					onUnbindProject={devContextApi.unbindProject}
 					onPreflightLaunchProject={devContextApi.preflightLaunchProject}
 					onLaunchProject={devContextApi.launchProject}
-					onCancel={devContextWindow.closeSelector}
+					onCancel={cancel}
+					onRunDiagnostics={onRunDiagnostics}
 					onCreateContext={createContext}
 					onStartContextCreation={() => setCreatingFirstContext(true)}
 					onRetryDetection={() => setDetectionRetry((attempt) => attempt + 1)}

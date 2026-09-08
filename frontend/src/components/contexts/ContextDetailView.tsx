@@ -597,8 +597,8 @@ function ContextLinkedProjects({
 					Linked projects
 				</h3>
 				<p className="mt-1 text-body text-secondary">
-					These projects remember this context. Move and reveal actions are
-					available from the Projects area.
+					Manage linked projects from the Projects area, where their current
+					location and context can be reviewed safely.
 				</p>
 			</div>
 			{error ? (
@@ -635,23 +635,7 @@ function ContextLinkedProjects({
 										size="sm"
 										onClick={onOpenProjects}
 									>
-										Open
-									</Button>
-									<Button
-										type="button"
-										variant="outline"
-										size="sm"
-										onClick={onOpenProjects}
-									>
-										Move
-									</Button>
-									<Button
-										type="button"
-										variant="outline"
-										size="sm"
-										onClick={onOpenProjects}
-									>
-										Reveal
+										Manage project
 									</Button>
 									<Button
 										type="button"

@@ -101,7 +101,7 @@ export function ProjectsContent({
 	errorProjectPath?: string;
 	launchError?: DisplayError;
 	onLaunch: (project: ProjectListItem) => void;
-	onOpenFolder: (project: ProjectListItem) => void;
+	onOpenFolder?: (project: ProjectListItem) => void;
 	onOpenDetail: (project: ProjectListItem) => void;
 	onStartLaunch?: () => void;
 }) {

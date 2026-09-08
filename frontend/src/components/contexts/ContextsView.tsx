@@ -23,6 +23,7 @@ type ContextListAction =
 	| "duplicate"
 	| "export"
 	| "archive"
+	| "restore"
 	| "delete";
 
 type ContextHealth =
@@ -204,7 +205,11 @@ function ContextActionsMenu({
 				<DropdownMenuItem onClick={() => onAction("export")}>
 					Export
 				</DropdownMenuItem>
-				{context.archivedAt ? null : (
+				{context.archivedAt ? (
+					<DropdownMenuItem onClick={() => onAction("restore")}>
+						Restore
+					</DropdownMenuItem>
+				) : (
 					<DropdownMenuItem onClick={() => onAction("archive")}>
 						Archive
 					</DropdownMenuItem>

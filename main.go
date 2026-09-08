@@ -75,18 +75,20 @@ func main() {
 }
 
 // desktopApplicationMode converts a non-CLI invocation into host-owned Wails
-// startup intent. It deliberately reuses the root launch parser so desktop and
-// CLI project paths share canonicalization and validation rules.
+// startup intent. Desktop launchers defer project-directory validation to the
+// UI so a missing path can use its folder-recovery journey.
 func desktopApplicationMode(args []string, workingDirectory string, paths filesystem.PlatformPaths) (wailsapp.ApplicationMode, error) {
 	if len(args) == 0 {
 		return wailsapp.ManagementMode(), nil
 	}
-
-	request, err := cli.ParseLaunchRequest(args, workingDirectory, paths)
+	if len(args) != 1 {
+		return wailsapp.ApplicationMode{}, fmt.Errorf("%w: desktop launch accepts one project path", cli.ErrInvalidCommand)
+	}
+	projectPath, err := project.CanonicalizePath(paths, args[0], project.Path(workingDirectory))
 	if err != nil {
 		return wailsapp.ApplicationMode{}, err
 	}
-	return wailsapp.LauncherMode(string(request.ProjectPath)), nil
+	return wailsapp.LauncherMode(string(projectPath)), nil
 }
 
 func reportStartupError(err error) {
