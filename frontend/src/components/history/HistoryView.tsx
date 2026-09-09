@@ -4,6 +4,8 @@ import { ProjectSafetyLabel } from "../projects/ProjectSafetyLabel.js";
 import { Card, CardContent } from "../ui/card.js";
 import { Disclosure } from "../ui/disclosure.js";
 import { Button } from "../ui/button.js";
+import { Input } from "../ui/input.js";
+import { PageHeader } from "../ui/page-header.js";
 import { EmptyState } from "../ui/collection-state.js";
 
 interface HistoryViewProps {
@@ -33,16 +35,16 @@ function HistoryView({ entries, onOpenProjects }: HistoryViewProps) {
 	);
 
 	return (
-		<section aria-labelledby="history-heading" className="space-y-6">
-			<div>
-				<p className="text-sm text-muted-foreground">Local activity</p>
-				<h2 id="history-heading" className="text-2xl font-semibold">
-					History
-				</h2>
-				<p className="mt-1 text-sm text-muted-foreground">
-					Review launches and changes recorded on this device.
-				</p>
-			</div>
+		<section
+			aria-labelledby="history-heading"
+			className="page-content page-section-stack"
+		>
+			<PageHeader
+				id="history-heading"
+				eyebrow="Local activity"
+				title="History"
+				description="Review launches and changes recorded on this device."
+			/>
 
 			<div className="grid gap-4 sm:grid-cols-[12rem_minmax(0,1fr)]">
 				<label
@@ -52,7 +54,7 @@ function HistoryView({ entries, onOpenProjects }: HistoryViewProps) {
 					Filter history
 					<select
 						id="history-filter"
-						className="h-10 border border-input bg-background px-3 text-sm text-foreground"
+						className="native-control w-full"
 						value={filter}
 						onChange={(event) =>
 							setFilter(event.currentTarget.value as HistoryFilter)
@@ -71,10 +73,10 @@ function HistoryView({ entries, onOpenProjects }: HistoryViewProps) {
 					htmlFor="history-search"
 				>
 					Search project or context
-					<input
+					<Input
 						id="history-search"
 						type="search"
-						className="h-10 border border-input bg-background px-3 text-sm text-foreground"
+						className="h-10"
 						value={search}
 						onChange={(event) => setSearch(event.currentTarget.value)}
 						placeholder="Search by project path or context"
@@ -84,9 +86,17 @@ function HistoryView({ entries, onOpenProjects }: HistoryViewProps) {
 
 			{groups.length === 0 ? (
 				<EmptyState
-					title={entries.length === 0 ? "No activity yet" : "No matching activity"}
-					description={entries.length === 0 ? "No activity has been recorded yet. Launches and context changes will appear here." : "No activity matches the selected filter or search."}
-					{...(entries.length === 0 ? { actionLabel: "View projects", onAction: onOpenProjects } : {})}
+					title={
+						entries.length === 0 ? "No activity yet" : "No matching activity"
+					}
+					description={
+						entries.length === 0
+							? "No activity has been recorded yet. Launches and context changes will appear here."
+							: "No activity matches the selected filter or search."
+					}
+					{...(entries.length === 0
+						? { actionLabel: "View projects", onAction: onOpenProjects }
+						: {})}
 				/>
 			) : (
 				<div className="space-y-6">
@@ -127,8 +137,8 @@ function HistoryDateGroupCard({
 			>
 				{formatHistoryDate(group.date)}
 			</h3>
-			<Card hierarchy="secondary" className="py-0">
-				<CardContent className="divide-y divide-border p-0">
+			<Card hierarchy="primary" className="py-0">
+				<CardContent className="divide-y divide-border/50 p-0">
 					{group.entries.map((entry, index) => (
 						<HistoryEntryRow
 							key={historyEntryKey(entry, index)}
@@ -150,7 +160,7 @@ function HistoryEntryRow({
 	onSelect: () => void;
 }) {
 	return (
-		<article className="space-y-3 p-5">
+		<article className="collection-row space-y-3 p-5">
 			<div className="flex flex-wrap items-start justify-between gap-3">
 				<div>
 					<h4 className="font-medium">{entry.message}</h4>
@@ -205,7 +215,10 @@ function HistoryEventDetails({
 		>
 			<CardContent className="space-y-5 p-5">
 				<div>
-					<h3 id="history-event-details-title" className="text-base font-semibold">
+					<h3
+						id="history-event-details-title"
+						className="text-base font-semibold"
+					>
 						Activity details
 					</h3>
 					<p className="mt-1 text-sm text-muted-foreground">{entry.message}</p>

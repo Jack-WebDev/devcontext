@@ -10,10 +10,7 @@ function AppearanceSettings() {
 	const { theme, setTheme } = useTheme();
 
 	return (
-		<section
-			className="border-b border-border pb-6"
-			aria-labelledby="settings-appearance"
-		>
+		<section className="p-6" aria-labelledby="settings-appearance">
 			<h3 id="settings-appearance" className="font-semibold">
 				Appearance
 			</h3>
@@ -28,7 +25,7 @@ function AppearanceSettings() {
 					</span>
 				</span>
 				<select
-					className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+					className="native-control min-w-28"
 					value={theme ?? "system"}
 					onChange={(event) => setTheme(event.target.value)}
 					aria-label="Color theme"

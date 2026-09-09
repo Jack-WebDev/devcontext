@@ -14,6 +14,7 @@ import { StatusIndicator } from "../status/StatusIndicator.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import { Disclosure } from "../ui/disclosure.js";
+import { PageHeader } from "../ui/page-header.js";
 
 interface DiagnosticsViewProps {
 	contexts: ContextListItem[];
@@ -131,17 +132,16 @@ function DiagnosticsView({
 	}
 
 	return (
-		<section aria-labelledby="diagnostics-heading" className="space-y-6">
-			<div>
-				<p className="text-sm text-muted-foreground">Application readiness</p>
-				<h2 id="diagnostics-heading" className="text-2xl font-semibold">
-					System Health
-				</h2>
-				<p className="mt-1 text-sm text-muted-foreground">
-					Review application-wide readiness, or open a context to check its
-					isolation, files, tools, bindings, and environment.
-				</p>
-			</div>
+		<section
+			aria-labelledby="diagnostics-heading"
+			className="page-content page-section-stack"
+		>
+			<PageHeader
+				id="diagnostics-heading"
+				eyebrow="Application readiness"
+				title="System Health"
+				description="Review application-wide readiness, or open a context to check its isolation, files, tools, bindings, and environment."
+			/>
 
 			<label
 				className="grid max-w-sm gap-2 text-sm font-medium"
@@ -150,7 +150,7 @@ function DiagnosticsView({
 				Context
 				<select
 					id="diagnostics-context-select"
-					className="h-10 border border-input bg-background px-3 text-sm text-foreground"
+					className="native-control w-full"
 					value={contextID}
 					onChange={(event) => setContextID(event.currentTarget.value)}
 				>

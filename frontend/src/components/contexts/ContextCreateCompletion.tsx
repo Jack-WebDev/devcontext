@@ -31,12 +31,10 @@ function ContextCreationProgress({
 			className="mx-auto max-w-xl space-y-6"
 		>
 			<div className="space-y-2">
-				<p className="text-sm font-medium text-muted-foreground">
-					Create a context
-				</p>
+				<p className="page-header-eyebrow">Create a context</p>
 				<h2
 					id="context-creation-progress-title"
-					className="text-2xl font-semibold"
+					className="text-launcher-title"
 				>
 					Setting up your context
 				</h2>
@@ -46,7 +44,7 @@ function ContextCreationProgress({
 			</div>
 			<ol className="space-y-3">
 				{steps.map((step) => (
-					<li key={step.id} className="rounded-lg border bg-card p-4">
+					<li key={step.id} className="rounded-xl bg-muted/35 p-4">
 						<p className="font-medium">
 							{step.label}{" "}
 							<span className="text-sm font-normal text-muted-foreground">
@@ -107,10 +105,8 @@ function ContextCreateSuccessScreen({
 			className="mx-auto max-w-xl space-y-6"
 		>
 			<div className="space-y-2">
-				<p className="text-sm font-medium text-muted-foreground">
-					Context ready
-				</p>
-				<h2 id="context-created-title" className="text-2xl font-semibold">
+				<p className="page-header-eyebrow">Context ready</p>
+				<h2 id="context-created-title" className="text-launcher-title">
 					{context.name} is ready
 				</h2>
 				<p className="text-sm text-muted-foreground">

@@ -13,6 +13,9 @@ import type {
 	ImportContextMetadataResult,
 } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
+import { Checkbox } from "../ui/checkbox.js";
+import { Skeleton } from "../ui/skeleton.js";
+import { Textarea } from "../ui/textarea.js";
 import {
 	Sheet,
 	SheetContent,
@@ -162,44 +165,54 @@ export function ContextDetailsDrawer({
 
 	return (
 		<Sheet open onOpenChange={(open) => !open && onClose()}>
-			<SheetContent>
-				<SheetHeader>
+			<SheetContent className="overflow-hidden">
+				<SheetHeader className="border-b border-border/60 bg-muted/20">
 					<SheetTitle>Context details</SheetTitle>
 					<SheetDescription>
 						Backend-owned context information.
 					</SheetDescription>
 				</SheetHeader>
-				<div className="space-y-3 px-8 pb-8">
+				<div className="flex-1 space-y-5 overflow-y-auto px-8 pb-8">
 					{!result ? (
-						<p>Loading context details...</p>
+						<div
+							className="space-y-3"
+							aria-label="Loading context details"
+							aria-busy="true"
+						>
+							<Skeleton className="h-4 w-1/3" />
+							<Skeleton className="h-4 w-2/3" />
+							<Skeleton className="h-24 w-full" />
+						</div>
 					) : !result.ok ? (
 						<p className="text-destructive">{result.error.message}</p>
 					) : (
 						<>
-							<Detail label="Name" value={result.data.context.name} />
-							<Detail label="Location" value={result.data.location} />
-							<Detail
-								label="Created"
-								value={new Date(result.data.createdAt).toLocaleString()}
-							/>
-							<Detail
-								label="Projects"
-								value={String(result.data.projectCount)}
-							/>
-							<Detail
-								label="Coding tool"
-								value={result.data.context.tool.name}
-							/>
-							<Detail
-								label="Providers"
-								value={
-									result.data.enabledProviders
-										.map((provider) => provider.name)
-										.join(", ") || "None"
-								}
-							/>
+							<div className="grid gap-4 rounded-xl bg-muted/35 p-4 sm:grid-cols-2">
+								<Detail label="Name" value={result.data.context.name} />
+								<Detail label="Location" value={result.data.location} />
+								<Detail
+									label="Created"
+									value={new Date(result.data.createdAt).toLocaleString()}
+								/>
+								<Detail
+									label="Projects"
+									value={String(result.data.projectCount)}
+								/>
+								<Detail
+									label="Coding tool"
+									value={result.data.context.tool.name}
+								/>
+								<Detail
+									label="Providers"
+									value={
+										result.data.enabledProviders
+											.map((provider) => provider.name)
+											.join(", ") || "None"
+									}
+								/>
+							</div>
 							<section
-								className="space-y-3 border-t border-border pt-4"
+								className="space-y-4 pt-2"
 								aria-labelledby="duplicate-context-heading"
 							>
 								<div>
@@ -238,7 +251,7 @@ export function ContextDetailsDrawer({
 								</Button>
 							</section>
 							<section
-								className="space-y-3 border-t border-border pt-4"
+								className="space-y-4 border-t border-border/60 pt-6"
 								aria-labelledby="context-transfer-heading"
 							>
 								<div>
@@ -267,9 +280,9 @@ export function ContextDetailsDrawer({
 								{exportedMetadata ? (
 									<label className="block text-sm">
 										Safe context metadata
-										<textarea
+										<Textarea
 											aria-label="Safe context metadata export"
-											className="mt-1 min-h-40 w-full border p-2 font-mono text-xs"
+											className="mt-2 min-h-40 font-mono text-xs"
 											value={exportedMetadata}
 											readOnly
 										/>
@@ -288,7 +301,9 @@ export function ContextDetailsDrawer({
 										<ContextMetadataImportReviewCard
 											exported={importedMetadata}
 											name={importName}
-											availableTools={result.data.context.availableTools.map((tool) => tool.id)}
+											availableTools={result.data.context.availableTools.map(
+												(tool) => tool.id,
+											)}
 											availableProviders={result.data.context.providers.map(
 												(provider) => provider.id,
 											)}
@@ -313,7 +328,12 @@ export function ContextDetailsDrawer({
 								) : null}
 								<Button
 									type="button"
-								disabled={importPending || !importedMetadata || !importName.trim() || nameConflict}
+									disabled={
+										importPending ||
+										!importedMetadata ||
+										!importName.trim() ||
+										nameConflict
+									}
 									onClick={() => void submitImport()}
 								>
 									{importPending ? "Importing..." : "Confirm import"}
@@ -344,7 +364,7 @@ function ContextMetadataImportReviewCard({
 	});
 	return (
 		<section
-			className="space-y-2 rounded-md border border-border p-3 text-sm"
+			className="space-y-2 rounded-xl bg-muted/35 p-4 text-sm"
 			aria-label="Import review"
 		>
 			<h4 className="font-medium">Review import</h4>
@@ -379,7 +399,10 @@ function ExportOptions({
 	value: ContextMetadataExportOptions;
 	onChange: (value: ContextMetadataExportOptions) => void;
 }) {
-	const options: Array<{ key: keyof ContextMetadataExportOptions; label: string }> = [
+	const options: Array<{
+		key: keyof ContextMetadataExportOptions;
+		label: string;
+	}> = [
 		{ key: "includeMetadata", label: "Context details" },
 		{ key: "includeProviderOptions", label: "Provider settings" },
 		{ key: "includeToolOptions", label: "Coding-tool settings" },
@@ -388,12 +411,14 @@ function ExportOptions({
 		<fieldset className="space-y-2 text-sm">
 			<legend className="font-medium">Include in export</legend>
 			{options.map((option) => (
-				<label key={option.key} className="flex items-center gap-2">
-					<input
-						type="checkbox"
+				<label
+					key={option.key}
+					className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-muted/50"
+				>
+					<Checkbox
 						checked={value[option.key]}
-						onChange={(event) =>
-							onChange({ ...value, [option.key]: event.target.checked })
+						onCheckedChange={(checked) =>
+							onChange({ ...value, [option.key]: checked })
 						}
 					/>
 					{option.label}
@@ -418,12 +443,19 @@ function ImportNameConflict({
 	onCancel: () => void;
 }) {
 	return (
-		<section className="space-y-3 rounded-md border border-border p-3" aria-label="Import name conflict">
+		<section
+			className="space-y-3 rounded-xl bg-destructive/5 p-4"
+			aria-label="Import name conflict"
+		>
 			<p className="text-sm">
 				A context named <strong>{name}</strong> already exists. Importing will
 				not replace it.
 			</p>
-			<ContextField label="New context name" value={name} onChange={onNameChange} />
+			<ContextField
+				label="New context name"
+				value={name}
+				onChange={onNameChange}
+			/>
 			<div className="flex gap-2">
 				<Button type="button" variant="outline" onClick={onImportCopy}>
 					Import as copy

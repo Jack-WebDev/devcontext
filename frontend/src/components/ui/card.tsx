@@ -42,15 +42,15 @@ function Card({
 function cardHierarchyClassName(hierarchy: CardHierarchy): string {
 	switch (hierarchy) {
 		case "primary":
-			return "border border-border/70 bg-card shadow-sm";
+			return "border border-border/60 bg-card shadow-sm";
 		case "inset":
-			return "border border-border bg-[var(--surface-subtle)] shadow-none";
+			return "border border-border/50 bg-[var(--surface-subtle)] shadow-none";
 		case "secondary":
-			return "border border-border bg-surface-muted shadow-none";
+			return "border border-border/50 bg-surface-muted shadow-none";
 		case "tertiary":
 			return "bg-transparent shadow-none";
 		case "selection":
-			return "border border-border bg-card shadow-sm transition-[border-color,box-shadow,background-color] duration-150 hover:border-foreground/20 data-[selected=true]:border-primary data-[selected=true]:ring-2 data-[selected=true]:ring-ring/40";
+			return "border border-border/60 bg-card shadow-sm transition-[border-color,box-shadow,background-color] duration-150 hover:border-foreground/20 hover:shadow-md data-[selected=true]:border-primary data-[selected=true]:ring-2 data-[selected=true]:ring-ring/30";
 	}
 }
 

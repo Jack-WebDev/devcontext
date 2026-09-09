@@ -31,7 +31,9 @@ function ContextCreateDevelopmentToolsScreen({
 	const [setupIntegrationID, setSetupIntegrationID] = useState<string>();
 	const selectedIDs = enabledIntegrationIds ?? localEnabledIDs;
 	const hasSelectedCodingTool = selectedIDs.some(
-		(id) => integrations.find((integration) => integration.id === id)?.category === "coding",
+		(id) =>
+			integrations.find((integration) => integration.id === id)?.category ===
+			"coding",
 	);
 	function updateEnabled(id: string, enabled: boolean) {
 		const integration = integrations.find((item) => item.id === id);
@@ -69,12 +71,10 @@ function ContextCreateDevelopmentToolsScreen({
 			className="mx-auto max-w-xl space-y-6"
 		>
 			<div className="space-y-2">
-				<p className="text-sm font-medium text-muted-foreground">
-					Create a context
-				</p>
+				<p className="page-header-eyebrow">Create a context</p>
 				<h2
 					id="context-development-tools-title"
-					className="text-2xl font-semibold"
+					className="text-launcher-title"
 				>
 					Development tools
 				</h2>
@@ -90,7 +90,11 @@ function ContextCreateDevelopmentToolsScreen({
 						Loading registered development tools...
 					</p>
 				) : null}
-				{error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+				{error ? (
+					<p role="alert" className="text-sm text-destructive">
+						{error}
+					</p>
+				) : null}
 				{developmentToolCategories.map((category) => {
 					const categoryIntegrations = integrations.filter(
 						(integration) => integration.category === category.id,
@@ -225,13 +229,8 @@ function DevelopmentToolSetupScreen({
 				Context / Development tools / {integration.name}
 			</nav>
 			<div className="space-y-2">
-				<p className="text-sm font-medium text-muted-foreground">
-					Development tool setup
-				</p>
-				<h2
-					id="development-tool-setup-title"
-					className="text-2xl font-semibold"
-				>
+				<p className="page-header-eyebrow">Development tool setup</p>
+				<h2 id="development-tool-setup-title" className="text-launcher-title">
 					Prepare {integration.name}
 				</h2>
 				<p className="text-sm text-muted-foreground">
@@ -243,8 +242,8 @@ function DevelopmentToolSetupScreen({
 			</div>
 			<p className="rounded-lg border bg-muted/30 p-4 text-sm">
 				This integration will remain enabled for this context. After the context
-				is created, open its project to sign in, then use Recheck setup to refresh
-				its local readiness.
+				is created, open its project to sign in, then use Recheck setup to
+				refresh its local readiness.
 			</p>
 			<details className="rounded-lg border p-4 text-sm">
 				<summary className="cursor-pointer font-medium">

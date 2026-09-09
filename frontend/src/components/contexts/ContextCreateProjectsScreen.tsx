@@ -222,10 +222,8 @@ function ContextCreateProjectsScreen({
 			className="mx-auto max-w-xl space-y-6"
 		>
 			<div className="space-y-2">
-				<p className="text-sm font-medium text-muted-foreground">
-					Create a context
-				</p>
-				<h2 id="context-projects-title" className="text-2xl font-semibold">
+				<p className="page-header-eyebrow">Create a context</p>
+				<h2 id="context-projects-title" className="text-launcher-title">
 					Which projects normally belong to this context?
 				</h2>
 				<p className="text-sm text-muted-foreground">

@@ -51,7 +51,8 @@ function ProjectContextChangeDialog({
 						Move project to a context
 					</h3>
 					<p className="mt-1 text-sm text-muted-foreground">
-						Dev Context will remember the selected context for {project.project.name}.
+						Dev Context will remember the selected context for{" "}
+						{project.project.name}.
 					</p>
 				</div>
 
@@ -69,8 +70,8 @@ function ProjectContextChangeDialog({
 				>
 					Move to context
 					<select
+						className="native-control w-full"
 						id="project-context-select"
-						className="h-10 border border-input bg-background px-3 text-sm text-foreground"
 						disabled={pending || contexts.length === 0}
 						value={contextID}
 						onChange={(event) => setContextID(event.currentTarget.value)}

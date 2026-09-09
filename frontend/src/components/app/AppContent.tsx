@@ -38,9 +38,13 @@ export function HistoryContent({
 }) {
 	if (history.status === "loading")
 		return <CollectionSkeleton label="Loading history" />;
-	if (history.status === "error")
-		return <GuiErrorNotice error={history.error} />;
-	return <HistoryView entries={history.data.entries} onOpenProjects={onOpenProjects} />;
+	if (history.status === "error") return <ContentError error={history.error} />;
+	return (
+		<HistoryView
+			entries={history.data.entries}
+			onOpenProjects={onOpenProjects}
+		/>
+	);
 }
 
 export function RunningContent({
@@ -50,15 +54,26 @@ export function RunningContent({
 	onLaunchProject,
 }: {
 	running: LoadState<RunningEnvironmentsState>;
-	onReveal: (environment: RunningEnvironmentsState["environments"][number], targetId?: string) => Promise<WorkspaceRevealResult | undefined>;
-	onStop: (environment: RunningEnvironmentsState["environments"][number]) => void;
+	onReveal: (
+		environment: RunningEnvironmentsState["environments"][number],
+		targetId?: string,
+	) => Promise<WorkspaceRevealResult | undefined>;
+	onStop: (
+		environment: RunningEnvironmentsState["environments"][number],
+	) => void;
 	onLaunchProject?: () => void;
 }) {
 	if (running.status === "loading")
 		return <CollectionSkeleton label="Loading workspaces" />;
-	if (running.status === "error")
-		return <GuiErrorNotice error={running.error} />;
-	return <RunningView environments={running.data.environments} onReveal={onReveal} onStop={onStop} onLaunchProject={onLaunchProject} />;
+	if (running.status === "error") return <ContentError error={running.error} />;
+	return (
+		<RunningView
+			environments={running.data.environments}
+			onReveal={onReveal}
+			onStop={onStop}
+			onLaunchProject={onLaunchProject}
+		/>
+	);
 }
 
 export function ContextsContent({
@@ -75,7 +90,7 @@ export function ContextsContent({
 	if (contexts.status === "loading")
 		return <CollectionSkeleton label="Loading contexts" />;
 	if (contexts.status === "error")
-		return <GuiErrorNotice error={contexts.error} />;
+		return <ContentError error={contexts.error} />;
 	return (
 		<ContextsView
 			contexts={contexts.data}
@@ -108,7 +123,7 @@ export function ProjectsContent({
 	if (projects.status === "loading")
 		return <CollectionSkeleton label="Loading projects" />;
 	if (projects.status === "error")
-		return <GuiErrorNotice error={projects.error} />;
+		return <ContentError error={projects.error} />;
 	return (
 		<ProjectsView
 			projects={projects.data.projects}
@@ -143,11 +158,11 @@ export function HomeDashboardContent({
 	onRecentProjectSelect: (project: RecentProjectState) => void;
 }) {
 	if (dashboard.status === "loading")
-		return <LoadingMessage>Loading Home dashboard...</LoadingMessage>;
+		return <CollectionSkeleton label="Loading Home dashboard" rows={2} />;
 	if (dashboard.status === "error")
-		return <GuiErrorNotice error={dashboard.error} />;
+		return <ContentError error={dashboard.error} />;
 	if (contexts.status === "loading")
-		return <LoadingMessage>Loading contexts...</LoadingMessage>;
+		return <CollectionSkeleton label="Loading contexts" rows={2} />;
 	const projects =
 		recentProjects.status === "loaded" ? recentProjects.data : [];
 	return (
@@ -228,7 +243,28 @@ export function PlaceholderScreen({ route }: { route: AppRoute }) {
 }
 
 function LoadingMessage({ children }: { children: string }) {
-	return <p className="text-sm text-muted-foreground">{children}</p>;
+	return (
+		<p
+			className="flex items-center gap-2 text-sm text-muted-foreground"
+			aria-live="polite"
+		>
+			<span
+				className="size-2 animate-pulse rounded-full bg-primary"
+				aria-hidden="true"
+			/>
+			{children}
+		</p>
+	);
+}
+
+function ContentError({ error }: { error: DisplayError }) {
+	return (
+		<div className="page-content">
+			<div className="page-reading-column">
+				<GuiErrorNotice error={error} />
+			</div>
+		</div>
+	);
 }
 
 function notifyLaunch(result: {

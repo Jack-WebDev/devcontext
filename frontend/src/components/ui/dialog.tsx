@@ -31,7 +31,7 @@ function DialogOverlay({
 		<DialogPrimitive.Backdrop
 			data-slot="dialog-overlay"
 			className={cn(
-				"overlay-backdrop fixed inset-0 isolate z-50 bg-black/20 supports-backdrop-filter:backdrop-blur-sm motion-reduce:transition-none",
+				"overlay-backdrop fixed inset-0 isolate z-50 bg-black/25 supports-backdrop-filter:backdrop-blur-md motion-reduce:transition-none",
 				className,
 			)}
 			{...props}
@@ -54,7 +54,7 @@ function DialogContent({
 			<DialogPrimitive.Popup
 				data-slot="dialog-content"
 				className={cn(
-					"overlay-surface fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-2xl border border-border/70 bg-popover p-7 text-sm text-popover-foreground shadow-xl outline-none data-starting-style:scale-[0.98] data-ending-style:scale-[0.98] sm:max-w-lg motion-reduce:transition-none",
+					"overlay-surface fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-2xl border border-border/60 bg-popover/98 p-7 text-sm text-popover-foreground shadow-[var(--shadow-overlay)] outline-none data-starting-style:scale-[0.975] data-ending-style:scale-[0.975] sm:max-w-lg motion-reduce:transition-none",
 					className,
 				)}
 				{...props}
@@ -67,7 +67,7 @@ function DialogContent({
 						render={
 							<Button
 								variant="ghost"
-								className="absolute top-5 right-5 bg-secondary"
+								className="absolute top-5 right-5 text-muted-foreground hover:text-foreground"
 								size="icon-sm"
 							/>
 						}

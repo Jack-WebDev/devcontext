@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Layers3 } from "lucide-react";
 import {
 	ContextsContent,
 	HistoryContent,
@@ -106,15 +107,32 @@ function App() {
 
 	if (applicationModeError !== undefined) {
 		return (
-			<main className="p-6">
-				<GuiErrorNotice error={applicationModeError} />
+			<main className="flex min-h-screen items-center justify-center bg-background p-8">
+				<div className="w-full max-w-xl">
+					<GuiErrorNotice error={applicationModeError} />
+				</div>
 			</main>
 		);
 	}
 	if (applicationMode === undefined) {
 		return (
-			<main className="flex min-h-screen items-center justify-center p-6">
-				<p className="text-sm text-muted-foreground">Opening Dev Context...</p>
+			<main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-6">
+				<span
+					className="grid size-12 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-lg"
+					aria-hidden="true"
+				>
+					<Layers3 className="size-6" />
+				</span>
+				<p
+					className="flex items-center gap-2 text-sm font-medium text-muted-foreground"
+					aria-live="polite"
+				>
+					<span
+						className="size-2 animate-pulse rounded-full bg-primary"
+						aria-hidden="true"
+					/>
+					Opening Dev Context…
+				</p>
 			</main>
 		);
 	}
@@ -161,7 +179,8 @@ function ManagementApp() {
 	const [pendingPreflightReview, setPendingPreflightReview] =
 		useState<PendingPreflightReview>();
 	const [preflightReviewPending, setPreflightReviewPending] = useState(false);
-	const [preflightReviewError, setPreflightReviewError] = useState<DisplayError>();
+	const [preflightReviewError, setPreflightReviewError] =
+		useState<DisplayError>();
 	const [contextDetailRoute, setContextDetailRoute] = useState(() =>
 		contextDetailRouteFromHash(window.location.hash),
 	);
@@ -203,9 +222,8 @@ function ManagementApp() {
 	const [projectBindingRemovalError, setProjectBindingRemovalError] =
 		useState<DisplayError>();
 	const [projectToForget, setProjectToForget] = useState<ProjectListItem>();
-	const [workspaceToStop, setWorkspaceToStop] = useState<
-		RunningEnvironmentsState["environments"][number]
-	>();
+	const [workspaceToStop, setWorkspaceToStop] =
+		useState<RunningEnvironmentsState["environments"][number]>();
 	const [workspaceStopError, setWorkspaceStopError] = useState<DisplayError>();
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 	const [commandPaletteLaunchPending, setCommandPaletteLaunchPending] =
@@ -613,7 +631,12 @@ function ManagementApp() {
 			return;
 		}
 		setProjectToForget(undefined);
-		await Promise.all([refreshProjects(), refreshHomeDashboard(), refreshRecentProjects(), refreshContexts()]);
+		await Promise.all([
+			refreshProjects(),
+			refreshHomeDashboard(),
+			refreshRecentProjects(),
+			refreshContexts(),
+		]);
 		handleNavigate("projects");
 	}
 
@@ -621,7 +644,9 @@ function ManagementApp() {
 		if (workspaceToStop === undefined) return;
 		const workspace = workspaceToStop;
 		setWorkspaceStopError(undefined);
-		const result = await devContextApi.stopWorkspace({ workspaceId: workspace.id });
+		const result = await devContextApi.stopWorkspace({
+			workspaceId: workspace.id,
+		});
 		if (result.ok) {
 			setWorkspaceToStop(undefined);
 			await refreshRunningEnvironments();
@@ -632,7 +657,12 @@ function ManagementApp() {
 
 	async function handleProjectLocate(project: ProjectListItem) {
 		const selected = await devContextApi.chooseProjectDirectory();
-		if (!selected.ok || selected.data === undefined || selected.data === project.project.path) return;
+		if (
+			!selected.ok ||
+			selected.data === undefined ||
+			selected.data === project.project.path
+		)
+			return;
 		if (project.contextId === undefined) {
 			setManagementLaunchProjectPath(selected.data);
 			return;
@@ -646,13 +676,20 @@ function ManagementApp() {
 			setProjectErrorPath(project.project.path);
 			return;
 		}
-		const forgotten = await devContextApi.forgetProject({ projectPath: project.project.path });
+		const forgotten = await devContextApi.forgetProject({
+			projectPath: project.project.path,
+		});
 		if (!forgotten.ok) {
 			setProjectLaunchError(forgotten.error);
 			setProjectErrorPath(project.project.path);
 			return;
 		}
-		await Promise.all([refreshProjects(), refreshHomeDashboard(), refreshRecentProjects(), refreshContexts()]);
+		await Promise.all([
+			refreshProjects(),
+			refreshHomeDashboard(),
+			refreshRecentProjects(),
+			refreshContexts(),
+		]);
 		window.location.hash = projectDetailHash({ projectPath: selected.data });
 	}
 
@@ -692,7 +729,9 @@ function ManagementApp() {
 			...pendingPreflightReview.request,
 			confirmPreflightWarnings: true,
 		};
-		if (deferRunningEnvironmentConflict(pendingPreflightReview.preflight, request)) {
+		if (
+			deferRunningEnvironmentConflict(pendingPreflightReview.preflight, request)
+		) {
 			setPendingPreflightReview(undefined);
 			return;
 		}
@@ -766,6 +805,7 @@ function ManagementApp() {
 		<AppShell
 			activeRoute={activeRoute}
 			onNavigate={handleNavigate}
+			onOpenCommandPalette={() => setCommandPaletteOpen(true)}
 			isFirstRun={isFirstRun}
 			currentProject={
 				launchState.status === "loaded" ? launchState.data.project : undefined
@@ -916,9 +956,13 @@ function ManagementApp() {
 				<>
 					{projectDetailRoute ? (
 						projects.status === "loading" ? (
-							<p className="text-sm text-muted-foreground">Loading project...</p>
+							<div className="page-content text-sm text-muted-foreground">
+								Loading project…
+							</div>
 						) : projects.status === "error" ? (
-							<GuiErrorNotice error={projects.error} />
+							<div className="page-content">
+								<GuiErrorNotice error={projects.error} />
+							</div>
 						) : (
 							<ProjectDetailView
 								project={projects.data.projects.find(
@@ -992,12 +1036,22 @@ function ManagementApp() {
 					}
 				/>
 			) : activeRoute === "history" ? (
-				<HistoryContent history={history} onOpenProjects={() => handleNavigate("projects")} />
+				<HistoryContent
+					history={history}
+					onOpenProjects={() => handleNavigate("projects")}
+				/>
 			) : activeRoute === "running" ? (
 				<RunningContent
 					running={running}
 					onLaunchProject={() => handleNavigate("projects")}
-					onReveal={async (workspace, targetId) => { const result = await devContextApi.revealWorkspace({ workspaceId: workspace.id, targetId }); if (result.ok) return result.data; return undefined; }}
+					onReveal={async (workspace, targetId) => {
+						const result = await devContextApi.revealWorkspace({
+							workspaceId: workspace.id,
+							targetId,
+						});
+						if (result.ok) return result.data;
+						return undefined;
+					}}
 					onStop={(workspace) => {
 						setWorkspaceStopError(undefined);
 						setWorkspaceToStop(workspace);
@@ -1019,16 +1073,38 @@ function ManagementApp() {
 				) : settings.status === "error" ? (
 					<GuiErrorNotice error={settings.error} />
 				) : (
-					<p className="text-sm text-muted-foreground">Loading settings...</p>
+					<div className="page-content text-sm text-muted-foreground">
+						Loading settings…
+					</div>
 				)
 			) : (
 				<PlaceholderScreen route={activeRoute} />
 			)}
 			{projectToForget ? (
-				<DestructiveConfirmationDialog title="Forget project?" objectName={projectToForget.project.name} impact="Dev Context will remove this project's remembered context, recent launch, and activity records." nonDeletionAssurance="Project files and folders are never deleted." confirmLabel="Forget project" onCancel={() => setProjectToForget(undefined)} onConfirm={() => void confirmProjectForget()} />
+				<DestructiveConfirmationDialog
+					title="Forget project?"
+					objectName={projectToForget.project.name}
+					impact="Dev Context will remove this project's remembered context, recent launch, and activity records."
+					nonDeletionAssurance="Project files and folders are never deleted."
+					confirmLabel="Forget project"
+					onCancel={() => setProjectToForget(undefined)}
+					onConfirm={() => void confirmProjectForget()}
+				/>
 			) : null}
 			{workspaceToStop ? (
-				<DestructiveConfirmationDialog title="Stop workspace?" objectName={workspaceToStop.project.name} impact="The coding-tool workspace will be stopped. Unsaved work in the coding tool may be lost." nonDeletionAssurance="Project files and folders are never deleted." confirmLabel="Stop workspace" error={workspaceStopError} onCancel={() => { setWorkspaceToStop(undefined); setWorkspaceStopError(undefined); }} onConfirm={() => void confirmWorkspaceStop()} />
+				<DestructiveConfirmationDialog
+					title="Stop workspace?"
+					objectName={workspaceToStop.project.name}
+					impact="The coding-tool workspace will be stopped. Unsaved work in the coding tool may be lost."
+					nonDeletionAssurance="Project files and folders are never deleted."
+					confirmLabel="Stop workspace"
+					error={workspaceStopError}
+					onCancel={() => {
+						setWorkspaceToStop(undefined);
+						setWorkspaceStopError(undefined);
+					}}
+					onConfirm={() => void confirmWorkspaceStop()}
+				/>
 			) : null}
 			{pendingPreflightReview ? (
 				<PreflightReviewDialog

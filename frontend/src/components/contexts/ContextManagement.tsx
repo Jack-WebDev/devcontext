@@ -83,9 +83,8 @@ export function CreateContextDialog({
 	const [steps, setSteps] = useState(initialSteps);
 	const [error, setError] = useState<string>();
 	const [created, setCreated] = useState<ContextState>();
-	const [catalogIntegrations, setCatalogIntegrations] = useState<
-		DevelopmentToolIntegration[]
-	>();
+	const [catalogIntegrations, setCatalogIntegrations] =
+		useState<DevelopmentToolIntegration[]>();
 	const [catalogLoading, setCatalogLoading] = useState(
 		loadCreationOptions !== undefined,
 	);
@@ -195,14 +194,14 @@ export function CreateContextDialog({
 	}
 	return (
 		<Sheet open onOpenChange={(open) => !open && onClose()}>
-			<SheetContent>
-				<SheetHeader>
+			<SheetContent className="max-w-[38rem] overflow-hidden">
+				<SheetHeader className="border-b border-border/60 bg-muted/20">
 					<SheetTitle>New context</SheetTitle>
 					<SheetDescription>
 						Create an isolated development identity.
 					</SheetDescription>
 				</SheetHeader>
-				<div className="max-h-[calc(100vh-10rem)] overflow-y-auto px-8 pb-8">
+				<div className="flex-1 overflow-y-auto px-8 py-7">
 					{flow.status === "identity" ? (
 						<ContextCreateIdentityScreen
 							draft={flow.draft}

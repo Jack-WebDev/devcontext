@@ -51,9 +51,9 @@ function ContextsView({
 			aria-labelledby="contexts-heading"
 			className="page-content page-section-stack"
 		>
-			<div className="flex items-start justify-between gap-4">
-				<div>
-					<p className="text-body text-secondary">Development identities</p>
+			<header className="page-header">
+				<div className="page-header-copy">
+					<p className="page-header-eyebrow">Development identities</p>
 					<h2 id="contexts-heading" className="text-page-title">
 						Contexts
 					</h2>
@@ -61,7 +61,7 @@ function ContextsView({
 				<Button type="button" onClick={onNew}>
 					New context
 				</Button>
-			</div>
+			</header>
 
 			{contexts.length === 0 ? (
 				<EmptyState
@@ -102,8 +102,8 @@ function ContextListCard({
 	return (
 		<Card
 			as="article"
-			hierarchy="secondary"
-			className="py-0"
+			hierarchy="primary"
+			className="py-0 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md"
 			aria-labelledby={`context-${context.id}-heading`}
 		>
 			<CardContent className="inset-group space-y-5">
@@ -136,7 +136,7 @@ function ContextListCard({
 					) : null}
 				</div>
 
-				<div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-border py-3">
+				<div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl bg-muted/35 px-4 py-3">
 					<div>
 						<p className="text-label text-muted-foreground">Health</p>
 						<StatusIndicator status={health.status}>
@@ -159,7 +159,7 @@ function ContextListCard({
 				{onSelect ? (
 					<Button
 						type="button"
-						variant="outline"
+						variant="ghost"
 						size="sm"
 						onClick={() => onSelect(context.id)}
 					>
@@ -193,9 +193,6 @@ function ContextActionsMenu({
 				<EllipsisIcon />
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end">
-				<DropdownMenuItem onClick={() => onAction("open")}>
-					Open
-				</DropdownMenuItem>
 				<DropdownMenuItem onClick={() => onAction("edit")}>
 					Edit
 				</DropdownMenuItem>

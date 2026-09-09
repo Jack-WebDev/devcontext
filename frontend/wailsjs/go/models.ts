@@ -579,3 +579,4 @@ export namespace wailsapp {
 	}
 
 }
+

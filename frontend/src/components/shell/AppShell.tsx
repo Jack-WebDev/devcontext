@@ -1,4 +1,5 @@
 import {
+	Command,
 	CirclePlay,
 	Clock3,
 	FolderKanban,
@@ -10,7 +11,7 @@ import {
 import type { ReactNode } from "react";
 
 import type { ProjectState } from "../../lib/devctx-api";
-import { type AppRoute, appRoutes } from "./routes.js";
+import { type AppRoute, appRouteDefinition, appRoutes } from "./routes.js";
 
 interface AppShellProps {
 	activeRoute: AppRoute;
@@ -18,6 +19,7 @@ interface AppShellProps {
 	isFirstRun?: boolean;
 	currentProject?: ProjectState;
 	statusBar?: ReactNode;
+	onOpenCommandPalette?: () => void;
 	children: ReactNode;
 }
 
@@ -27,6 +29,7 @@ function AppShell({
 	isFirstRun = false,
 	currentProject,
 	statusBar,
+	onOpenCommandPalette,
 	children,
 }: AppShellProps) {
 	return (
@@ -35,9 +38,9 @@ function AppShell({
 			data-app-shell
 		>
 			<div className="app-shell-grid grid min-h-0 overflow-hidden">
-				<aside className="app-sidebar flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-					<div className="px-7 pt-9 pb-8">
-						<h1 className="flex items-center gap-3 text-[15px] font-bold tracking-[-0.025em]">
+				<aside className="app-sidebar flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border/80 bg-sidebar text-sidebar-foreground">
+					<div className="px-6 pt-7 pb-7">
+						<h1 className="flex items-center gap-3 text-[15px] font-bold tracking-[-0.025em] text-sidebar-foreground">
 							<span className="grid size-8 place-items-center rounded-[10px] bg-primary text-primary-foreground shadow-sm">
 								<Layers3 className="size-5" />
 							</span>
@@ -45,16 +48,19 @@ function AppShell({
 						</h1>
 					</div>
 					<nav
-						className="flex flex-col gap-px px-4"
+						className="flex flex-col gap-1 px-3"
 						aria-label="Primary navigation"
 					>
+						<p className="px-3 pb-1.5 text-[10px] font-bold tracking-[0.08em] text-sidebar-foreground/45 uppercase">
+							Workspace
+						</p>
 						{appRoutes
 							.filter((route) => route.id !== "settings")
 							.map((route) => (
 								<button
 									key={route.id}
 									type="button"
-									className="flex h-[38px] min-w-0 items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-sidebar-foreground/65 transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-sidebar-ring focus-visible:outline-offset-2 data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground motion-reduce:transition-none"
+									className="flex h-[36px] min-w-0 items-center gap-3 rounded-lg px-3 text-left text-[13px] font-medium text-sidebar-foreground/70 transition-colors duration-150 hover:bg-sidebar-accent/75 hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-sidebar-ring focus-visible:outline-offset-2 data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-sidebar-accent-foreground motion-reduce:transition-none"
 									data-active={activeRoute === route.id}
 									aria-current={activeRoute === route.id ? "page" : undefined}
 									onClick={() => onNavigate(route.id)}
@@ -64,10 +70,10 @@ function AppShell({
 								</button>
 							))}
 					</nav>
-					<div className="mx-5 mt-5 border-t border-sidebar-border pt-4">
+					<div className="mx-4 mt-5 border-t border-sidebar-border/80 pt-4">
 						<button
 							type="button"
-							className="flex h-[38px] w-full items-center gap-3 rounded-[7px] px-3.5 text-left text-sm font-medium text-sidebar-foreground/65 transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-sidebar-ring focus-visible:outline-offset-2 data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground motion-reduce:transition-none"
+							className="flex h-[36px] w-full items-center gap-3 rounded-lg px-3 text-left text-[13px] font-medium text-sidebar-foreground/70 transition-colors duration-150 hover:bg-sidebar-accent/75 hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-sidebar-ring focus-visible:outline-offset-2 data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-sidebar-accent-foreground motion-reduce:transition-none"
 							data-active={activeRoute === "settings"}
 							onClick={() => onNavigate("settings")}
 						>
@@ -79,38 +85,30 @@ function AppShell({
 					{isFirstRun || !currentProject ? null : (
 						<CurrentProjectSummary project={currentProject} />
 					)}
-					{isFirstRun ? null : <SidebarShortcuts />}
 				</aside>
 				<main className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto">
+					<div className="sticky top-0 z-10">
+						<div className="app-toolbar">
+							<span className="app-toolbar-title">
+								{appRouteDefinition(activeRoute).label}
+							</span>
+							{onOpenCommandPalette ? (
+								<button
+									type="button"
+									className="app-toolbar-command"
+									onClick={onOpenCommandPalette}
+									aria-label="Open command palette"
+								>
+									<Command className="size-3.5" />
+									Quick switch <kbd>⌘ K</kbd>
+								</button>
+							) : null}
+						</div>
+					</div>
 					<div className="app-page-container">{children}</div>
 				</main>
 			</div>
 			{statusBar}
-		</div>
-	);
-}
-
-function SidebarShortcuts() {
-	return (
-		<div className="mt-auto px-3 pb-5">
-			<section
-				className="rounded-lg border border-sidebar-border bg-sidebar-accent p-3"
-				aria-label="Keyboard shortcuts"
-			>
-				<p className="mb-2.5 text-[11px] font-semibold">Keyboard shortcuts</p>
-				<Shortcut label="Quick Switch" keycap="⌘ K" />
-			</section>
-		</div>
-	);
-}
-
-function Shortcut({ label, keycap }: { label: string; keycap: string }) {
-	return (
-		<div className="flex h-[29px] items-center justify-between text-[11px] text-sidebar-foreground/65">
-			<span>{label}</span>
-			<kbd className="min-w-9 rounded border border-sidebar-border bg-sidebar px-1.5 py-0.5 text-center text-[10px] text-foreground">
-				{keycap}
-			</kbd>
 		</div>
 	);
 }
@@ -138,18 +136,24 @@ function NavIcon({ route }: { route: AppRoute }) {
 function CurrentProjectSummary({ project }: { project: ProjectState }) {
 	return (
 		<section
-			className="min-w-0 border-t border-sidebar-border px-5 py-4"
+			className="min-w-0 border-t border-sidebar-border/80 px-5 py-4"
 			aria-labelledby="shell-current-project-title"
 		>
 			<p
 				id="shell-current-project-title"
-				className="text-xs font-semibold tracking-wide text-sidebar-foreground/70 uppercase"
+				className="text-[10px] font-semibold tracking-[0.08em] text-sidebar-foreground/55 uppercase"
 			>
 				Current project
 			</p>
-			<p className="mt-1 truncate text-sm font-medium" title={project.name}>
-				{project.name}
-			</p>
+			<div className="mt-2 flex items-center gap-2">
+				<span
+					className="size-2 shrink-0 rounded-full bg-success shadow-[0_0_0_3px_color-mix(in_srgb,var(--success)_14%,transparent)]"
+					aria-hidden="true"
+				/>
+				<p className="truncate text-sm font-semibold" title={project.name}>
+					{project.name}
+				</p>
+			</div>
 			<p
 				className="mt-1 truncate font-mono text-xs text-sidebar-foreground/70"
 				title={project.path}
