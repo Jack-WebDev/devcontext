@@ -368,15 +368,15 @@ test("launcher state keeps progress and dialogs mutually exclusive", () => {
 test("notification policy permits only meaningful provider, tool, and update events", () => {
 	assert.deepEqual(
 		notificationPresentation({
-			kind: "provider_verified",
+			kind: "provider_identity_observed",
 			providerName: "Codex",
 			contextName: "Personal",
 		}),
 		{
-			kind: "provider_verified",
-			title: "Codex verified",
-			description: "Codex is ready in Personal.",
-			severity: "success",
+			kind: "provider_identity_observed",
+			title: "Codex identity observed",
+			description: "Codex account metadata was found locally in Personal.",
+			severity: "info",
 		},
 	);
 	assert.deepEqual(
@@ -402,9 +402,9 @@ test("notification policy permits only meaningful provider, tool, and update eve
 		}),
 		{
 			kind: "tool_launched",
-			title: "Cursor launched",
-			description: "API opened in Company.",
-			severity: "success",
+			title: "Cursor started",
+			description: "Started for API in Company.",
+			severity: "info",
 		},
 	);
 	assert.deepEqual(
@@ -703,6 +703,31 @@ test("running environments show immutable launch context and tool action entry p
 	assert.notEqual(formatRunningTime("invalid"), "Invalid Date");
 });
 
+test("unknown workspaces disclose their lifecycle and disable unsupported actions", () => {
+	const environments = [{
+		id: "environment-unknown",
+		project: { name: "api", path: "/work/api" },
+		context: { id: "company", name: "Company" },
+		tool: { id: "vscode", name: "VS Code" },
+		startedAt: "2026-08-28T10:30:00Z",
+		process: { state: "unknown" },
+		session: { state: "unknown" },
+		launch: { source: "gui", resolutionSource: "explicit" },
+		lifecycle: { state: "unknown", focusable: false, revealable: false, stoppable: false },
+	}];
+	const html = renderToStaticMarkup(createElement(RunningView, {
+		environments,
+		onReveal: async () => ({ revealed: false, targets: [] }),
+		onStop: () => {},
+	}));
+
+	assert.ok(html.includes("Lifecycle unknown"));
+	assert.ok(html.includes("could not verify whether this workspace is still open"));
+	assert.ok(html.includes("cannot be revealed"));
+	assert.ok(html.includes("cannot be stopped"));
+	assert.match(html, /disabled=""/);
+});
+
 test("workspaces present concurrent contexts as independent sessions", () => {
 	const environments = ["Personal", "Company"].map((name, index) => ({
 		id: `workspace-${index}`,
@@ -931,7 +956,7 @@ test("session assignment supports dynamic contexts and leaves Not sure unassigne
 	assert.match(html, /Use with Client work/);
 	assert.match(html, /Not sure/);
 	assert.match(html, /Not sure — unassigned/);
-	assert.match(html, /could not be verified, so it cannot be assigned/);
+	assert.match(html, /has no usable metadata, so it cannot be assigned/);
 });
 
 test("first-run welcome shows pending and error states", () => {
@@ -1198,11 +1223,11 @@ test("recommendation labels only reflect backend binding, verification, and conf
 		reasons: ["api is bound to Company."],
 	});
 
-	const verified = launchStateFixture({ contexts: [context] });
-	assert.deepEqual(contextRecommendation(verified, context), {
-		category: "verified",
-		label: "Verified",
-		detail: "Dev Context verified the required launch checks.",
+	const checked = launchStateFixture({ contexts: [context] });
+	assert.deepEqual(contextRecommendation(checked, context), {
+		category: "checked",
+		label: "Checks passed",
+		detail: "Dev Context completed the required launch checks.",
 		reasons: ["Required launch checks are ready."],
 	});
 
@@ -1770,7 +1795,7 @@ test("Contexts screen lists backend-owned identity summaries and reserves creati
 				id: "provider",
 				name: "Provider",
 				enabled: true,
-				state: "ready",
+				state: "local_state",
 				identity: { status: "none", fields: [] },
 			},
 		],
@@ -1949,7 +1974,7 @@ test("context card renders as a selectable control when wired", () => {
 
 test("context card renders enabled provider status variants with accessible names", () => {
 	const context = contextFixture("personal", "Personal", [
-		providerFixture("claude-ready", "Claude", true, "ready"),
+		providerFixture("claude-local-state", "Claude", true, "local_state"),
 		providerFixture(
 			"codex-not-configured",
 			"Codex",
@@ -1971,11 +1996,11 @@ test("context card renders enabled provider status variants with accessible name
 			"unavailable",
 			"Codex context directory could not be inspected",
 		),
-		providerFixture("disabled", "Disabled Provider", false, "ready"),
+		providerFixture("disabled", "Disabled Provider", false, "local_state"),
 	]);
 	const html = renderToStaticMarkup(ContextCard({ context }));
 
-	assert.match(html, /Claude local status: Ready/);
+	assert.match(html, /Claude local status: Local state found/);
 	assert.match(html, /Codex local status: Not configured/);
 	assert.match(html, /Claude local status: Directory missing/);
 	assert.match(html, /Codex local status: Unavailable/);
@@ -1986,14 +2011,14 @@ test("context card renders enabled provider status variants with accessible name
 test("context card renders only backend-provided provider identity information", () => {
 	const context = contextFixture("personal", "Personal", [
 		{
-			...providerFixture("verified", "Verified Provider", true, "ready"),
+			...providerFixture("observed", "Observed Provider", true, "local_state"),
 			identity: {
-				status: "verified",
+				status: "observed",
 				fields: [{ label: "Email", value: "developer@example.com" }],
 			},
 		},
 		{
-			...providerFixture("unavailable", "Unavailable Provider", true, "ready"),
+			...providerFixture("unavailable", "Unavailable Provider", true, "local_state"),
 			identity: { status: "unavailable", fields: [] },
 		},
 	]);
@@ -2013,10 +2038,10 @@ test("context card renders generic setup guidance for an unconfigured provider",
 			"not_configured",
 			"Codex isolated provider state was not found",
 		),
-		providerFixture("claude", "Claude", true, "ready"),
+		providerFixture("claude", "Claude", true, "local_state"),
 	]);
 	const company = contextFixture("company", "Company", [
-		providerFixture("codex", "Codex", true, "ready"),
+		providerFixture("codex", "Codex", true, "local_state"),
 		{
 			...providerFixture("internal", "Internal Tool", true, "not_configured"),
 			actionHint: "Connect Internal Tool to Company.",
@@ -2059,7 +2084,7 @@ test("context card offers the backend-supplied provider setup action", () => {
 test("context card renders the backend-supplied provider sign-in waiting state", () => {
 	const context = contextFixture("company", "Company", [
 		{
-			...providerFixture("future", "Future Provider", true, "ready"),
+			...providerFixture("future", "Future Provider", true, "local_state"),
 			setupAction: {
 				state: "waiting_for_sign_in",
 				label: "Waiting for sign-in",
@@ -2075,31 +2100,27 @@ test("context card renders the backend-supplied provider sign-in waiting state",
 	assert.doesNotMatch(html, /Open and configure/);
 });
 
-test("context card shows connected provider identity only after backend verification", () => {
+test("context card shows locally observed provider identity without claiming authentication", () => {
 	const context = contextFixture("personal", "Personal", [
 		{
-			...providerFixture("future", "Future Provider", true, "ready"),
+			...providerFixture("future", "Future Provider", true, "local_state"),
 			identity: {
-				status: "verified",
+				status: "observed",
 				fields: [{ label: "Workspace", value: "Example" }],
 			},
 			setupAction: {
-				state: "verified",
-				label: "Verified",
+				state: "identity_observed",
+				label: "Identity observed",
 				message:
-					"Future Provider account identity is verified for this context.",
+					"Future Provider account metadata was observed in this context's local storage.",
 			},
 		},
 	]);
 	const html = renderToStaticMarkup(ContextCard({ context }));
 
 	assert.match(html, /role="status"/);
-	assert.ok(html.includes("Verified"));
-	assert.ok(
-		html.includes(
-			"Future Provider account identity is verified for this context.",
-		),
-	);
+	assert.ok(html.includes("Identity observed"));
+	assert.ok(html.includes("Future Provider account metadata was observed"));
 	assert.ok(html.includes("Account: Workspace: Example"));
 	assert.ok(!html.includes("Account identity unavailable"));
 });
@@ -3821,15 +3842,27 @@ test("context creation progress and success present completed local work", () =>
 	assert.equal(creationStepLabel("skipped"), "Not needed");
 	const success = renderToStaticMarkup(
 		createElement(ContextCreateSuccessScreen, {
-			context: contextFixture("personal", "Personal"),
+			context: contextFixture("personal", "Personal", [
+				providerFixture(
+					"assistant",
+					"Assistant",
+					true,
+					"not_configured",
+					"Sign in to Assistant.",
+				),
+			]),
 			projectName: "api",
 			onOpenProject() {},
+			onRecheckContext() {},
 			onViewContext() {},
 			onCreateAnother() {},
 		}),
 	);
 	assert.match(success, /Personal is ready/);
 	assert.match(success, /Open api/);
+	assert.match(success, /Finish provider sign-in/);
+	assert.match(success, /Open context for sign-in/);
+	assert.match(success, /Recheck setup/);
 	assert.match(success, /View Context/);
 	assert.match(success, /Create Another Context/);
 });
@@ -3884,7 +3917,7 @@ test("context creation frames tool setup as development tools with generic categ
 	assert.match(html, /Sign in to continue/);
 	assert.match(html, /Continue/);
 	assert.match(html, /Disable/);
-	assert.match(html, /Set up/);
+	assert.match(html, /How setup works/);
 	assert.doesNotMatch(html, /Provider/);
 	assert.deepEqual(Object.keys(developmentToolStatusPresentation), [
 		"available",
@@ -4164,12 +4197,14 @@ test("privacy settings describe implemented local data boundaries", () => {
 		[
 			"Stored on this device",
 			"Project paths",
-			"Credentials stay with integrations",
+			"Credential handling",
 			"Portable exports",
 		],
 	);
-	assert.match(privacyStatements[1].description, /only when you choose/);
-	assert.match(privacyStatements[2].description, /does not store or sync/);
+	assert.match(privacyStatements[1].description, /recent launches, active workspaces, and local activity/);
+	assert.match(privacyStatements[1].description, /Forgetting a project removes/);
+	assert.match(privacyStatements[2].description, /explicitly choose to import/);
+	assert.match(privacyStatements[2].description, /never displays, logs, uploads, or exports credential contents/);
 	assert.match(privacyStatements[3].description, /do not include credentials/);
 });
 

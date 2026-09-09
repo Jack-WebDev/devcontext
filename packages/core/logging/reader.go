@@ -7,12 +7,49 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"devctx/packages/core/filesystem"
 )
 
 // ReadLocalEvents reads the allowlisted local event log in newest-first order.
 // A missing log is a valid empty history.
 func ReadLocalEvents(logsDir string) ([]Event, error) {
-	file, err := os.Open(filepath.Join(logsDir, DefaultFileName))
+	events, err := readEvents(filepath.Join(logsDir, DefaultFileName))
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(events, func(i, j int) bool { return events[i].Timestamp.After(events[j].Timestamp) })
+	return events, nil
+}
+
+// RemoveEventsForProject deletes local activity records for one forgotten
+// project. It does not affect records for other projects.
+func RemoveEventsForProject(logsDir, projectPath string, permissions filesystem.StoragePermissions) error {
+	if projectPath == "" {
+		return fmt.Errorf("remove project events: project path is required")
+	}
+
+	path := filepath.Join(logsDir, DefaultFileName)
+	return filesystem.WithExclusiveFileLock(path, func() error {
+		events, err := readEvents(path)
+		if err != nil {
+			return err
+		}
+		remaining := events[:0]
+		for _, event := range events {
+			if event.ProjectPath != projectPath {
+				remaining = append(remaining, event)
+			}
+		}
+		if len(remaining) == len(events) {
+			return nil
+		}
+		return writeEvents(path, remaining, permissions)
+	})
+}
+
+func readEvents(path string) ([]Event, error) {
+	file, err := os.Open(path)
 	if os.IsNotExist(err) {
 		return []Event{}, nil
 	}
@@ -33,6 +70,5 @@ func ReadLocalEvents(logsDir string) ([]Event, error) {
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("read event log: %w", err)
 	}
-	sort.SliceStable(events, func(i, j int) bool { return events[i].Timestamp.After(events[j].Timestamp) })
 	return events, nil
 }

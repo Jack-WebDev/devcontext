@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Layers3 } from "lucide-react";
 import {
 	ContextsContent,
 	HistoryContent,
@@ -29,6 +30,8 @@ import { ProjectBindingRemovalDialog } from "./components/projects/ProjectBindin
 import { ProjectDetailView } from "./components/projects/ProjectDetailView";
 import { RunningEnvironmentConflictDialog } from "./components/running/RunningEnvironmentConflictDialog";
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
+import { PreflightReviewDialog } from "./components/selector/PreflightReviewDialog";
+import { FirstRunWelcome } from "./components/selector/FirstRunWelcome";
 import { createContextAndRefresh } from "./components/contexts/context-creation";
 import { LauncherFlow } from "./components/launcher/LauncherFlow";
 import { SettingsView } from "./components/settings/SettingsView";
@@ -56,6 +59,7 @@ import {
 	type ImportContextMetadataRequest,
 	type ImportContextMetadataResult,
 	type ProjectListItem,
+	type PreflightLaunchProjectResult,
 	type RecentProjectState,
 	type RunningEnvironmentConflict,
 	type RunningEnvironmentsState,
@@ -64,7 +68,16 @@ import {
 
 interface PendingRunningEnvironmentLaunch {
 	conflict: RunningEnvironmentConflict;
+	request: {
+		projectPath: string;
+		contextId: string;
+		confirmPreflightWarnings?: boolean;
+	};
+}
+
+interface PendingPreflightReview {
 	request: { projectPath: string; contextId: string };
+	preflight: PreflightLaunchProjectResult;
 }
 
 function App() {
@@ -94,15 +107,32 @@ function App() {
 
 	if (applicationModeError !== undefined) {
 		return (
-			<main className="p-6">
-				<GuiErrorNotice error={applicationModeError} />
+			<main className="flex min-h-screen items-center justify-center bg-background p-8">
+				<div className="w-full max-w-xl">
+					<GuiErrorNotice error={applicationModeError} />
+				</div>
 			</main>
 		);
 	}
 	if (applicationMode === undefined) {
 		return (
-			<main className="flex min-h-screen items-center justify-center p-6">
-				<p className="text-sm text-muted-foreground">Opening Dev Context...</p>
+			<main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-6">
+				<span
+					className="grid size-12 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-lg"
+					aria-hidden="true"
+				>
+					<Layers3 className="size-6" />
+				</span>
+				<p
+					className="flex items-center gap-2 text-sm font-medium text-muted-foreground"
+					aria-live="polite"
+				>
+					<span
+						className="size-2 animate-pulse rounded-full bg-primary"
+						aria-hidden="true"
+					/>
+					Opening Dev Context…
+				</p>
 			</main>
 		);
 	}
@@ -136,12 +166,20 @@ function ManagementApp() {
 	} = useAppData(activeRoute);
 	const isFirstRun = contexts.status === "loaded" && contexts.data.length === 0;
 	const [settingsPending, setSettingsPending] = useState(false);
+	const [settingsSaveError, setSettingsSaveError] = useState<DisplayError>();
 	const [onboardingReplayVisible, setOnboardingReplayVisible] = useState(false);
+	const [managementLaunchProjectPath, setManagementLaunchProjectPath] =
+		useState<string>();
 	const [pendingRunningEnvironmentLaunch, setPendingRunningEnvironmentLaunch] =
 		useState<PendingRunningEnvironmentLaunch>();
 	const [runningEnvironmentLaunchPending, setRunningEnvironmentLaunchPending] =
 		useState(false);
 	const [runningEnvironmentLaunchError, setRunningEnvironmentLaunchError] =
+		useState<DisplayError>();
+	const [pendingPreflightReview, setPendingPreflightReview] =
+		useState<PendingPreflightReview>();
+	const [preflightReviewPending, setPreflightReviewPending] = useState(false);
+	const [preflightReviewError, setPreflightReviewError] =
 		useState<DisplayError>();
 	const [contextDetailRoute, setContextDetailRoute] = useState(() =>
 		contextDetailRouteFromHash(window.location.hash),
@@ -184,9 +222,8 @@ function ManagementApp() {
 	const [projectBindingRemovalError, setProjectBindingRemovalError] =
 		useState<DisplayError>();
 	const [projectToForget, setProjectToForget] = useState<ProjectListItem>();
-	const [workspaceToStop, setWorkspaceToStop] = useState<
-		RunningEnvironmentsState["environments"][number]
-	>();
+	const [workspaceToStop, setWorkspaceToStop] =
+		useState<RunningEnvironmentsState["environments"][number]>();
 	const [workspaceStopError, setWorkspaceStopError] = useState<DisplayError>();
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 	const [commandPaletteLaunchPending, setCommandPaletteLaunchPending] =
@@ -269,6 +306,9 @@ function ManagementApp() {
 				setCommandPaletteLaunchError(preflight.error);
 				return;
 			}
+			if (deferPreflightReview(preflight.data, request)) {
+				return;
+			}
 			if (deferRunningEnvironmentConflict(preflight.data, request)) {
 				return;
 			}
@@ -330,6 +370,13 @@ function ManagementApp() {
 			}
 			return;
 		}
+		if (action === "restore") {
+			const restored = await devContextApi.restoreContext({ contextId });
+			if (restored.ok) {
+				await refreshContexts();
+			}
+			return;
+		}
 		if (action === "delete") {
 			const context =
 				contexts.status === "loaded"
@@ -351,12 +398,13 @@ function ManagementApp() {
 	async function handleSettingsChange(next: SettingsState) {
 		if (settingsPending) return;
 		setSettingsPending(true);
+		setSettingsSaveError(undefined);
 		const result = await devContextApi.updateSettings(next);
-		setSettings(
-			result.ok
-				? { status: "loaded", data: result.data }
-				: { status: "error", error: result.error },
-		);
+		if (result.ok) {
+			setSettings({ status: "loaded", data: result.data });
+		} else {
+			setSettingsSaveError(result.error);
+		}
 		setSettingsPending(false);
 	}
 
@@ -380,6 +428,9 @@ function ManagementApp() {
 			const preflight = await devContextApi.preflightLaunchProject(request);
 			if (!preflight.ok) {
 				setHomeLaunchError(preflight.error);
+				return;
+			}
+			if (deferPreflightReview(preflight.data, request)) {
 				return;
 			}
 			if (deferRunningEnvironmentConflict(preflight.data, request)) {
@@ -428,6 +479,9 @@ function ManagementApp() {
 				setRecentProjectLaunchError(preflight.error);
 				return;
 			}
+			if (deferPreflightReview(preflight.data, request)) {
+				return;
+			}
 			if (deferRunningEnvironmentConflict(preflight.data, request)) {
 				return;
 			}
@@ -446,7 +500,16 @@ function ManagementApp() {
 	}
 
 	function handleReviewLaunchOptions() {
-		handleNavigate("contexts");
+		if (homeDashboard.status === "loaded") {
+			setManagementLaunchProjectPath(homeDashboard.data.project.path);
+		}
+	}
+
+	async function handleStartProjectLaunch() {
+		const selected = await devContextApi.chooseProjectDirectory();
+		if (selected.ok && selected.data !== undefined) {
+			setManagementLaunchProjectPath(selected.data);
+		}
 	}
 
 	async function handleProjectLaunch(project: ProjectListItem) {
@@ -465,6 +528,9 @@ function ManagementApp() {
 			const preflight = await devContextApi.preflightLaunchProject(request);
 			if (!preflight.ok) {
 				setProjectLaunchError(preflight.error);
+				return;
+			}
+			if (deferPreflightReview(preflight.data, request)) {
 				return;
 			}
 			if (deferRunningEnvironmentConflict(preflight.data, request)) {
@@ -565,7 +631,12 @@ function ManagementApp() {
 			return;
 		}
 		setProjectToForget(undefined);
-		await Promise.all([refreshProjects(), refreshHomeDashboard(), refreshRecentProjects(), refreshContexts()]);
+		await Promise.all([
+			refreshProjects(),
+			refreshHomeDashboard(),
+			refreshRecentProjects(),
+			refreshContexts(),
+		]);
 		handleNavigate("projects");
 	}
 
@@ -573,7 +644,9 @@ function ManagementApp() {
 		if (workspaceToStop === undefined) return;
 		const workspace = workspaceToStop;
 		setWorkspaceStopError(undefined);
-		const result = await devContextApi.stopWorkspace({ workspaceId: workspace.id });
+		const result = await devContextApi.stopWorkspace({
+			workspaceId: workspace.id,
+		});
 		if (result.ok) {
 			setWorkspaceToStop(undefined);
 			await refreshRunningEnvironments();
@@ -583,9 +656,17 @@ function ManagementApp() {
 	}
 
 	async function handleProjectLocate(project: ProjectListItem) {
-		if (project.contextId === undefined) return;
 		const selected = await devContextApi.chooseProjectDirectory();
-		if (!selected.ok || selected.data === undefined || selected.data === project.project.path) return;
+		if (
+			!selected.ok ||
+			selected.data === undefined ||
+			selected.data === project.project.path
+		)
+			return;
+		if (project.contextId === undefined) {
+			setManagementLaunchProjectPath(selected.data);
+			return;
+		}
 		const bound = await devContextApi.bindProject({
 			projectPath: selected.data,
 			contextId: project.contextId,
@@ -595,22 +676,21 @@ function ManagementApp() {
 			setProjectErrorPath(project.project.path);
 			return;
 		}
-		const forgotten = await devContextApi.forgetProject({ projectPath: project.project.path });
+		const forgotten = await devContextApi.forgetProject({
+			projectPath: project.project.path,
+		});
 		if (!forgotten.ok) {
 			setProjectLaunchError(forgotten.error);
 			setProjectErrorPath(project.project.path);
 			return;
 		}
-		await Promise.all([refreshProjects(), refreshHomeDashboard(), refreshRecentProjects(), refreshContexts()]);
+		await Promise.all([
+			refreshProjects(),
+			refreshHomeDashboard(),
+			refreshRecentProjects(),
+			refreshContexts(),
+		]);
 		window.location.hash = projectDetailHash({ projectPath: selected.data });
-	}
-
-	function handleProjectOpenFolder(project: ProjectListItem) {
-		window.open(
-			new URL(project.project.path, "file://").href,
-			"_blank",
-			"noopener,noreferrer",
-		);
 	}
 
 	function deferRunningEnvironmentConflict(
@@ -623,9 +703,59 @@ function ManagementApp() {
 		setRunningEnvironmentLaunchError(undefined);
 		setPendingRunningEnvironmentLaunch({
 			conflict: preflight.runningEnvironmentConflict,
-			request,
+			request: { ...request, confirmPreflightWarnings: true },
 		});
 		return true;
+	}
+
+	function deferPreflightReview(
+		preflight: PreflightLaunchProjectResult,
+		request: { projectPath: string; contextId: string },
+	) {
+		if (!preflight.groups.some((group) => group.status !== "ready")) {
+			return false;
+		}
+		setPreflightReviewError(undefined);
+		setPendingPreflightReview({ request, preflight });
+		return true;
+	}
+
+	async function handlePreflightReviewContinue() {
+		if (pendingPreflightReview === undefined || preflightReviewPending) {
+			return;
+		}
+
+		const request = {
+			...pendingPreflightReview.request,
+			confirmPreflightWarnings: true,
+		};
+		if (
+			deferRunningEnvironmentConflict(pendingPreflightReview.preflight, request)
+		) {
+			setPendingPreflightReview(undefined);
+			return;
+		}
+
+		setPreflightReviewPending(true);
+		setPreflightReviewError(undefined);
+		try {
+			const launch = await devContextApi.launchProject(request);
+			if (!launch.ok) {
+				setPreflightReviewError(launch.error);
+				return;
+			}
+			notifyLaunch(launch.data);
+			setPendingPreflightReview(undefined);
+			setRecentProjectToLaunch(undefined);
+			await Promise.all([
+				refreshHomeDashboard(),
+				refreshRecentProjects(),
+				refreshProjects(),
+				refreshRunningEnvironments(),
+			]);
+		} finally {
+			setPreflightReviewPending(false);
+		}
 	}
 
 	async function handleLaunchAnotherWindow() {
@@ -658,10 +788,24 @@ function ManagementApp() {
 		}
 	}
 
+	if (managementLaunchProjectPath !== undefined) {
+		return (
+			<LauncherFlow
+				projectPath={managementLaunchProjectPath}
+				onCancel={() => setManagementLaunchProjectPath(undefined)}
+				onRunDiagnostics={() => {
+					setManagementLaunchProjectPath(undefined);
+					handleNavigate("diagnostics");
+				}}
+			/>
+		);
+	}
+
 	return (
 		<AppShell
 			activeRoute={activeRoute}
 			onNavigate={handleNavigate}
+			onOpenCommandPalette={() => setCommandPaletteOpen(true)}
 			isFirstRun={isFirstRun}
 			currentProject={
 				launchState.status === "loaded" ? launchState.data.project : undefined
@@ -677,16 +821,24 @@ function ManagementApp() {
 		>
 			{activeRoute === "home" ? (
 				<section aria-labelledby="home-heading">
-					<HomeDashboardContent
-						dashboard={homeDashboard}
-						contexts={contexts}
-						recentProjects={recentProjects}
-						launchPending={homeLaunchPending}
-						launchError={homeLaunchError}
-						onQuickLaunch={handleHomeQuickLaunch}
-						onReviewLaunchOptions={handleReviewLaunchOptions}
-						onRecentProjectSelect={handleRecentProjectSelect}
-					/>
+					{onboardingReplayVisible && launchState.status === "loaded" ? (
+						<FirstRunWelcome
+							launchState={launchState.data}
+							replay
+							onContinue={() => setOnboardingReplayVisible(false)}
+						/>
+					) : (
+						<HomeDashboardContent
+							dashboard={homeDashboard}
+							contexts={contexts}
+							recentProjects={recentProjects}
+							launchPending={homeLaunchPending}
+							launchError={homeLaunchError}
+							onQuickLaunch={handleHomeQuickLaunch}
+							onReviewLaunchOptions={handleReviewLaunchOptions}
+							onRecentProjectSelect={handleRecentProjectSelect}
+						/>
+					)}
 					{recentProjectToLaunch ? (
 						<RecentProjectConfirmationDialog
 							project={recentProjectToLaunch}
@@ -778,17 +930,19 @@ function ManagementApp() {
 									}
 									return result;
 								}}
+								loadCreationOptions={devContextApi.getContextTemplates}
 								bindProject={async (request) => {
 									const result = await devContextApi.bindProject(request);
 									if (result.ok) await refreshProjects();
 									return result;
 								}}
-								verifyContext={(context) =>
-									devContextApi.getContextDetails({ contextId: context.id })
-								}
-								onOpenProject={() => {
-									setCreatingContext(false);
-									setActiveRoute("projects");
+								verifyContext={async (context) => {
+									const result = await devContextApi.getContextDetails({
+										contextId: context.id,
+									});
+									return result.ok
+										? { ok: true, data: result.data.context }
+										: result;
 								}}
 								onViewContext={(contextId) => {
 									setCreatingContext(false);
@@ -802,9 +956,13 @@ function ManagementApp() {
 				<>
 					{projectDetailRoute ? (
 						projects.status === "loading" ? (
-							<p className="text-sm text-muted-foreground">Loading project...</p>
+							<div className="page-content text-sm text-muted-foreground">
+								Loading project…
+							</div>
 						) : projects.status === "error" ? (
-							<GuiErrorNotice error={projects.error} />
+							<div className="page-content">
+								<GuiErrorNotice error={projects.error} />
+							</div>
 						) : (
 							<ProjectDetailView
 								project={projects.data.projects.find(
@@ -813,7 +971,6 @@ function ManagementApp() {
 								)}
 								onBack={() => handleNavigate("projects")}
 								onLaunch={handleProjectLaunch}
-								onOpenFolder={handleProjectOpenFolder}
 								onChangeContext={
 									contexts.status === "loaded"
 										? handleProjectChangeContext
@@ -831,9 +988,8 @@ function ManagementApp() {
 							errorProjectPath={projectErrorPath}
 							launchError={projectLaunchError}
 							onLaunch={handleProjectLaunch}
-							onOpenFolder={handleProjectOpenFolder}
 							onOpenDetail={navigateToProjectDetail}
-							onStartLaunch={() => handleNavigate("contexts")}
+							onStartLaunch={() => void handleStartProjectLaunch()}
 						/>
 					)}
 					{projectContextChange && contexts.status === "loaded" ? (
@@ -880,12 +1036,22 @@ function ManagementApp() {
 					}
 				/>
 			) : activeRoute === "history" ? (
-				<HistoryContent history={history} onOpenProjects={() => handleNavigate("projects")} />
+				<HistoryContent
+					history={history}
+					onOpenProjects={() => handleNavigate("projects")}
+				/>
 			) : activeRoute === "running" ? (
 				<RunningContent
 					running={running}
 					onLaunchProject={() => handleNavigate("projects")}
-					onReveal={async (workspace, targetId) => { const result = await devContextApi.revealWorkspace({ workspaceId: workspace.id, targetId }); if (result.ok) return result.data; return undefined; }}
+					onReveal={async (workspace, targetId) => {
+						const result = await devContextApi.revealWorkspace({
+							workspaceId: workspace.id,
+							targetId,
+						});
+						if (result.ok) return result.data;
+						return undefined;
+					}}
 					onStop={(workspace) => {
 						setWorkspaceStopError(undefined);
 						setWorkspaceToStop(workspace);
@@ -896,6 +1062,7 @@ function ManagementApp() {
 					<SettingsView
 						settings={settings.data}
 						pending={settingsPending}
+						error={settingsSaveError}
 						onChange={(next) => void handleSettingsChange(next)}
 						onReplayOnboarding={() => {
 							setOnboardingReplayVisible(true);
@@ -906,16 +1073,52 @@ function ManagementApp() {
 				) : settings.status === "error" ? (
 					<GuiErrorNotice error={settings.error} />
 				) : (
-					<p className="text-sm text-muted-foreground">Loading settings...</p>
+					<div className="page-content text-sm text-muted-foreground">
+						Loading settings…
+					</div>
 				)
 			) : (
 				<PlaceholderScreen route={activeRoute} />
 			)}
 			{projectToForget ? (
-				<DestructiveConfirmationDialog title="Forget project?" objectName={projectToForget.project.name} impact="Dev Context will remove this project from its local history and bindings." nonDeletionAssurance="Project files and folders are never deleted." confirmLabel="Forget project" onCancel={() => setProjectToForget(undefined)} onConfirm={() => void confirmProjectForget()} />
+				<DestructiveConfirmationDialog
+					title="Forget project?"
+					objectName={projectToForget.project.name}
+					impact="Dev Context will remove this project's remembered context, recent launch, and activity records."
+					nonDeletionAssurance="Project files and folders are never deleted."
+					confirmLabel="Forget project"
+					onCancel={() => setProjectToForget(undefined)}
+					onConfirm={() => void confirmProjectForget()}
+				/>
 			) : null}
 			{workspaceToStop ? (
-				<DestructiveConfirmationDialog title="Stop workspace?" objectName={workspaceToStop.project.name} impact="The coding-tool workspace will be stopped. Unsaved work in the coding tool may be lost." nonDeletionAssurance="Project files and folders are never deleted." confirmLabel="Stop workspace" error={workspaceStopError} onCancel={() => { setWorkspaceToStop(undefined); setWorkspaceStopError(undefined); }} onConfirm={() => void confirmWorkspaceStop()} />
+				<DestructiveConfirmationDialog
+					title="Stop workspace?"
+					objectName={workspaceToStop.project.name}
+					impact="The coding-tool workspace will be stopped. Unsaved work in the coding tool may be lost."
+					nonDeletionAssurance="Project files and folders are never deleted."
+					confirmLabel="Stop workspace"
+					error={workspaceStopError}
+					onCancel={() => {
+						setWorkspaceToStop(undefined);
+						setWorkspaceStopError(undefined);
+					}}
+					onConfirm={() => void confirmWorkspaceStop()}
+				/>
+			) : null}
+			{pendingPreflightReview ? (
+				<PreflightReviewDialog
+					preflight={pendingPreflightReview.preflight}
+					pending={preflightReviewPending}
+					error={preflightReviewError}
+					onCancel={() => {
+						if (!preflightReviewPending) {
+							setPendingPreflightReview(undefined);
+							setPreflightReviewError(undefined);
+						}
+					}}
+					onContinue={() => void handlePreflightReviewContinue()}
+				/>
 			) : null}
 			{commandPaletteLaunchError ? (
 				<GuiErrorNotice error={commandPaletteLaunchError} />

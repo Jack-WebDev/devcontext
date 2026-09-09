@@ -1,12 +1,19 @@
 import { useState } from "react";
-import type { RunningEnvironmentState, WorkspaceRevealResult } from "../../lib/devctx-api";
+import type {
+	RunningEnvironmentState,
+	WorkspaceRevealResult,
+} from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import { EmptyState } from "../ui/collection-state.js";
+import { PageHeader } from "../ui/page-header.js";
 
 interface RunningViewProps {
 	environments: RunningEnvironmentState[];
-	onReveal?: (environment: RunningEnvironmentState, targetId?: string) => Promise<WorkspaceRevealResult | undefined>;
+	onReveal?: (
+		environment: RunningEnvironmentState,
+		targetId?: string,
+	) => Promise<WorkspaceRevealResult | undefined>;
 	onStop?: (environment: RunningEnvironmentState) => void;
 	onLaunchProject?: () => void;
 }
@@ -17,27 +24,39 @@ function RunningView({
 	onStop,
 	onLaunchProject,
 }: RunningViewProps) {
-	const [choice, setChoice] = useState<{ workspace: RunningEnvironmentState; targets: WorkspaceRevealResult["targets"] }>();
+	const [choice, setChoice] = useState<{
+		workspace: RunningEnvironmentState;
+		targets: WorkspaceRevealResult["targets"];
+	}>();
 	async function reveal(workspace: RunningEnvironmentState, targetId?: string) {
 		const result = await onReveal?.(workspace, targetId);
-		setChoice(result && !result.revealed && result.targets.length > 1 ? { workspace, targets: result.targets } : undefined);
+		setChoice(
+			result && !result.revealed && result.targets.length > 1
+				? { workspace, targets: result.targets }
+				: undefined,
+		);
 	}
 	return (
-		<section aria-labelledby="workspaces-heading" className="space-y-6">
-			<div>
-				<p className="text-sm text-muted-foreground">Active coding work</p>
-				<h2 id="workspaces-heading" className="text-2xl font-semibold">
-					Workspaces
-				</h2>
-				<p className="mt-1 text-sm text-muted-foreground">
-					Workspaces run independently and keep the context selected when each was launched.
-				</p>
-			</div>
+		<section
+			aria-labelledby="workspaces-heading"
+			className="page-content page-section-stack"
+		>
+			<PageHeader
+				id="workspaces-heading"
+				eyebrow="Coding work"
+				title="Workspaces"
+				description="Workspaces run independently and keep the context selected when each was launched. Lifecycle state is shown only when Dev Context can observe it."
+			/>
 
 			{environments.length === 0 ? (
-				<EmptyState title="No active workspaces" description="Launch a project to create an isolated coding-tool workspace." actionLabel="View projects" onAction={onLaunchProject} />
+				<EmptyState
+					title="No current workspaces"
+					description="Launch a project to create an isolated coding-tool workspace."
+					actionLabel="View projects"
+					onAction={onLaunchProject}
+				/>
 			) : (
-				<div className="space-y-4">
+				<div className="collection-surface divide-y divide-border/50">
 					{environments.map((environment) => (
 						<RunningEnvironmentCard
 							key={environment.id}
@@ -46,7 +65,29 @@ function RunningView({
 							onStop={onStop}
 						/>
 					))}
-					{choice ? <section role="dialog" aria-label="Choose workspace window" className="rounded-md border border-border p-4 text-sm"><p className="mb-3 font-medium">Choose a window for {choice.workspace.project.name}</p>{choice.targets.map((target) => <Button key={target.id} type="button" variant="outline" size="sm" className="mr-2" onClick={() => void reveal(choice.workspace, target.id)}>{target.label}</Button>)}</section> : null}
+					{choice ? (
+						<section
+							role="dialog"
+							aria-label="Choose workspace window"
+							className="rounded-xl border border-border/60 bg-card p-5 text-sm shadow-sm"
+						>
+							<p className="mb-3 font-medium">
+								Choose a window for {choice.workspace.project.name}
+							</p>
+							{choice.targets.map((target) => (
+								<Button
+									key={target.id}
+									type="button"
+									variant="outline"
+									size="sm"
+									className="mr-2"
+									onClick={() => void reveal(choice.workspace, target.id)}
+								>
+									{target.label}
+								</Button>
+							))}
+						</section>
+					) : null}
 				</div>
 			)}
 		</section>
@@ -65,8 +106,8 @@ function RunningEnvironmentCard({
 	return (
 		<Card
 			as="article"
-			hierarchy="secondary"
-			className="py-0"
+			hierarchy="tertiary"
+			className="collection-row rounded-none py-0"
 			aria-labelledby={`running-${environment.id}-heading`}
 		>
 			<CardContent className="space-y-4 p-5">
@@ -87,10 +128,17 @@ function RunningEnvironmentCard({
 						</p>
 					</div>
 					<span className="shrink-0 text-sm font-medium text-accent-company">
-						Active
+						{environment.lifecycle.state === "active"
+							? "Active"
+							: "Lifecycle unknown"}
 					</span>
 				</div>
-				<dl className="grid gap-3 border-t border-border pt-4 text-sm sm:grid-cols-3">
+				{environment.lifecycle.state === "unknown" ? (
+					<p className="text-sm text-muted-foreground">
+						Dev Context could not verify whether this workspace is still open.
+					</p>
+				) : null}
+				<dl className="grid gap-3 rounded-xl bg-muted/30 p-4 text-sm sm:grid-cols-3">
 					<RunningDetail label="Context" value={environment.context.name} />
 					<RunningDetail label="Coding tool" value={environment.tool.name} />
 					<RunningDetail
@@ -98,16 +146,20 @@ function RunningEnvironmentCard({
 						value={formatRunningTime(environment.startedAt)}
 					/>
 				</dl>
-				<div className="flex flex-wrap gap-3 border-t border-border pt-4">
+				<div className="flex flex-wrap gap-2">
 					<Button
 						type="button"
 						variant="outline"
 						size="sm"
-						disabled={!environment.lifecycle.revealable || onReveal === undefined}
+						disabled={
+							!environment.lifecycle.revealable || onReveal === undefined
+						}
 						title={
-							onReveal === undefined
-								? "Revealing an environment is not available for this coding tool yet."
-								: undefined
+							environment.lifecycle.state !== "active"
+								? "This workspace cannot be observed, so it cannot be revealed."
+								: onReveal === undefined
+									? "Revealing an environment is not available for this coding tool yet."
+									: undefined
 						}
 						onClick={() => onReveal?.(environment)}
 					>
@@ -119,9 +171,11 @@ function RunningEnvironmentCard({
 						size="sm"
 						disabled={!environment.lifecycle.stoppable || onStop === undefined}
 						title={
-							onStop === undefined
-								? "Stopping an environment is not available for this coding tool yet."
-								: undefined
+							environment.lifecycle.state !== "active"
+								? "This workspace cannot be observed, so it cannot be stopped."
+								: onStop === undefined
+									? "Stopping an environment is not available for this coding tool yet."
+									: undefined
 						}
 						onClick={() => onStop?.(environment)}
 					>

@@ -13,7 +13,7 @@ function LauncherSurface({ projectPath, children }: LauncherSurfaceProps) {
 		>
 			<section
 				aria-labelledby="launcher-heading"
-				className="launcher-container border border-border bg-card shadow-sm"
+				className="launcher-container rounded-2xl border border-border/60 bg-card shadow-[var(--shadow-overlay)]"
 			>
 				<p className="text-label text-secondary">Dev Context</p>
 				<h1 id="launcher-heading" className="text-launcher-title mt-2">

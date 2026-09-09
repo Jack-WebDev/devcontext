@@ -75,18 +75,20 @@ func main() {
 }
 
 // desktopApplicationMode converts a non-CLI invocation into host-owned Wails
-// startup intent. It deliberately reuses the root launch parser so desktop and
-// CLI project paths share canonicalization and validation rules.
+// startup intent. Desktop launchers defer project-directory validation to the
+// UI so a missing path can use its folder-recovery journey.
 func desktopApplicationMode(args []string, workingDirectory string, paths filesystem.PlatformPaths) (wailsapp.ApplicationMode, error) {
 	if len(args) == 0 {
 		return wailsapp.ManagementMode(), nil
 	}
-
-	request, err := cli.ParseLaunchRequest(args, workingDirectory, paths)
+	if len(args) != 1 {
+		return wailsapp.ApplicationMode{}, fmt.Errorf("%w: desktop launch accepts one project path", cli.ErrInvalidCommand)
+	}
+	projectPath, err := project.CanonicalizePath(paths, args[0], project.Path(workingDirectory))
 	if err != nil {
 		return wailsapp.ApplicationMode{}, err
 	}
-	return wailsapp.LauncherMode(string(request.ProjectPath)), nil
+	return wailsapp.LauncherMode(string(projectPath)), nil
 }
 
 func reportStartupError(err error) {
@@ -140,19 +142,29 @@ func runCLI(args []string) cli.ExitCode {
 		fmt.Fprint(os.Stderr, cli.RenderError(err, debug))
 		return cli.ExitInternalError
 	}
+	service, err := application.NewDefaultService(application.DefaultOptions{
+		Paths:             paths,
+		ParentEnvironment: os.Environ(),
+		WorkingDirectory:  workingDirectory,
+	})
+	if err != nil {
+		fmt.Fprint(os.Stderr, cli.RenderError(err, debug))
+		return cli.ExitCodeForError(err)
+	}
 
 	runner := cli.Runner{
-		Contexts:          devcontext.NewRepository(layout.ContextsDir),
-		Projects:          project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
-		WorkingDirectory:  workingDirectory,
-		Paths:             paths,
-		ProviderRegistry:  provider.BuiltInRegistry(),
-		ToolRegistry:      codingtool.BuiltInRegistry(),
-		ProcessLauncher:   launcher.NativeProcessLauncher{},
-		ParentEnvironment: os.Environ(),
-		DetachMode:        launcher.DetachModeDetached,
-		Debug:             debug,
-		Logger:            devlog.NewLocalLogger(layout.LogsDir, filesystem.NewDefaultStoragePermissions(), nil),
+		Contexts:           devcontext.NewRepository(layout.ContextsDir),
+		Projects:           project.NewRepository(filepath.Join(layout.HomeDir, "projects.toml"), paths),
+		WorkingDirectory:   workingDirectory,
+		Paths:              paths,
+		ProviderRegistry:   provider.BuiltInRegistry(),
+		ToolRegistry:       codingtool.BuiltInRegistry(),
+		ProcessLauncher:    launcher.NativeProcessLauncher{},
+		ParentEnvironment:  os.Environ(),
+		DetachMode:         launcher.DetachModeDetached,
+		Debug:              debug,
+		Logger:             devlog.NewLocalLogger(layout.LogsDir, filesystem.NewDefaultStoragePermissions(), nil),
+		RootLaunchWorkflow: service,
 	}
 	result := runner.Run(parsedArgs)
 	if err := result.Write(os.Stdout, os.Stderr); err != nil {

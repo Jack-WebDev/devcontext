@@ -262,7 +262,8 @@ func (s *Service) UnbindProject(request UnbindProjectRequest) (ProjectBindingSta
 	return state, nil
 }
 
-// ForgetProject removes both the remembered binding and recent-launch record.
+// ForgetProject removes the remembered binding, recent-launch record, and
+// local activity records for one project.
 // It never reads, changes, or deletes the project folder.
 func (s *Service) ForgetProject(request ForgetProjectRequest) *Error {
 	projectPath, err := s.canonicalProjectPath(request.ProjectPath)
@@ -273,6 +274,13 @@ func (s *Service) ForgetProject(request ForgetProjectRequest) *Error {
 		return NewError(err)
 	}
 	if err := s.dependencies.RecentProjects.Remove(projectPath); err != nil {
+		return NewError(err)
+	}
+	homeDir, err := s.dependencies.Paths.DevContextHomeDir()
+	if err != nil {
+		return NewError(err)
+	}
+	if err := devlog.RemoveEventsForProject(filepath.Join(homeDir, "logs"), string(projectPath), s.dependencies.StoragePermissions); err != nil {
 		return NewError(err)
 	}
 	return nil
@@ -297,7 +305,10 @@ func (s *Service) GetContextTemplates() ContextTemplatesState {
 			Icon: template.Icon, Accent: template.Accent,
 		}
 	}
-	return ContextTemplatesState{Templates: states}
+	return ContextTemplatesState{
+		Templates:        states,
+		DevelopmentTools: contextCreationDevelopmentTools(s.dependencies.ToolRegistry, s.dependencies.ProviderRegistry),
+	}
 }
 
 // DuplicateContext creates a new isolated context with the source context's
@@ -377,8 +388,8 @@ func (s *Service) GetHistory() (HistoryState, *Error) {
 	return history, nil
 }
 
-// GetRunningEnvironments returns active coding-tool environments after
-// refreshing process state where a PID is available.
+// GetRunningEnvironments returns active and lifecycle-unknown coding-tool
+// workspace records after refreshing process state where a PID is available.
 func (s *Service) GetRunningEnvironments() (RunningEnvironmentsState, *Error) {
 	state, err := s.getRunningEnvironments()
 	if err != nil {
@@ -1328,6 +1339,18 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 		confirmation = launcher.ContextMismatchAccepted
 	}
 
+	preflight, err := s.preflightLaunchProject(PreflightLaunchProjectRequest{
+		ProjectPath:            string(projectPath),
+		ContextID:              contextID.String(),
+		ConfirmContextMismatch: request.ConfirmContextMismatch,
+	})
+	if err != nil {
+		return LaunchProjectResult{}, err
+	}
+	if preflightRequiresReview(preflight.Groups) && !request.ConfirmPreflightWarnings {
+		return LaunchProjectResult{}, ErrPreflightReviewRequired
+	}
+
 	plan, err := s.launchPlanBuilder().Build(launcher.LaunchRequest{
 		ProjectPath:          projectPath,
 		RequestedContext:     &contextID,
@@ -1347,27 +1370,9 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 		return LaunchProjectResult{}, err
 	}
 
-	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventContextResolution, plan, nil, s.now()))
-	if request.ConfirmContextMismatch && hasContextMismatchWarning(plan.Warnings) {
-		s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventContextOverrideAccepted, plan, nil, s.now()))
-	}
-	for range plan.MissingProviderIDs {
-		event := eventFromLaunchPlan(devlog.EventLaunchProviderMissing, plan, nil, s.now())
-		event.ErrorCategory = devlog.ErrorCategoryProvider
-		s.recordLaunchEvent(event)
-	}
-	if err := s.exportCodingToolStatus(plan); err != nil {
+	if err := s.executeLaunchPlan(plan, launcher.InvocationSourceGUI, request.ConfirmContextMismatch); err != nil {
 		return LaunchProjectResult{}, err
 	}
-
-	if err := s.processLauncher().Launch(processRequestFromLaunchPlan(plan, s.dependencies.DetachMode)); err != nil {
-		s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchProcessFailure, plan, err, s.now()))
-		return LaunchProjectResult{}, newLaunchFailureError(err, plan.Executable, plan.Environment, s.now())
-	}
-
-	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchSucceeded, plan, nil, s.now()))
-	_ = s.dependencies.RecentProjects.Record(plan.ProjectPath, plan.Context.ID, s.now())
-	_, _ = s.dependencies.RunningEnvironments.Record(runningEnvironmentFromLaunchPlan(plan, s.now()))
 
 	return LaunchProjectResult{
 		Project:  projectState(plan.ProjectPath),
@@ -1376,19 +1381,89 @@ func (s *Service) launchProject(request LaunchProjectRequest) (LaunchProjectResu
 	}, nil
 }
 
-func runningEnvironmentFromLaunchPlan(plan launcher.LaunchPlan, startedAt time.Time) coreRunning.Environment {
+// LaunchCLIProject runs the same launch recordkeeping and tool-status flow as
+// LaunchProject. CLI requests deliberately continue non-blocking warnings:
+// the command line is noninteractive, while blocking launch-plan failures are
+// still enforced by the shared builder.
+func (s *Service) LaunchCLIProject(request launcher.LaunchRequest) (launcher.LaunchPlan, error) {
+	plan, err := s.launchPlanBuilder().Preflight(request)
+	if err != nil {
+		s.recordLaunchEvent(devlog.NewEvent(devlog.EventInput{
+			Name:             devlog.LaunchEventNameForError(err),
+			Timestamp:        s.now(),
+			ProjectPath:      string(request.ProjectPath),
+			ContextID:        requestedLaunchContextID(request),
+			Err:              err,
+			KnownEnvironment: s.dependencies.ParentEnvironment,
+		}))
+		return launcher.LaunchPlan{}, err
+	}
+
+	// Evaluate application-owned confidence and workspace evidence even though
+	// the CLI intentionally has no review screen. This keeps detection behavior
+	// aligned with GUI launches without changing CLI's noninteractive contract.
+	_ = s.launchConfidenceState(&plan.Context)
+	if _, err := s.runningEnvironmentConflict(plan.ProjectPath, plan.Context.ID); err != nil {
+		return launcher.LaunchPlan{}, err
+	}
+	if err := s.executeLaunchPlan(plan, launcher.InvocationSourceCLI, request.MismatchConfirmation == launcher.ContextMismatchAccepted); err != nil {
+		return launcher.LaunchPlan{}, err
+	}
+	return plan, nil
+}
+
+func (s *Service) executeLaunchPlan(plan launcher.LaunchPlan, source launcher.InvocationSource, contextMismatchAccepted bool) error {
+	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventContextResolution, plan, nil, s.now()))
+	if contextMismatchAccepted && hasContextMismatchWarning(plan.Warnings) {
+		s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventContextOverrideAccepted, plan, nil, s.now()))
+	}
+	for range plan.MissingProviderIDs {
+		event := eventFromLaunchPlan(devlog.EventLaunchProviderMissing, plan, nil, s.now())
+		event.ErrorCategory = devlog.ErrorCategoryProvider
+		s.recordLaunchEvent(event)
+	}
+	if err := s.exportCodingToolStatus(plan); err != nil {
+		return err
+	}
+	if err := s.processLauncher().Launch(processRequestFromLaunchPlan(plan, s.dependencies.DetachMode)); err != nil {
+		s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchProcessFailure, plan, err, s.now()))
+		return newLaunchFailureError(err, plan.Executable, plan.Environment, s.now())
+	}
+	s.recordLaunchEvent(eventFromLaunchPlan(devlog.EventLaunchSpawned, plan, nil, s.now()))
+	_ = s.dependencies.RecentProjects.Record(plan.ProjectPath, plan.Context.ID, s.now())
+	_, _ = s.dependencies.RunningEnvironments.Record(runningEnvironmentFromLaunchPlan(plan, s.now(), source))
+	return nil
+}
+
+func runningEnvironmentFromLaunchPlan(plan launcher.LaunchPlan, startedAt time.Time, source launcher.InvocationSource) coreRunning.Environment {
 	return coreRunning.Environment{
 		Project:   coreRunning.ProjectIdentity{Path: plan.ProjectPath, Name: projectName(plan.ProjectPath)},
 		Context:   coreRunning.ContextIdentity{ID: plan.Context.ID, Name: plan.Context.Name},
 		Tool:      coreRunning.ToolIdentity{ID: plan.Tool.ID, Name: plan.Tool.DisplayName},
 		StartedAt: startedAt.UTC(),
-		Process:   coreRunning.Process{State: coreRunning.ProcessStateRunning},
+		Process:   coreRunning.Process{State: coreRunning.ProcessStateUnknown},
 		Session:   coreRunning.Session{State: coreRunning.SessionStateUnknown},
 		Launch: coreRunning.LaunchIdentity{
-			Source:           launcher.InvocationSourceGUI,
+			Source:           source,
 			ResolutionSource: plan.ResolutionSource,
 		},
 	}
+}
+
+func preflightRequiresReview(groups []PreflightGroup) bool {
+	for _, group := range groups {
+		if group.Status == LaunchConfidenceNeedsAttention {
+			return true
+		}
+	}
+	return false
+}
+
+func requestedLaunchContextID(request launcher.LaunchRequest) string {
+	if request.RequestedContext == nil {
+		return ""
+	}
+	return request.RequestedContext.String()
 }
 
 func (s *Service) preflightLaunchProject(request PreflightLaunchProjectRequest) (PreflightLaunchProjectResult, error) {
@@ -1860,11 +1935,11 @@ func providerSetupAction(integration provider.Provider, enabled bool, status pro
 			Message: providerSetupMessage(integration, runtime),
 		}
 	case provider.StatusConfigured:
-		if identity.Status == ProviderIdentityVerified {
+		if identity.Status == ProviderIdentityObserved {
 			return &ProviderSetupAction{
-				State:   ProviderSetupVerified,
-				Label:   "Verified",
-				Message: integration.DisplayName() + " account identity is verified for this context.",
+				State:   ProviderSetupIdentityObserved,
+				Label:   "Identity observed",
+				Message: integration.DisplayName() + " account metadata was observed in this context's local storage.",
 			}
 		}
 		return &ProviderSetupAction{
@@ -1922,7 +1997,7 @@ func enabledProviderIDs(ctx devcontext.Context) []provider.ID {
 func providerReadinessState(status provider.Status) ProviderReadinessState {
 	switch status.State {
 	case provider.StatusConfigured:
-		return ProviderReadinessReady
+		return ProviderReadinessLocalState
 	case provider.StatusNotConfigured:
 		return ProviderReadinessNotConfigured
 	case provider.StatusDirectoryMissing:
@@ -1944,7 +2019,7 @@ func providerIdentityState(integration provider.Provider, enabled bool, status p
 		if pathsErr != nil {
 			return unavailableProviderIdentity()
 		}
-		return verifiedProviderIdentity(integration, runtime)
+		return observedProviderIdentity(integration, runtime)
 	case provider.StatusUnavailable:
 		return unavailableProviderIdentity()
 	default:
@@ -1952,7 +2027,7 @@ func providerIdentityState(integration provider.Provider, enabled bool, status p
 	}
 }
 
-func verifiedProviderIdentity(integration provider.Provider, runtime provider.RuntimeContext) ProviderIdentityState {
+func observedProviderIdentity(integration provider.Provider, runtime provider.RuntimeContext) ProviderIdentityState {
 	detector, ok := integration.(provider.ContextIdentityDetector)
 	if !ok {
 		return unavailableProviderIdentity()
@@ -1963,7 +2038,7 @@ func verifiedProviderIdentity(integration provider.Provider, runtime provider.Ru
 	}
 
 	return ProviderIdentityState{
-		Status: ProviderIdentityVerified,
+		Status: ProviderIdentityObserved,
 		Fields: providerMetadataFields(identity.Fields),
 	}
 }
@@ -2057,7 +2132,7 @@ func (s *Service) launchConfidenceStateForContext(ctx devcontext.Context, provid
 func identityEvidence(entries []providerStateEntry) []launcher.AccountIdentityEvidence {
 	evidence := make([]launcher.AccountIdentityEvidence, 0, len(entries))
 	for _, entry := range entries {
-		if !entry.state.Enabled || entry.state.Identity.Status != ProviderIdentityVerified {
+		if !entry.state.Enabled || entry.state.Identity.Status != ProviderIdentityObserved {
 			continue
 		}
 		fields := make([]launcher.AccountIdentityField, 0, len(entry.state.Identity.Fields))
@@ -2144,6 +2219,35 @@ func developmentToolIntegrations(
 	return integrations
 }
 
+// contextCreationDevelopmentTools exposes every registered integration before
+// a context exists. It must not derive options from existing contexts because
+// a first-run user has none.
+func contextCreationDevelopmentTools(toolRegistry codingtool.Registry, providerRegistry provider.Registry) []DevelopmentToolIntegration {
+	tools := toolRegistry.All()
+	providers := providerRegistry.All()
+	integrations := make([]DevelopmentToolIntegration, 0, len(tools)+len(providers))
+	for _, tool := range tools {
+		integrations = append(integrations, DevelopmentToolIntegration{
+			ID:       string(tool.Integration.ID()),
+			Name:     tool.DisplayName,
+			Category: developmentToolCategory(tool.Category),
+			Status:   DevelopmentToolAvailable,
+			Message:  "Available to add to this context.",
+			Enabled:  tool.Integration.ID() == toolRegistry.DefaultID(),
+		})
+	}
+	for _, integration := range providers {
+		integrations = append(integrations, DevelopmentToolIntegration{
+			ID:       string(integration.ID()),
+			Name:     integration.DisplayName(),
+			Category: developmentToolCategory(providerRegistry.Category(integration.ID())),
+			Status:   DevelopmentToolAvailable,
+			Message:  "Available to add to this context.",
+		})
+	}
+	return integrations
+}
+
 func developmentToolCategory(value string) DevelopmentToolCategory {
 	switch DevelopmentToolCategory(value) {
 	case DevelopmentToolCategoryCoding,
@@ -2176,15 +2280,15 @@ func developmentToolStatusForProvider(state ProviderState) (DevelopmentToolStatu
 		switch state.SetupAction.State {
 		case ProviderSetupWaitingForSignIn:
 			return DevelopmentToolNeedsSignIn, state.SetupAction.Message, state.SetupAction.Label
-		case ProviderSetupVerified:
-			return DevelopmentToolConnected, state.SetupAction.Message, ""
+		case ProviderSetupIdentityObserved:
+			return DevelopmentToolNeedsSignIn, state.SetupAction.Message, "Sign in to this provider in the selected context."
 		case ProviderSetupOpenAndConfigure:
 			return DevelopmentToolNotConfigured, state.SetupAction.Message, state.SetupAction.Label
 		}
 	}
 	switch state.State {
-	case ProviderReadinessReady:
-		return DevelopmentToolConnected, state.Explanation, ""
+	case ProviderReadinessLocalState:
+		return DevelopmentToolNeedsSignIn, "Local provider state was found, but usable authentication has not been verified.", "Sign in to this provider in the selected context."
 	case ProviderReadinessNotConfigured:
 		return DevelopmentToolNotConfigured, state.Explanation, state.ActionHint
 	case ProviderReadinessDirectoryMissing:

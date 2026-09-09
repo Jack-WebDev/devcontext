@@ -3,7 +3,6 @@ import {
 	CheckCircle2,
 	Copy,
 	Folder,
-	MoreVertical,
 	Play,
 	Plus,
 	UserRound,
@@ -36,7 +35,7 @@ export function HomeView(props: HomeViewProps) {
 		<div className="home-content">
 			<header className="home-header">
 				<div>
-					<h2 id="home-heading" className="home-title text-page-title">
+					<h2 id="home-heading" className="text-page-title">
 						Welcome back
 					</h2>
 					<p className="home-subtitle text-body text-secondary">
@@ -45,14 +44,15 @@ export function HomeView(props: HomeViewProps) {
 					</p>
 				</div>
 				<div className="home-toolbar">
-					<button
+					<Button
 						type="button"
-						className="home-toolbar-button inline-flex items-center gap-2"
+						variant="outline"
+						size="sm"
 						onClick={props.onReviewLaunchOptions}
 					>
 						<Plus className="size-4" />
-						Manage contexts
-					</button>
+						Launch options
+					</Button>
 				</div>
 			</header>
 			<Overview
@@ -80,7 +80,7 @@ function FirstRunHome({
 	return (
 		<div className="home-content w-full max-w-[820px] pt-14">
 			<header className="max-w-[680px]">
-				<h2 id="home-heading" className="home-title text-page-title">
+				<h2 id="home-heading" className="text-page-title">
 					Welcome to Dev Context
 				</h2>
 				<p className="mt-2 text-body font-medium text-foreground">
@@ -252,7 +252,7 @@ function Overview({
 						<div className="mt-5 grid grid-cols-4">
 							{statusEntries.map((check, index) => (
 								<ProviderStatus
-								key={`${id}-${check.label}`}
+									key={`${id}-${check.label}`}
 									label={check.label}
 									detail={check.message}
 									status={check.severity}
@@ -441,12 +441,7 @@ function RunningSummary({
 	running: HomeDashboardState["running"];
 }) {
 	return (
-		<Panel
-			title="Active workspaces"
-			action="View all"
-			labelledBy="home-running-heading"
-			fill
-		>
+		<Panel title="Active workspaces" labelledBy="home-running-heading" fill>
 			{running.count === 0 ? (
 				<p className="text-xs text-muted-foreground">No active workspaces.</p>
 			) : (
@@ -471,7 +466,6 @@ function RunningSummary({
 							<span className="text-right text-[10px] text-muted-foreground">
 								Running
 							</span>
-							<MoreVertical className="size-4 text-muted-foreground" />
 						</li>
 					))}
 				</ul>
@@ -490,7 +484,6 @@ function RecentProjects({
 	return (
 		<Panel
 			title="Recent projects"
-			action="View all"
 			labelledBy="home-recent-projects-heading"
 			fill
 		>
@@ -550,13 +543,11 @@ function ContextLabel({ name }: { name: string }) {
 
 function Panel({
 	title,
-	action,
 	labelledBy,
 	fill,
 	children,
 }: {
 	title: string;
-	action?: string;
 	labelledBy: string;
 	fill?: boolean;
 	children: ReactNode;
@@ -570,14 +561,6 @@ function Panel({
 				<h3 id={labelledBy} className="home-panel-title">
 					{title}
 				</h3>
-				{action ? (
-					<button
-						type="button"
-						className="text-[11px] text-muted-foreground hover:text-foreground"
-					>
-						{action}
-					</button>
-				) : null}
 			</div>
 			{children}
 		</section>

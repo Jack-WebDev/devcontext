@@ -32,7 +32,7 @@ test("UXF-02 typography roles are defined and used by representative screens", a
 		assert.match(styles, new RegExp(`\\.${role}\\s*\\{`));
 	}
 
-	assert.match(styles, /--font-sans: ui-sans-serif, system-ui/);
+	assert.match(styles, /--font-sans: "Nunito", ui-sans-serif, system-ui/);
 	assert.match(home, /text-page-title/);
 	assert.match(contexts, /text-page-title/);
 	assert.match(launcher, /text-launcher-title/);

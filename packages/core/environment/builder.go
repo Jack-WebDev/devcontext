@@ -49,6 +49,33 @@ func Build(parent []string, contributions ...provider.EnvironmentContribution) V
 	return variables
 }
 
+// WithoutKeys returns parent environment entries except for the supplied keys.
+// Environment variable names are compared case-insensitively because Windows
+// treats them that way.
+func WithoutKeys(parent []string, keys ...string) []string {
+	excluded := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		if key != "" {
+			excluded[strings.ToUpper(key)] = struct{}{}
+		}
+	}
+	if len(excluded) == 0 {
+		return append([]string(nil), parent...)
+	}
+
+	filtered := make([]string, 0, len(parent))
+	for _, entry := range parent {
+		key, _, ok := strings.Cut(entry, "=")
+		if ok {
+			if _, excluded := excluded[strings.ToUpper(key)]; excluded {
+				continue
+			}
+		}
+		filtered = append(filtered, entry)
+	}
+	return filtered
+}
+
 // BuildForContext copies the parent environment, applies provider
 // contributions, and marks the selected Dev Context.
 func BuildForContext(parent []string, contextID devcontext.ID, contributions ...provider.EnvironmentContribution) (Variables, error) {
@@ -66,6 +93,11 @@ func (v Variables) Apply(contribution provider.EnvironmentContribution) {
 	for key, value := range contribution {
 		if key == "" {
 			continue
+		}
+		for existingKey := range v {
+			if existingKey != key && strings.EqualFold(existingKey, key) {
+				delete(v, existingKey)
+			}
 		}
 		v[key] = value
 	}

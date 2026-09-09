@@ -49,8 +49,12 @@ type WorkspaceLifecycle struct {
 
 // Lifecycle reports the workspace lifecycle without performing adapter work.
 func (e Environment) Lifecycle(capabilities codingtool.WorkspaceCapabilities) WorkspaceLifecycle {
+	state := workspaceState(e.Process.State, e.Session.State)
+	if state != WorkspaceStateActive {
+		return WorkspaceLifecycle{State: state}
+	}
 	return WorkspaceLifecycle{
-		State:      workspaceState(e.Process.State, e.Session.State),
+		State:      state,
 		Focusable:  capabilities.Focusable,
 		Revealable: capabilities.Revealable,
 		Stoppable:  capabilities.Stoppable,

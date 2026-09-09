@@ -21,7 +21,9 @@ interface ContextCreateIdentityScreenProps {
 
 const contextPurposeMaxLength = 120;
 
-function contextPurposeValidation(purpose: string | undefined): string | undefined {
+function contextPurposeValidation(
+	purpose: string | undefined,
+): string | undefined {
 	if ((purpose?.length ?? 0) > contextPurposeMaxLength) {
 		return `Keep the purpose to ${contextPurposeMaxLength} characters or fewer.`;
 	}
@@ -47,10 +49,8 @@ function ContextCreateIdentityScreen({
 			className="mx-auto max-w-xl space-y-6"
 		>
 			<div className="space-y-2">
-				<p className="text-sm font-medium text-muted-foreground">
-					Create a context
-				</p>
-				<h2 id="context-identity-title" className="text-2xl font-semibold">
+				<p className="page-header-eyebrow">Create a context</p>
+				<h2 id="context-identity-title" className="text-launcher-title">
 					What kind of development identity are you creating?
 				</h2>
 				<p className="text-sm text-muted-foreground">
@@ -68,7 +68,7 @@ function ContextCreateIdentityScreen({
 							variant={
 								selectedTemplate?.id === template.id ? "default" : "outline"
 							}
-							className="h-auto justify-start whitespace-normal px-4 py-3 text-left"
+							className="h-auto min-h-20 justify-start whitespace-normal px-4 py-3 text-left transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-0.5"
 							onClick={() =>
 								onDraftChange(draftFromContextIdentityTemplate(template))
 							}
@@ -97,7 +97,8 @@ function ContextCreateIdentityScreen({
 			</label>
 
 			<label className="block space-y-2 text-sm font-medium">
-				Purpose <span className="font-normal text-muted-foreground">(optional)</span>
+				Purpose{" "}
+				<span className="font-normal text-muted-foreground">(optional)</span>
 				<Input
 					value={draft.purpose ?? ""}
 					onChange={(event) =>
@@ -109,13 +110,18 @@ function ContextCreateIdentityScreen({
 				/>
 			</label>
 			{purposeError ? (
-				<p id="context-purpose-error" role="alert" className="text-sm text-destructive">
+				<p
+					id="context-purpose-error"
+					role="alert"
+					className="text-sm text-destructive"
+				>
 					{purposeError}
 				</p>
 			) : null}
 
 			<label className="block space-y-2 text-sm font-medium">
-				Description <span className="font-normal text-muted-foreground">(optional)</span>
+				Description{" "}
+				<span className="font-normal text-muted-foreground">(optional)</span>
 				<Textarea
 					value={draft.description ?? ""}
 					onChange={(event) =>

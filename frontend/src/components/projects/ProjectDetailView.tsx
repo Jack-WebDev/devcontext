@@ -27,10 +27,13 @@ function ProjectDetailView({
 }: ProjectDetailViewProps) {
 	if (project === undefined) {
 		return (
-			<section aria-labelledby="project-detail-heading" className="space-y-6">
+			<section
+				aria-labelledby="project-detail-heading"
+				className="page-content page-section-stack"
+			>
 				<div>
 					<p className="text-sm text-muted-foreground">Projects</p>
-					<h2 id="project-detail-heading" className="text-2xl font-semibold">
+					<h2 id="project-detail-heading" className="text-page-title">
 						Project not found
 					</h2>
 					<p className="mt-1 text-sm text-muted-foreground">
@@ -49,8 +52,14 @@ function ProjectDetailView({
 	const canLaunch = isAssigned && onLaunch !== undefined;
 
 	return (
-		<section aria-labelledby="project-detail-heading" className="space-y-6">
-			<nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-muted-foreground">
+		<section
+			aria-labelledby="project-detail-heading"
+			className="page-content page-section-stack"
+		>
+			<nav
+				aria-label="Breadcrumb"
+				className="flex items-center gap-2 text-sm text-muted-foreground"
+			>
 				<button
 					type="button"
 					className="rounded-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
@@ -66,20 +75,20 @@ function ProjectDetailView({
 
 			<div className="flex flex-wrap items-start justify-between gap-4">
 				<div className="min-w-0">
-					<p className="text-sm text-muted-foreground">Project</p>
-					<h2 id="project-detail-heading" className="truncate text-2xl font-semibold">
+					<p className="page-header-eyebrow">Project</p>
+					<h2 id="project-detail-heading" className="truncate text-page-title">
 						{project.project.name}
 					</h2>
-					<p className="mt-1 truncate font-mono text-sm text-muted-foreground" title={project.project.path}>
+					<p
+						className="mt-1 truncate font-mono text-sm text-muted-foreground"
+						title={project.project.path}
+					>
 						{project.project.path}
 					</p>
 				</div>
-				<Button type="button" variant="outline" onClick={onBack}>
-					Back to projects
-				</Button>
 			</div>
 
-			<div className="grid gap-4 lg:grid-cols-2">
+			<div className="collection-surface grid lg:grid-cols-2 [&>*:nth-child(odd)]:lg:border-r [&>*:nth-child(-n+2)]:lg:border-b">
 				<ProjectDetailSection title="Context">
 					<ProjectDetailRow label="Normal context" value={contextName} />
 					<ProjectDetailRow
@@ -113,7 +122,7 @@ function ProjectDetailView({
 				</ProjectDetailSection>
 			</div>
 
-			<div className="flex flex-wrap gap-3">
+			<div className="flex flex-wrap items-center gap-2">
 				<Button
 					type="button"
 					disabled={!canLaunch}
@@ -123,7 +132,7 @@ function ProjectDetailView({
 				</Button>
 				<Button
 					type="button"
-					variant="outline"
+					variant="secondary"
 					disabled={onOpenFolder === undefined}
 					onClick={() => onOpenFolder?.(project)}
 				>
@@ -133,7 +142,7 @@ function ProjectDetailView({
 					<>
 						<Button
 							type="button"
-							variant="outline"
+							variant="ghost"
 							disabled={onChangeContext === undefined}
 							onClick={() => onChangeContext?.(project)}
 						>
@@ -141,7 +150,8 @@ function ProjectDetailView({
 						</Button>
 						<Button
 							type="button"
-							variant="destructive"
+							variant="ghost"
+							className="text-destructive hover:bg-destructive/10 hover:text-destructive"
 							disabled={onRemoveBinding === undefined}
 							onClick={() => onRemoveBinding?.(project)}
 						>
@@ -151,7 +161,8 @@ function ProjectDetailView({
 				) : null}
 				<Button
 					type="button"
-					variant="destructive"
+					variant="ghost"
+					className="text-destructive hover:bg-destructive/10 hover:text-destructive"
 					disabled={onForget === undefined}
 					onClick={() => onForget?.(project)}
 				>
@@ -159,9 +170,8 @@ function ProjectDetailView({
 				</Button>
 				<Button
 					type="button"
-					variant="outline"
-					disabled={!isAssigned || onLocate === undefined}
-					title={!isAssigned ? "Assign a context before relocating this project." : undefined}
+					variant="ghost"
+					disabled={onLocate === undefined}
 					onClick={() => onLocate?.(project)}
 				>
 					Locate project
@@ -179,7 +189,7 @@ function ProjectDetailSection({
 	children: ReactNode;
 }) {
 	return (
-		<Card as="section" hierarchy="secondary" className="py-0">
+		<Card as="section" hierarchy="tertiary" className="rounded-none py-0">
 			<CardContent className="space-y-3 p-5">
 				<h3 className="font-semibold">{title}</h3>
 				{children}

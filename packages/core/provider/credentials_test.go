@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCodexProviderCredentialCapabilities(t *testing.T) {
@@ -37,9 +38,23 @@ func TestCodexProviderCredentialCapabilities(t *testing.T) {
 	}
 }
 
+func TestCodexProviderDoesNotExposeExpiredTokenMetadata(t *testing.T) {
+	directory := t.TempDir()
+	token := testCredentialJWT(t, map[string]any{
+		"email": "expired@example.com",
+		"exp":   time.Now().Add(-time.Minute).Unix(),
+	})
+	writeProviderCredential(t, filepath.Join(directory, "auth.json"), map[string]any{"id_token": token})
+
+	identity, available, err := (CodexProvider{}).DetectContextIdentity(RuntimeContext{Paths: ContextPaths{StorageDir: directory}})
+	if err != nil || available || len(identity.Fields) != 0 {
+		t.Fatalf("expired token identity = %#v available=%t err=%v", identity, available, err)
+	}
+}
+
 func TestClaudeProviderCredentialCapabilities(t *testing.T) {
 	homeDir := t.TempDir()
-	writeProviderCredential(t, filepath.Join(homeDir, ".claude", ".credentials.json"), map[string]string{"subscriptionType": "Pro", "organizationUuid": "org-1", "organizationName": "Acme", "accessToken": "secret"})
+	writeProviderCredential(t, filepath.Join(homeDir, ".claude", ".credentials.json"), map[string]string{"email": "dev@example.com", "subscriptionType": "Pro", "organizationUuid": "org-1", "organizationName": "Acme", "accessToken": "secret"})
 	writeProviderCredential(t, filepath.Join(homeDir, ".claude", "settings.json"), map[string]string{"theme": "dark"})
 
 	p := ClaudeProvider{}
@@ -56,7 +71,7 @@ func TestClaudeProviderCredentialCapabilities(t *testing.T) {
 		t.Fatalf("import credentials: %v", err)
 	}
 	identity, available, err := p.DetectContextIdentity(RuntimeContext{Paths: ContextPaths{StorageDir: destination}})
-	if err != nil || !available || metadataField(identity.Fields, "Subscription") != "Pro" {
+	if err != nil || !available || metadataField(identity.Fields, "Email") != "dev@example.com" || metadataField(identity.Fields, "Subscription") != "Pro" {
 		t.Fatalf("identity = %#v available=%t err=%v", identity, available, err)
 	}
 }
@@ -105,7 +120,7 @@ func writeProviderCredential(t *testing.T, path string, value any) {
 	}
 }
 
-func testCredentialJWT(t *testing.T, claims map[string]string) string {
+func testCredentialJWT(t *testing.T, claims any) string {
 	t.Helper()
 	payload, err := json.Marshal(claims)
 	if err != nil {

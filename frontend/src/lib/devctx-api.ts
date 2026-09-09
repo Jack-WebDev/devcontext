@@ -300,7 +300,7 @@ export interface ProviderState {
 export type ProviderSetupState =
 	| "open_and_configure"
 	| "waiting_for_sign_in"
-	| "verified";
+	| "identity_observed";
 
 export interface ProviderSetupAction {
 	state: ProviderSetupState;
@@ -309,13 +309,13 @@ export interface ProviderSetupAction {
 }
 
 export type ProviderReadinessState =
-	| "ready"
+	| "local_state"
 	| "not_configured"
 	| "directory_missing"
 	| "unavailable";
 
 export type ProviderIdentityStatus =
-	| "verified"
+	| "observed"
 	| "unavailable"
 	| "none"
 	| "mismatch_evidence";
@@ -377,6 +377,7 @@ export interface LaunchProjectRequest {
 	projectPath?: string;
 	contextId: string;
 	confirmContextMismatch?: boolean;
+	confirmPreflightWarnings?: boolean;
 }
 
 export interface PreflightLaunchProjectRequest {
@@ -483,6 +484,7 @@ export interface ContextTemplateState {
 }
 export interface ContextTemplatesState {
 	templates: ContextTemplateState[];
+	developmentTools: DevelopmentToolIntegration[];
 }
 export interface DuplicateContextRequest {
 	sourceContextId: string;
@@ -934,6 +936,7 @@ export function createDevContextApi(
 					bindings.launchProject({
 						...request,
 						confirmContextMismatch: request.confirmContextMismatch ?? false,
+						confirmPreflightWarnings: request.confirmPreflightWarnings ?? false,
 					}),
 				normalizeLaunchProjectResult,
 			);
@@ -1118,6 +1121,7 @@ const generatedBindings: WailsBindings = {
 		return bindings.LaunchProject({
 			...request,
 			confirmContextMismatch: request.confirmContextMismatch ?? false,
+			confirmPreflightWarnings: request.confirmPreflightWarnings ?? false,
 		});
 	},
 	async bindProject(request) {
@@ -1690,6 +1694,9 @@ function normalizeContextTemplatesState(value: unknown): ContextTemplatesState {
 	const object = objectValue(value);
 	return {
 		templates: arrayValue(object.templates).map(normalizeContextTemplateState),
+		developmentTools: arrayValue(object.developmentTools).map(
+			normalizeDevelopmentToolIntegration,
+		),
 	};
 }
 function normalizeContextTemplateState(value: unknown): ContextTemplateState {
@@ -2114,7 +2121,7 @@ function normalizeProviderSetupState(value: unknown): ProviderSetupState {
 	switch (value) {
 		case "open_and_configure":
 		case "waiting_for_sign_in":
-		case "verified":
+		case "identity_observed":
 			return value;
 		default:
 			throw new Error("Invalid Dev Context response.");
@@ -2125,7 +2132,7 @@ function normalizeProviderReadinessState(
 	value: unknown,
 ): ProviderReadinessState {
 	switch (value) {
-		case "ready":
+		case "local_state":
 		case "not_configured":
 		case "directory_missing":
 		case "unavailable":
@@ -2152,7 +2159,7 @@ function normalizeProviderIdentityStatus(
 	value: unknown,
 ): ProviderIdentityStatus {
 	switch (value) {
-		case "verified":
+		case "observed":
 		case "unavailable":
 		case "none":
 		case "mismatch_evidence":

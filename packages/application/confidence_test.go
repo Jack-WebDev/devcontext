@@ -81,9 +81,9 @@ func TestProviderReadinessStateVariantsSerialize(t *testing.T) {
 		want  string
 	}{
 		{
-			name:  "ready",
-			state: application.ProviderReadinessReady,
-			want:  `{"state":"ready"}`,
+			name:  "local state",
+			state: application.ProviderReadinessLocalState,
+			want:  `{"state":"local_state"}`,
 		},
 		{
 			name:  "not configured",
@@ -155,12 +155,12 @@ func TestProviderIdentityStateVariantsSerialize(t *testing.T) {
 		want     string
 	}{
 		{
-			name: "verified identity fields",
+			name: "observed identity fields",
 			identity: application.ProviderIdentityState{
-				Status: application.ProviderIdentityVerified,
+				Status: application.ProviderIdentityObserved,
 				Fields: []application.ProviderMetadataField{{Label: "Email", Value: "user@example.com"}, {Label: "Plan", Value: "Business"}, {Label: "Account", Value: "acct_123"}},
 			},
-			want: `{"status":"verified","fields":[{"label":"Email","value":"user@example.com"},{"label":"Plan","value":"Business"},{"label":"Account","value":"acct_123"}]}`,
+			want: `{"status":"observed","fields":[{"label":"Email","value":"user@example.com"},{"label":"Plan","value":"Business"},{"label":"Account","value":"acct_123"}]}`,
 		},
 		{
 			name: "unavailable",

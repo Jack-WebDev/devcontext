@@ -38,7 +38,7 @@ const (
 	// isolation readiness.
 	LaunchConfidenceCheckIsolation LaunchConfidenceCheckComponent = launcher.ConfidenceCheckIsolation
 
-	// LaunchConfidenceCheckIdentity identifies meaningful conflicting verified
-	// account identity evidence across enabled providers.
+	// LaunchConfidenceCheckIdentity identifies meaningful conflicting locally
+	// observed account identity evidence across enabled providers.
 	LaunchConfidenceCheckIdentity LaunchConfidenceCheckComponent = launcher.ConfidenceCheckIdentity
 )

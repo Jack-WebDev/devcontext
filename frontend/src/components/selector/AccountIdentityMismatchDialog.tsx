@@ -33,7 +33,7 @@ function AccountIdentityMismatchDialog({
 						Review provider accounts
 					</h3>
 					<p className="mt-1 text-muted-foreground">
-						Verified provider email identities do not match for {contextName}.
+						Observed provider email identities do not match for {contextName}.
 						This may be intentional, but review the accounts before launching
 						this context.
 					</p>

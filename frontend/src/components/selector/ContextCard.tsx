@@ -474,13 +474,13 @@ function ProviderStatusRow({
 					</p>
 				</div>
 			) : null}
-			{provider.setupAction?.state === "verified" &&
-			provider.identity.status === "verified" ? (
+			{provider.setupAction?.state === "identity_observed" &&
+			provider.identity.status === "observed" ? (
 				<div
-					className="mt-2 border border-success/40 bg-success/5 p-2 text-xs"
+					className="mt-2 border border-warning/40 bg-warning/5 p-2 text-xs"
 					role="status"
 				>
-					<StatusIndicator status="ready">
+					<StatusIndicator status="needs_attention">
 						{provider.setupAction.label}
 					</StatusIndicator>
 					<p className="mt-1 text-muted-foreground">
@@ -495,7 +495,7 @@ function ProviderStatusRow({
 function ProviderIdentityLine({ provider }: { provider: ProviderState }) {
 	const { identity } = provider;
 
-	if (identity.status === "verified" && identity.fields.length > 0) {
+	if (identity.status === "observed" && identity.fields.length > 0) {
 		const details = identity.fields
 			.map((field) => `${field.label}: ${field.value}`)
 			.join(" · ");
@@ -541,8 +541,8 @@ function providerStatusPresentation(state: ProviderState["state"]): {
 	indicatorClassName: string;
 } {
 	switch (state) {
-		case "ready":
-			return { label: "Ready", indicatorClassName: "bg-emerald-600" };
+		case "local_state":
+			return { label: "Local state found", indicatorClassName: "bg-amber-500" };
 		case "not_configured":
 			return { label: "Not configured", indicatorClassName: "bg-amber-500" };
 		case "directory_missing":

@@ -42,6 +42,29 @@ func TestRunnerContextListRendersEmptyAndPopulatedContexts(t *testing.T) {
 		"Personal  personal\n", "")
 }
 
+func TestRunnerRoutesRootLaunchThroughHostWorkflow(t *testing.T) {
+	fixture := newRunnerFixture(t)
+	workflow := &rootLaunchWorkflowFake{
+		plan: launcher.LaunchPlan{
+			ProjectPath: project.Path(fixture.workingDir),
+			Context:     devcontext.Context{ID: devcontext.MustID("personal")},
+		},
+	}
+	runner := fixture.runner()
+	runner.RootLaunchWorkflow = workflow
+
+	result := runner.Run([]string{"--personal"})
+	if result.Code != cli.ExitSuccess {
+		t.Fatalf("result = %#v, want successful launch", result)
+	}
+	if len(workflow.requests) != 1 {
+		t.Fatalf("workflow requests = %#v, want one", workflow.requests)
+	}
+	if got := workflow.requests[0]; got.Source != launcher.InvocationSourceCLI || got.RequestedContext == nil || got.RequestedContext.String() != "personal" {
+		t.Fatalf("workflow request = %#v, want personal CLI request", got)
+	}
+}
+
 func TestRunnerContextCreateDoesNotImportUnclassifiedProviderCredentials(t *testing.T) {
 	fixture := newRunnerFixture(t)
 	writeCLICredentialFixture(t, filepath.Join(fixture.homeDir, ".codex", "auth.json"), []byte("codex-auth-fixture"))
@@ -313,7 +336,7 @@ func TestRunnerRootLaunchWritesLifecycleEvents(t *testing.T) {
 	wantNames := []devlog.EventName{
 		devlog.EventContextResolution,
 		devlog.EventLaunchProviderMissing,
-		devlog.EventLaunchSucceeded,
+		devlog.EventLaunchSpawned,
 	}
 	if got := eventNames(events); !reflect.DeepEqual(got, wantNames) {
 		t.Fatalf("event names = %#v, want %#v", got, wantNames)
@@ -764,6 +787,17 @@ func (f runnerFixture) runner() cli.Runner {
 			return f.now
 		},
 	}
+}
+
+type rootLaunchWorkflowFake struct {
+	requests []launcher.LaunchRequest
+	plan     launcher.LaunchPlan
+	err      error
+}
+
+func (f *rootLaunchWorkflowFake) LaunchCLIProject(request launcher.LaunchRequest) (launcher.LaunchPlan, error) {
+	f.requests = append(f.requests, request)
+	return f.plan, f.err
 }
 
 func (f runnerFixture) mkdir(t *testing.T, elements ...string) string {

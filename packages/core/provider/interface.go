@@ -32,6 +32,14 @@ type ContextPaths struct {
 // EnvironmentContribution stores environment variables owned by one provider.
 type EnvironmentContribution map[string]string
 
+// InheritedAuthenticationEnvironmentProvider identifies environment variables
+// whose inherited values override credentials stored in a context's isolated
+// provider directory. Launch planning removes these values for enabled
+// providers so the selected context determines authentication.
+type InheritedAuthenticationEnvironmentProvider interface {
+	InheritedAuthenticationEnvironmentVariables() []string
+}
+
 // MetadataField contains one safe, non-secret provider metadata value suitable
 // for display.
 type MetadataField struct {

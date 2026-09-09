@@ -6,7 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"time"
 )
+
+const detachedProcessStartupGracePeriod = 50 * time.Millisecond
 
 var (
 	// ErrMissingProcessExecutable identifies a process launch request without an
@@ -103,8 +106,8 @@ func (NativeProcessLauncher) Launch(request ProcessRequest) error {
 		if err := command.Start(); err != nil {
 			return mapProcessLaunchError(request, err)
 		}
-		if err := command.Process.Release(); err != nil {
-			return newProcessLaunchError(request, ErrProcessStartFailed, err)
+		if err := waitForImmediateProcessExit(command); err != nil {
+			return mapProcessLaunchError(request, err)
 		}
 		return nil
 	}
@@ -113,6 +116,22 @@ func (NativeProcessLauncher) Launch(request ProcessRequest) error {
 		return mapProcessLaunchError(request, err)
 	}
 	return nil
+}
+
+// waitForImmediateProcessExit gives a detached process a brief opportunity to
+// report an immediate startup failure without waiting for normal tool runtime.
+func waitForImmediateProcessExit(command *exec.Cmd) error {
+	exited := make(chan error, 1)
+	go func() {
+		exited <- command.Wait()
+	}()
+
+	select {
+	case err := <-exited:
+		return err
+	case <-time.After(detachedProcessStartupGracePeriod):
+		return nil
+	}
 }
 
 func (a Arguments) strings() []string {

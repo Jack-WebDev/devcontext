@@ -37,7 +37,7 @@ func TestRefreshProcessStatesStopsOnlyKnownInactiveProcesses(t *testing.T) {
 	for _, environment := range result.Environments {
 		states[string(environment.Project.Path)] = environment.Process.State
 	}
-	if states["/work/api"] != running.ProcessStateRunning || states["/work/web"] != running.ProcessStateStopped || states["/work/docs"] != running.ProcessStateRunning {
+	if states["/work/api"] != running.ProcessStateRunning || states["/work/web"] != running.ProcessStateStopped || states["/work/docs"] != running.ProcessStateUnknown {
 		t.Fatalf("process states = %#v", states)
 	}
 }

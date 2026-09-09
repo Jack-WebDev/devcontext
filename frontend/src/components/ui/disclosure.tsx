@@ -12,12 +12,12 @@ function Disclosure({
 		<details
 			data-slot="disclosure"
 			className={cn(
-				"group/disclosure rounded-lg border border-border/70 bg-(--surface-subtle) px-3 py-2.5 text-sm open:bg-card",
+				"group/disclosure rounded-xl bg-muted/40 px-4 py-3 text-sm transition-colors open:bg-muted/55",
 				className,
 			)}
 			{...props}
 		>
-			<summary className="cursor-pointer list-none font-medium text-foreground [&::-webkit-details-marker]:hidden">
+			<summary className="cursor-pointer list-none font-semibold text-foreground transition-colors hover:text-primary [&::-webkit-details-marker]:hidden">
 				{summary}
 			</summary>
 			<div className="pt-3">{children}</div>

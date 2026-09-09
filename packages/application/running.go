@@ -17,8 +17,9 @@ func (s *Service) getRunningEnvironments() (RunningEnvironmentsState, error) {
 	if err != nil {
 		return RunningEnvironmentsState{}, err
 	}
-	states := make([]RunningEnvironmentState, len(environments))
-	for index, environment := range environments {
+	current := currentWorkspaceRecords(environments)
+	states := make([]RunningEnvironmentState, len(current))
+	for index, environment := range current {
 		states[index] = s.runningEnvironmentState(environment)
 	}
 	return RunningEnvironmentsState{Environments: states}, nil
@@ -83,6 +84,9 @@ func (s *Service) activeWorkspace(id string) (coreRunning.Environment, error) {
 		return coreRunning.Environment{}, err
 	}
 	for _, environment := range environments {
+		if environment.Lifecycle(s.dependencies.ToolRegistry.WorkspaceCapabilities(environment.Tool.ID)).State != coreRunning.WorkspaceStateActive {
+			continue
+		}
 		if string(environment.ID) == id {
 			return environment, nil
 		}
@@ -102,13 +106,7 @@ func (s *Service) refreshRunningEnvironments() ([]coreRunning.Environment, error
 	for _, environment := range result.Stopped {
 		s.recordHistoryEvent(environmentStoppedEvent(environment, s.now()))
 	}
-	active := make([]coreRunning.Environment, 0, len(result.Environments))
-	for _, environment := range result.Environments {
-		if environment.Lifecycle(codingtool.WorkspaceCapabilities{}).State == coreRunning.WorkspaceStateActive {
-			active = append(active, environment)
-		}
-	}
-	return active, nil
+	return result.Environments, nil
 }
 
 func (s *Service) homeRunningSummary() (HomeRunningSummary, error) {
@@ -116,8 +114,9 @@ func (s *Service) homeRunningSummary() (HomeRunningSummary, error) {
 	if err != nil {
 		return HomeRunningSummary{}, err
 	}
+	active := activeWorkspaceRecords(environments)
 	counts := map[string]HomeRunningContextCount{}
-	for _, environment := range environments {
+	for _, environment := range active {
 		count := counts[environment.Context.ID.String()]
 		count.ContextID = environment.Context.ID.String()
 		count.ContextName = environment.Context.Name
@@ -129,7 +128,7 @@ func (s *Service) homeRunningSummary() (HomeRunningSummary, error) {
 		contextCounts = append(contextCounts, count)
 	}
 	sort.Slice(contextCounts, func(i, j int) bool { return contextCounts[i].ContextName < contextCounts[j].ContextName })
-	return HomeRunningSummary{Count: len(environments), ContextCounts: contextCounts, IsolationProtected: len(environments) > 0}, nil
+	return HomeRunningSummary{Count: len(active), ContextCounts: contextCounts, IsolationProtected: len(active) > 0}, nil
 }
 
 func (s *Service) runningEnvironmentConflict(projectPath project.Path, contextID devcontext.ID) (*RunningEnvironmentConflict, error) {
@@ -138,7 +137,7 @@ func (s *Service) runningEnvironmentConflict(projectPath project.Path, contextID
 		return nil, err
 	}
 	var differentContext *RunningEnvironmentConflict
-	for _, environment := range environments {
+	for _, environment := range activeWorkspaceRecords(environments) {
 		if environment.Project.Path != projectPath {
 			continue
 		}
@@ -150,6 +149,26 @@ func (s *Service) runningEnvironmentConflict(projectPath project.Path, contextID
 		}
 	}
 	return differentContext, nil
+}
+
+func currentWorkspaceRecords(environments []coreRunning.Environment) []coreRunning.Environment {
+	current := make([]coreRunning.Environment, 0, len(environments))
+	for _, environment := range environments {
+		if environment.Lifecycle(codingtool.WorkspaceCapabilities{}).State != coreRunning.WorkspaceStateStopped {
+			current = append(current, environment)
+		}
+	}
+	return current
+}
+
+func activeWorkspaceRecords(environments []coreRunning.Environment) []coreRunning.Environment {
+	active := make([]coreRunning.Environment, 0, len(environments))
+	for _, environment := range environments {
+		if environment.Lifecycle(codingtool.WorkspaceCapabilities{}).State == coreRunning.WorkspaceStateActive {
+			active = append(active, environment)
+		}
+	}
+	return active
 }
 
 func environmentStoppedEvent(environment coreRunning.Environment, timestamp time.Time) devlog.Event {

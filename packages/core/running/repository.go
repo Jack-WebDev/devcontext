@@ -14,6 +14,7 @@ import (
 
 	codingtool "devctx/packages/core/codingtool"
 	devcontext "devctx/packages/core/context"
+	"devctx/packages/core/filesystem"
 	"devctx/packages/core/launcher"
 	"devctx/packages/core/project"
 )
@@ -76,28 +77,27 @@ func (r Repository) Record(environment Environment) (Environment, error) {
 		return Environment{}, fmt.Errorf("record running environment: %w", err)
 	}
 
-	environments, err := r.List()
-	if err != nil {
-		return Environment{}, err
-	}
-	for index, existing := range environments {
-		if existing.Project.Path == environment.Project.Path && existing.Context.ID == environment.Context.ID {
-			environment.ID = existing.ID
-			environments[index] = environment
-			if err := r.write(environments); err != nil {
-				return Environment{}, err
-			}
-			return environment, nil
+	if err := filesystem.WithExclusiveFileLock(r.path, func() error {
+		environments, err := r.List()
+		if err != nil {
+			return err
 		}
-	}
+		for index, existing := range environments {
+			if existing.Project.Path == environment.Project.Path && existing.Context.ID == environment.Context.ID {
+				environment.ID = existing.ID
+				environments[index] = environment
+				return r.write(environments)
+			}
+		}
 
-	id, err := newID()
-	if err != nil {
-		return Environment{}, fmt.Errorf("create running environment ID: %w", err)
-	}
-	environment.ID = id
-	environments = append(environments, environment)
-	if err := r.write(environments); err != nil {
+		id, err := newID()
+		if err != nil {
+			return fmt.Errorf("create running environment ID: %w", err)
+		}
+		environment.ID = id
+		environments = append(environments, environment)
+		return r.write(environments)
+	}); err != nil {
 		return Environment{}, err
 	}
 	return environment, nil
@@ -105,27 +105,37 @@ func (r Repository) Record(environment Environment) (Environment, error) {
 
 // MarkStopped records that an adapter has stopped exactly one workspace.
 func (r Repository) MarkStopped(id ID) (Environment, error) {
-	environments, err := r.List()
-	if err != nil {
+	var stopped Environment
+	found := false
+	if err := filesystem.WithExclusiveFileLock(r.path, func() error {
+		environments, err := r.List()
+		if err != nil {
+			return err
+		}
+		for index := range environments {
+			if environments[index].ID != id {
+				continue
+			}
+			environments[index].Process.State = ProcessStateStopped
+			environments[index].Session.State = SessionStateEnded
+			stopped = environments[index]
+			found = true
+			return r.write(environments)
+		}
+		return nil
+	}); err != nil {
 		return Environment{}, err
 	}
-	for index := range environments {
-		if environments[index].ID != id {
-			continue
-		}
-		environments[index].Process.State = ProcessStateStopped
-		environments[index].Session.State = SessionStateEnded
-		if err := r.write(environments); err != nil {
-			return Environment{}, err
-		}
-		return environments[index], nil
+	if found {
+		return stopped, nil
 	}
 	return Environment{}, fmt.Errorf("workspace %q does not exist", id)
 }
 
 // RefreshProcessStates marks running environments stopped when their recorded
-// PID is no longer active. Records without a PID remain unchanged because their
-// process state cannot be observed safely.
+// PID is no longer active. Legacy records that claimed a running process without
+// a PID or adapter session are changed to unknown because that claim cannot be
+// observed safely.
 func (r Repository) RefreshProcessStates(inspector ProcessInspector) (RefreshResult, error) {
 	if r.IsZero() {
 		return RefreshResult{}, fmt.Errorf("refresh running environments: repository is not configured")
@@ -133,37 +143,48 @@ func (r Repository) RefreshProcessStates(inspector ProcessInspector) (RefreshRes
 	if inspector == nil {
 		return RefreshResult{}, fmt.Errorf("refresh running environments: process inspector is required")
 	}
-	environments, err := r.List()
-	if err != nil {
+	stopped := make([]Environment, 0)
+	var refreshed []Environment
+	if err := filesystem.WithExclusiveFileLock(r.path, func() error {
+		environments, err := r.List()
+		if err != nil {
+			return err
+		}
+		changed := false
+		for index := range environments {
+			environment := &environments[index]
+			if environment.Process.State == ProcessStateRunning && environment.Process.PID == nil && environment.Session.State == SessionStateUnknown {
+				environment.Process.State = ProcessStateUnknown
+				changed = true
+			}
+			if environment.Process.State != ProcessStateRunning || environment.Process.PID == nil {
+				continue
+			}
+			running, err := inspector.IsRunning(*environment.Process.PID)
+			if err != nil {
+				return err
+			}
+			if running {
+				continue
+			}
+			environment.Process.State = ProcessStateStopped
+			if environment.Session.State == SessionStateActive {
+				environment.Session.State = SessionStateEnded
+			}
+			stopped = append(stopped, *environment)
+			changed = true
+		}
+		if changed {
+			if err := r.write(environments); err != nil {
+				return err
+			}
+		}
+		refreshed = environments
+		return nil
+	}); err != nil {
 		return RefreshResult{}, err
 	}
-	stopped := make([]Environment, 0)
-	changed := false
-	for index := range environments {
-		environment := &environments[index]
-		if environment.Process.State != ProcessStateRunning || environment.Process.PID == nil {
-			continue
-		}
-		running, err := inspector.IsRunning(*environment.Process.PID)
-		if err != nil {
-			return RefreshResult{}, err
-		}
-		if running {
-			continue
-		}
-		environment.Process.State = ProcessStateStopped
-		if environment.Session.State == SessionStateActive {
-			environment.Session.State = SessionStateEnded
-		}
-		stopped = append(stopped, *environment)
-		changed = true
-	}
-	if changed {
-		if err := r.write(environments); err != nil {
-			return RefreshResult{}, err
-		}
-	}
-	return RefreshResult{Environments: environments, Stopped: stopped}, nil
+	return RefreshResult{Environments: refreshed, Stopped: stopped}, nil
 }
 
 type document struct {

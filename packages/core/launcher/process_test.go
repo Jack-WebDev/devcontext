@@ -123,6 +123,23 @@ func TestNativeProcessLauncherDetachesFixtureProcess(t *testing.T) {
 	waitForFile(t, donePath)
 }
 
+func TestNativeProcessLauncherReportsImmediateDetachedFailure(t *testing.T) {
+	err := launcher.NativeProcessLauncher{}.Launch(launcher.ProcessRequest{
+		Executable: launcher.Executable(os.Args[0]),
+		Arguments: launcher.Arguments{
+			"-test.run=TestNativeProcessLauncherFailingHelper",
+		},
+		Environment: launcher.Environment{
+			"DEVCTX_FAILING_HELPER_PROCESS": "1",
+		},
+		WorkingDirectory: launcher.WorkingDirectory(t.TempDir()),
+		DetachMode:       launcher.DetachModeDetached,
+	})
+	if !errors.Is(err, launcher.ErrProcessStartFailed) {
+		t.Fatalf("error = %v, want %v", err, launcher.ErrProcessStartFailed)
+	}
+}
+
 func TestNativeProcessLauncherMapsLaunchFailures(t *testing.T) {
 	workingDirectory := t.TempDir()
 

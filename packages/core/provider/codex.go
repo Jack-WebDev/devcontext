@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
@@ -16,6 +17,18 @@ const (
 
 	// CodexHomeEnvVar is the environment variable Codex uses for its home.
 	CodexHomeEnvVar = "CODEX_HOME"
+
+	// OpenAIAPIKeyEnvVar supplies API-key authentication, which overrides
+	// context-owned Codex credentials.
+	OpenAIAPIKeyEnvVar = "OPENAI_API_KEY"
+
+	// CodexAPIKeyEnvVar supplies Codex API-key authentication, which overrides
+	// context-owned Codex credentials.
+	CodexAPIKeyEnvVar = "CODEX_API_KEY"
+
+	// CodexAccessTokenEnvVar supplies access-token authentication, which
+	// overrides context-owned Codex credentials.
+	CodexAccessTokenEnvVar = "CODEX_ACCESS_TOKEN"
 )
 
 // CodexProvider contributes isolated Codex process configuration.
@@ -24,6 +37,7 @@ type CodexProvider struct {
 }
 
 var _ Provider = CodexProvider{}
+var _ InheritedAuthenticationEnvironmentProvider = CodexProvider{}
 var _ GlobalCredentialDetector = CodexProvider{}
 var _ CredentialMetadataExtractor = CodexProvider{}
 var _ CredentialImporter = CodexProvider{}
@@ -48,9 +62,15 @@ func (CodexProvider) BuildEnvironment(ctx RuntimeContext) (EnvironmentContributi
 	}, nil
 }
 
+// InheritedAuthenticationEnvironmentVariables identifies host credentials
+// that Codex gives precedence over its context-owned credentials.
+func (CodexProvider) InheritedAuthenticationEnvironmentVariables() []string {
+	return []string{OpenAIAPIKeyEnvVar, CodexAPIKeyEnvVar, CodexAccessTokenEnvVar}
+}
+
 // Status returns local provider readiness.
 func (p CodexProvider) Status(ctx RuntimeContext) (Status, error) {
-	return detectLocalStatus(p.Probe, p.DisplayName(), ctx.Paths.StorageDir)
+	return detectLocalStatus(p.Probe, p.DisplayName(), ctx.Paths.StorageDir, "auth.json")
 }
 
 // DetectGlobalCredentialSession identifies the local Codex session without
@@ -107,6 +127,7 @@ type codexIDTokenClaims struct {
 	Email            string `json:"email"`
 	ChatGPTPlanType  string `json:"chatgpt_plan_type"`
 	ChatGPTAccountID string `json:"chatgpt_account_id"`
+	ExpiresAt        int64  `json:"exp"`
 }
 
 func codexMetadataFromFile(path string) ([]MetadataField, bool, bool, error) {
@@ -135,6 +156,9 @@ func codexMetadataFromFile(path string) ([]MetadataField, bool, bool, error) {
 	}
 	var claims codexIDTokenClaims
 	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil, false, true, nil
+	}
+	if claims.ExpiresAt > 0 && claims.ExpiresAt <= time.Now().Unix() {
 		return nil, false, true, nil
 	}
 	fields := metadataFields(

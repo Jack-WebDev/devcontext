@@ -3,6 +3,7 @@ import type { ProjectListItem } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import { EmptyState } from "../ui/collection-state.js";
+import { PageHeader } from "../ui/page-header.js";
 
 interface ProjectsViewProps {
 	projects: ProjectListItem[];
@@ -30,16 +31,16 @@ function ProjectsView({
 	onStartLaunch,
 }: ProjectsViewProps) {
 	return (
-		<section aria-labelledby="projects-heading" className="space-y-6">
-			<div>
-				<p className="text-sm text-muted-foreground">Known projects</p>
-				<h2 id="projects-heading" className="text-2xl font-semibold">
-					Projects
-				</h2>
-				<p className="mt-1 text-sm text-muted-foreground">
-					Review the context Dev Context will use before launching a project.
-				</p>
-			</div>
+		<section
+			aria-labelledby="projects-heading"
+			className="page-content page-section-stack"
+		>
+			<PageHeader
+				id="projects-heading"
+				eyebrow="Known projects"
+				title="Projects"
+				description="Review the context Dev Context will use before launching a project."
+			/>
 
 			<FilteredProjects
 				projects={projects}
@@ -70,15 +71,21 @@ function FilteredProjects(props: ProjectsViewProps) {
 	return (
 		<>
 			{props.projects.length > 0 ? (
-				<fieldset className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-					<legend className="font-medium">Project assignment</legend>
-					{([
-						["all", "All projects"],
-						["assigned", "Assigned"],
-						["unassigned", "Unassigned"],
-					] as const).map(([value, label]) => (
-						<label key={value} className="flex items-center gap-2">
+				<fieldset className="flex flex-wrap items-center gap-1 rounded-xl bg-muted/45 p-1.5 text-sm">
+					<legend className="sr-only">Project assignment</legend>
+					{(
+						[
+							["all", "All projects"],
+							["assigned", "Assigned"],
+							["unassigned", "Unassigned"],
+						] as const
+					).map(([value, label]) => (
+						<label
+							key={value}
+							className="has-[:checked]:bg-card has-[:checked]:shadow-sm flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors has-[:checked]:text-foreground has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/25"
+						>
 							<input
+								className="sr-only"
 								type="radio"
 								name="project-assignment-filter"
 								value={value}
@@ -93,14 +100,18 @@ function FilteredProjects(props: ProjectsViewProps) {
 
 			{visibleProjects.length === 0 ? (
 				<EmptyState
-					title={props.projects.length === 0 ? "No projects yet" : "No matching projects"}
+					title={
+						props.projects.length === 0
+							? "No projects yet"
+							: "No matching projects"
+					}
 					description={emptyMessage}
 					{...(props.projects.length === 0
 						? { actionLabel: "Launch a project", onAction: props.onStartLaunch }
 						: {})}
 				/>
 			) : (
-				<div className="space-y-4">
+				<div className="collection-surface divide-y divide-border/50">
 					{visibleProjects.map((project, index) => (
 						<ProjectCard
 							key={project.project.path}
@@ -150,8 +161,8 @@ function ProjectCard({
 	return (
 		<Card
 			as="article"
-			hierarchy="secondary"
-			className="py-0"
+			hierarchy="tertiary"
+			className="collection-row rounded-none py-0"
 			aria-labelledby={id}
 		>
 			<CardContent className="space-y-4 p-5">
@@ -168,20 +179,16 @@ function ProjectCard({
 					<span
 						className={
 							isAssigned
-								? "inline-flex shrink-0 border border-border bg-muted/30 px-2 py-1 text-xs font-medium text-foreground"
-								: "inline-flex shrink-0 border border-border bg-background px-2 py-1 text-xs font-medium text-muted-foreground"
+								? "inline-flex shrink-0 rounded-md bg-[var(--green-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--green-strong)]"
+								: "inline-flex shrink-0 rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
 						}
 					>
 						{isAssigned ? "Assigned" : "Unassigned"}
 					</span>
 				</div>
 
-				<dl className="grid gap-4 border-y border-border py-4 text-sm sm:grid-cols-2">
-					<ProjectDetail
-						label="Normal context"
-						value={contextName}
-						prominent
-					/>
+				<dl className="grid gap-x-8 gap-y-4 rounded-xl bg-muted/30 p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+					<ProjectDetail label="Normal context" value={contextName} prominent />
 					<ProjectDetail
 						label="Binding state"
 						value={
@@ -207,10 +214,10 @@ function ProjectCard({
 					</p>
 				) : null}
 
-				<div className="flex flex-wrap gap-3">
+				<div className="flex flex-wrap items-center gap-2">
 					<Button
 						type="button"
-						variant="outline"
+						variant="ghost"
 						size="sm"
 						disabled={onOpenDetail === undefined}
 						onClick={() => onOpenDetail?.(project)}
@@ -220,14 +227,17 @@ function ProjectCard({
 					<Button
 						type="button"
 						size="sm"
+						className="ml-auto"
 						disabled={!canLaunch || launching}
 						onClick={() => onLaunch?.(project)}
 					>
-						{launching ? `Launching ${contextName}...` : `Launch ${contextName}`}
+						{launching
+							? `Launching ${contextName}...`
+							: `Launch ${contextName}`}
 					</Button>
 					<Button
 						type="button"
-						variant="outline"
+						variant="ghost"
 						size="sm"
 						disabled={onOpenFolder === undefined}
 						onClick={() => onOpenFolder?.(project)}
@@ -256,7 +266,9 @@ function filterProjects(
 ): ProjectListItem[] {
 	if (filter === "all") return projects;
 	const assigned = filter === "assigned";
-	return projects.filter((project) => (project.contextId !== undefined) === assigned);
+	return projects.filter(
+		(project) => (project.contextId !== undefined) === assigned,
+	);
 }
 
 function ProjectDetail({

@@ -2,10 +2,14 @@ package project_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,6 +17,68 @@ import (
 	"devctx/packages/core/filesystem"
 	"devctx/packages/core/project"
 )
+
+func TestRepositoryBindRetainsAllConcurrentBindings(t *testing.T) {
+	homeDir := t.TempDir()
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) { return homeDir, nil })
+	contextsDir := filepath.Join(homeDir, ".devctx", "contexts")
+	_ = createContextRepository(t, contextsDir, devcontext.DefaultPersonalContext(testTime(10, 0)))
+	bindingsPath := filepath.Join(homeDir, ".devctx", "projects.toml")
+	repository := project.NewRepository(bindingsPath, platformPaths)
+
+	const bindingCount = 32
+	projectDirs := make([]string, bindingCount)
+	for index := range projectDirs {
+		projectDirs[index] = filepath.Join(homeDir, "projects", fmt.Sprintf("project-%d", index))
+		createDirectory(t, projectDirs[index])
+	}
+
+	var workers sync.WaitGroup
+	for index, projectDir := range projectDirs {
+		workers.Add(1)
+		go func(index int, projectDir string) {
+			defer workers.Done()
+			command := exec.Command(os.Args[0], "-test.run=^TestRepositoryBindHelperProcess$")
+			command.Env = append(os.Environ(),
+				"DEVCTX_BIND_HELPER=1",
+				"DEVCTX_BIND_HOME="+homeDir,
+				"DEVCTX_BIND_PROJECT="+projectDir,
+				fmt.Sprintf("DEVCTX_BIND_MINUTE=%d", index),
+			)
+			if output, err := command.CombinedOutput(); err != nil {
+				t.Errorf("bind project concurrently: %v\n%s", err, output)
+			}
+		}(index, projectDir)
+	}
+	workers.Wait()
+
+	bindings, err := repository.List()
+	if err != nil {
+		t.Fatalf("list bindings: %v", err)
+	}
+	if len(bindings) != bindingCount {
+		t.Fatalf("binding count = %d, want %d", len(bindings), bindingCount)
+	}
+}
+
+func TestRepositoryBindHelperProcess(t *testing.T) {
+	if os.Getenv("DEVCTX_BIND_HELPER") != "1" {
+		return
+	}
+
+	homeDir := os.Getenv("DEVCTX_BIND_HOME")
+	projectDir := os.Getenv("DEVCTX_BIND_PROJECT")
+	minute, err := strconv.Atoi(os.Getenv("DEVCTX_BIND_MINUTE"))
+	if err != nil {
+		t.Fatalf("read bind minute: %v", err)
+	}
+	platformPaths := filesystem.NewDefaultPlatformPathsWithUserHome(func() (string, error) { return homeDir, nil })
+	repository := project.NewRepository(filepath.Join(homeDir, ".devctx", "projects.toml"), platformPaths)
+	contexts := devcontext.NewRepository(filepath.Join(homeDir, ".devctx", "contexts"))
+	if _, err := repository.Bind(projectDir, project.Path(homeDir), devcontext.MustID("personal"), contexts, testTime(11, minute)); err != nil {
+		t.Fatalf("bind project: %v", err)
+	}
+}
 
 func TestRepositoryLookupFindsEquivalentProjectPathBindings(t *testing.T) {
 	homeDir := t.TempDir()

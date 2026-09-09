@@ -42,6 +42,33 @@ func TestBuildReplacesDuplicateKeys(t *testing.T) {
 	assertVariable(t, variables, provider.CodexHomeEnvVar, "/home/alex/.devctx/contexts/company/providers/codex")
 }
 
+func TestWithoutKeysRemovesCaseInsensitiveMatches(t *testing.T) {
+	got := environment.WithoutKeys(
+		[]string{
+			"PATH=/usr/bin",
+			"anthropic_api_key=secret",
+			"OPENAI_API_KEY=secret",
+			"invalid-entry",
+		},
+		"ANTHROPIC_API_KEY",
+		"openai_api_key",
+	)
+	want := []string{"PATH=/usr/bin", "invalid-entry"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("environment = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildReplacesCaseInsensitiveContributionKey(t *testing.T) {
+	variables := environment.Build(
+		[]string{"codex_home=/global/codex"},
+		provider.EnvironmentContribution{provider.CodexHomeEnvVar: "/context/codex"},
+	)
+	if !reflect.DeepEqual(variables, environment.Variables{provider.CodexHomeEnvVar: "/context/codex"}) {
+		t.Fatalf("variables = %#v", variables)
+	}
+}
+
 func TestBuildForContextAddsActiveContextMarker(t *testing.T) {
 	personalVariables, err := environment.BuildForContext(
 		[]string{

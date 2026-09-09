@@ -6,6 +6,7 @@ interface PreflightReviewViewProps {
 	projectName: string;
 	contextName: string;
 	preflight: PreflightLaunchProjectResult;
+	pending?: boolean;
 	onFixFirst: () => void;
 	onLaunchWithoutIt?: () => void;
 }
@@ -14,6 +15,7 @@ function PreflightReviewView({
 	projectName,
 	contextName,
 	preflight,
+	pending = false,
 	onFixFirst,
 	onLaunchWithoutIt,
 }: PreflightReviewViewProps) {
@@ -32,11 +34,11 @@ function PreflightReviewView({
 				groups={preflight.groups}
 			/>
 			<div className="control-cluster justify-end">
-				<Button type="button" variant="outline" onClick={onFixFirst}>
+				<Button type="button" variant="outline" disabled={pending} onClick={onFixFirst}>
 					Fix first
 				</Button>
 				{onLaunchWithoutIt ? (
-					<Button type="button" onClick={onLaunchWithoutIt}>
+					<Button type="button" disabled={pending} onClick={onLaunchWithoutIt}>
 						Launch without it
 					</Button>
 				) : null}

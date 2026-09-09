@@ -392,6 +392,7 @@ export namespace application {
 	    projectPath?: string;
 	    contextId: string;
 	    confirmContextMismatch: boolean;
+	    confirmPreflightWarnings: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new LaunchProjectRequest(source);
@@ -402,6 +403,7 @@ export namespace application {
 	        this.projectPath = source["projectPath"];
 	        this.contextId = source["contextId"];
 	        this.confirmContextMismatch = source["confirmContextMismatch"];
+	        this.confirmPreflightWarnings = source["confirmPreflightWarnings"];
 	    }
 	}
 	export class PreflightLaunchProjectRequest {

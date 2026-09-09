@@ -86,6 +86,12 @@ func (l LocalLogger) Record(event Event) error {
 	}
 
 	path := filepath.Join(l.LogsDir, l.fileName())
+	return filesystem.WithExclusiveFileLock(path, func() error {
+		return l.append(path, data, permissions)
+	})
+}
+
+func (l LocalLogger) append(path string, data []byte, permissions filesystem.StoragePermissions) error {
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, permissions.FileMode())
 	if err != nil {
 		if wrapped := filesystem.WrapStoragePermissionError("open file", path, err); wrapped != err {
@@ -105,6 +111,63 @@ func (l LocalLogger) Record(event Event) error {
 		return fmt.Errorf("append log event to %q: %w", path, err)
 	}
 	return nil
+}
+
+func writeEvents(path string, events []Event, permissions filesystem.StoragePermissions) error {
+	if permissions == nil {
+		permissions = filesystem.NewDefaultStoragePermissions()
+	}
+
+	directory := filepath.Dir(path)
+	file, err := os.CreateTemp(directory, "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("create temporary event log: %w", err)
+	}
+	temporaryPath := file.Name()
+	removeTemporary := true
+	defer func() {
+		if removeTemporary {
+			_ = os.Remove(temporaryPath)
+		}
+	}()
+
+	if err := permissions.ApplyFile(temporaryPath); err != nil {
+		_ = file.Close()
+		return err
+	}
+	for _, event := range events {
+		data, err := json.Marshal(event)
+		if err != nil {
+			_ = file.Close()
+			return fmt.Errorf("encode event log: %w", err)
+		}
+		if _, err := file.Write(append(data, '\n')); err != nil {
+			_ = file.Close()
+			return fmt.Errorf("write temporary event log: %w", err)
+		}
+	}
+	if err := file.Sync(); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("sync temporary event log: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("close temporary event log: %w", err)
+	}
+	if err := os.Rename(temporaryPath, path); err != nil {
+		return fmt.Errorf("replace event log: %w", err)
+	}
+	removeTemporary = false
+	syncEventLogDirectory(directory)
+	return nil
+}
+
+func syncEventLogDirectory(path string) {
+	directory, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer directory.Close()
+	_ = directory.Sync()
 }
 
 func (l LocalLogger) fileName() string {

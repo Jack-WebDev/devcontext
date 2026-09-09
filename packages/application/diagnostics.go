@@ -237,8 +237,7 @@ func providerReadinessDiagnostic(id string, entry providerStateEntry) Diagnostic
 		message = entry.state.Name + " needs configuration."
 	}
 	if entry.status.State == provider.StatusConfigured {
-		severity = DiagnosticSeverityReady
-		message = entry.state.Name + " is configured for this context."
+		message = entry.state.Name + " local credential state is present, but usable authentication has not been verified."
 	}
 	if entry.status.State == provider.StatusUnavailable {
 		severity = DiagnosticSeverityBlocked
@@ -260,13 +259,13 @@ func credentialFileDiagnostic(id, label, path string) DiagnosticCheck {
 }
 
 func providerIdentityDiagnostic(id, providerName string, identity ProviderIdentityState) DiagnosticCheck {
-	if identity.Status == ProviderIdentityVerified {
-		return DiagnosticCheck{ID: id, Severity: DiagnosticSeverityReady, Label: providerName + " account identity", Message: providerName + " account identity is verified.", Details: providerIdentityDetails(identity.Fields)}
+	if identity.Status == ProviderIdentityObserved {
+		return DiagnosticCheck{ID: id, Severity: DiagnosticSeverityReady, Label: providerName + " account identity", Message: providerName + " account metadata was observed locally.", Details: providerIdentityDetails(identity.Fields)}
 	}
 	if identity.Status == ProviderIdentityUnavailable {
 		return DiagnosticCheck{ID: id, Severity: DiagnosticSeverityNeedsAttention, Label: providerName + " account identity", Message: "Account identity is unavailable.", ActionHint: "Re-check the integration when its account information is available."}
 	}
-	return DiagnosticCheck{ID: id, Severity: DiagnosticSeverityNeedsAttention, Label: providerName + " account identity", Message: "Account identity has not been verified.", ActionHint: "Sign in or re-check this integration in the selected context."}
+	return DiagnosticCheck{ID: id, Severity: DiagnosticSeverityNeedsAttention, Label: providerName + " account identity", Message: "Account identity has not been observed.", ActionHint: "Sign in or re-check this integration in the selected context."}
 }
 
 func providerIdentityDetails(fields []ProviderMetadataField) []DiagnosticDetail {

@@ -409,28 +409,28 @@ type ProviderSetupState string
 const (
 	ProviderSetupOpenAndConfigure ProviderSetupState = "open_and_configure"
 	ProviderSetupWaitingForSignIn ProviderSetupState = "waiting_for_sign_in"
-	ProviderSetupVerified         ProviderSetupState = "verified"
+	ProviderSetupIdentityObserved ProviderSetupState = "identity_observed"
 )
 
 // Valid reports whether state is one of the bounded API provider setup states.
 func (s ProviderSetupState) Valid() bool {
 	switch s {
-	case ProviderSetupOpenAndConfigure, ProviderSetupWaitingForSignIn, ProviderSetupVerified:
+	case ProviderSetupOpenAndConfigure, ProviderSetupWaitingForSignIn, ProviderSetupIdentityObserved:
 		return true
 	default:
 		return false
 	}
 }
 
-// ProviderReadinessState is the UI-facing provider readiness vocabulary.
-// It intentionally maps core provider.StatusConfigured to ready so API
-// consumers do not need to understand storage-oriented provider wording.
+// ProviderReadinessState is the UI-facing provider local-state vocabulary.
+// It intentionally distinguishes local credential-file presence from usable
+// provider authentication.
 type ProviderReadinessState string
 
 const (
-	// ProviderReadinessReady means the provider has local state for this
-	// context.
-	ProviderReadinessReady ProviderReadinessState = "ready"
+	// ProviderReadinessLocalState means the provider has a recognized local
+	// credential file for this context. It does not verify authentication.
+	ProviderReadinessLocalState ProviderReadinessState = "local_state"
 
 	// ProviderReadinessNotConfigured means provider storage exists but does not
 	// appear initialized.
@@ -449,7 +449,7 @@ const (
 // states.
 func (s ProviderReadinessState) Valid() bool {
 	switch s {
-	case ProviderReadinessReady, ProviderReadinessNotConfigured, ProviderReadinessDirectoryMissing, ProviderReadinessUnavailable:
+	case ProviderReadinessLocalState, ProviderReadinessNotConfigured, ProviderReadinessDirectoryMissing, ProviderReadinessUnavailable:
 		return true
 	default:
 		return false
@@ -461,9 +461,10 @@ func (s ProviderReadinessState) Valid() bool {
 type ProviderIdentityStatus string
 
 const (
-	// ProviderIdentityVerified means identity metadata was verified from local
-	// provider state and is safe to display.
-	ProviderIdentityVerified ProviderIdentityStatus = "verified"
+	// ProviderIdentityObserved means identity metadata was observed in local
+	// provider state and is safe to display. It does not establish a current,
+	// usable provider authentication session.
+	ProviderIdentityObserved ProviderIdentityStatus = "observed"
 
 	// ProviderIdentityUnavailable means provider state exists, but account
 	// identity could not be verified.
@@ -482,7 +483,7 @@ const (
 // states.
 func (s ProviderIdentityStatus) Valid() bool {
 	switch s {
-	case ProviderIdentityVerified, ProviderIdentityUnavailable, ProviderIdentityNone, ProviderIdentityMismatchEvidence:
+	case ProviderIdentityObserved, ProviderIdentityUnavailable, ProviderIdentityNone, ProviderIdentityMismatchEvidence:
 		return true
 	default:
 		return false
@@ -490,8 +491,8 @@ func (s ProviderIdentityStatus) Valid() bool {
 }
 
 // ProviderIdentityState contains only safe provider account identity metadata.
-// Verified provider-specific fields are added by provider extraction phases;
-// until then, the status tells the UI not to guess.
+// Locally observed provider-specific fields are added by provider extraction
+// phases; until then, the status tells the UI not to guess.
 type ProviderIdentityState struct {
 	Status  ProviderIdentityStatus  `json:"status"`
 	Message string                  `json:"message,omitempty"`
@@ -644,7 +645,8 @@ type ContextTemplateState struct {
 // ContextTemplatesState contains the built-in templates available to the
 // create-context flow.
 type ContextTemplatesState struct {
-	Templates []ContextTemplateState `json:"templates"`
+	Templates        []ContextTemplateState       `json:"templates"`
+	DevelopmentTools []DevelopmentToolIntegration `json:"developmentTools"`
 }
 
 // DuplicateContextRequest copies a context's safe configuration into a new
@@ -919,7 +921,8 @@ type RunningEnvironmentLaunchState struct {
 	ResolutionSource string `json:"resolutionSource"`
 }
 
-// RunningEnvironmentsState contains active coding-tool environments.
+// RunningEnvironmentsState contains active and lifecycle-unknown coding-tool
+// workspace records. Stopped workspaces are omitted.
 type RunningEnvironmentsState struct {
 	Environments []RunningEnvironmentState `json:"environments"`
 }
@@ -963,6 +966,10 @@ type LaunchProjectRequest struct {
 	ProjectPath            string `json:"projectPath,omitempty"`
 	ContextID              string `json:"contextId"`
 	ConfirmContextMismatch bool   `json:"confirmContextMismatch"`
+	// ConfirmPreflightWarnings records a deliberate decision to continue after
+	// reviewing non-blocking preflight warnings. LaunchProject enforces this so
+	// callers cannot treat preflight as advisory.
+	ConfirmPreflightWarnings bool `json:"confirmPreflightWarnings"`
 }
 
 // LaunchProjectResult describes a completed editor launch.

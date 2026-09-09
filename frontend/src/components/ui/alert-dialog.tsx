@@ -27,7 +27,7 @@ function AlertDialogOverlay({
 		<AlertDialogPrimitive.Backdrop
 			data-slot="alert-dialog-overlay"
 			className={cn(
-				"overlay-backdrop fixed inset-0 isolate z-50 bg-black/20 supports-backdrop-filter:backdrop-blur-sm motion-reduce:transition-none",
+				"overlay-backdrop fixed inset-0 isolate z-50 bg-black/25 supports-backdrop-filter:backdrop-blur-md motion-reduce:transition-none",
 				className,
 			)}
 			{...props}
@@ -50,7 +50,7 @@ function AlertDialogContent({
 				data-slot="alert-dialog-content"
 				data-size={size}
 				className={cn(
-					"overlay-surface group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-6 rounded-2xl border border-border/70 bg-popover p-7 text-popover-foreground shadow-xl outline-none data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-md data-starting-style:scale-[0.98] data-ending-style:scale-[0.98] motion-reduce:transition-none",
+					"overlay-surface group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-6 rounded-2xl border border-border/60 bg-popover p-7 text-popover-foreground shadow-[var(--shadow-overlay)] outline-none data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-md data-starting-style:scale-[0.975] data-ending-style:scale-[0.975] motion-reduce:transition-none",
 					className,
 				)}
 				{...props}

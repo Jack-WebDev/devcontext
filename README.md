@@ -374,8 +374,8 @@ Download:
 devctx_<version>_windows_amd64_installer.exe
 ```
 
-Run the installer and verify:
-Run the installer and verify:
+Run the installer. Open a new terminal so it receives the updated `PATH`, then
+verify:
 
 ```bash
 devctx --version
@@ -393,10 +393,12 @@ Download:
 devctx_<version>_macos_universal.zip
 ```
 
-Extract the archive and move Dev Context into:
+Extract the archive, then install the app and the included CLI symlink:
 
-```text
-/Applications
+```bash
+sudo mv devctx/devctx.app /Applications/
+sudo mkdir -p /usr/local/bin
+sudo mv devctx/devctx /usr/local/bin/devctx
 ```
 
 Then verify:
@@ -418,20 +420,17 @@ devctx_<version>_linux_amd64.tar.gz
 ```
 
 Extract:
-Extract:
 
 ```bash
 tar -xzf devctx_<version>_linux_amd64.tar.gz
 ```
 
 Move the executable onto your `PATH`:
-Move the executable onto your `PATH`:
 
 ```bash
 sudo mv devctx /usr/local/bin/devctx
 ```
 
-Verify:
 Verify:
 
 ```bash
@@ -511,13 +510,14 @@ Dev Context creates **local identity boundaries**. It is **not** a secrets manag
 
 Dev Context does not intentionally:
 
-- ❌ parse credential secrets
 - ❌ display credential secrets
 - ❌ upload credential files
 - ❌ synchronize credentials between contexts
 - ❌ overwrite existing context credentials during normal launches
 
-Provider credential files are treated as **opaque, provider-owned data**. Authentication remains the responsibility of the provider — Dev Context controls *which local environment* that provider runs inside.
+Normal launches never copy, move, replace, or synchronize global provider credentials. When you explicitly choose to import a detected provider session while creating a context, Dev Context copies that provider's local credential file into the new context. Provider adapters may read credential documents only to derive allowlisted identity metadata for local display; credential contents are never displayed, logged, uploaded, or included in exports.
+
+Dev Context stores its configuration, context settings, project mappings, recent launches, workspace records, activity records, and troubleshooting logs locally. Forgetting a project removes its remembered context, recent-launch, and activity records without changing the project folder. Authentication remains the responsibility of the provider — Dev Context controls *which local environment* that provider runs inside.
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 

@@ -79,7 +79,7 @@ func TestGetLaunchStateReturnsBoundProjectState(t *testing.T) {
 				ID:      "fake",
 				Name:    "Fake Provider",
 				Enabled: true,
-				State:   ProviderReadinessReady,
+				State:   ProviderReadinessLocalState,
 				SetupAction: &ProviderSetupAction{
 					State:   ProviderSetupWaitingForSignIn,
 					Label:   "Waiting for sign-in",
@@ -145,6 +145,63 @@ func TestLaunchProjectRecordsRecentProjectAfterSuccessfulLaunch(t *testing.T) {
 		LastLaunchedAt: fixture.now,
 	}}) {
 		t.Fatalf("recent projects = %#v", recents)
+	}
+}
+
+func TestForgetProjectRemovesBindingsRecentsAndActivity(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.projectDir),
+		ContextID:   devcontext.MustID("personal"),
+		CreatedAt:   fixture.now,
+	})
+	otherProject := filepath.Join(fixture.root, "projects", "other")
+	if err := project.WriteRecentProjectsFile(fixture.recentsPath, []project.RecentProject{
+		{ProjectPath: project.Path(fixture.projectDir), ContextID: devcontext.MustID("personal"), LastLaunchedAt: fixture.now},
+		{ProjectPath: project.Path(otherProject), ContextID: devcontext.MustID("company"), LastLaunchedAt: fixture.now},
+	}); err != nil {
+		t.Fatalf("write recent projects: %v", err)
+	}
+	devContextHomeDir, err := fixture.paths.DevContextHomeDir()
+	if err != nil {
+		t.Fatalf("dev context home: %v", err)
+	}
+	logger := devlog.NewLocalLogger(filepath.Join(devContextHomeDir, "logs"), fixture.storagePermissions, func() time.Time {
+		return fixture.now
+	})
+	for _, event := range []devlog.Event{
+		{Name: devlog.EventLaunchSpawned, Timestamp: fixture.now, ProjectPath: fixture.projectDir},
+		{Name: devlog.EventProjectBound, Timestamp: fixture.now, ProjectPath: otherProject},
+	} {
+		if err := logger.Record(event); err != nil {
+			t.Fatalf("record event: %v", err)
+		}
+	}
+
+	if appErr := fixture.service().ForgetProject(ForgetProjectRequest{ProjectPath: fixture.projectDir}); appErr != nil {
+		t.Fatalf("forget project: %#v", appErr)
+	}
+
+	bindings, err := project.ReadProjectBindingsFile(fixture.bindingsPath)
+	if err != nil {
+		t.Fatalf("read bindings: %v", err)
+	}
+	if len(bindings) != 0 {
+		t.Fatalf("bindings = %#v, want none", bindings)
+	}
+	recents, err := project.NewRecentRepository(fixture.recentsPath).List()
+	if err != nil {
+		t.Fatalf("list recent projects: %v", err)
+	}
+	if len(recents) != 1 || recents[0].ProjectPath != project.Path(otherProject) {
+		t.Fatalf("recent projects = %#v, want only other project", recents)
+	}
+	history, appErr := fixture.service().GetHistory()
+	if appErr != nil {
+		t.Fatalf("get history: %#v", appErr)
+	}
+	if len(history.Entries) != 1 || history.Entries[0].ProjectPath != otherProject {
+		t.Fatalf("history = %#v, want only other project", history)
 	}
 }
 
@@ -417,17 +474,17 @@ func TestGetLaunchStateDerivesProviderSetupActions(t *testing.T) {
 			wantLabel: "Open and configure",
 		},
 		{
-			name:      "configured provider awaits sign-in verification",
+			name:      "configured provider awaits local identity metadata",
 			status:    provider.ConfiguredStatus(),
 			wantState: ProviderSetupWaitingForSignIn,
 			wantLabel: "Waiting for sign-in",
 		},
 		{
-			name:        "configured verified provider is verified",
+			name:        "configured provider with observed identity",
 			status:      provider.ConfiguredStatus(),
 			hasIdentity: true,
-			wantState:   ProviderSetupVerified,
-			wantLabel:   "Verified",
+			wantState:   ProviderSetupIdentityObserved,
+			wantLabel:   "Identity observed",
 		},
 		{
 			name:         "unavailable provider has no setup action",
@@ -1058,7 +1115,7 @@ func TestGetLaunchStateIncludesRegisteredProviderIdentityMetadata(t *testing.T) 
 		t.Fatalf("get launch state: %v", appErr)
 	}
 	identity := state.Contexts[0].Providers[0].Identity
-	if identity.Status != ProviderIdentityVerified || metadataValueForTest(identity.Fields, "Workspace") != "Example" {
+	if identity.Status != ProviderIdentityObserved || metadataValueForTest(identity.Fields, "Workspace") != "Example" {
 		t.Fatalf("provider identity = %#v", identity)
 	}
 }
@@ -1099,9 +1156,9 @@ func TestGetLaunchStateNormalizesProviderReadinessForUI(t *testing.T) {
 		want   ProviderReadinessState
 	}{
 		{
-			name:   "configured maps to ready",
+			name:   "configured maps to local state",
 			status: provider.ConfiguredStatus(),
-			want:   ProviderReadinessReady,
+			want:   ProviderReadinessLocalState,
 		},
 		{
 			name:   "not configured",
@@ -1203,7 +1260,7 @@ func TestGetLaunchStateReturnsProviderIdentityContract(t *testing.T) {
 	}
 }
 
-func TestGetLaunchStateReturnsVerifiedProviderIdentitiesForIsolatedContexts(t *testing.T) {
+func TestGetLaunchStateReturnsLocallyObservedProviderIdentitiesForIsolatedContexts(t *testing.T) {
 	fixture := newApplicationFixture(t)
 	fixture.providerRegistry = provider.MustNewRegistry([]provider.Provider{
 		applicationFakeProvider{
@@ -1264,8 +1321,8 @@ func TestGetLaunchStateReturnsVerifiedProviderIdentitiesForIsolatedContexts(t *t
 	}
 
 	codex := providersByID["codex"].Identity
-	if codex.Status != ProviderIdentityVerified {
-		t.Fatalf("codex identity = %#v, want verified codex identity", codex)
+	if codex.Status != ProviderIdentityObserved {
+		t.Fatalf("codex identity = %#v, want locally observed Codex identity", codex)
 	}
 	if metadataValueForTest(codex.Fields, "Email") != "user@company.com" ||
 		metadataValueForTest(codex.Fields, "ChatGPT plan") != "business" ||
@@ -1274,8 +1331,8 @@ func TestGetLaunchStateReturnsVerifiedProviderIdentitiesForIsolatedContexts(t *t
 	}
 
 	claude := providersByID["claude"].Identity
-	if claude.Status != ProviderIdentityVerified {
-		t.Fatalf("claude identity = %#v, want verified claude identity", claude)
+	if claude.Status != ProviderIdentityObserved {
+		t.Fatalf("claude identity = %#v, want locally observed Claude identity", claude)
 	}
 	if metadataValueForTest(claude.Fields, "Subscription") != "Pro" ||
 		metadataValueForTest(claude.Fields, "Organization UUID") != "e783-organization" ||
@@ -1333,8 +1390,8 @@ func TestGetLaunchStateDoesNotInferIdentityMismatchEvidenceFromContextName(t *te
 	}
 
 	identity := state.Contexts[0].Providers[0].Identity
-	if identity.Status != ProviderIdentityVerified {
-		t.Fatalf("identity status = %q, want verified without inferred mismatch evidence", identity.Status)
+	if identity.Status != ProviderIdentityObserved {
+		t.Fatalf("identity status = %q, want locally observed identity without inferred mismatch evidence", identity.Status)
 	}
 }
 
@@ -1620,12 +1677,19 @@ func TestCreateContextReportsStorageWriteFailure(t *testing.T) {
 }
 
 func TestGetContextTemplatesReturnsBuiltInSafeDefaults(t *testing.T) {
-	templates := newApplicationFixture(t).service().GetContextTemplates().Templates
+	state := newApplicationFixture(t).service().GetContextTemplates()
+	templates := state.Templates
 	if got, want := len(templates), 6; got != want {
 		t.Fatalf("template count = %d, want %d", got, want)
 	}
 	if templates[0].ID != "personal" || templates[5].ID != "custom" {
 		t.Fatalf("templates = %#v", templates)
+	}
+	if !reflect.DeepEqual(state.DevelopmentTools, []DevelopmentToolIntegration{
+		{ID: "fake-editor", Name: "Fake Tool", Category: DevelopmentToolCategoryOther, Status: DevelopmentToolAvailable, Message: "Available to add to this context.", Enabled: true},
+		{ID: "fake", Name: "Fake Provider", Category: DevelopmentToolCategoryAI, Status: DevelopmentToolAvailable, Message: "Available to add to this context."},
+	}) {
+		t.Fatalf("development tools = %#v", state.DevelopmentTools)
 	}
 }
 
@@ -1895,7 +1959,7 @@ func TestLaunchProjectExportsSafeStatusForStatusAwareTool(t *testing.T) {
 	}
 	if !reflect.DeepEqual(status.Providers, []CodingToolStatusProvider{{
 		ID: "fake", Name: "Fake Provider", Identity: ProviderIdentityState{
-			Status: ProviderIdentityVerified,
+			Status: ProviderIdentityObserved,
 			Fields: []ProviderMetadataField{{Label: "Account", Value: "developer@example.com"}},
 		},
 	}}) {
@@ -1928,7 +1992,7 @@ func TestLaunchProjectRecordsLifecycleEvents(t *testing.T) {
 
 	wantNames := []devlog.EventName{
 		devlog.EventContextResolution,
-		devlog.EventLaunchSucceeded,
+		devlog.EventLaunchSpawned,
 	}
 	if got := applicationEventNames(logger.events); !reflect.DeepEqual(got, wantNames) {
 		t.Fatalf("event names = %#v, want %#v", got, wantNames)
@@ -1967,7 +2031,7 @@ func TestLaunchProjectCreatesAndUpdatesRunningEnvironment(t *testing.T) {
 	if first.ID == "" || first.Project.Path != project.Path(fixture.projectDir) || first.Context.ID.String() != "personal" || first.Tool.Name != "Fake Tool" {
 		t.Fatalf("running environment = %#v", first)
 	}
-	if first.Process.State != coreRunning.ProcessStateRunning || first.Session.State != coreRunning.SessionStateUnknown {
+	if first.Process.State != coreRunning.ProcessStateUnknown || first.Session.State != coreRunning.SessionStateUnknown {
 		t.Fatalf("running environment state = %#v", first)
 	}
 
@@ -2035,9 +2099,10 @@ func TestLaunchProjectAcceptsConfirmedMismatch(t *testing.T) {
 	})
 
 	result, appErr := fixture.service().LaunchProject(LaunchProjectRequest{
-		ProjectPath:            fixture.projectDir,
-		ContextID:              "personal",
-		ConfirmContextMismatch: true,
+		ProjectPath:              fixture.projectDir,
+		ContextID:                "personal",
+		ConfirmContextMismatch:   true,
+		ConfirmPreflightWarnings: true,
 	})
 	if appErr != nil {
 		t.Fatalf("launch project: %v", appErr)
@@ -2051,7 +2116,7 @@ func TestLaunchProjectAcceptsConfirmedMismatch(t *testing.T) {
 	if got, want := applicationEventNames(logger.events), []devlog.EventName{
 		devlog.EventContextResolution,
 		devlog.EventContextOverrideAccepted,
-		devlog.EventLaunchSucceeded,
+		devlog.EventLaunchSpawned,
 	}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("event names = %#v, want %#v", got, want)
 	}
@@ -2067,6 +2132,63 @@ func TestLaunchProjectAcceptsConfirmedMismatch(t *testing.T) {
 	}}
 	if !reflect.DeepEqual(bindings, want) {
 		t.Fatalf("bindings = %#v, want unchanged company binding", bindings)
+	}
+}
+
+func TestLaunchProjectRequiresPreflightWarningConfirmation(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	fixture.writeContext(t, fixture.context("company", "Company"))
+	fixture.writeBindings(t, project.Binding{
+		ProjectPath: project.Path(fixture.projectDir),
+		ContextID:   devcontext.MustID("company"),
+		CreatedAt:   fixture.now,
+	})
+
+	_, appErr := fixture.service().LaunchProject(LaunchProjectRequest{
+		ProjectPath:            fixture.projectDir,
+		ContextID:              "personal",
+		ConfirmContextMismatch: true,
+	})
+	if appErr == nil || appErr.Code != ErrorCodePreflightReview {
+		t.Fatalf("launch error = %#v, want preflight review requirement", appErr)
+	}
+	if len(fixture.process.requests) != 0 {
+		t.Fatalf("process requests = %#v, want none", fixture.process.requests)
+	}
+}
+
+func TestLaunchCLIProjectRecordsSharedLaunchState(t *testing.T) {
+	fixture := newApplicationFixture(t)
+	logger := &applicationRecordingLogger{}
+	fixture.logger = logger
+	fixture.writeContext(t, fixture.context("personal", "Personal"))
+	contextID := devcontext.MustID("personal")
+
+	_, err := fixture.service().LaunchCLIProject(launcher.LaunchRequest{
+		ProjectPath:      project.Path(fixture.projectDir),
+		RequestedContext: &contextID,
+		Source:           launcher.InvocationSourceCLI,
+	})
+	if err != nil {
+		t.Fatalf("launch CLI project: %v", err)
+	}
+	if len(fixture.process.requests) != 1 {
+		t.Fatalf("process request count = %d, want 1", len(fixture.process.requests))
+	}
+	recents, err := project.NewRecentRepository(fixture.recentsPath).List()
+	if err != nil || len(recents) != 1 || recents[0].ContextID != contextID {
+		t.Fatalf("recent projects = %#v, %v; want personal launch", recents, err)
+	}
+	environments, err := coreRunning.NewRepository(fixture.runningPath).List()
+	if err != nil || len(environments) != 1 || environments[0].Launch.Source != launcher.InvocationSourceCLI {
+		t.Fatalf("running environments = %#v, %v; want CLI launch", environments, err)
+	}
+	if got := applicationEventNames(logger.events); !reflect.DeepEqual(got, []devlog.EventName{
+		devlog.EventContextResolution,
+		devlog.EventLaunchSpawned,
+	}) {
+		t.Fatalf("events = %#v", got)
 	}
 }
 
@@ -2262,11 +2384,11 @@ func TestDevelopmentToolStatusProjectionUsesBoundedVocabulary(t *testing.T) {
 			wantStatus: DevelopmentToolAvailable,
 		},
 		{
-			name: "verified integration is connected",
+			name: "observed identity integration still needs sign-in verification",
 			state: ProviderState{Enabled: true, SetupAction: &ProviderSetupAction{
-				State: ProviderSetupVerified,
+				State: ProviderSetupIdentityObserved,
 			}},
-			wantStatus: DevelopmentToolConnected,
+			wantStatus: DevelopmentToolNeedsSignIn,
 		},
 		{
 			name: "waiting integration needs sign-in",

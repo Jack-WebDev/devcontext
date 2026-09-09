@@ -16,6 +16,8 @@ import type {
 } from "../../lib/devctx-api";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
+import { Input } from "../ui/input.js";
+import { Textarea } from "../ui/textarea.js";
 import { ProjectBindingRemovalDialog } from "../projects/ProjectBindingRemovalDialog.js";
 import {
 	contextAccentOption,
@@ -235,7 +237,7 @@ function ContextDetailOverview({
 	onNavigate: (destination: ContextDetailDestination) => void;
 }) {
 	return (
-		<div className="grid gap-4 lg:grid-cols-2">
+		<div className="grid gap-3 lg:grid-cols-2">
 			<DestinationCard
 				title="Name & purpose"
 				description="Set the name and description people see for this development identity."
@@ -310,15 +312,19 @@ function DestinationCard({
 	onClick: () => void;
 }) {
 	return (
-		<Card as="section" hierarchy="secondary" className="py-0">
-			<CardContent className="inset-group">
+		<Card
+			as="section"
+			hierarchy="primary"
+			className="py-0 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md"
+		>
+			<CardContent className="inset-group flex min-h-44 flex-col">
 				<h3 className="text-section-title">{title}</h3>
 				<p className="mt-2 text-body text-secondary">{description}</p>
 				<Button
 					type="button"
-					variant="outline"
+					variant="ghost"
 					size="sm"
-					className="mt-5"
+					className="mt-auto self-start px-0 text-primary hover:bg-transparent hover:text-primary/80"
 					onClick={onClick}
 				>
 					{action}
@@ -382,8 +388,7 @@ function ContextNamePurposeEditor({
 				</p>
 			</div>
 			<Field label="Context name">
-				<input
-					className="h-10 w-full rounded-lg border border-input bg-card px-3 py-1 text-base outline-none placeholder:text-muted-foreground hover:border-foreground/20 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 md:text-sm"
+				<Input
 					value={name}
 					onChange={(event) => setName(event.target.value)}
 					aria-invalid={nameError !== undefined}
@@ -391,8 +396,7 @@ function ContextNamePurposeEditor({
 				/>
 			</Field>
 			<Field label="Purpose" optional>
-				<input
-					className="h-10 w-full rounded-lg border border-input bg-card px-3 py-1 text-base outline-none placeholder:text-muted-foreground hover:border-foreground/20 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 md:text-sm"
+				<Input
 					value={purpose}
 					onChange={(event) => setPurpose(event.target.value)}
 					aria-invalid={purposeError !== undefined}
@@ -400,8 +404,7 @@ function ContextNamePurposeEditor({
 				/>
 			</Field>
 			<Field label="Description" optional>
-				<textarea
-					className="min-h-24 w-full resize-none rounded-lg border border-input bg-card px-3 py-2 text-base outline-none placeholder:text-muted-foreground hover:border-foreground/20 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 md:text-sm"
+				<Textarea
 					value={description}
 					onChange={(event) => setDescription(event.target.value)}
 					aria-invalid={descriptionError !== undefined}
@@ -597,8 +600,8 @@ function ContextLinkedProjects({
 					Linked projects
 				</h3>
 				<p className="mt-1 text-body text-secondary">
-					These projects remember this context. Move and reveal actions are
-					available from the Projects area.
+					Manage linked projects from the Projects area, where their current
+					location and context can be reviewed safely.
 				</p>
 			</div>
 			{error ? (
@@ -635,23 +638,7 @@ function ContextLinkedProjects({
 										size="sm"
 										onClick={onOpenProjects}
 									>
-										Open
-									</Button>
-									<Button
-										type="button"
-										variant="outline"
-										size="sm"
-										onClick={onOpenProjects}
-									>
-										Move
-									</Button>
-									<Button
-										type="button"
-										variant="outline"
-										size="sm"
-										onClick={onOpenProjects}
-									>
-										Reveal
+										Manage project
 									</Button>
 									<Button
 										type="button"
@@ -889,7 +876,7 @@ function ContextLaunchPreferences({
 						<input
 							id="context-executable-override"
 							type="text"
-							className="h-10 border border-input bg-background px-3 text-sm text-foreground"
+							className="native-control"
 							placeholder="/path/to/code"
 							value={executableOverride}
 							onChange={(event) =>

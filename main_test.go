@@ -8,7 +8,6 @@ import (
 
 	"devctx/packages/core/cli"
 	"devctx/packages/core/filesystem"
-	"devctx/packages/core/project"
 	"devctx/packages/wailsapp"
 )
 
@@ -121,7 +120,7 @@ func TestDesktopApplicationModeResolvesProjectInvocations(t *testing.T) {
 	}
 }
 
-func TestDesktopApplicationModeReturnsTypedInvalidProjectPathErrors(t *testing.T) {
+func TestDesktopApplicationModeDefersProjectPathValidationToLauncher(t *testing.T) {
 	root := t.TempDir()
 	workingDirectory := mkdir(t, root, "work", "web")
 	paths := filesystem.NewDefaultPlatformPaths()
@@ -133,32 +132,32 @@ func TestDesktopApplicationModeReturnsTypedInvalidProjectPathErrors(t *testing.T
 	tests := []struct {
 		name string
 		args []string
-		want error
+		want wailsapp.ApplicationMode
 	}{
 		{
 			name: "missing directory",
 			args: []string{filepath.Join(root, "missing")},
-			want: project.ErrProjectDirectoryNotFound,
+			want: wailsapp.LauncherMode(filepath.Join(root, "missing")),
 		},
 		{
 			name: "file instead of directory",
 			args: []string{filePath},
-			want: project.ErrProjectPathNotDirectory,
-		},
-		{
-			name: "multiple project paths",
-			args: []string{workingDirectory, root},
-			want: cli.ErrInvalidCommand,
+			want: wailsapp.LauncherMode(filePath),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := desktopApplicationMode(tt.args, workingDirectory, paths)
-			if !errors.Is(err, tt.want) {
-				t.Fatalf("error = %v, want %v", err, tt.want)
+			got, err := desktopApplicationMode(tt.args, workingDirectory, paths)
+			if err != nil || got != tt.want {
+				t.Fatalf("mode, error = %#v, %v; want %#v, nil", got, err, tt.want)
 			}
 		})
+	}
+
+	_, err := desktopApplicationMode([]string{workingDirectory, root}, workingDirectory, paths)
+	if !errors.Is(err, cli.ErrInvalidCommand) {
+		t.Fatalf("multiple paths error = %v, want invalid command", err)
 	}
 }
 

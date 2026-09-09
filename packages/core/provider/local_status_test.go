@@ -27,9 +27,14 @@ func TestCodexProviderDetectsLocalStatus(t *testing.T) {
 			wantState: provider.StatusNotConfigured,
 		},
 		{
-			name:      "configured fixture without CLI detection",
-			directory: paths.configuredDir,
+			name:      "recognized credential file",
+			directory: paths.codexDir,
 			wantState: provider.StatusConfigured,
+		},
+		{
+			name:      "unrelated file",
+			directory: paths.unrelatedDir,
+			wantState: provider.StatusNotConfigured,
 		},
 	}
 
@@ -71,9 +76,14 @@ func TestClaudeProviderDetectsLocalStatus(t *testing.T) {
 			wantState: provider.StatusNotConfigured,
 		},
 		{
-			name:      "configured fixture without CLI detection",
-			directory: paths.configuredDir,
+			name:      "recognized credential file",
+			directory: paths.claudeDir,
 			wantState: provider.StatusConfigured,
+		},
+		{
+			name:      "unrelated file",
+			directory: paths.unrelatedDir,
+			wantState: provider.StatusNotConfigured,
 		},
 	}
 
@@ -98,10 +108,12 @@ func TestClaudeProviderDetectsLocalStatus(t *testing.T) {
 }
 
 type statusFixturePaths struct {
-	emptyDir      string
-	configuredDir string
-	missingDir    string
-	rawSecret     string
+	emptyDir     string
+	codexDir     string
+	claudeDir    string
+	unrelatedDir string
+	missingDir   string
+	rawSecret    string
 }
 
 func localStatusFixture(t *testing.T) statusFixturePaths {
@@ -109,25 +121,37 @@ func localStatusFixture(t *testing.T) statusFixturePaths {
 
 	root := t.TempDir()
 	emptyDir := filepath.Join(root, "empty")
-	configuredDir := filepath.Join(root, "configured")
+	codexDir := filepath.Join(root, "codex")
+	claudeDir := filepath.Join(root, "claude")
+	unrelatedDir := filepath.Join(root, "unrelated")
 	missingDir := filepath.Join(root, "missing")
 	rawSecret := "raw-provider-token"
 
 	if err := os.Mkdir(emptyDir, 0o700); err != nil {
 		t.Fatalf("create empty directory: %v", err)
 	}
-	if err := os.Mkdir(configuredDir, 0o700); err != nil {
-		t.Fatalf("create configured directory: %v", err)
+	for _, directory := range []string{codexDir, claudeDir, unrelatedDir} {
+		if err := os.Mkdir(directory, 0o700); err != nil {
+			t.Fatalf("create provider directory: %v", err)
+		}
 	}
-	if err := os.WriteFile(filepath.Join(configuredDir, "credentials.json"), []byte(rawSecret), 0o600); err != nil {
-		t.Fatalf("write configured fixture: %v", err)
+	if err := os.WriteFile(filepath.Join(codexDir, "auth.json"), []byte(rawSecret), 0o600); err != nil {
+		t.Fatalf("write Codex credential fixture: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(claudeDir, ".credentials.json"), []byte(rawSecret), 0o600); err != nil {
+		t.Fatalf("write Claude credential fixture: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(unrelatedDir, "notes.txt"), []byte(rawSecret), 0o600); err != nil {
+		t.Fatalf("write unrelated fixture: %v", err)
 	}
 
 	return statusFixturePaths{
-		emptyDir:      emptyDir,
-		configuredDir: configuredDir,
-		missingDir:    missingDir,
-		rawSecret:     rawSecret,
+		emptyDir:     emptyDir,
+		codexDir:     codexDir,
+		claudeDir:    claudeDir,
+		unrelatedDir: unrelatedDir,
+		missingDir:   missingDir,
+		rawSecret:    rawSecret,
 	}
 }
 

@@ -14,9 +14,10 @@ func TestEnvironmentLifecycleSeparatesObservationFromAdapterCapabilities(t *test
 		process running.ProcessState
 		session running.SessionState
 		want    running.WorkspaceState
+		actions bool
 	}{
-		{name: "active process", process: running.ProcessStateRunning, want: running.WorkspaceStateActive},
-		{name: "active session", session: running.SessionStateActive, want: running.WorkspaceStateActive},
+		{name: "active process", process: running.ProcessStateRunning, want: running.WorkspaceStateActive, actions: true},
+		{name: "active session", session: running.SessionStateActive, want: running.WorkspaceStateActive, actions: true},
 		{name: "stopped process", process: running.ProcessStateStopped, session: running.SessionStateActive, want: running.WorkspaceStateStopped},
 		{name: "ended session", process: running.ProcessStateUnknown, session: running.SessionStateEnded, want: running.WorkspaceStateStopped},
 		{name: "unobserved", process: running.ProcessStateUnknown, session: running.SessionStateUnknown, want: running.WorkspaceStateUnknown},
@@ -25,7 +26,7 @@ func TestEnvironmentLifecycleSeparatesObservationFromAdapterCapabilities(t *test
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lifecycle := (running.Environment{Process: running.Process{State: tt.process}, Session: running.Session{State: tt.session}}).Lifecycle(capabilities)
-			if lifecycle.State != tt.want || !lifecycle.Focusable || !lifecycle.Revealable || !lifecycle.Stoppable {
+			if lifecycle.State != tt.want || lifecycle.Focusable != tt.actions || lifecycle.Revealable != tt.actions || lifecycle.Stoppable != tt.actions {
 				t.Fatalf("lifecycle = %#v", lifecycle)
 			}
 		})
