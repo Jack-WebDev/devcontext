@@ -1,18 +1,12 @@
 import type { ContextState } from "../../lib/devctx-api.js";
 import { Button } from "../ui/button.js";
+import type {
+	ContextCreationStep,
+	ContextCreationStepStatus,
+} from "./context-creation.js";
 
-type CreationStepStatus =
-	| "pending"
-	| "running"
-	| "complete"
-	| "skipped"
-	| "failed";
-interface CreationStep {
-	id: "create" | "bind" | "initialize" | "verify";
-	label: string;
-	status: CreationStepStatus;
-	detail?: string;
-}
+type CreationStep = ContextCreationStep;
+type CreationStepStatus = ContextCreationStepStatus;
 
 function ContextCreationProgress({
 	steps,
@@ -184,7 +178,7 @@ function creationStepLabel(status: CreationStepStatus) {
 
 export type { CreationStep, CreationStepStatus };
 export {
-	ContextCreationProgress,
 	ContextCreateSuccessScreen,
+	ContextCreationProgress,
 	creationStepLabel,
 };

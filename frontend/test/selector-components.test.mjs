@@ -122,7 +122,19 @@ import {
 	defaultLaunchSuccessCloseBehavior,
 	shouldCloseSelectorAfterLaunch,
 } from "../.tmp-test/src/components/selector/launch-success-close-behavior.js";
-import { createContextAndRefresh } from "../.tmp-test/src/components/contexts/context-creation.js";
+import {
+	beginContextCreation,
+	completeContextCreation,
+	createContextAndRefresh,
+	editContextCreateSection,
+	executeContextCreation,
+	initialContextCreateFlow,
+	nextContextCreateStep,
+	previousContextCreateStep,
+	returnToContextCreateReview,
+	updateContextCreateDraft,
+	updateContextCreateProjects,
+} from "../.tmp-test/src/components/contexts/context-creation.js";
 import {
 	ContextCreateIdentityScreen,
 	contextPurposeMaxLength,
@@ -160,17 +172,6 @@ import {
 } from "../.tmp-test/src/components/contexts/context-identity-options.js";
 import { developmentToolCategories } from "../.tmp-test/src/components/contexts/development-tool-categories.js";
 import { developmentToolStatusPresentation } from "../.tmp-test/src/components/contexts/development-tool-status.js";
-import {
-	beginContextCreation,
-	completeContextCreation,
-	editContextCreateSection,
-	initialContextCreateFlow,
-	nextContextCreateStep,
-	previousContextCreateStep,
-	returnToContextCreateReview,
-	updateContextCreateDraft,
-	updateContextCreateProjects,
-} from "../.tmp-test/src/components/contexts/context-create-flow.js";
 import { ProjectIdentity } from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import { ProviderCredentialClassification } from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
 import {
@@ -3674,6 +3675,88 @@ test("context creation returns failures without refreshing", async () => {
 		error: error.error,
 	});
 	assert.deepEqual(calls, [["createContext", request]]);
+});
+
+test("context creation retains successful project bindings when retrying", async () => {
+	const calls = [];
+	const steps = [];
+	const context = contextFixture("personal", "Personal");
+	const request = { contextId: "personal", name: "Personal" };
+	const projects = [
+		{ name: "api", path: "/work/api" },
+		{ name: "web", path: "/work/web" },
+	];
+	const bindingError = apiError(
+		"validation_error",
+		"Unable to save project association.",
+		"Retry the project association.",
+	).error;
+
+	const failed = await executeContextCreation({
+		request,
+		projects,
+		boundProjectPaths: [],
+		createContext(receivedRequest) {
+			calls.push(["create", receivedRequest]);
+			return Promise.resolve({ ok: true, data: { context } });
+		},
+		bindProject(bindingRequest) {
+			calls.push(["bind", bindingRequest]);
+			return Promise.resolve(
+				bindingRequest.projectPath === "/work/web"
+					? { ok: false, error: bindingError }
+					: { ok: true, data: {} },
+			);
+		},
+		verifyContext(receivedContext) {
+			calls.push(["verify", receivedContext.id]);
+			return Promise.resolve({ ok: true, data: receivedContext });
+		},
+		onStep(id, status, detail) {
+			steps.push([id, status, detail]);
+		},
+	});
+
+	assert.deepEqual(failed, {
+		ok: false,
+		error: bindingError,
+		context,
+		boundProjectPaths: ["/work/api"],
+	});
+	assert.deepEqual(steps.at(-1), ["bind", "failed", "1 of 2 project associations saved."]);
+
+	const retried = await executeContextCreation({
+		request,
+		projects,
+		createdContext: failed.context,
+		boundProjectPaths: failed.boundProjectPaths,
+		createContext() {
+			calls.push(["create", "retried"]);
+			return Promise.resolve({ ok: true, data: { context } });
+		},
+		bindProject(bindingRequest) {
+			calls.push(["bind", bindingRequest]);
+			return Promise.resolve({ ok: true, data: {} });
+		},
+		verifyContext(receivedContext) {
+			calls.push(["verify", receivedContext.id]);
+			return Promise.resolve({ ok: true, data: receivedContext });
+		},
+		onStep() {},
+	});
+
+	assert.deepEqual(retried, {
+		ok: true,
+		context,
+		boundProjectPaths: ["/work/api", "/work/web"],
+	});
+	assert.deepEqual(calls, [
+		["create", request],
+		["bind", { projectPath: "/work/api", contextId: "personal" }],
+		["bind", { projectPath: "/work/web", contextId: "personal" }],
+		["bind", { projectPath: "/work/web", contextId: "personal" }],
+		["verify", "personal"],
+	]);
 });
 
 test("context creation flow preserves its draft across forward and back steps", () => {
