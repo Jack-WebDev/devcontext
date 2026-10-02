@@ -8,6 +8,7 @@ import type {
 	ProjectBindingState,
 	RunningEnvironmentConflict,
 } from "../../lib/devctx-api";
+import { runProjectLaunchJourney } from "../project-launch/project-launch-journey.js";
 
 interface LaunchSelectorDependencies {
 	projectPath: string;
@@ -65,13 +66,11 @@ async function launchSelectedContext(
 	dependencies: LaunchSelectorDependencies,
 ): Promise<LaunchSelectorResult> {
 	const contextId = dependencies.selectedContextId;
+	const bindingContextId = dependencies.bindingContextId;
 	if (contextId === undefined) {
 		return undefined;
 	}
-	if (
-		dependencies.bindingContextId !== undefined &&
-		dependencies.bindingContextId !== contextId
-	) {
+	if (bindingContextId !== undefined && bindingContextId !== contextId) {
 		throw new Error("Binding context must match the selected launch context.");
 	}
 
@@ -86,38 +85,36 @@ async function launchSelectedContext(
 			: {}),
 	};
 
-	const preflight = await dependencies.preflightLaunchProject(launchRequest);
-	if (!preflight.ok) {
-		return preflight;
-	}
-
-	if (
-		preflight.data.runningEnvironmentConflict &&
-		!dependencies.allowExistingEnvironmentLaunch
-	) {
-		return {
-			runningEnvironmentConflict: preflight.data.runningEnvironmentConflict,
-		};
-	}
-
-	const shouldLaunch = await dependencies.onPreflightComplete?.(preflight.data);
-	if (shouldLaunch === false) {
-		return { preflightReview: preflight.data };
-	}
-
-	if (dependencies.bindingContextId !== undefined) {
-		const binding = await dependencies.bindProject({
-			projectPath: dependencies.projectPath,
-			contextId: dependencies.bindingContextId,
-		});
-		if (!binding.ok) {
-			return binding;
-		}
-	}
-
-	return dependencies.launchProject({
-		...launchRequest,
+	const result = await runProjectLaunchJourney({
+		request: launchRequest,
+		allowExistingEnvironmentLaunch: dependencies.allowExistingEnvironmentLaunch,
+		onPreflightComplete: dependencies.onPreflightComplete,
+		prepareLaunch:
+			bindingContextId === undefined
+				? undefined
+				: async () => {
+						const binding = await dependencies.bindProject({
+							projectPath: dependencies.projectPath,
+							contextId: bindingContextId,
+						});
+						return binding.ok
+							? { ok: true }
+							: { ok: false, error: binding.error };
+					},
+		preflightLaunchProject: dependencies.preflightLaunchProject,
+		launchProject: dependencies.launchProject,
 	});
+
+	if (result.kind === "launched") {
+		return { ok: true, data: result.result };
+	}
+	if (result.kind === "failed") {
+		return { ok: false, error: result.error };
+	}
+	if (result.kind === "preflight-review") {
+		return { preflightReview: result.preflight };
+	}
+	return { runningEnvironmentConflict: result.conflict };
 }
 
 export type {

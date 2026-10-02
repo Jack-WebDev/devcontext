@@ -111,6 +111,10 @@ import {
 	launchSelectedContext,
 } from "../.tmp-test/src/components/selector/launch-action.js";
 import {
+	requiresPreflightReview,
+	runProjectLaunchJourney,
+} from "../.tmp-test/src/components/project-launch/project-launch-journey.js";
+import {
 	launchActionLabel,
 	launchPendingLabel,
 } from "../.tmp-test/src/components/selector/launch-copy.js";
@@ -2892,6 +2896,46 @@ test("selector critical path renders selected context and submits remembered lau
 		],
 		["bindProject", { projectPath: "/work/api", contextId: "company" }],
 		["launchProject", { projectPath: "/work/api", contextId: "company" }],
+	]);
+});
+
+test("project launch journey requires review before an existing workspace decision", async () => {
+	const calls = [];
+	const preflight = {
+		...preflightLaunchProjectResult().data,
+		groups: [
+			{
+				id: "tools",
+				label: "Tools",
+				status: "needs_attention",
+				blocking: false,
+				message: "Review the provider setup.",
+				checks: [],
+			},
+		],
+		runningEnvironmentConflict: { kind: "same_context", environment: {} },
+	};
+
+	const result = await runProjectLaunchJourney({
+		request: { projectPath: "/work/api", contextId: "personal" },
+		preflightLaunchProject(request) {
+			calls.push(["preflight", request]);
+			return Promise.resolve({ ok: true, data: preflight });
+		},
+		onPreflightComplete(receivedPreflight) {
+			calls.push(["review", receivedPreflight]);
+			return !requiresPreflightReview(receivedPreflight);
+		},
+		launchProject(request) {
+			calls.push(["launch", request]);
+			return Promise.resolve(launchProjectResult());
+		},
+	});
+
+	assert.deepEqual(result, { kind: "preflight-review", preflight });
+	assert.deepEqual(calls, [
+		["preflight", { projectPath: "/work/api", contextId: "personal" }],
+		["review", preflight],
 	]);
 });
 

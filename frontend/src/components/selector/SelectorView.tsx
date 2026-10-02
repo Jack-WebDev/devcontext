@@ -16,6 +16,8 @@ import type {
 } from "../../lib/devctx-api";
 import { contextPositionFromShortcut } from "../command-palette/shortcut";
 import { RunningEnvironmentConflictDialog } from "../running/RunningEnvironmentConflictDialog";
+
+import { requiresPreflightReview } from "../project-launch/project-launch-journey.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import { AccountIdentityMismatchDialog } from "./AccountIdentityMismatchDialog";
@@ -355,10 +357,7 @@ function SelectorView({
 					allowExistingEnvironmentLaunch,
 					confirmPreflightWarnings: skipPreflightReview,
 					onPreflightComplete: (preflight) => {
-						if (
-							!skipPreflightReview &&
-							preflight.groups.some((group) => group.status !== "ready")
-						) {
+						if (!skipPreflightReview && requiresPreflightReview(preflight)) {
 							setLauncherState({
 								status: "preflight_review",
 								selection: currentSelection,

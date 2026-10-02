@@ -28,6 +28,12 @@ import { notifyCodingToolLaunched } from "./components/notifications/notificatio
 import { ProjectContextChangeDialog } from "./components/projects/ProjectContextChangeDialog";
 import { ProjectBindingRemovalDialog } from "./components/projects/ProjectBindingRemovalDialog";
 import { ProjectDetailView } from "./components/projects/ProjectDetailView";
+import {
+	continueProjectLaunchJourney,
+	requiresPreflightReview,
+	runProjectLaunchJourney,
+	type ProjectLaunchJourneyResult,
+} from "./components/project-launch/project-launch-journey.js";
 import { RunningEnvironmentConflictDialog } from "./components/running/RunningEnvironmentConflictDialog";
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
 import { PreflightReviewDialog } from "./components/selector/PreflightReviewDialog";
@@ -59,6 +65,7 @@ import {
 	type ImportContextMetadataRequest,
 	type ImportContextMetadataResult,
 	type ProjectListItem,
+	type LaunchProjectRequest,
 	type PreflightLaunchProjectResult,
 	type RecentProjectState,
 	type RunningEnvironmentConflict,
@@ -68,15 +75,11 @@ import {
 
 interface PendingRunningEnvironmentLaunch {
 	conflict: RunningEnvironmentConflict;
-	request: {
-		projectPath: string;
-		contextId: string;
-		confirmPreflightWarnings?: boolean;
-	};
+	request: LaunchProjectRequest;
 }
 
 interface PendingPreflightReview {
-	request: { projectPath: string; contextId: string };
+	request: LaunchProjectRequest;
 	preflight: PreflightLaunchProjectResult;
 }
 
@@ -301,29 +304,10 @@ function ManagementApp() {
 		setCommandPaletteLaunchError(undefined);
 		try {
 			const request = { projectPath: launchState.data.project.path, contextId };
-			const preflight = await devContextApi.preflightLaunchProject(request);
-			if (!preflight.ok) {
-				setCommandPaletteLaunchError(preflight.error);
-				return;
-			}
-			if (deferPreflightReview(preflight.data, request)) {
-				return;
-			}
-			if (deferRunningEnvironmentConflict(preflight.data, request)) {
-				return;
-			}
-			const launch = await devContextApi.launchProject(request);
-			if (!launch.ok) {
-				setCommandPaletteLaunchError(launch.error);
-				return;
-			}
-			notifyLaunch(launch.data);
-			await Promise.all([
-				refreshHomeDashboard(),
-				refreshRecentProjects(),
-				refreshProjects(),
-				refreshRunningEnvironments(),
-			]);
+			await launchManagementProject({
+				request,
+				onError: setCommandPaletteLaunchError,
+			});
 		} finally {
 			setCommandPaletteLaunchPending(false);
 		}
@@ -425,26 +409,7 @@ function ManagementApp() {
 				projectPath: project.path,
 				contextId: currentContext.id,
 			};
-			const preflight = await devContextApi.preflightLaunchProject(request);
-			if (!preflight.ok) {
-				setHomeLaunchError(preflight.error);
-				return;
-			}
-			if (deferPreflightReview(preflight.data, request)) {
-				return;
-			}
-			if (deferRunningEnvironmentConflict(preflight.data, request)) {
-				return;
-			}
-			const launch = await devContextApi.launchProject(request);
-			if (!launch.ok) {
-				setHomeLaunchError(launch.error);
-				return;
-			}
-			notifyLaunch(launch.data);
-			await refreshHomeDashboard();
-			await refreshRecentProjects();
-			await refreshProjects();
+			await launchManagementProject({ request, onError: setHomeLaunchError });
 		} finally {
 			setHomeLaunchPending(false);
 		}
@@ -474,26 +439,11 @@ function ManagementApp() {
 				projectPath: recentProjectToLaunch.project.path,
 				contextId: recentProjectToLaunch.contextId,
 			};
-			const preflight = await devContextApi.preflightLaunchProject(request);
-			if (!preflight.ok) {
-				setRecentProjectLaunchError(preflight.error);
-				return;
-			}
-			if (deferPreflightReview(preflight.data, request)) {
-				return;
-			}
-			if (deferRunningEnvironmentConflict(preflight.data, request)) {
-				return;
-			}
-			const launch = await devContextApi.launchProject(request);
-			if (!launch.ok) {
-				setRecentProjectLaunchError(launch.error);
-				return;
-			}
-			notifyLaunch(launch.data);
-			setRecentProjectToLaunch(undefined);
-			await refreshRecentProjects();
-			await refreshProjects();
+			await launchManagementProject({
+				request,
+				onError: setRecentProjectLaunchError,
+				onLaunched: () => setRecentProjectToLaunch(undefined),
+			});
 		} finally {
 			setRecentProjectLaunchPending(false);
 		}
@@ -525,28 +475,10 @@ function ManagementApp() {
 				projectPath: project.project.path,
 				contextId: project.contextId,
 			};
-			const preflight = await devContextApi.preflightLaunchProject(request);
-			if (!preflight.ok) {
-				setProjectLaunchError(preflight.error);
-				return;
-			}
-			if (deferPreflightReview(preflight.data, request)) {
-				return;
-			}
-			if (deferRunningEnvironmentConflict(preflight.data, request)) {
-				return;
-			}
-			const launch = await devContextApi.launchProject(request);
-			if (!launch.ok) {
-				setProjectLaunchError(launch.error);
-				return;
-			}
-			notifyLaunch(launch.data);
-			await Promise.all([
-				refreshHomeDashboard(),
-				refreshRecentProjects(),
-				refreshProjects(),
-			]);
+			await launchManagementProject({
+				request,
+				onError: setProjectLaunchError,
+			});
 		} finally {
 			setProjectLaunchPath(undefined);
 		}
@@ -693,31 +625,63 @@ function ManagementApp() {
 		window.location.hash = projectDetailHash({ projectPath: selected.data });
 	}
 
-	function deferRunningEnvironmentConflict(
-		preflight: { runningEnvironmentConflict?: RunningEnvironmentConflict },
-		request: { projectPath: string; contextId: string },
-	) {
-		if (preflight.runningEnvironmentConflict === undefined) {
-			return false;
-		}
-		setRunningEnvironmentLaunchError(undefined);
-		setPendingRunningEnvironmentLaunch({
-			conflict: preflight.runningEnvironmentConflict,
-			request: { ...request, confirmPreflightWarnings: true },
-		});
-		return true;
+	async function refreshManagementLaunchData() {
+		await Promise.all([
+			refreshHomeDashboard(),
+			refreshRecentProjects(),
+			refreshProjects(),
+			refreshRunningEnvironments(),
+		]);
 	}
 
-	function deferPreflightReview(
-		preflight: PreflightLaunchProjectResult,
-		request: { projectPath: string; contextId: string },
+	async function handleManagementLaunchOutcome(
+		result: ProjectLaunchJourneyResult,
+		options: {
+			onError: (error: DisplayError) => void;
+			onLaunched?: () => void;
+			request: LaunchProjectRequest;
+		},
 	) {
-		if (!preflight.groups.some((group) => group.status !== "ready")) {
-			return false;
+		if (result.kind === "preflight-review") {
+			return;
 		}
-		setPreflightReviewError(undefined);
-		setPendingPreflightReview({ request, preflight });
-		return true;
+		if (result.kind === "running-environment-conflict") {
+			setRunningEnvironmentLaunchError(undefined);
+			setPendingRunningEnvironmentLaunch({
+				conflict: result.conflict,
+				request: { ...options.request, confirmPreflightWarnings: true },
+			});
+			return;
+		}
+		if (result.kind === "failed") {
+			options.onError(result.error);
+			return;
+		}
+
+		notifyLaunch(result.result);
+		options.onLaunched?.();
+		await refreshManagementLaunchData();
+	}
+
+	async function launchManagementProject(options: {
+		request: LaunchProjectRequest;
+		onError: (error: DisplayError) => void;
+		onLaunched?: () => void;
+	}) {
+		const result = await runProjectLaunchJourney({
+			request: options.request,
+			preflightLaunchProject: devContextApi.preflightLaunchProject,
+			launchProject: devContextApi.launchProject,
+			onPreflightComplete: (preflight) => {
+				if (!requiresPreflightReview(preflight)) {
+					return true;
+				}
+				setPreflightReviewError(undefined);
+				setPendingPreflightReview({ request: options.request, preflight });
+				return false;
+			},
+		});
+		await handleManagementLaunchOutcome(result, options);
 	}
 
 	async function handlePreflightReviewContinue() {
@@ -729,30 +693,25 @@ function ManagementApp() {
 			...pendingPreflightReview.request,
 			confirmPreflightWarnings: true,
 		};
-		if (
-			deferRunningEnvironmentConflict(pendingPreflightReview.preflight, request)
-		) {
-			setPendingPreflightReview(undefined);
-			return;
-		}
-
 		setPreflightReviewPending(true);
 		setPreflightReviewError(undefined);
 		try {
-			const launch = await devContextApi.launchProject(request);
-			if (!launch.ok) {
-				setPreflightReviewError(launch.error);
-				return;
+			const result = await continueProjectLaunchJourney({
+				request,
+				preflight: pendingPreflightReview.preflight,
+				launchProject: devContextApi.launchProject,
+			});
+			if (result.kind === "running-environment-conflict") {
+				setPendingPreflightReview(undefined);
 			}
-			notifyLaunch(launch.data);
-			setPendingPreflightReview(undefined);
-			setRecentProjectToLaunch(undefined);
-			await Promise.all([
-				refreshHomeDashboard(),
-				refreshRecentProjects(),
-				refreshProjects(),
-				refreshRunningEnvironments(),
-			]);
+			await handleManagementLaunchOutcome(result, {
+				request,
+				onError: setPreflightReviewError,
+				onLaunched: () => {
+					setPendingPreflightReview(undefined);
+					setRecentProjectToLaunch(undefined);
+				},
+			});
 		} finally {
 			setPreflightReviewPending(false);
 		}
@@ -768,21 +727,16 @@ function ManagementApp() {
 		setRunningEnvironmentLaunchPending(true);
 		setRunningEnvironmentLaunchError(undefined);
 		try {
-			const result = await devContextApi.launchProject(
-				pendingRunningEnvironmentLaunch.request,
-			);
-			if (!result.ok) {
-				setRunningEnvironmentLaunchError(result.error);
-				return;
-			}
-			notifyLaunch(result.data);
-			setPendingRunningEnvironmentLaunch(undefined);
-			await Promise.all([
-				refreshHomeDashboard(),
-				refreshRecentProjects(),
-				refreshProjects(),
-				refreshRunningEnvironments(),
-			]);
+			const result = await continueProjectLaunchJourney({
+				request: pendingRunningEnvironmentLaunch.request,
+				allowExistingEnvironmentLaunch: true,
+				launchProject: devContextApi.launchProject,
+			});
+			await handleManagementLaunchOutcome(result, {
+				request: pendingRunningEnvironmentLaunch.request,
+				onError: setRunningEnvironmentLaunchError,
+				onLaunched: () => setPendingRunningEnvironmentLaunch(undefined),
+			});
 		} finally {
 			setRunningEnvironmentLaunchPending(false);
 		}
