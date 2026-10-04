@@ -3,18 +3,12 @@ import type {
 	PreflightLaunchProjectResult,
 	RunningEnvironmentConflict,
 } from "../../lib/devctx-api";
+import type { ProjectLaunchPending } from "../project-launch/project-launch-journey.js";
 
 interface LauncherSelection {
 	selectedContextId?: string;
 	rovingContextId?: string;
 	rememberProject: boolean;
-}
-
-interface LaunchAttempt {
-	confirmContextMismatch: boolean;
-	contextId?: string;
-	allowExistingEnvironmentLaunch: boolean;
-	confirmIdentityMismatch: boolean;
 }
 
 type LauncherState =
@@ -34,8 +28,7 @@ type LauncherState =
 	| {
 			status: "preflight_review";
 			selection: LauncherSelection;
-			preflight: PreflightLaunchProjectResult;
-			attempt: LaunchAttempt;
+			pending: ProjectLaunchPending;
 	  }
 	| {
 			status: "launching";
@@ -47,6 +40,7 @@ type LauncherState =
 			status: "existing_workspace";
 			selection: LauncherSelection;
 			conflict: RunningEnvironmentConflict;
+			pending: ProjectLaunchPending;
 	  }
 	| {
 			status: "binding_replacement";
@@ -68,13 +62,13 @@ type LauncherState =
 			error: DisplayError;
 	  };
 
-function selectingLauncherState(
-	selection: LauncherSelection,
-): LauncherState {
+function selectingLauncherState(selection: LauncherSelection): LauncherState {
 	return { status: "selecting", selection };
 }
 
-function launcherSelection(state: LauncherState): LauncherSelection | undefined {
+function launcherSelection(
+	state: LauncherState,
+): LauncherSelection | undefined {
 	return "selection" in state ? state.selection : undefined;
 }
 
@@ -87,5 +81,5 @@ function launcherStateIsPending(state: LauncherState): boolean {
 	);
 }
 
-export type { LaunchAttempt, LauncherSelection, LauncherState };
+export type { LauncherSelection, LauncherState };
 export { launcherSelection, launcherStateIsPending, selectingLauncherState };

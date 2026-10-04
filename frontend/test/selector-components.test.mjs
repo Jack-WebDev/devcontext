@@ -49,7 +49,10 @@ import {
 	homeConfidenceSummary,
 } from "../.tmp-test/src/components/home/HomeView.js";
 import { RecentProjectConfirmationDialog } from "../.tmp-test/src/components/home/RecentProjectConfirmationDialog.js";
-import { isToastEligible, notificationPresentation } from "../.tmp-test/src/components/notifications/notification-policy.js";
+import {
+	isToastEligible,
+	notificationPresentation,
+} from "../.tmp-test/src/components/notifications/notification-policy.js";
 import {
 	ProjectContextChangeDialog,
 	safetyImplication,
@@ -111,6 +114,10 @@ import {
 	launchSelectedContext,
 } from "../.tmp-test/src/components/selector/launch-action.js";
 import {
+	continueProjectLaunchJourney,
+	runProjectLaunchJourney,
+} from "../.tmp-test/src/components/project-launch/project-launch-journey.js";
+import {
 	launchActionLabel,
 	launchPendingLabel,
 } from "../.tmp-test/src/components/selector/launch-copy.js";
@@ -118,7 +125,18 @@ import {
 	defaultLaunchSuccessCloseBehavior,
 	shouldCloseSelectorAfterLaunch,
 } from "../.tmp-test/src/components/selector/launch-success-close-behavior.js";
-import { createContextAndRefresh } from "../.tmp-test/src/components/contexts/context-creation.js";
+import {
+	beginContextCreation,
+	completeContextCreation,
+	editContextCreateSection,
+	executeContextCreation,
+	initialContextCreateFlow,
+	nextContextCreateStep,
+	previousContextCreateStep,
+	returnToContextCreateReview,
+	updateContextCreateDraft,
+	updateContextCreateProjects,
+} from "../.tmp-test/src/components/contexts/context-creation.js";
 import {
 	ContextCreateIdentityScreen,
 	contextPurposeMaxLength,
@@ -156,17 +174,6 @@ import {
 } from "../.tmp-test/src/components/contexts/context-identity-options.js";
 import { developmentToolCategories } from "../.tmp-test/src/components/contexts/development-tool-categories.js";
 import { developmentToolStatusPresentation } from "../.tmp-test/src/components/contexts/development-tool-status.js";
-import {
-	beginContextCreation,
-	completeContextCreation,
-	editContextCreateSection,
-	initialContextCreateFlow,
-	nextContextCreateStep,
-	previousContextCreateStep,
-	returnToContextCreateReview,
-	updateContextCreateDraft,
-	updateContextCreateProjects,
-} from "../.tmp-test/src/components/contexts/context-create-flow.js";
 import { ProjectIdentity } from "../.tmp-test/src/components/selector/ProjectIdentity.js";
 import { ProviderCredentialClassification } from "../.tmp-test/src/components/selector/ProviderCredentialClassification.js";
 import {
@@ -201,6 +208,7 @@ import {
 	canLaunchSelectedContextFromKeyboard,
 	escapeKeyboardAction,
 } from "../.tmp-test/src/components/selector/selector-keyboard.js";
+import { createSelectorLaunchModule } from "../.tmp-test/src/components/selector/selector-launch.js";
 import { AppShell } from "../.tmp-test/src/components/shell/AppShell.js";
 import {
 	appRouteFromHash,
@@ -252,7 +260,7 @@ test("context metadata import review identifies unavailable integrations before 
 
 test("account identity mismatch review is limited to backend identity evidence", () => {
 	assert.equal(
-			hasAccountIdentityMismatch({
+		hasAccountIdentityMismatch({
 			confidence: {
 				checks: [{ component: "identity", severity: "needs_attention" }],
 			},
@@ -260,7 +268,7 @@ test("account identity mismatch review is limited to backend identity evidence",
 		true,
 	);
 	assert.equal(
-			hasAccountIdentityMismatch({
+		hasAccountIdentityMismatch({
 			confidence: {
 				checks: [{ component: "provider", severity: "needs_attention" }],
 			},
@@ -704,25 +712,36 @@ test("running environments show immutable launch context and tool action entry p
 });
 
 test("unknown workspaces disclose their lifecycle and disable unsupported actions", () => {
-	const environments = [{
-		id: "environment-unknown",
-		project: { name: "api", path: "/work/api" },
-		context: { id: "company", name: "Company" },
-		tool: { id: "vscode", name: "VS Code" },
-		startedAt: "2026-08-28T10:30:00Z",
-		process: { state: "unknown" },
-		session: { state: "unknown" },
-		launch: { source: "gui", resolutionSource: "explicit" },
-		lifecycle: { state: "unknown", focusable: false, revealable: false, stoppable: false },
-	}];
-	const html = renderToStaticMarkup(createElement(RunningView, {
-		environments,
-		onReveal: async () => ({ revealed: false, targets: [] }),
-		onStop: () => {},
-	}));
+	const environments = [
+		{
+			id: "environment-unknown",
+			project: { name: "api", path: "/work/api" },
+			context: { id: "company", name: "Company" },
+			tool: { id: "vscode", name: "VS Code" },
+			startedAt: "2026-08-28T10:30:00Z",
+			process: { state: "unknown" },
+			session: { state: "unknown" },
+			launch: { source: "gui", resolutionSource: "explicit" },
+			lifecycle: {
+				state: "unknown",
+				focusable: false,
+				revealable: false,
+				stoppable: false,
+			},
+		},
+	];
+	const html = renderToStaticMarkup(
+		createElement(RunningView, {
+			environments,
+			onReveal: async () => ({ revealed: false, targets: [] }),
+			onStop: () => {},
+		}),
+	);
 
 	assert.ok(html.includes("Lifecycle unknown"));
-	assert.ok(html.includes("could not verify whether this workspace is still open"));
+	assert.ok(
+		html.includes("could not verify whether this workspace is still open"),
+	);
 	assert.ok(html.includes("cannot be revealed"));
 	assert.ok(html.includes("cannot be stopped"));
 	assert.match(html, /disabled=""/);
@@ -2018,7 +2037,12 @@ test("context card renders only backend-provided provider identity information",
 			},
 		},
 		{
-			...providerFixture("unavailable", "Unavailable Provider", true, "local_state"),
+			...providerFixture(
+				"unavailable",
+				"Unavailable Provider",
+				true,
+				"local_state",
+			),
 			identity: { status: "unavailable", fields: [] },
 		},
 	]);
@@ -2884,7 +2908,10 @@ test("selector critical path renders selected context and submits remembered lau
 		},
 	});
 
-	assert.deepEqual(result, launchProjectResult());
+	assert.deepEqual(result, {
+		kind: "launched",
+		result: launchProjectResult().data,
+	});
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",
@@ -2892,6 +2919,125 @@ test("selector critical path renders selected context and submits remembered lau
 		],
 		["bindProject", { projectPath: "/work/api", contextId: "company" }],
 		["launchProject", { projectPath: "/work/api", contextId: "company" }],
+	]);
+});
+
+test("project launch journey requires review before an existing workspace decision", async () => {
+	const calls = [];
+	const preflight = {
+		...preflightLaunchProjectResult().data,
+		groups: [
+			{
+				id: "tools",
+				label: "Tools",
+				status: "needs_attention",
+				blocking: false,
+				message: "Review the provider setup.",
+				checks: [],
+			},
+		],
+		runningEnvironmentConflict: { kind: "same_context", environment: {} },
+	};
+
+	const result = await runProjectLaunchJourney({
+		request: { projectPath: "/work/api", contextId: "personal" },
+		preflightLaunchProject(request) {
+			calls.push(["preflight", request]);
+			return Promise.resolve({ ok: true, data: preflight });
+		},
+		launchProject(request) {
+			calls.push(["launch", request]);
+			return Promise.resolve(launchProjectResult());
+		},
+	});
+
+	assert.deepEqual(result, {
+		kind: "preflight-review",
+		pending: {
+			request: { projectPath: "/work/api", contextId: "personal" },
+			preflight,
+		},
+	});
+	assert.deepEqual(calls, [
+		["preflight", { projectPath: "/work/api", contextId: "personal" }],
+	]);
+
+	const continuation = await continueProjectLaunchJourney({
+		pending: result.pending,
+		decision: "continue-after-review",
+		launchProject(request) {
+			calls.push(["launch", request]);
+			return Promise.resolve(launchProjectResult());
+		},
+	});
+	assert.deepEqual(continuation, {
+		kind: "running-environment-conflict",
+		conflict: preflight.runningEnvironmentConflict,
+		pending: result.pending,
+	});
+	assert.deepEqual(calls, [
+		["preflight", { projectPath: "/work/api", contextId: "personal" }],
+	]);
+});
+
+test("selector launch module owns identity review and launch transitions", async () => {
+	const states = [];
+	const calls = [];
+	const state = launchStateFixture({
+		contexts: [
+			{
+				...contextFixture("personal", "Personal"),
+				confidence: {
+					checks: [
+						{
+							component: "identity",
+							severity: "needs_attention",
+						},
+					],
+				},
+			},
+		],
+	});
+	const module = createSelectorLaunchModule({
+		launchState: state,
+		adapter: {
+			bindProject: () => Promise.resolve(projectBindingResult()),
+			unbindProject: () => Promise.resolve(projectBindingResult()),
+			preflightLaunchProject(request) {
+				calls.push(["preflight", request]);
+				return Promise.resolve(preflightLaunchProjectResult());
+			},
+			launchProject(request) {
+				calls.push(["launch", request]);
+				return Promise.resolve(launchProjectResult());
+			},
+			closeSelector: () => undefined,
+		},
+		options: {
+			launchSuccessClosesSelector: false,
+			projectMemoryEnabled: true,
+			requireContextMismatchConfirmation: true,
+		},
+		onStateChange(next) {
+			states.push(next.status);
+		},
+	});
+
+	await module.launch();
+	assert.equal(module.getState().status, "identity_mismatch");
+	assert.deepEqual(calls, []);
+
+	await module.launch({ confirmIdentityMismatch: true });
+	assert.deepEqual(calls, [
+		["preflight", { projectPath: "/work/api", contextId: "personal" }],
+		["launch", { projectPath: "/work/api", contextId: "personal" }],
+	]);
+	assert.equal(module.getState().status, "selecting");
+	assert.deepEqual(states, [
+		"identity_mismatch",
+		"preflighting",
+		"launching",
+		"selecting",
 	]);
 });
 
@@ -2936,7 +3082,10 @@ test("launch action launches the selected context when remember is off", async (
 		},
 	});
 
-	assert.deepEqual(result, launchProjectResult());
+	assert.deepEqual(result, {
+		kind: "launched",
+		result: launchProjectResult().data,
+	});
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",
@@ -2968,7 +3117,7 @@ test("launch action exposes preflight verification steps before starting the cod
 				data: { ...preflightLaunchProjectResult().data, verificationSteps },
 			});
 		},
-		onPreflightComplete(preflight) {
+		onLaunchStarting(preflight) {
 			calls.push(["verification", preflight.verificationSteps]);
 		},
 		launchProject(request) {
@@ -2977,7 +3126,7 @@ test("launch action exposes preflight verification steps before starting the cod
 		},
 	});
 
-	assert.equal(result?.ok, true);
+	assert.equal(result?.kind, "launched");
 	assert.deepEqual(calls, [
 		["preflight", { projectPath: "/work/api", contextId: "personal" }],
 		["verification", verificationSteps],
@@ -3005,7 +3154,10 @@ test("launch action preflights before binding when remember is on", async () => 
 		},
 	});
 
-	assert.deepEqual(result, launchProjectResult());
+	assert.deepEqual(result, {
+		kind: "launched",
+		result: launchProjectResult().data,
+	});
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",
@@ -3043,16 +3195,19 @@ test("launch action pauses before binding when preflight needs review", async ()
 			calls.push(["preflightLaunchProject", request]);
 			return Promise.resolve({ ok: true, data: preflight });
 		},
-		onPreflightComplete() {
-			return false;
-		},
 		launchProject(request) {
 			calls.push(["launchProject", request]);
 			return Promise.resolve(launchProjectResult());
 		},
 	});
 
-	assert.deepEqual(result, { preflightReview: preflight });
+	assert.deepEqual(result, {
+		kind: "preflight-review",
+		pending: {
+			request: { projectPath: "/work/api", contextId: "company" },
+			preflight,
+		},
+	});
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",
@@ -3114,14 +3269,14 @@ test("launch action returns binding errors without launching", async () => {
 		},
 	});
 
-	assert.deepEqual(
-		result,
-		apiError(
+	assert.deepEqual(result, {
+		kind: "failed",
+		error: apiError(
 			"validation_error",
 			"Unable to complete request.",
 			"Check the selected project and context, then retry.",
-		),
-	);
+		).error,
+	});
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",
@@ -3155,7 +3310,7 @@ test("launch action returns preflight errors without launching", async () => {
 		},
 	});
 
-	assert.deepEqual(result, error);
+	assert.deepEqual(result, { kind: "failed", error: error.error });
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",
@@ -3184,7 +3339,10 @@ test("launch action resubmits explicit context mismatch confirmation", async () 
 		},
 	});
 
-	assert.deepEqual(result, launchProjectResult());
+	assert.deepEqual(result, {
+		kind: "launched",
+		result: launchProjectResult().data,
+	});
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",
@@ -3356,7 +3514,10 @@ test("context mismatch open anyway submits exactly one confirmed launch", async 
 		},
 	});
 
-	assert.deepEqual(result, launchProjectResult());
+	assert.deepEqual(result, {
+		kind: "launched",
+		result: launchProjectResult().data,
+	});
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",
@@ -3562,74 +3723,149 @@ test("cancel closes the selector without launch or binding side effects", async 
 	assert.deepEqual(calls, ["closeSelector"]);
 });
 
-test("context creation refreshes launch state after success", async () => {
+test("context creation retains a completed context when refresh fails", async () => {
 	const calls = [];
-	const refreshedState = launchStateFixture({
-		contexts: [contextFixture("personal", "Personal")],
-		firstRun: false,
-	});
+	const steps = [];
+	const context = contextFixture("personal", "Personal");
+	const refreshError = apiError(
+		"internal_error",
+		"Could not refresh the created context.",
+		"Retry the refresh.",
+	).error;
 
-	const request = {
-		contextId: "personal",
-		name: "Personal",
-		importProviderIds: ["codex"],
-	};
-	const result = await createContextAndRefresh({
-		request,
+	const failed = await executeContextCreation({
+		request: { contextId: "personal", name: "Personal" },
+		projects: [],
+		boundProjectPaths: [],
 		createContext(receivedRequest) {
-			calls.push(["createContext", receivedRequest]);
-			return Promise.resolve({
-				ok: true,
-				data: {
-					context: contextFixture("personal", "Personal"),
-				},
-			});
+			calls.push(["create", receivedRequest]);
+			return Promise.resolve({ ok: true, data: { context } });
 		},
-		getLaunchState() {
-			calls.push(["getLaunchState"]);
-			return Promise.resolve({
-				ok: true,
-				data: refreshedState,
-			});
+		refreshContext(receivedContext) {
+			calls.push(["refresh", receivedContext.id]);
+			return Promise.resolve({ ok: false, error: refreshError });
+		},
+		onStep(id, status, detail) {
+			steps.push([id, status, detail]);
 		},
 	});
 
-	assert.deepEqual(result, {
-		ok: true,
-		created: {
-			context: contextFixture("personal", "Personal"),
-		},
-		launchState: refreshedState,
+	assert.deepEqual(failed, {
+		ok: false,
+		error: refreshError,
+		context,
+		boundProjectPaths: [],
 	});
-	assert.deepEqual(calls, [["createContext", request], ["getLaunchState"]]);
+	assert.deepEqual(steps.at(-1), ["refresh", "failed", undefined]);
+
+	const retried = await executeContextCreation({
+		request: { contextId: "personal", name: "Personal" },
+		projects: [],
+		createdContext: failed.context,
+		boundProjectPaths: failed.boundProjectPaths,
+		createContext() {
+			calls.push(["create", "retried"]);
+			return Promise.resolve({ ok: true, data: { context } });
+		},
+		refreshContext(receivedContext) {
+			calls.push(["refresh", receivedContext.id]);
+			return Promise.resolve({ ok: true, data: receivedContext });
+		},
+		onStep() {},
+	});
+
+	assert.deepEqual(retried, { ok: true, context, boundProjectPaths: [] });
+	assert.deepEqual(calls, [
+		["create", { contextId: "personal", name: "Personal" }],
+		["refresh", "personal"],
+		["refresh", "personal"],
+	]);
 });
 
-test("context creation returns failures without refreshing", async () => {
+test("context creation retains successful project bindings when retrying", async () => {
 	const calls = [];
-	const error = apiError(
+	const steps = [];
+	const context = contextFixture("personal", "Personal");
+	const request = { contextId: "personal", name: "Personal" };
+	const projects = [
+		{ name: "api", path: "/work/api" },
+		{ name: "web", path: "/work/web" },
+	];
+	const bindingError = apiError(
 		"validation_error",
-		"Unable to complete request.",
-		"Check the selected project and context, then retry.",
-	);
+		"Unable to save project association.",
+		"Retry the project association.",
+	).error;
 
-	const request = { contextId: "company" };
-	const result = await createContextAndRefresh({
+	const failed = await executeContextCreation({
 		request,
+		projects,
+		boundProjectPaths: [],
 		createContext(receivedRequest) {
-			calls.push(["createContext", receivedRequest]);
-			return Promise.resolve(error);
+			calls.push(["create", receivedRequest]);
+			return Promise.resolve({ ok: true, data: { context } });
 		},
-		getLaunchState() {
-			calls.push(["getLaunchState"]);
-			return Promise.resolve({ ok: true, data: launchStateFixture() });
+		bindProject(bindingRequest) {
+			calls.push(["bind", bindingRequest]);
+			return Promise.resolve(
+				bindingRequest.projectPath === "/work/web"
+					? { ok: false, error: bindingError }
+					: { ok: true, data: {} },
+			);
+		},
+		refreshContext(receivedContext) {
+			calls.push(["refresh", receivedContext.id]);
+			return Promise.resolve({ ok: true, data: receivedContext });
+		},
+		onStep(id, status, detail) {
+			steps.push([id, status, detail]);
 		},
 	});
 
-	assert.deepEqual(result, {
+	assert.deepEqual(failed, {
 		ok: false,
-		error: error.error,
+		error: bindingError,
+		context,
+		boundProjectPaths: ["/work/api"],
 	});
-	assert.deepEqual(calls, [["createContext", request]]);
+	assert.deepEqual(steps.at(-1), [
+		"bind",
+		"failed",
+		"1 of 2 project associations saved.",
+	]);
+
+	const retried = await executeContextCreation({
+		request,
+		projects,
+		createdContext: failed.context,
+		boundProjectPaths: failed.boundProjectPaths,
+		createContext() {
+			calls.push(["create", "retried"]);
+			return Promise.resolve({ ok: true, data: { context } });
+		},
+		bindProject(bindingRequest) {
+			calls.push(["bind", bindingRequest]);
+			return Promise.resolve({ ok: true, data: {} });
+		},
+		refreshContext(receivedContext) {
+			calls.push(["refresh", receivedContext.id]);
+			return Promise.resolve({ ok: true, data: receivedContext });
+		},
+		onStep() {},
+	});
+
+	assert.deepEqual(retried, {
+		ok: true,
+		context,
+		boundProjectPaths: ["/work/api", "/work/web"],
+	});
+	assert.deepEqual(calls, [
+		["create", request],
+		["bind", { projectPath: "/work/api", contextId: "personal" }],
+		["bind", { projectPath: "/work/web", contextId: "personal" }],
+		["bind", { projectPath: "/work/web", contextId: "personal" }],
+		["refresh", "personal"],
+	]);
 });
 
 test("context creation flow preserves its draft across forward and back steps", () => {
@@ -3831,7 +4067,7 @@ test("context creation progress and success present completed local work", () =>
 			label: "Initialize isolated tool storage",
 			status: "complete",
 		},
-		{ id: "verify", label: "Verify context readiness", status: "running" },
+		{ id: "refresh", label: "Refresh context state", status: "running" },
 	];
 	const progress = renderToStaticMarkup(
 		createElement(ContextCreationProgress, { steps }),
@@ -4201,10 +4437,19 @@ test("privacy settings describe implemented local data boundaries", () => {
 			"Portable exports",
 		],
 	);
-	assert.match(privacyStatements[1].description, /recent launches, active workspaces, and local activity/);
-	assert.match(privacyStatements[1].description, /Forgetting a project removes/);
+	assert.match(
+		privacyStatements[1].description,
+		/recent launches, active workspaces, and local activity/,
+	);
+	assert.match(
+		privacyStatements[1].description,
+		/Forgetting a project removes/,
+	);
 	assert.match(privacyStatements[2].description, /explicitly choose to import/);
-	assert.match(privacyStatements[2].description, /never displays, logs, uploads, or exports credential contents/);
+	assert.match(
+		privacyStatements[2].description,
+		/never displays, logs, uploads, or exports credential contents/,
+	);
 	assert.match(privacyStatements[3].description, /do not include credentials/);
 });
 

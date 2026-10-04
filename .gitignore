@@ -3,3 +3,6 @@ node_modules
 frontend/dist
 frontend/.tmp-test
 docs/
+.claude/
+.agents/
+skills-lock.json

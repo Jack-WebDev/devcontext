@@ -4,63 +4,44 @@ import type {
 	ApiResult,
 	BindProjectRequest,
 	ContextState,
-	DisplayError,
 	LaunchProjectRequest,
 	LaunchProjectResult,
 	LaunchState,
 	PreflightLaunchProjectRequest,
 	PreflightLaunchProjectResult,
 	ProjectBindingState,
-	ProviderCredentialSession,
 	UnbindProjectRequest,
 } from "../../lib/devctx-api";
 import { contextPositionFromShortcut } from "../command-palette/shortcut";
+import type { ProjectLaunchPending } from "../project-launch/project-launch-journey.js";
 import { RunningEnvironmentConflictDialog } from "../running/RunningEnvironmentConflictDialog";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import { AccountIdentityMismatchDialog } from "./AccountIdentityMismatchDialog";
-import { hasAccountIdentityMismatch } from "./account-identity-mismatch";
-import { bindingReplacementForLaunch } from "./binding-replacement";
 import { ContextChoiceList } from "./ContextChoiceList";
-import {
-	type ContextCreationAction,
-	useContextCreation,
-} from "../contexts/context-creation";
 import { ContextMismatchDialog } from "./ContextMismatchDialog";
-import { DanglingBindingDialog } from "./DanglingBindingDialog";
 import { cancelSelector } from "./cancel-action";
+import { DanglingBindingDialog } from "./DanglingBindingDialog";
 import { missingDefaultContextIds } from "./default-context-actions";
 import {
 	FirstRunWelcome,
 	shouldRenderFirstRunWelcome,
 } from "./FirstRunWelcome";
-import { GuiErrorNotice } from "./GuiErrorNotice";
 import { LaunchFailureView } from "./LaunchFailureView";
 import { LaunchProgressView } from "./LaunchProgressView";
-import { PreflightReviewView } from "./PreflightReviewView";
-import {
-	createLaunchRequestGuard,
-	launchSelectedContext,
-} from "./launch-action";
 import {
 	defaultLaunchSuccessCloseBehavior,
 	type LaunchSuccessCloseBehavior,
 	shouldCloseSelectorAfterLaunch,
 } from "./launch-success-close-behavior";
 import {
-	type LaunchAttempt,
-	type LauncherSelection,
 	type LauncherState,
 	launcherSelection,
 	launcherStateIsPending,
 	selectingLauncherState,
 } from "./launcher-state";
+import { PreflightReviewView } from "./PreflightReviewView";
 import { ProjectIdentity } from "./ProjectIdentity";
-import {
-	ProviderCredentialClassification,
-	type ProviderSessionAssignment,
-	type ProviderSessionAssignments,
-} from "./ProviderCredentialClassification.js";
 import {
 	canRememberProject,
 	RememberProjectControl,
@@ -70,19 +51,18 @@ import { SelectorActions } from "./SelectorActions";
 import { SelectorConfidenceSummary } from "./SelectorConfidenceSummary";
 import { SelectorLayout } from "./SelectorLayout";
 import { SingleContextLaunchView } from "./SingleContextLaunchView";
-import { WelcomeView } from "./WelcomeView";
-import {
-	type ContextNavigationDirection,
-	initialRovingContextId,
-	initialSelectedContextId,
-	nextKeyboardContextId,
-	nextSelectedContextId,
-} from "./selection-state";
+import type { ContextNavigationDirection } from "./selection-state";
 import {
 	canLaunchSelectedContextFromKeyboard,
 	escapeKeyboardAction,
 } from "./selector-keyboard";
-import { projectMemoryBindingContextId } from "./project-memory.js";
+import {
+	createSelectorLaunchModule,
+	initialSelectorLaunchState,
+	type LaunchAttemptOptions,
+	type SelectorLaunchModule,
+} from "./selector-launch.js";
+import { WelcomeView } from "./WelcomeView";
 
 interface SelectorViewProps {
 	launchState: LaunchState;
@@ -100,7 +80,6 @@ interface SelectorViewProps {
 	) => Promise<ApiResult<LaunchProjectResult>>;
 	onCancel: () => Promise<void> | void;
 	launchSuccessCloseBehavior?: LaunchSuccessCloseBehavior;
-	onCreateContext?: ContextCreationAction;
 	onRunDiagnostics?: () => void;
 	onCodingToolLaunched?: (result: LaunchProjectResult) => void;
 	showLaunchVerification?: boolean;
@@ -108,7 +87,7 @@ interface SelectorViewProps {
 	requireContextMismatchConfirmation?: boolean;
 	showOnboardingReplay?: boolean;
 	onDismissOnboardingReplay?: () => void;
-	onStartContextCreation?: () => void;
+	onStartContextCreation: () => void;
 	onRetryDetection?: () => void;
 }
 
@@ -120,7 +99,6 @@ function SelectorView({
 	onLaunchProject,
 	onCancel,
 	launchSuccessCloseBehavior = defaultLaunchSuccessCloseBehavior,
-	onCreateContext,
 	onRunDiagnostics,
 	onCodingToolLaunched,
 	showLaunchVerification = true,
@@ -132,16 +110,34 @@ function SelectorView({
 	onRetryDetection,
 }: SelectorViewProps) {
 	const [launcherState, setLauncherState] = useState<LauncherState>(() =>
-		initialLauncherState(launchState),
+		initialSelectorLaunchState(launchState),
 	);
-	const contextCreation = useContextCreation(onCreateContext);
-	const [providerSessionAssignments, setProviderSessionAssignments] =
-		useState<ProviderSessionAssignments>({});
 	const [showContextChoices, setShowContextChoices] = useState(false);
-	const [showFirstRunSetup, setShowFirstRunSetup] = useState(false);
 	const [contextSearch, setContextSearch] = useState("");
 	const contextButtonRefs = useRef(new Map<string, HTMLButtonElement>());
-	const launchGuard = useRef(createLaunchRequestGuard());
+	const launchModuleRef = useRef<SelectorLaunchModule | undefined>(undefined);
+	if (launchModuleRef.current === undefined) {
+		launchModuleRef.current = createSelectorLaunchModule({
+			launchState,
+			adapter: {
+				bindProject: onBindProject,
+				unbindProject: onUnbindProject,
+				preflightLaunchProject: onPreflightLaunchProject,
+				launchProject: onLaunchProject,
+				closeSelector: onCancel,
+				onCodingToolLaunched,
+			},
+			options: {
+				launchSuccessClosesSelector: shouldCloseSelectorAfterLaunch(
+					launchSuccessCloseBehavior,
+				),
+				projectMemoryEnabled,
+				requireContextMismatchConfirmation,
+			},
+			onStateChange: setLauncherState,
+		});
+	}
+	const launchModule = launchModuleRef.current;
 	const selection = launcherSelection(launcherState);
 	const selectedContextId = selection?.selectedContextId;
 	const rovingContextId = selection?.rovingContextId;
@@ -155,14 +151,12 @@ function SelectorView({
 		(context) => context.id === selectedContextId,
 	);
 	const launchPending = launcherStateIsPending(launcherState);
-	const cancellationPending = launchPending || contextCreation.pending;
+	const cancellationPending = launchPending;
 	const singleHealthyContext = singleHealthyLaunchContext(launchState);
 	const showSingleContextConfirmation =
 		singleHealthyContext !== undefined && !showContextChoices;
 	const showWelcome =
-		shouldRenderFirstRunWelcome(launchState) &&
-		launchState.firstRun &&
-		!showFirstRunSetup;
+		shouldRenderFirstRunWelcome(launchState) && launchState.firstRun;
 	const launchInProgress =
 		launcherState.status === "preflighting" ||
 		launcherState.status === "launching";
@@ -179,14 +173,43 @@ function SelectorView({
 	});
 
 	useEffect(() => {
-		setLauncherState(initialLauncherState(launchState));
-		contextCreation.reset();
-		setProviderSessionAssignments({});
+		launchModule.updateInputs(
+			launchState,
+			{
+				bindProject: onBindProject,
+				unbindProject: onUnbindProject,
+				preflightLaunchProject: onPreflightLaunchProject,
+				launchProject: onLaunchProject,
+				closeSelector: onCancel,
+				onCodingToolLaunched,
+			},
+			{
+				launchSuccessClosesSelector: shouldCloseSelectorAfterLaunch(
+					launchSuccessCloseBehavior,
+				),
+				projectMemoryEnabled,
+				requireContextMismatchConfirmation,
+			},
+		);
+	}, [
+		launchModule,
+		launchState,
+		onBindProject,
+		onCancel,
+		onCodingToolLaunched,
+		onLaunchProject,
+		onPreflightLaunchProject,
+		onUnbindProject,
+		launchSuccessCloseBehavior,
+		projectMemoryEnabled,
+		requireContextMismatchConfirmation,
+	]);
+
+	useEffect(() => {
+		launchModule.reset(launchState);
 		setShowContextChoices(false);
-		setShowFirstRunSetup(false);
 		setContextSearch("");
-		launchGuard.current = createLaunchRequestGuard();
-	}, [launchState]);
+	}, [launchModule, launchState]);
 
 	function setContextButtonRef(contextId: string) {
 		return (button: HTMLButtonElement | null) => {
@@ -199,46 +222,18 @@ function SelectorView({
 	}
 
 	function handleSelectContext(contextId: string) {
-		if (launcherState.status !== "selecting") {
-			return;
-		}
-		const nextContextId = nextSelectedContextId(
-			launchState.contexts,
-			contextId,
-		);
-		setLauncherState(
-			selectingLauncherState({
-				...launcherState.selection,
-				selectedContextId: nextContextId,
-				rovingContextId: nextContextId,
-			}),
-		);
+		launchModule.selectContext(contextId);
 	}
 
 	function handleContextNavigation(
 		contextId: string,
 		direction: ContextNavigationDirection,
 	) {
-		if (launcherState.status !== "selecting") {
-			return;
-		}
-
-		const nextContextId = nextKeyboardContextId(
-			launchState.contexts,
-			contextId,
-			direction,
-		);
+		const nextContextId = launchModule.navigateContext(contextId, direction);
 		if (nextContextId === undefined) {
 			return;
 		}
 
-		setLauncherState(
-			selectingLauncherState({
-				...launcherState.selection,
-				selectedContextId: nextContextId,
-				rovingContextId: nextContextId,
-			}),
-		);
 		contextButtonRefs.current.get(nextContextId)?.focus();
 	}
 
@@ -283,7 +278,7 @@ function SelectorView({
 		event.stopPropagation();
 
 		if (action === "close-dialog" && selection !== undefined) {
-			setLauncherState(selectingLauncherState(selection));
+			launchModule.dismissToSelection();
 			return;
 		}
 
@@ -293,257 +288,29 @@ function SelectorView({
 		});
 	}
 
-	async function handleLaunch({
-		confirmContextMismatch = false,
-		contextId = selectedContextId,
-		allowExistingEnvironmentLaunch = false,
-		confirmIdentityMismatch = false,
-		skipPreflightReview = false,
-	}: LaunchAttemptOptions = {}) {
-		if (launcherState.status === "dangling_binding") {
-			return;
-		}
-		const currentSelection = launcherSelection(launcherState);
-		if (currentSelection === undefined) {
-			return;
-		}
-		const contextToLaunch = launchState.contexts.find(
-			(context) => context.id === contextId,
-		);
-		if (contextToLaunch === undefined) {
-			setLauncherState(selectingLauncherState(currentSelection));
-			return;
-		}
-		const attempt: LaunchAttempt = {
-			confirmContextMismatch,
-			contextId,
-			allowExistingEnvironmentLaunch,
-			confirmIdentityMismatch,
-		};
-		if (
-			!confirmIdentityMismatch &&
-			hasAccountIdentityMismatch(contextToLaunch)
-		) {
-			if (contextId !== undefined) {
-				setLauncherState({
-					status: "identity_mismatch",
-					selection: currentSelection,
-					contextId,
-				});
-			}
-			return;
-		}
-
-		await launchGuard.current.run(async () => {
-			setLauncherState({
-				status: "preflighting",
-				selection: currentSelection,
-			});
-
-			try {
-				const result = await launchSelectedContext({
-					projectPath: launchState.project.path,
-					selectedContextId: contextId,
-					bindingContextId: projectMemoryBindingContextId({
-						projectMemoryEnabled,
-						binding: launchState.binding,
-						rememberProject,
-						selectedContextId: contextId,
-					}),
-					confirmContextMismatch:
-						confirmContextMismatch || !requireContextMismatchConfirmation,
-					allowExistingEnvironmentLaunch,
-					confirmPreflightWarnings: skipPreflightReview,
-					onPreflightComplete: (preflight) => {
-						if (
-							!skipPreflightReview &&
-							preflight.groups.some((group) => group.status !== "ready")
-						) {
-							setLauncherState({
-								status: "preflight_review",
-								selection: currentSelection,
-								preflight,
-								attempt,
-							});
-							return false;
-						}
-						setLauncherState({
-							status: "launching",
-							selection: currentSelection,
-							groups: preflight.groups,
-							steps: preflight.verificationSteps,
-						});
-						return true;
-					},
-					bindProject: onBindProject,
-					preflightLaunchProject: onPreflightLaunchProject,
-					launchProject: onLaunchProject,
-				});
-
-				if (result && "runningEnvironmentConflict" in result) {
-					setLauncherState({
-						status: "existing_workspace",
-						selection: currentSelection,
-						conflict: result.runningEnvironmentConflict,
-					});
-				} else if (result && "preflightReview" in result) {
-					return;
-				} else if (result?.ok) {
-					if ("project" in result.data && "context" in result.data) {
-						onCodingToolLaunched?.(result.data);
-						const replacement = bindingReplacementForLaunch(
-							launchState.binding,
-							result.data.context.id,
-						);
-						if (replacement !== undefined) {
-							setLauncherState({
-								status: "binding_replacement",
-								selection: currentSelection,
-								...replacement,
-								pending: false,
-							});
-							return;
-						}
-					}
-					await finishSuccessfulLaunch(currentSelection);
-				} else if (result && !result.ok) {
-					if (
-						result.error.code === "context_mismatch_requires_confirmation" &&
-						result.error.contextMismatch
-					) {
-						setLauncherState({
-							status: "context_mismatch",
-							selection: currentSelection,
-							error: result.error,
-						});
-					} else {
-						setLauncherState({
-							status: "failure",
-							selection: currentSelection,
-							error: result.error,
-						});
-					}
-				} else {
-					setLauncherState(selectingLauncherState(currentSelection));
-				}
-			} catch (error) {
-				setLauncherState({
-					status: "failure",
-					selection: currentSelection,
-					error: unexpectedLaunchError(error),
-				});
-			}
-		});
+	function handleLaunch(options?: LaunchAttemptOptions) {
+		return launchModule.launch(options);
 	}
 
-	async function finishSuccessfulLaunch(selection: LauncherSelection) {
-		if (shouldCloseSelectorAfterLaunch(launchSuccessCloseBehavior)) {
-			await cancelSelector({ closeSelector: onCancel });
-		}
-		setLauncherState(selectingLauncherState(selection));
+	function continueLaunch(
+		pending: ProjectLaunchPending,
+		decision: "continue-after-review" | "launch-another",
+	) {
+		return launchModule.continueLaunch(pending, decision);
 	}
 
-	async function handleBindingReplacement() {
-		if (
-			launcherState.status !== "binding_replacement" ||
-			launcherState.pending
-		) {
-			return;
-		}
-
-		setLauncherState({ ...launcherState, pending: true, error: undefined });
-		try {
-			const result = await onBindProject({
-				projectPath: launchState.project.path,
-				contextId: launcherState.replacementContextId,
-			});
-			if (!result.ok) {
-				setLauncherState({
-					...launcherState,
-					pending: false,
-					error: result.error,
-				});
-				return;
-			}
-			await finishSuccessfulLaunch(launcherState.selection);
-		} catch (error) {
-			setLauncherState({
-				...launcherState,
-				pending: false,
-				error: unexpectedBindingError(error),
-			});
-		}
+	function handleBindingReplacement() {
+		return launchModule.replaceBinding();
 	}
 
-	async function handleDanglingBindingRemoval() {
-		if (launcherState.status !== "dangling_binding" || launcherState.pending) {
-			return;
-		}
-
-		setLauncherState({ ...launcherState, pending: true, error: undefined });
-		try {
-			const result = await onUnbindProject({
-				projectPath: launchState.project.path,
-			});
-			if (!result.ok) {
-				setLauncherState({
-					...launcherState,
-					pending: false,
-					error: result.error,
-				});
-				return;
-			}
-			setLauncherState(selectingLauncherState(launcherState.selection));
-		} catch (error) {
-			setLauncherState({
-				...launcherState,
-				pending: false,
-				error: unexpectedBindingRemovalError(error),
-			});
-		}
+	function handleDanglingBindingRemoval() {
+		return launchModule.removeDanglingBinding();
 	}
 
 	function handleRememberProjectChange(rememberProject: boolean) {
-		if (
-			launcherState.status !== "selecting" ||
-			!canRememberProject(launchState.binding)
-		) {
-			return;
+		if (canRememberProject(launchState.binding)) {
+			launchModule.setRememberProject(rememberProject);
 		}
-		setLauncherState(
-			selectingLauncherState({
-				...launcherState.selection,
-				rememberProject,
-			}),
-		);
-	}
-
-	function handleClassifyProviderSession(
-		providerId: string,
-		assignment: ProviderSessionAssignment,
-	) {
-		setProviderSessionAssignments((current) => ({
-			...current,
-			[providerId]: assignment,
-		}));
-	}
-
-	function importProviderIdsForContext(
-		contextId: "personal" | "company",
-	): string[] {
-		return launchState.providerCredentialSessions
-			.filter(
-				(session) =>
-					providerSessionAssignments[session.providerId] === contextId,
-			)
-			.map((session) => session.providerId);
-	}
-
-	function handleCreateContext(contextId: "personal" | "company") {
-		void contextCreation.create({
-			contextId,
-			importProviderIds: importProviderIdsForContext(contextId),
-		});
 	}
 
 	if (launchInProgress) {
@@ -571,29 +338,12 @@ function SelectorView({
 			onKeyDown={handleSelectorKeyDown}
 		>
 			{showWelcome ? (
-				<WelcomeView
-					onCreateFirstContext={
-						onStartContextCreation ?? (() => setShowFirstRunSetup(true))
-					}
-				/>
-			) : shouldRenderFirstRunWelcome(launchState) || showOnboardingReplay ? (
+				<WelcomeView onCreateFirstContext={onStartContextCreation} />
+			) : showOnboardingReplay ? (
 				<>
 					<ProjectIdentity project={launchState.project} />
 					<FirstRunWelcome
 						launchState={launchState}
-						providerCredentialSessions={launchState.providerCredentialSessions}
-						providerSessionAssignments={providerSessionAssignments}
-						pendingContextId={contextCreation.pendingRequest?.contextId}
-						error={contextCreation.error}
-						onClassifyProviderSession={handleClassifyProviderSession}
-						onCreatePersonal={
-							onCreateContext
-								? () => handleCreateContext("personal")
-								: undefined
-						}
-						onCreateCompany={
-							onCreateContext ? () => handleCreateContext("company") : undefined
-						}
 						replay={showOnboardingReplay && !launchState.firstRun}
 						onContinue={
 							showOnboardingReplay && !launchState.firstRun
@@ -635,23 +385,7 @@ function SelectorView({
 
 							<MissingDefaultContextActions
 								launchState={launchState}
-								providerCredentialSessions={
-									launchState.providerCredentialSessions
-								}
-								providerSessionAssignments={providerSessionAssignments}
-								pendingContextId={contextCreation.pendingRequest?.contextId}
-								error={contextCreation.error}
-								onClassifyProviderSession={handleClassifyProviderSession}
-								onCreatePersonal={
-									onCreateContext
-										? () => handleCreateContext("personal")
-										: undefined
-								}
-								onCreateCompany={
-									onCreateContext
-										? () => handleCreateContext("company")
-										: undefined
-								}
+								onStartContextCreation={onStartContextCreation}
 							/>
 						</>
 					}
@@ -679,24 +413,24 @@ function SelectorView({
 						<>
 							{launcherState.status === "preflight_review" ? (
 								<PreflightReviewView
-									projectName={launcherState.preflight.project.name}
-									contextName={launcherState.preflight.context.name}
-									preflight={launcherState.preflight}
+									projectName={launcherState.pending.preflight.project.name}
+									contextName={launcherState.pending.preflight.context.name}
+									preflight={launcherState.pending.preflight}
 									onFixFirst={() =>
 										setLauncherState(
 											selectingLauncherState(launcherState.selection),
 										)
 									}
 									onLaunchWithoutIt={
-										launcherState.preflight.groups.some(
+										launcherState.pending.preflight.groups.some(
 											(group) => group.blocking,
 										)
 											? undefined
 											: () =>
-													void handleLaunch({
-														...launcherState.attempt,
-														skipPreflightReview: true,
-													})
+													void continueLaunch(
+														launcherState.pending,
+														"continue-after-review",
+													)
 									}
 								/>
 							) : null}
@@ -732,9 +466,7 @@ function SelectorView({
 									}
 									pending={launcherState.pending}
 									error={launcherState.error}
-									onKeepCurrent={() =>
-										void finishSuccessfulLaunch(launcherState.selection)
-									}
+									onKeepCurrent={() => void launchModule.keepCurrentBinding()}
 									onReplace={() => void handleBindingReplacement()}
 								/>
 							) : null}
@@ -824,7 +556,7 @@ function SelectorView({
 										)
 									}
 									onLaunchAnother={() =>
-										void handleLaunch({ allowExistingEnvironmentLaunch: true })
+										void continueLaunch(launcherState.pending, "launch-another")
 									}
 								/>
 							) : null}
@@ -852,87 +584,16 @@ function SelectorView({
 	);
 }
 
-interface LaunchAttemptOptions extends Partial<LaunchAttempt> {
-	skipPreflightReview?: boolean;
-}
-
-function initialLauncherSelection(launchState: LaunchState): LauncherSelection {
-	return {
-		selectedContextId: initialSelectedContextId(launchState),
-		rovingContextId: initialRovingContextId(launchState),
-		rememberProject: false,
-	};
-}
-
-function initialLauncherState(launchState: LaunchState): LauncherState {
-	const selection = initialLauncherSelection(launchState);
-	if (launchState.binding.dangling) {
-		return { status: "dangling_binding", selection, pending: false };
-	}
-	return selectingLauncherState(selection);
-}
-
-function unexpectedLaunchError(error: unknown): DisplayError {
-	const message = error instanceof Error ? error.message : "Launch failed.";
-	return {
-		code: "unexpected_error",
-		message,
-		recovery: "Retry the launch. If it keeps failing, review diagnostics.",
-	};
-}
-
-function unexpectedBindingError(error: unknown): DisplayError {
-	const message =
-		error instanceof Error ? error.message : "Could not remember this context.";
-	return {
-		code: "unexpected_error",
-		message,
-		recovery: "Try again or keep the current remembered context.",
-	};
-}
-
-function unexpectedBindingRemovalError(error: unknown): DisplayError {
-	const message =
-		error instanceof Error
-			? error.message
-			: "Could not remove the remembered context.";
-	return {
-		code: "unexpected_error",
-		message,
-		recovery:
-			"Try again or choose a context for this launch without removing it.",
-	};
-}
-
 function MissingDefaultContextActions({
 	launchState,
-	providerCredentialSessions,
-	providerSessionAssignments,
-	pendingContextId,
-	error,
-	onClassifyProviderSession,
-	onCreatePersonal,
-	onCreateCompany,
+	onStartContextCreation,
 }: {
 	launchState: LaunchState;
-	providerCredentialSessions: ProviderCredentialSession[];
-	providerSessionAssignments: ProviderSessionAssignments;
-	pendingContextId?: string;
-	error?: DisplayError;
-	onClassifyProviderSession: (
-		providerId: string,
-		assignment: ProviderSessionAssignment,
-	) => void;
-	onCreatePersonal?: () => void;
-	onCreateCompany?: () => void;
+	onStartContextCreation: () => void;
 }) {
 	const missingDefaults = missingDefaultContextIds(launchState.contexts);
 	const missingPersonal = missingDefaults.includes("personal");
 	const missingCompany = missingDefaults.includes("company");
-	const pending = pendingContextId !== undefined;
-	const classificationComplete = providerCredentialSessions.every(
-		(session) => providerSessionAssignments[session.providerId] !== undefined,
-	);
 
 	if (!missingPersonal && !missingCompany) {
 		return null;
@@ -956,54 +617,15 @@ function MissingDefaultContextActions({
 							needs both identities.
 						</p>
 					</div>
-					<div className="flex flex-wrap gap-2">
-						{missingPersonal ? (
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								disabled={
-									pending ||
-									!classificationComplete ||
-									onCreatePersonal === undefined
-								}
-								onClick={onCreatePersonal}
-							>
-								{pendingContextId === "personal"
-									? "Creating..."
-									: "Add Personal"}
-							</Button>
-						) : null}
-						{missingCompany ? (
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								disabled={
-									pending ||
-									!classificationComplete ||
-									onCreateCompany === undefined
-								}
-								onClick={onCreateCompany}
-							>
-								{pendingContextId === "company" ? "Creating..." : "Add Company"}
-							</Button>
-						) : null}
-					</div>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={onStartContextCreation}
+					>
+						Create a context
+					</Button>
 				</div>
-				<ProviderCredentialClassification
-					sessions={providerCredentialSessions}
-					assignments={providerSessionAssignments}
-					disabled={pending}
-					onAssign={onClassifyProviderSession}
-				/>
-				{pendingContextId ? (
-					<p className="mt-3 text-sm text-muted-foreground" role="status">
-						Creating {pendingContextId === "personal" ? "Personal" : "Company"}{" "}
-						context...
-					</p>
-				) : null}
-				{error ? <GuiErrorNotice error={error} /> : null}
 			</CardContent>
 		</Card>
 	);

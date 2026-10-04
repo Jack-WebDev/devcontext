@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { Layers3 } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
 	ContextsContent,
 	HistoryContent,
@@ -15,35 +15,40 @@ import {
 } from "./components/command-palette/actions";
 import { CommandPalette } from "./components/command-palette/CommandPalette";
 import { isCommandPaletteShortcut } from "./components/command-palette/shortcut";
+import { ContextDeleteDialog } from "./components/contexts/ContextDeleteDialog";
+import { ContextDetailView } from "./components/contexts/ContextDetailView";
 import {
 	ContextDetailsDrawer,
 	CreateContextDialog,
 } from "./components/contexts/ContextManagement";
-import { ContextDeleteDialog } from "./components/contexts/ContextDeleteDialog";
-import { ContextDetailView } from "./components/contexts/ContextDetailView";
 import type { ContextListAction } from "./components/contexts/ContextsView";
 import { DiagnosticsView } from "./components/diagnostics/DiagnosticsView";
 import { RecentProjectConfirmationDialog } from "./components/home/RecentProjectConfirmationDialog";
+import { LauncherFlow } from "./components/launcher/LauncherFlow";
 import { notifyCodingToolLaunched } from "./components/notifications/notifications";
-import { ProjectContextChangeDialog } from "./components/projects/ProjectContextChangeDialog";
+import {
+	continueProjectLaunchJourney,
+	type ProjectLaunchAdapter,
+	type ProjectLaunchJourneyResult,
+	type ProjectLaunchPending,
+	runProjectLaunchJourney,
+} from "./components/project-launch/project-launch-journey.js";
 import { ProjectBindingRemovalDialog } from "./components/projects/ProjectBindingRemovalDialog";
+import { ProjectContextChangeDialog } from "./components/projects/ProjectContextChangeDialog";
 import { ProjectDetailView } from "./components/projects/ProjectDetailView";
 import { RunningEnvironmentConflictDialog } from "./components/running/RunningEnvironmentConflictDialog";
+import { FirstRunWelcome } from "./components/selector/FirstRunWelcome";
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
 import { PreflightReviewDialog } from "./components/selector/PreflightReviewDialog";
-import { FirstRunWelcome } from "./components/selector/FirstRunWelcome";
-import { createContextAndRefresh } from "./components/contexts/context-creation";
-import { LauncherFlow } from "./components/launcher/LauncherFlow";
 import { SettingsView } from "./components/settings/SettingsView";
 import { AppShell } from "./components/shell/AppShell";
 import {
 	type AppRoute,
-	appRouteDefinition,
 	appRouteDefinitions,
 	appRouteFromHash,
+	type ContextDetailDestination,
 	contextDetailHash,
 	contextDetailRouteFromHash,
-	type ContextDetailDestination,
 	projectDetailHash,
 	projectDetailRouteFromHash,
 } from "./components/shell/routes";
@@ -52,14 +57,12 @@ import { DestructiveConfirmationDialog } from "./components/ui/destructive-confi
 import {
 	type ApiResult,
 	type ApplicationMode,
-	type CreateContextResult,
-	type CreateContextRequest,
 	type DisplayError,
 	devContextApi,
 	type ImportContextMetadataRequest,
 	type ImportContextMetadataResult,
+	type LaunchProjectRequest,
 	type ProjectListItem,
-	type PreflightLaunchProjectResult,
 	type RecentProjectState,
 	type RunningEnvironmentConflict,
 	type RunningEnvironmentsState,
@@ -68,17 +71,13 @@ import {
 
 interface PendingRunningEnvironmentLaunch {
 	conflict: RunningEnvironmentConflict;
-	request: {
-		projectPath: string;
-		contextId: string;
-		confirmPreflightWarnings?: boolean;
-	};
+	pending: ProjectLaunchPending;
 }
 
-interface PendingPreflightReview {
-	request: { projectPath: string; contextId: string };
-	preflight: PreflightLaunchProjectResult;
-}
+const desktopProjectLaunchAdapter: ProjectLaunchAdapter = {
+	preflightLaunchProject: devContextApi.preflightLaunchProject,
+	launchProject: devContextApi.launchProject,
+};
 
 function App() {
 	const [applicationMode, setApplicationMode] = useState<
@@ -149,7 +148,6 @@ function ManagementApp() {
 	);
 	const {
 		launchState,
-		setLaunchState,
 		homeDashboard,
 		recentProjects,
 		contexts,
@@ -177,7 +175,7 @@ function ManagementApp() {
 	const [runningEnvironmentLaunchError, setRunningEnvironmentLaunchError] =
 		useState<DisplayError>();
 	const [pendingPreflightReview, setPendingPreflightReview] =
-		useState<PendingPreflightReview>();
+		useState<ProjectLaunchPending>();
 	const [preflightReviewPending, setPreflightReviewPending] = useState(false);
 	const [preflightReviewError, setPreflightReviewError] =
 		useState<DisplayError>();
@@ -301,52 +299,13 @@ function ManagementApp() {
 		setCommandPaletteLaunchError(undefined);
 		try {
 			const request = { projectPath: launchState.data.project.path, contextId };
-			const preflight = await devContextApi.preflightLaunchProject(request);
-			if (!preflight.ok) {
-				setCommandPaletteLaunchError(preflight.error);
-				return;
-			}
-			if (deferPreflightReview(preflight.data, request)) {
-				return;
-			}
-			if (deferRunningEnvironmentConflict(preflight.data, request)) {
-				return;
-			}
-			const launch = await devContextApi.launchProject(request);
-			if (!launch.ok) {
-				setCommandPaletteLaunchError(launch.error);
-				return;
-			}
-			notifyLaunch(launch.data);
-			await Promise.all([
-				refreshHomeDashboard(),
-				refreshRecentProjects(),
-				refreshProjects(),
-				refreshRunningEnvironments(),
-			]);
+			await launchManagementProject({
+				request,
+				onError: setCommandPaletteLaunchError,
+			});
 		} finally {
 			setCommandPaletteLaunchPending(false);
 		}
-	}
-
-	async function handleCreateContext(
-		request: CreateContextRequest,
-	): Promise<ApiResult<CreateContextResult>> {
-		const result = await createContextAndRefresh({
-			request,
-			createContext: devContextApi.createContext,
-			getLaunchState: () => devContextApi.getLaunchState(),
-		});
-		if (result.ok) {
-			setLaunchState({ status: "loaded", data: result.launchState });
-			void refreshHomeDashboard();
-			void refreshRecentProjects();
-			void refreshContexts();
-			void refreshProjects();
-			return { ok: true, data: result.created };
-		}
-
-		return { ok: false, error: result.error };
 	}
 
 	async function handleImportContextMetadata(
@@ -425,26 +384,7 @@ function ManagementApp() {
 				projectPath: project.path,
 				contextId: currentContext.id,
 			};
-			const preflight = await devContextApi.preflightLaunchProject(request);
-			if (!preflight.ok) {
-				setHomeLaunchError(preflight.error);
-				return;
-			}
-			if (deferPreflightReview(preflight.data, request)) {
-				return;
-			}
-			if (deferRunningEnvironmentConflict(preflight.data, request)) {
-				return;
-			}
-			const launch = await devContextApi.launchProject(request);
-			if (!launch.ok) {
-				setHomeLaunchError(launch.error);
-				return;
-			}
-			notifyLaunch(launch.data);
-			await refreshHomeDashboard();
-			await refreshRecentProjects();
-			await refreshProjects();
+			await launchManagementProject({ request, onError: setHomeLaunchError });
 		} finally {
 			setHomeLaunchPending(false);
 		}
@@ -474,26 +414,11 @@ function ManagementApp() {
 				projectPath: recentProjectToLaunch.project.path,
 				contextId: recentProjectToLaunch.contextId,
 			};
-			const preflight = await devContextApi.preflightLaunchProject(request);
-			if (!preflight.ok) {
-				setRecentProjectLaunchError(preflight.error);
-				return;
-			}
-			if (deferPreflightReview(preflight.data, request)) {
-				return;
-			}
-			if (deferRunningEnvironmentConflict(preflight.data, request)) {
-				return;
-			}
-			const launch = await devContextApi.launchProject(request);
-			if (!launch.ok) {
-				setRecentProjectLaunchError(launch.error);
-				return;
-			}
-			notifyLaunch(launch.data);
-			setRecentProjectToLaunch(undefined);
-			await refreshRecentProjects();
-			await refreshProjects();
+			await launchManagementProject({
+				request,
+				onError: setRecentProjectLaunchError,
+				onLaunched: () => setRecentProjectToLaunch(undefined),
+			});
 		} finally {
 			setRecentProjectLaunchPending(false);
 		}
@@ -525,28 +450,10 @@ function ManagementApp() {
 				projectPath: project.project.path,
 				contextId: project.contextId,
 			};
-			const preflight = await devContextApi.preflightLaunchProject(request);
-			if (!preflight.ok) {
-				setProjectLaunchError(preflight.error);
-				return;
-			}
-			if (deferPreflightReview(preflight.data, request)) {
-				return;
-			}
-			if (deferRunningEnvironmentConflict(preflight.data, request)) {
-				return;
-			}
-			const launch = await devContextApi.launchProject(request);
-			if (!launch.ok) {
-				setProjectLaunchError(launch.error);
-				return;
-			}
-			notifyLaunch(launch.data);
-			await Promise.all([
-				refreshHomeDashboard(),
-				refreshRecentProjects(),
-				refreshProjects(),
-			]);
+			await launchManagementProject({
+				request,
+				onError: setProjectLaunchError,
+			});
 		} finally {
 			setProjectLaunchPath(undefined);
 		}
@@ -693,31 +600,55 @@ function ManagementApp() {
 		window.location.hash = projectDetailHash({ projectPath: selected.data });
 	}
 
-	function deferRunningEnvironmentConflict(
-		preflight: { runningEnvironmentConflict?: RunningEnvironmentConflict },
-		request: { projectPath: string; contextId: string },
-	) {
-		if (preflight.runningEnvironmentConflict === undefined) {
-			return false;
-		}
-		setRunningEnvironmentLaunchError(undefined);
-		setPendingRunningEnvironmentLaunch({
-			conflict: preflight.runningEnvironmentConflict,
-			request: { ...request, confirmPreflightWarnings: true },
-		});
-		return true;
+	async function refreshManagementLaunchData() {
+		await Promise.all([
+			refreshHomeDashboard(),
+			refreshRecentProjects(),
+			refreshProjects(),
+			refreshRunningEnvironments(),
+		]);
 	}
 
-	function deferPreflightReview(
-		preflight: PreflightLaunchProjectResult,
-		request: { projectPath: string; contextId: string },
+	async function handleManagementLaunchOutcome(
+		result: ProjectLaunchJourneyResult,
+		options: {
+			onError: (error: DisplayError) => void;
+			onLaunched?: () => void;
+		},
 	) {
-		if (!preflight.groups.some((group) => group.status !== "ready")) {
-			return false;
+		if (result.kind === "preflight-review") {
+			setPreflightReviewError(undefined);
+			setPendingPreflightReview(result.pending);
+			return;
 		}
-		setPreflightReviewError(undefined);
-		setPendingPreflightReview({ request, preflight });
-		return true;
+		if (result.kind === "running-environment-conflict") {
+			setRunningEnvironmentLaunchError(undefined);
+			setPendingRunningEnvironmentLaunch({
+				conflict: result.conflict,
+				pending: result.pending,
+			});
+			return;
+		}
+		if (result.kind === "failed") {
+			options.onError(result.error);
+			return;
+		}
+
+		notifyLaunch(result.result);
+		options.onLaunched?.();
+		await refreshManagementLaunchData();
+	}
+
+	async function launchManagementProject(options: {
+		request: LaunchProjectRequest;
+		onError: (error: DisplayError) => void;
+		onLaunched?: () => void;
+	}) {
+		const result = await runProjectLaunchJourney({
+			request: options.request,
+			...desktopProjectLaunchAdapter,
+		});
+		await handleManagementLaunchOutcome(result, options);
 	}
 
 	async function handlePreflightReviewContinue() {
@@ -725,34 +656,21 @@ function ManagementApp() {
 			return;
 		}
 
-		const request = {
-			...pendingPreflightReview.request,
-			confirmPreflightWarnings: true,
-		};
-		if (
-			deferRunningEnvironmentConflict(pendingPreflightReview.preflight, request)
-		) {
-			setPendingPreflightReview(undefined);
-			return;
-		}
-
 		setPreflightReviewPending(true);
 		setPreflightReviewError(undefined);
 		try {
-			const launch = await devContextApi.launchProject(request);
-			if (!launch.ok) {
-				setPreflightReviewError(launch.error);
-				return;
-			}
-			notifyLaunch(launch.data);
-			setPendingPreflightReview(undefined);
-			setRecentProjectToLaunch(undefined);
-			await Promise.all([
-				refreshHomeDashboard(),
-				refreshRecentProjects(),
-				refreshProjects(),
-				refreshRunningEnvironments(),
-			]);
+			const result = await continueProjectLaunchJourney({
+				pending: pendingPreflightReview,
+				decision: "continue-after-review",
+				...desktopProjectLaunchAdapter,
+			});
+			await handleManagementLaunchOutcome(result, {
+				onError: setPreflightReviewError,
+				onLaunched: () => {
+					setPendingPreflightReview(undefined);
+					setRecentProjectToLaunch(undefined);
+				},
+			});
 		} finally {
 			setPreflightReviewPending(false);
 		}
@@ -768,21 +686,15 @@ function ManagementApp() {
 		setRunningEnvironmentLaunchPending(true);
 		setRunningEnvironmentLaunchError(undefined);
 		try {
-			const result = await devContextApi.launchProject(
-				pendingRunningEnvironmentLaunch.request,
-			);
-			if (!result.ok) {
-				setRunningEnvironmentLaunchError(result.error);
-				return;
-			}
-			notifyLaunch(result.data);
-			setPendingRunningEnvironmentLaunch(undefined);
-			await Promise.all([
-				refreshHomeDashboard(),
-				refreshRecentProjects(),
-				refreshProjects(),
-				refreshRunningEnvironments(),
-			]);
+			const result = await continueProjectLaunchJourney({
+				pending: pendingRunningEnvironmentLaunch.pending,
+				decision: "launch-another",
+				...desktopProjectLaunchAdapter,
+			});
+			await handleManagementLaunchOutcome(result, {
+				onError: setRunningEnvironmentLaunchError,
+				onLaunched: () => setPendingRunningEnvironmentLaunch(undefined),
+			});
 		} finally {
 			setRunningEnvironmentLaunchPending(false);
 		}
@@ -867,7 +779,9 @@ function ManagementApp() {
 						onOpenProjects={() => handleNavigate("projects")}
 						getHistory={devContextApi.getHistory}
 						getDiagnostics={devContextApi.getDiagnostics}
-						onContextUpdated={refreshContexts}
+						onContextUpdated={async () => {
+							await refreshContexts();
+						}}
 					/>
 				) : (
 					<>
@@ -923,26 +837,23 @@ function ManagementApp() {
 							<CreateContextDialog
 								contexts={contexts.data}
 								onClose={() => setCreatingContext(false)}
-								create={async (request) => {
-									const result = await devContextApi.createContext(request);
-									if (result.ok) {
-										await refreshContexts();
-									}
-									return result;
-								}}
+								create={devContextApi.createContext}
 								loadCreationOptions={devContextApi.getContextTemplates}
 								bindProject={async (request) => {
 									const result = await devContextApi.bindProject(request);
 									if (result.ok) await refreshProjects();
 									return result;
 								}}
-								verifyContext={async (context) => {
+								refreshContext={async (context) => {
 									const result = await devContextApi.getContextDetails({
 										contextId: context.id,
 									});
-									return result.ok
+									if (!result.ok) return result;
+
+									const refreshed = await refreshContexts();
+									return refreshed.ok
 										? { ok: true, data: result.data.context }
-										: result;
+										: refreshed;
 								}}
 								onViewContext={(contextId) => {
 									setCreatingContext(false);
