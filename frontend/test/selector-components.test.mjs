@@ -208,6 +208,7 @@ import {
 	canLaunchSelectedContextFromKeyboard,
 	escapeKeyboardAction,
 } from "../.tmp-test/src/components/selector/selector-keyboard.js";
+import { createSelectorLaunchModule } from "../.tmp-test/src/components/selector/selector-launch.js";
 import { AppShell } from "../.tmp-test/src/components/shell/AppShell.js";
 import {
 	appRouteFromHash,
@@ -2976,6 +2977,67 @@ test("project launch journey requires review before an existing workspace decisi
 	});
 	assert.deepEqual(calls, [
 		["preflight", { projectPath: "/work/api", contextId: "personal" }],
+	]);
+});
+
+test("selector launch module owns identity review and launch transitions", async () => {
+	const states = [];
+	const calls = [];
+	const state = launchStateFixture({
+		contexts: [
+			{
+				...contextFixture("personal", "Personal"),
+				confidence: {
+					checks: [
+						{
+							component: "identity",
+							severity: "needs_attention",
+						},
+					],
+				},
+			},
+		],
+	});
+	const module = createSelectorLaunchModule({
+		launchState: state,
+		adapter: {
+			bindProject: () => Promise.resolve(projectBindingResult()),
+			unbindProject: () => Promise.resolve(projectBindingResult()),
+			preflightLaunchProject(request) {
+				calls.push(["preflight", request]);
+				return Promise.resolve(preflightLaunchProjectResult());
+			},
+			launchProject(request) {
+				calls.push(["launch", request]);
+				return Promise.resolve(launchProjectResult());
+			},
+			closeSelector: () => undefined,
+		},
+		options: {
+			launchSuccessClosesSelector: false,
+			projectMemoryEnabled: true,
+			requireContextMismatchConfirmation: true,
+		},
+		onStateChange(next) {
+			states.push(next.status);
+		},
+	});
+
+	await module.launch();
+	assert.equal(module.getState().status, "identity_mismatch");
+	assert.deepEqual(calls, []);
+
+	await module.launch({ confirmIdentityMismatch: true });
+	assert.deepEqual(calls, [
+		["preflight", { projectPath: "/work/api", contextId: "personal" }],
+		["launch", { projectPath: "/work/api", contextId: "personal" }],
+	]);
+	assert.equal(module.getState().status, "selecting");
+	assert.deepEqual(states, [
+		"identity_mismatch",
+		"preflighting",
+		"launching",
+		"selecting",
 	]);
 });
 

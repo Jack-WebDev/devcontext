@@ -4,7 +4,6 @@ import type {
 	ApiResult,
 	BindProjectRequest,
 	ContextState,
-	DisplayError,
 	LaunchProjectRequest,
 	LaunchProjectResult,
 	LaunchState,
@@ -14,16 +13,11 @@ import type {
 	UnbindProjectRequest,
 } from "../../lib/devctx-api";
 import { contextPositionFromShortcut } from "../command-palette/shortcut";
-import type {
-	ProjectLaunchJourneyResult,
-	ProjectLaunchPending,
-} from "../project-launch/project-launch-journey.js";
+import type { ProjectLaunchPending } from "../project-launch/project-launch-journey.js";
 import { RunningEnvironmentConflictDialog } from "../running/RunningEnvironmentConflictDialog";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import { AccountIdentityMismatchDialog } from "./AccountIdentityMismatchDialog";
-import { hasAccountIdentityMismatch } from "./account-identity-mismatch";
-import { bindingReplacementForLaunch } from "./binding-replacement";
 import { ContextChoiceList } from "./ContextChoiceList";
 import { ContextMismatchDialog } from "./ContextMismatchDialog";
 import { cancelSelector } from "./cancel-action";
@@ -36,17 +30,11 @@ import {
 import { LaunchFailureView } from "./LaunchFailureView";
 import { LaunchProgressView } from "./LaunchProgressView";
 import {
-	continueLaunchingSelectedContext,
-	createLaunchRequestGuard,
-	launchSelectedContext,
-} from "./launch-action";
-import {
 	defaultLaunchSuccessCloseBehavior,
 	type LaunchSuccessCloseBehavior,
 	shouldCloseSelectorAfterLaunch,
 } from "./launch-success-close-behavior";
 import {
-	type LauncherSelection,
 	type LauncherState,
 	launcherSelection,
 	launcherStateIsPending,
@@ -54,7 +42,6 @@ import {
 } from "./launcher-state";
 import { PreflightReviewView } from "./PreflightReviewView";
 import { ProjectIdentity } from "./ProjectIdentity";
-import { projectMemoryBindingContextId } from "./project-memory.js";
 import {
 	canRememberProject,
 	RememberProjectControl,
@@ -64,17 +51,17 @@ import { SelectorActions } from "./SelectorActions";
 import { SelectorConfidenceSummary } from "./SelectorConfidenceSummary";
 import { SelectorLayout } from "./SelectorLayout";
 import { SingleContextLaunchView } from "./SingleContextLaunchView";
-import {
-	type ContextNavigationDirection,
-	initialRovingContextId,
-	initialSelectedContextId,
-	nextKeyboardContextId,
-	nextSelectedContextId,
-} from "./selection-state";
+import type { ContextNavigationDirection } from "./selection-state";
 import {
 	canLaunchSelectedContextFromKeyboard,
 	escapeKeyboardAction,
 } from "./selector-keyboard";
+import {
+	createSelectorLaunchModule,
+	initialSelectorLaunchState,
+	type LaunchAttemptOptions,
+	type SelectorLaunchModule,
+} from "./selector-launch.js";
 import { WelcomeView } from "./WelcomeView";
 
 interface SelectorViewProps {
@@ -123,12 +110,34 @@ function SelectorView({
 	onRetryDetection,
 }: SelectorViewProps) {
 	const [launcherState, setLauncherState] = useState<LauncherState>(() =>
-		initialLauncherState(launchState),
+		initialSelectorLaunchState(launchState),
 	);
 	const [showContextChoices, setShowContextChoices] = useState(false);
 	const [contextSearch, setContextSearch] = useState("");
 	const contextButtonRefs = useRef(new Map<string, HTMLButtonElement>());
-	const launchGuard = useRef(createLaunchRequestGuard());
+	const launchModuleRef = useRef<SelectorLaunchModule | undefined>(undefined);
+	if (launchModuleRef.current === undefined) {
+		launchModuleRef.current = createSelectorLaunchModule({
+			launchState,
+			adapter: {
+				bindProject: onBindProject,
+				unbindProject: onUnbindProject,
+				preflightLaunchProject: onPreflightLaunchProject,
+				launchProject: onLaunchProject,
+				closeSelector: onCancel,
+				onCodingToolLaunched,
+			},
+			options: {
+				launchSuccessClosesSelector: shouldCloseSelectorAfterLaunch(
+					launchSuccessCloseBehavior,
+				),
+				projectMemoryEnabled,
+				requireContextMismatchConfirmation,
+			},
+			onStateChange: setLauncherState,
+		});
+	}
+	const launchModule = launchModuleRef.current;
 	const selection = launcherSelection(launcherState);
 	const selectedContextId = selection?.selectedContextId;
 	const rovingContextId = selection?.rovingContextId;
@@ -164,11 +173,43 @@ function SelectorView({
 	});
 
 	useEffect(() => {
-		setLauncherState(initialLauncherState(launchState));
+		launchModule.updateInputs(
+			launchState,
+			{
+				bindProject: onBindProject,
+				unbindProject: onUnbindProject,
+				preflightLaunchProject: onPreflightLaunchProject,
+				launchProject: onLaunchProject,
+				closeSelector: onCancel,
+				onCodingToolLaunched,
+			},
+			{
+				launchSuccessClosesSelector: shouldCloseSelectorAfterLaunch(
+					launchSuccessCloseBehavior,
+				),
+				projectMemoryEnabled,
+				requireContextMismatchConfirmation,
+			},
+		);
+	}, [
+		launchModule,
+		launchState,
+		onBindProject,
+		onCancel,
+		onCodingToolLaunched,
+		onLaunchProject,
+		onPreflightLaunchProject,
+		onUnbindProject,
+		launchSuccessCloseBehavior,
+		projectMemoryEnabled,
+		requireContextMismatchConfirmation,
+	]);
+
+	useEffect(() => {
+		launchModule.reset(launchState);
 		setShowContextChoices(false);
 		setContextSearch("");
-		launchGuard.current = createLaunchRequestGuard();
-	}, [launchState]);
+	}, [launchModule, launchState]);
 
 	function setContextButtonRef(contextId: string) {
 		return (button: HTMLButtonElement | null) => {
@@ -181,46 +222,18 @@ function SelectorView({
 	}
 
 	function handleSelectContext(contextId: string) {
-		if (launcherState.status !== "selecting") {
-			return;
-		}
-		const nextContextId = nextSelectedContextId(
-			launchState.contexts,
-			contextId,
-		);
-		setLauncherState(
-			selectingLauncherState({
-				...launcherState.selection,
-				selectedContextId: nextContextId,
-				rovingContextId: nextContextId,
-			}),
-		);
+		launchModule.selectContext(contextId);
 	}
 
 	function handleContextNavigation(
 		contextId: string,
 		direction: ContextNavigationDirection,
 	) {
-		if (launcherState.status !== "selecting") {
-			return;
-		}
-
-		const nextContextId = nextKeyboardContextId(
-			launchState.contexts,
-			contextId,
-			direction,
-		);
+		const nextContextId = launchModule.navigateContext(contextId, direction);
 		if (nextContextId === undefined) {
 			return;
 		}
 
-		setLauncherState(
-			selectingLauncherState({
-				...launcherState.selection,
-				selectedContextId: nextContextId,
-				rovingContextId: nextContextId,
-			}),
-		);
 		contextButtonRefs.current.get(nextContextId)?.focus();
 	}
 
@@ -265,7 +278,7 @@ function SelectorView({
 		event.stopPropagation();
 
 		if (action === "close-dialog" && selection !== undefined) {
-			setLauncherState(selectingLauncherState(selection));
+			launchModule.dismissToSelection();
 			return;
 		}
 
@@ -275,267 +288,29 @@ function SelectorView({
 		});
 	}
 
-	async function handleLaunch({
-		confirmContextMismatch = false,
-		contextId = selectedContextId,
-		confirmIdentityMismatch = false,
-	}: LaunchAttemptOptions = {}) {
-		if (launcherState.status === "dangling_binding") {
-			return;
-		}
-		const currentSelection = launcherSelection(launcherState);
-		if (currentSelection === undefined) {
-			return;
-		}
-		const contextToLaunch = launchState.contexts.find(
-			(context) => context.id === contextId,
-		);
-		if (contextToLaunch === undefined) {
-			setLauncherState(selectingLauncherState(currentSelection));
-			return;
-		}
-		if (
-			!confirmIdentityMismatch &&
-			hasAccountIdentityMismatch(contextToLaunch)
-		) {
-			if (contextId !== undefined) {
-				setLauncherState({
-					status: "identity_mismatch",
-					selection: currentSelection,
-					contextId,
-				});
-			}
-			return;
-		}
-
-		await launchGuard.current.run(async () => {
-			setLauncherState({
-				status: "preflighting",
-				selection: currentSelection,
-			});
-
-			try {
-				const result = await launchSelectedContext({
-					projectPath: launchState.project.path,
-					selectedContextId: contextId,
-					bindingContextId: projectMemoryBindingContextId({
-						projectMemoryEnabled,
-						binding: launchState.binding,
-						rememberProject,
-						selectedContextId: contextId,
-					}),
-					confirmContextMismatch:
-						confirmContextMismatch || !requireContextMismatchConfirmation,
-					onLaunchStarting: (preflight) => {
-						setLauncherState({
-							status: "launching",
-							selection: currentSelection,
-							groups: preflight.groups,
-							steps: preflight.verificationSteps,
-						});
-					},
-					bindProject: onBindProject,
-					preflightLaunchProject: onPreflightLaunchProject,
-					launchProject: onLaunchProject,
-				});
-
-				if (result === undefined) {
-					setLauncherState(selectingLauncherState(currentSelection));
-					return;
-				}
-				await handleLaunchResult(result, currentSelection);
-			} catch (error) {
-				setLauncherState({
-					status: "failure",
-					selection: currentSelection,
-					error: unexpectedLaunchError(error),
-				});
-			}
-		});
+	function handleLaunch(options?: LaunchAttemptOptions) {
+		return launchModule.launch(options);
 	}
 
-	async function continueLaunch(
+	function continueLaunch(
 		pending: ProjectLaunchPending,
 		decision: "continue-after-review" | "launch-another",
 	) {
-		const currentSelection = launcherSelection(launcherState);
-		if (currentSelection === undefined) {
-			return;
-		}
-
-		await launchGuard.current.run(async () => {
-			try {
-				const result = await continueLaunchingSelectedContext({
-					pending,
-					decision,
-					projectPath: launchState.project.path,
-					bindingContextId: projectMemoryBindingContextId({
-						projectMemoryEnabled,
-						binding: launchState.binding,
-						rememberProject,
-						selectedContextId: currentSelection.selectedContextId,
-					}),
-					onLaunchStarting: (preflight) => {
-						setLauncherState({
-							status: "launching",
-							selection: currentSelection,
-							groups: preflight.groups,
-							steps: preflight.verificationSteps,
-						});
-					},
-					bindProject: onBindProject,
-					launchProject: onLaunchProject,
-				});
-				if (result !== undefined) {
-					await handleLaunchResult(result, currentSelection);
-				}
-			} catch (error) {
-				setLauncherState({
-					status: "failure",
-					selection: currentSelection,
-					error: unexpectedLaunchError(error),
-				});
-			}
-		});
+		return launchModule.continueLaunch(pending, decision);
 	}
 
-	async function handleLaunchResult(
-		result: ProjectLaunchJourneyResult,
-		selection: LauncherSelection,
-	) {
-		if (result.kind === "running-environment-conflict") {
-			setLauncherState({
-				status: "existing_workspace",
-				selection,
-				conflict: result.conflict,
-				pending: result.pending,
-			});
-			return;
-		}
-		if (result.kind === "preflight-review") {
-			setLauncherState({
-				status: "preflight_review",
-				selection,
-				pending: result.pending,
-			});
-			return;
-		}
-		if (result.kind === "launched") {
-			if ("project" in result.result && "context" in result.result) {
-				onCodingToolLaunched?.(result.result);
-				const replacement = bindingReplacementForLaunch(
-					launchState.binding,
-					result.result.context.id,
-				);
-				if (replacement !== undefined) {
-					setLauncherState({
-						status: "binding_replacement",
-						selection,
-						...replacement,
-						pending: false,
-					});
-					return;
-				}
-			}
-			await finishSuccessfulLaunch(selection);
-			return;
-		}
-		if (result.kind === "failed") {
-			if (
-				result.error.code === "context_mismatch_requires_confirmation" &&
-				result.error.contextMismatch
-			) {
-				setLauncherState({
-					status: "context_mismatch",
-					selection,
-					error: result.error,
-				});
-				return;
-			}
-			setLauncherState({ status: "failure", selection, error: result.error });
-		}
+	function handleBindingReplacement() {
+		return launchModule.replaceBinding();
 	}
 
-	async function finishSuccessfulLaunch(selection: LauncherSelection) {
-		if (shouldCloseSelectorAfterLaunch(launchSuccessCloseBehavior)) {
-			await cancelSelector({ closeSelector: onCancel });
-		}
-		setLauncherState(selectingLauncherState(selection));
-	}
-
-	async function handleBindingReplacement() {
-		if (
-			launcherState.status !== "binding_replacement" ||
-			launcherState.pending
-		) {
-			return;
-		}
-
-		setLauncherState({ ...launcherState, pending: true, error: undefined });
-		try {
-			const result = await onBindProject({
-				projectPath: launchState.project.path,
-				contextId: launcherState.replacementContextId,
-			});
-			if (!result.ok) {
-				setLauncherState({
-					...launcherState,
-					pending: false,
-					error: result.error,
-				});
-				return;
-			}
-			await finishSuccessfulLaunch(launcherState.selection);
-		} catch (error) {
-			setLauncherState({
-				...launcherState,
-				pending: false,
-				error: unexpectedBindingError(error),
-			});
-		}
-	}
-
-	async function handleDanglingBindingRemoval() {
-		if (launcherState.status !== "dangling_binding" || launcherState.pending) {
-			return;
-		}
-
-		setLauncherState({ ...launcherState, pending: true, error: undefined });
-		try {
-			const result = await onUnbindProject({
-				projectPath: launchState.project.path,
-			});
-			if (!result.ok) {
-				setLauncherState({
-					...launcherState,
-					pending: false,
-					error: result.error,
-				});
-				return;
-			}
-			setLauncherState(selectingLauncherState(launcherState.selection));
-		} catch (error) {
-			setLauncherState({
-				...launcherState,
-				pending: false,
-				error: unexpectedBindingRemovalError(error),
-			});
-		}
+	function handleDanglingBindingRemoval() {
+		return launchModule.removeDanglingBinding();
 	}
 
 	function handleRememberProjectChange(rememberProject: boolean) {
-		if (
-			launcherState.status !== "selecting" ||
-			!canRememberProject(launchState.binding)
-		) {
-			return;
+		if (canRememberProject(launchState.binding)) {
+			launchModule.setRememberProject(rememberProject);
 		}
-		setLauncherState(
-			selectingLauncherState({
-				...launcherState.selection,
-				rememberProject,
-			}),
-		);
 	}
 
 	if (launchInProgress) {
@@ -691,9 +466,7 @@ function SelectorView({
 									}
 									pending={launcherState.pending}
 									error={launcherState.error}
-									onKeepCurrent={() =>
-										void finishSuccessfulLaunch(launcherState.selection)
-									}
+									onKeepCurrent={() => void launchModule.keepCurrentBinding()}
 									onReplace={() => void handleBindingReplacement()}
 								/>
 							) : null}
@@ -809,60 +582,6 @@ function SelectorView({
 			)}
 		</section>
 	);
-}
-
-interface LaunchAttemptOptions {
-	confirmContextMismatch?: boolean;
-	contextId?: string;
-	confirmIdentityMismatch?: boolean;
-}
-
-function initialLauncherSelection(launchState: LaunchState): LauncherSelection {
-	return {
-		selectedContextId: initialSelectedContextId(launchState),
-		rovingContextId: initialRovingContextId(launchState),
-		rememberProject: false,
-	};
-}
-
-function initialLauncherState(launchState: LaunchState): LauncherState {
-	const selection = initialLauncherSelection(launchState);
-	if (launchState.binding.dangling) {
-		return { status: "dangling_binding", selection, pending: false };
-	}
-	return selectingLauncherState(selection);
-}
-
-function unexpectedLaunchError(error: unknown): DisplayError {
-	const message = error instanceof Error ? error.message : "Launch failed.";
-	return {
-		code: "unexpected_error",
-		message,
-		recovery: "Retry the launch. If it keeps failing, review diagnostics.",
-	};
-}
-
-function unexpectedBindingError(error: unknown): DisplayError {
-	const message =
-		error instanceof Error ? error.message : "Could not remember this context.";
-	return {
-		code: "unexpected_error",
-		message,
-		recovery: "Try again or keep the current remembered context.",
-	};
-}
-
-function unexpectedBindingRemovalError(error: unknown): DisplayError {
-	const message =
-		error instanceof Error
-			? error.message
-			: "Could not remove the remembered context.";
-	return {
-		code: "unexpected_error",
-		message,
-		recovery:
-			"Try again or choose a context for this launch without removing it.",
-	};
 }
 
 function MissingDefaultContextActions({
