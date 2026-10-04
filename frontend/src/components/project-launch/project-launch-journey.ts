@@ -16,11 +16,8 @@ interface ProjectLaunchJourneyDependencies {
 	launchProject: (
 		request: LaunchProjectRequest,
 	) => Promise<ApiResult<LaunchProjectResult>>;
-	allowExistingEnvironmentLaunch?: boolean;
-	onPreflightComplete?: (
-		preflight: PreflightLaunchProjectResult,
-	) => boolean | undefined | Promise<boolean | undefined>;
 	prepareLaunch?: () => Promise<ProjectLaunchPreparationResult>;
+	onLaunchStarting?: (preflight: PreflightLaunchProjectResult) => void;
 }
 
 type ProjectLaunchPreparationResult =
@@ -28,27 +25,36 @@ type ProjectLaunchPreparationResult =
 	| { ok: false; error: DisplayError };
 
 interface ProjectLaunchContinuationDependencies {
-	request: LaunchProjectRequest;
+	pending: ProjectLaunchPending;
 	launchProject: (
 		request: LaunchProjectRequest,
 	) => Promise<ApiResult<LaunchProjectResult>>;
-	preflight?: PreflightLaunchProjectResult;
-	allowExistingEnvironmentLaunch?: boolean;
+	decision: ProjectLaunchDecision;
+	prepareLaunch?: () => Promise<ProjectLaunchPreparationResult>;
+	onLaunchStarting?: (preflight: PreflightLaunchProjectResult) => void;
 }
+
+interface ProjectLaunchPending {
+	request: LaunchProjectRequest;
+	preflight: PreflightLaunchProjectResult;
+}
+
+type ProjectLaunchDecision = "continue-after-review" | "launch-another";
 
 type ProjectLaunchJourneyResult =
 	| { kind: "launched"; result: LaunchProjectResult }
 	| { kind: "failed"; error: DisplayError }
-	| { kind: "preflight-review"; preflight: PreflightLaunchProjectResult }
+	| { kind: "preflight-review"; pending: ProjectLaunchPending }
 	| {
 			kind: "running-environment-conflict";
 			conflict: RunningEnvironmentConflict;
+			pending: ProjectLaunchPending;
 	  };
 
 function requiresPreflightReview(
 	preflight: PreflightLaunchProjectResult,
 ): boolean {
-	return preflight.groups.some((group) => group.status !== "ready");
+	return (preflight.groups ?? []).some((group) => group.status !== "ready");
 }
 
 async function runProjectLaunchJourney(
@@ -61,34 +67,40 @@ async function runProjectLaunchJourney(
 		return { kind: "failed", error: preflight.error };
 	}
 
-	const shouldLaunch = await dependencies.onPreflightComplete?.(preflight.data);
-	if (shouldLaunch === false) {
-		return { kind: "preflight-review", preflight: preflight.data };
+	const pending = { request: dependencies.request, preflight: preflight.data };
+	if (requiresPreflightReview(preflight.data)) {
+		return { kind: "preflight-review", pending };
 	}
 
 	return continueProjectLaunchJourney({
-		request: dependencies.request,
-		preflight: preflight.data,
-		allowExistingEnvironmentLaunch: dependencies.allowExistingEnvironmentLaunch,
-		launchProject: async (request) => {
-			const prepared = await dependencies.prepareLaunch?.();
-			if (prepared !== undefined && !prepared.ok) {
-				return prepared;
-			}
-			return dependencies.launchProject(request);
-		},
+		pending,
+		decision: "continue-after-review",
+		launchProject: dependencies.launchProject,
+		prepareLaunch: dependencies.prepareLaunch,
+		onLaunchStarting: dependencies.onLaunchStarting,
 	});
 }
 
 async function continueProjectLaunchJourney(
 	dependencies: ProjectLaunchContinuationDependencies,
 ): Promise<Exclude<ProjectLaunchJourneyResult, { kind: "preflight-review" }>> {
-	const conflict = dependencies.preflight?.runningEnvironmentConflict;
-	if (conflict !== undefined && !dependencies.allowExistingEnvironmentLaunch) {
-		return { kind: "running-environment-conflict", conflict };
+	const { pending } = dependencies;
+	const conflict = pending.preflight.runningEnvironmentConflict;
+	if (conflict !== undefined && dependencies.decision !== "launch-another") {
+		return { kind: "running-environment-conflict", conflict, pending };
 	}
 
-	const launch = await dependencies.launchProject(dependencies.request);
+	dependencies.onLaunchStarting?.(pending.preflight);
+	const prepared = await dependencies.prepareLaunch?.();
+	if (prepared !== undefined && !prepared.ok) {
+		return { kind: "failed", error: prepared.error };
+	}
+	const launch = await dependencies.launchProject({
+		...pending.request,
+		...(requiresPreflightReview(pending.preflight)
+			? { confirmPreflightWarnings: true }
+			: {}),
+	});
 	if (!launch.ok) {
 		return { kind: "failed", error: launch.error };
 	}
@@ -97,8 +109,10 @@ async function continueProjectLaunchJourney(
 
 export type {
 	ProjectLaunchContinuationDependencies,
+	ProjectLaunchDecision,
 	ProjectLaunchJourneyDependencies,
 	ProjectLaunchJourneyResult,
+	ProjectLaunchPending,
 	ProjectLaunchPreparationResult,
 };
 export {

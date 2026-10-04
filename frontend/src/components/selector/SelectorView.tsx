@@ -14,7 +14,7 @@ import type {
 	UnbindProjectRequest,
 } from "../../lib/devctx-api";
 import { contextPositionFromShortcut } from "../command-palette/shortcut";
-import { requiresPreflightReview } from "../project-launch/project-launch-journey.js";
+import type { ProjectLaunchPending } from "../project-launch/project-launch-journey.js";
 import { RunningEnvironmentConflictDialog } from "../running/RunningEnvironmentConflictDialog";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
@@ -33,8 +33,10 @@ import {
 import { LaunchFailureView } from "./LaunchFailureView";
 import { LaunchProgressView } from "./LaunchProgressView";
 import {
+	continueLaunchingSelectedContext,
 	createLaunchRequestGuard,
 	launchSelectedContext,
+	type LaunchSelectorResult,
 } from "./launch-action";
 import {
 	defaultLaunchSuccessCloseBehavior,
@@ -42,7 +44,6 @@ import {
 	shouldCloseSelectorAfterLaunch,
 } from "./launch-success-close-behavior";
 import {
-	type LaunchAttempt,
 	type LauncherSelection,
 	type LauncherState,
 	launcherSelection,
@@ -275,9 +276,7 @@ function SelectorView({
 	async function handleLaunch({
 		confirmContextMismatch = false,
 		contextId = selectedContextId,
-		allowExistingEnvironmentLaunch = false,
 		confirmIdentityMismatch = false,
-		skipPreflightReview = false,
 	}: LaunchAttemptOptions = {}) {
 		if (launcherState.status === "dangling_binding") {
 			return;
@@ -293,12 +292,6 @@ function SelectorView({
 			setLauncherState(selectingLauncherState(currentSelection));
 			return;
 		}
-		const attempt: LaunchAttempt = {
-			confirmContextMismatch,
-			contextId,
-			allowExistingEnvironmentLaunch,
-			confirmIdentityMismatch,
-		};
 		if (
 			!confirmIdentityMismatch &&
 			hasAccountIdentityMismatch(contextToLaunch)
@@ -331,76 +324,68 @@ function SelectorView({
 					}),
 					confirmContextMismatch:
 						confirmContextMismatch || !requireContextMismatchConfirmation,
-					allowExistingEnvironmentLaunch,
-					confirmPreflightWarnings: skipPreflightReview,
-					onPreflightComplete: (preflight) => {
-						if (!skipPreflightReview && requiresPreflightReview(preflight)) {
-							setLauncherState({
-								status: "preflight_review",
-								selection: currentSelection,
-								preflight,
-								attempt,
-							});
-							return false;
-						}
+					onLaunchStarting: (preflight) => {
 						setLauncherState({
 							status: "launching",
 							selection: currentSelection,
 							groups: preflight.groups,
 							steps: preflight.verificationSteps,
 						});
-						return true;
 					},
 					bindProject: onBindProject,
 					preflightLaunchProject: onPreflightLaunchProject,
 					launchProject: onLaunchProject,
 				});
 
-				if (result && "runningEnvironmentConflict" in result) {
-					setLauncherState({
-						status: "existing_workspace",
-						selection: currentSelection,
-						conflict: result.runningEnvironmentConflict,
-					});
-				} else if (result && "preflightReview" in result) {
-					return;
-				} else if (result?.ok) {
-					if ("project" in result.data && "context" in result.data) {
-						onCodingToolLaunched?.(result.data);
-						const replacement = bindingReplacementForLaunch(
-							launchState.binding,
-							result.data.context.id,
-						);
-						if (replacement !== undefined) {
-							setLauncherState({
-								status: "binding_replacement",
-								selection: currentSelection,
-								...replacement,
-								pending: false,
-							});
-							return;
-						}
-					}
-					await finishSuccessfulLaunch(currentSelection);
-				} else if (result && !result.ok) {
-					if (
-						result.error.code === "context_mismatch_requires_confirmation" &&
-						result.error.contextMismatch
-					) {
-						setLauncherState({
-							status: "context_mismatch",
-							selection: currentSelection,
-							error: result.error,
-						});
-					} else {
-						setLauncherState({
-							status: "failure",
-							selection: currentSelection,
-							error: result.error,
-						});
-					}
-				} else {
+				if (result === undefined) {
 					setLauncherState(selectingLauncherState(currentSelection));
+					return;
+				}
+				await handleLaunchResult(result, currentSelection);
+			} catch (error) {
+				setLauncherState({
+					status: "failure",
+					selection: currentSelection,
+					error: unexpectedLaunchError(error),
+				});
+			}
+		});
+	}
+
+	async function continueLaunch(
+		pending: ProjectLaunchPending,
+		decision: "continue-after-review" | "launch-another",
+	) {
+		const currentSelection = launcherSelection(launcherState);
+		if (currentSelection === undefined) {
+			return;
+		}
+
+		await launchGuard.current.run(async () => {
+			try {
+				const result = await continueLaunchingSelectedContext({
+					pending,
+					decision,
+					projectPath: launchState.project.path,
+					bindingContextId: projectMemoryBindingContextId({
+						projectMemoryEnabled,
+						binding: launchState.binding,
+						rememberProject,
+						selectedContextId: currentSelection.selectedContextId,
+					}),
+					onLaunchStarting: (preflight) => {
+						setLauncherState({
+							status: "launching",
+							selection: currentSelection,
+							groups: preflight.groups,
+							steps: preflight.verificationSteps,
+						});
+					},
+					bindProject: onBindProject,
+					launchProject: onLaunchProject,
+				});
+				if (result !== undefined) {
+					await handleLaunchResult(result, currentSelection);
 				}
 			} catch (error) {
 				setLauncherState({
@@ -410,6 +395,61 @@ function SelectorView({
 				});
 			}
 		});
+	}
+
+	async function handleLaunchResult(
+		result: Exclude<LaunchSelectorResult, undefined>,
+		selection: LauncherSelection,
+	) {
+		if ("runningEnvironmentConflict" in result) {
+			setLauncherState({
+				status: "existing_workspace",
+				selection,
+				conflict: result.runningEnvironmentConflict,
+				pending: result.pending,
+			});
+			return;
+		}
+		if ("preflightReview" in result) {
+			setLauncherState({
+				status: "preflight_review",
+				selection,
+				pending: result.preflightReview,
+			});
+			return;
+		}
+		if (result.ok) {
+			if ("project" in result.data && "context" in result.data) {
+				onCodingToolLaunched?.(result.data);
+				const replacement = bindingReplacementForLaunch(
+					launchState.binding,
+					result.data.context.id,
+				);
+				if (replacement !== undefined) {
+					setLauncherState({
+						status: "binding_replacement",
+						selection,
+						...replacement,
+						pending: false,
+					});
+					return;
+				}
+			}
+			await finishSuccessfulLaunch(selection);
+			return;
+		}
+		if (
+			result.error.code === "context_mismatch_requires_confirmation" &&
+			result.error.contextMismatch
+		) {
+			setLauncherState({
+				status: "context_mismatch",
+				selection,
+				error: result.error,
+			});
+			return;
+		}
+		setLauncherState({ status: "failure", selection, error: result.error });
 	}
 
 	async function finishSuccessfulLaunch(selection: LauncherSelection) {
@@ -594,24 +634,24 @@ function SelectorView({
 						<>
 							{launcherState.status === "preflight_review" ? (
 								<PreflightReviewView
-									projectName={launcherState.preflight.project.name}
-									contextName={launcherState.preflight.context.name}
-									preflight={launcherState.preflight}
+									projectName={launcherState.pending.preflight.project.name}
+									contextName={launcherState.pending.preflight.context.name}
+									preflight={launcherState.pending.preflight}
 									onFixFirst={() =>
 										setLauncherState(
 											selectingLauncherState(launcherState.selection),
 										)
 									}
 									onLaunchWithoutIt={
-										launcherState.preflight.groups.some(
+										launcherState.pending.preflight.groups.some(
 											(group) => group.blocking,
 										)
 											? undefined
 											: () =>
-													void handleLaunch({
-														...launcherState.attempt,
-														skipPreflightReview: true,
-													})
+													void continueLaunch(
+														launcherState.pending,
+														"continue-after-review",
+													)
 									}
 								/>
 							) : null}
@@ -739,7 +779,7 @@ function SelectorView({
 										)
 									}
 									onLaunchAnother={() =>
-										void handleLaunch({ allowExistingEnvironmentLaunch: true })
+										void continueLaunch(launcherState.pending, "launch-another")
 									}
 								/>
 							) : null}
@@ -767,8 +807,10 @@ function SelectorView({
 	);
 }
 
-interface LaunchAttemptOptions extends Partial<LaunchAttempt> {
-	skipPreflightReview?: boolean;
+interface LaunchAttemptOptions {
+	confirmContextMismatch?: boolean;
+	contextId?: string;
+	confirmIdentityMismatch?: boolean;
 }
 
 function initialLauncherSelection(launchState: LaunchState): LauncherSelection {

@@ -114,7 +114,7 @@ import {
 	launchSelectedContext,
 } from "../.tmp-test/src/components/selector/launch-action.js";
 import {
-	requiresPreflightReview,
+	continueProjectLaunchJourney,
 	runProjectLaunchJourney,
 } from "../.tmp-test/src/components/project-launch/project-launch-journey.js";
 import {
@@ -2941,20 +2941,38 @@ test("project launch journey requires review before an existing workspace decisi
 			calls.push(["preflight", request]);
 			return Promise.resolve({ ok: true, data: preflight });
 		},
-		onPreflightComplete(receivedPreflight) {
-			calls.push(["review", receivedPreflight]);
-			return !requiresPreflightReview(receivedPreflight);
-		},
 		launchProject(request) {
 			calls.push(["launch", request]);
 			return Promise.resolve(launchProjectResult());
 		},
 	});
 
-	assert.deepEqual(result, { kind: "preflight-review", preflight });
+	assert.deepEqual(result, {
+		kind: "preflight-review",
+		pending: {
+			request: { projectPath: "/work/api", contextId: "personal" },
+			preflight,
+		},
+	});
 	assert.deepEqual(calls, [
 		["preflight", { projectPath: "/work/api", contextId: "personal" }],
-		["review", preflight],
+	]);
+
+	const continuation = await continueProjectLaunchJourney({
+		pending: result.pending,
+		decision: "continue-after-review",
+		launchProject(request) {
+			calls.push(["launch", request]);
+			return Promise.resolve(launchProjectResult());
+		},
+	});
+	assert.deepEqual(continuation, {
+		kind: "running-environment-conflict",
+		conflict: preflight.runningEnvironmentConflict,
+		pending: result.pending,
+	});
+	assert.deepEqual(calls, [
+		["preflight", { projectPath: "/work/api", contextId: "personal" }],
 	]);
 });
 
@@ -3031,7 +3049,7 @@ test("launch action exposes preflight verification steps before starting the cod
 				data: { ...preflightLaunchProjectResult().data, verificationSteps },
 			});
 		},
-		onPreflightComplete(preflight) {
+		onLaunchStarting(preflight) {
 			calls.push(["verification", preflight.verificationSteps]);
 		},
 		launchProject(request) {
@@ -3106,16 +3124,18 @@ test("launch action pauses before binding when preflight needs review", async ()
 			calls.push(["preflightLaunchProject", request]);
 			return Promise.resolve({ ok: true, data: preflight });
 		},
-		onPreflightComplete() {
-			return false;
-		},
 		launchProject(request) {
 			calls.push(["launchProject", request]);
 			return Promise.resolve(launchProjectResult());
 		},
 	});
 
-	assert.deepEqual(result, { preflightReview: preflight });
+	assert.deepEqual(result, {
+		preflightReview: {
+			request: { projectPath: "/work/api", contextId: "company" },
+			preflight,
+		},
+	});
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",

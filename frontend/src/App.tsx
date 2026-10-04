@@ -29,7 +29,7 @@ import { notifyCodingToolLaunched } from "./components/notifications/notificatio
 import {
 	continueProjectLaunchJourney,
 	type ProjectLaunchJourneyResult,
-	requiresPreflightReview,
+	type ProjectLaunchPending,
 	runProjectLaunchJourney,
 } from "./components/project-launch/project-launch-journey.js";
 import { ProjectBindingRemovalDialog } from "./components/projects/ProjectBindingRemovalDialog";
@@ -61,7 +61,6 @@ import {
 	type ImportContextMetadataRequest,
 	type ImportContextMetadataResult,
 	type LaunchProjectRequest,
-	type PreflightLaunchProjectResult,
 	type ProjectListItem,
 	type RecentProjectState,
 	type RunningEnvironmentConflict,
@@ -71,12 +70,7 @@ import {
 
 interface PendingRunningEnvironmentLaunch {
 	conflict: RunningEnvironmentConflict;
-	request: LaunchProjectRequest;
-}
-
-interface PendingPreflightReview {
-	request: LaunchProjectRequest;
-	preflight: PreflightLaunchProjectResult;
+	pending: ProjectLaunchPending;
 }
 
 function App() {
@@ -175,7 +169,7 @@ function ManagementApp() {
 	const [runningEnvironmentLaunchError, setRunningEnvironmentLaunchError] =
 		useState<DisplayError>();
 	const [pendingPreflightReview, setPendingPreflightReview] =
-		useState<PendingPreflightReview>();
+		useState<ProjectLaunchPending>();
 	const [preflightReviewPending, setPreflightReviewPending] = useState(false);
 	const [preflightReviewError, setPreflightReviewError] =
 		useState<DisplayError>();
@@ -614,17 +608,18 @@ function ManagementApp() {
 		options: {
 			onError: (error: DisplayError) => void;
 			onLaunched?: () => void;
-			request: LaunchProjectRequest;
 		},
 	) {
 		if (result.kind === "preflight-review") {
+			setPreflightReviewError(undefined);
+			setPendingPreflightReview(result.pending);
 			return;
 		}
 		if (result.kind === "running-environment-conflict") {
 			setRunningEnvironmentLaunchError(undefined);
 			setPendingRunningEnvironmentLaunch({
 				conflict: result.conflict,
-				request: { ...options.request, confirmPreflightWarnings: true },
+				pending: result.pending,
 			});
 			return;
 		}
@@ -647,14 +642,6 @@ function ManagementApp() {
 			request: options.request,
 			preflightLaunchProject: devContextApi.preflightLaunchProject,
 			launchProject: devContextApi.launchProject,
-			onPreflightComplete: (preflight) => {
-				if (!requiresPreflightReview(preflight)) {
-					return true;
-				}
-				setPreflightReviewError(undefined);
-				setPendingPreflightReview({ request: options.request, preflight });
-				return false;
-			},
 		});
 		await handleManagementLaunchOutcome(result, options);
 	}
@@ -664,23 +651,15 @@ function ManagementApp() {
 			return;
 		}
 
-		const request = {
-			...pendingPreflightReview.request,
-			confirmPreflightWarnings: true,
-		};
 		setPreflightReviewPending(true);
 		setPreflightReviewError(undefined);
 		try {
 			const result = await continueProjectLaunchJourney({
-				request,
-				preflight: pendingPreflightReview.preflight,
+				pending: pendingPreflightReview,
+				decision: "continue-after-review",
 				launchProject: devContextApi.launchProject,
 			});
-			if (result.kind === "running-environment-conflict") {
-				setPendingPreflightReview(undefined);
-			}
 			await handleManagementLaunchOutcome(result, {
-				request,
 				onError: setPreflightReviewError,
 				onLaunched: () => {
 					setPendingPreflightReview(undefined);
@@ -703,12 +682,11 @@ function ManagementApp() {
 		setRunningEnvironmentLaunchError(undefined);
 		try {
 			const result = await continueProjectLaunchJourney({
-				request: pendingRunningEnvironmentLaunch.request,
-				allowExistingEnvironmentLaunch: true,
+				pending: pendingRunningEnvironmentLaunch.pending,
+				decision: "launch-another",
 				launchProject: devContextApi.launchProject,
 			});
 			await handleManagementLaunchOutcome(result, {
-				request: pendingRunningEnvironmentLaunch.request,
 				onError: setRunningEnvironmentLaunchError,
 				onLaunched: () => setPendingRunningEnvironmentLaunch(undefined),
 			});
