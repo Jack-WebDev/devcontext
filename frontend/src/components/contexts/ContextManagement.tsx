@@ -33,7 +33,7 @@ export function CreateContextDialog({
 	create,
 	loadCreationOptions,
 	bindProject,
-	verifyContext,
+	refreshContext,
 	initialProjects = [],
 	projectName,
 	onOpenProject,
@@ -51,7 +51,7 @@ export function CreateContextDialog({
 		projectPath: string;
 		contextId: string;
 	}) => Promise<ApiResult<unknown>>;
-	verifyContext?: (context: ContextState) => Promise<ApiResult<ContextState>>;
+	refreshContext?: (context: ContextState) => Promise<ApiResult<ContextState>>;
 	initialProjects?: ProjectState[];
 	projectName?: string;
 	onOpenProject?: (context: ContextState) => void;
@@ -60,7 +60,7 @@ export function CreateContextDialog({
 	const creation = useContextCreationJourney({
 		createContext: create,
 		bindProject,
-		verifyContext,
+		refreshContext,
 		initialProjects,
 	});
 	const { setDefaultEnabledDevelopmentToolIds } = creation;

@@ -6,7 +6,6 @@ import type {
 	CreateContextRequest,
 	CreateContextResult,
 	DisplayError,
-	LaunchState,
 	ProjectState,
 } from "../../lib/devctx-api";
 
@@ -24,7 +23,7 @@ const initialContextCreationSteps: ContextCreationStep[] = [
 		status: "pending",
 	},
 	{ id: "bind", label: "Save project associations", status: "pending" },
-	{ id: "verify", label: "Verify context readiness", status: "pending" },
+	{ id: "refresh", label: "Refresh context state", status: "pending" },
 ];
 
 type ContextCreateStep = (typeof contextCreateSteps)[number];
@@ -43,7 +42,7 @@ interface ContextCreateFlowState {
 }
 
 interface ContextCreationStep {
-	id: "create" | "bind" | "initialize" | "verify";
+	id: "create" | "bind" | "initialize" | "refresh";
 	label: string;
 	status: ContextCreationStepStatus;
 	detail?: string;
@@ -55,7 +54,7 @@ interface ContextCreationJourneyDependencies {
 		projectPath: string;
 		contextId: string;
 	}) => Promise<ApiResult<unknown>>;
-	verifyContext?: (context: ContextState) => Promise<ApiResult<ContextState>>;
+	refreshContext?: (context: ContextState) => Promise<ApiResult<ContextState>>;
 	initialProjects?: ProjectState[];
 }
 
@@ -250,113 +249,26 @@ async function executeContextCreation(
 		dependencies.onStep("bind", "complete");
 	}
 
-	dependencies.onStep("verify", "running");
-	if (dependencies.verifyContext === undefined) {
-		dependencies.onStep("verify", "complete");
+	dependencies.onStep("refresh", "running");
+	if (dependencies.refreshContext === undefined) {
+		dependencies.onStep("refresh", "complete");
 		return { ok: true, context, boundProjectPaths: [...boundProjectPaths] };
 	}
-	const verified = await dependencies.verifyContext(context);
-	if (!verified.ok) {
-		dependencies.onStep("verify", "failed");
+	const refreshed = await dependencies.refreshContext(context);
+	if (!refreshed.ok) {
+		dependencies.onStep("refresh", "failed");
 		return {
 			ok: false,
-			error: verified.error,
+			error: refreshed.error,
 			context,
 			boundProjectPaths: [...boundProjectPaths],
 		};
 	}
-	dependencies.onStep("verify", "complete");
+	dependencies.onStep("refresh", "complete");
 	return {
 		ok: true,
-		context: verified.data,
+		context: refreshed.data,
 		boundProjectPaths: [...boundProjectPaths],
-	};
-}
-
-interface ContextCreationState {
-	pending: boolean;
-	pendingRequest?: CreateContextRequest;
-	error?: DisplayError;
-	create: (
-		request: CreateContextRequest,
-	) => Promise<ApiResult<CreateContextResult> | undefined>;
-	reset: () => void;
-}
-
-interface CreateContextAndRefreshDependencies {
-	request: CreateContextRequest;
-	createContext: ContextCreationAction;
-	getLaunchState: () => Promise<ApiResult<LaunchState>>;
-}
-
-type CreateContextAndRefreshResult =
-	| { ok: true; created: CreateContextResult; launchState: LaunchState }
-	| { ok: false; error: DisplayError };
-
-// Creates any context request, then reloads the launch state that owns the
-// current user journey. The refresh prevents callers from duplicating the
-// create-and-reconcile sequence.
-async function createContextAndRefresh(
-	dependencies: CreateContextAndRefreshDependencies,
-): Promise<CreateContextAndRefreshResult> {
-	const created = await dependencies.createContext(dependencies.request);
-	if (!created.ok) {
-		return { ok: false, error: created.error };
-	}
-
-	const refreshed = await dependencies.getLaunchState();
-	if (!refreshed.ok) {
-		return { ok: false, error: refreshed.error };
-	}
-
-	return { ok: true, created: created.data, launchState: refreshed.data };
-}
-
-// Keeps mutation state independent from the form that supplies a creation
-// request, so the existing dialog and the later multi-step flow can share it.
-function useContextCreation(
-	createContext?: ContextCreationAction,
-): ContextCreationState {
-	const [pendingRequest, setPendingRequest] = useState<
-		CreateContextRequest | undefined
-	>(undefined);
-	const [error, setError] = useState<DisplayError>();
-	const requestInFlight = useRef(false);
-
-	async function create(
-		request: CreateContextRequest,
-	): Promise<ApiResult<CreateContextResult> | undefined> {
-		if (createContext === undefined || requestInFlight.current) {
-			return undefined;
-		}
-
-		requestInFlight.current = true;
-		setPendingRequest(request);
-		setError(undefined);
-		try {
-			const result = await createContext(request);
-			if (!result.ok) {
-				setError(result.error);
-			}
-			return result;
-		} finally {
-			requestInFlight.current = false;
-			setPendingRequest(undefined);
-		}
-	}
-
-	function reset() {
-		requestInFlight.current = false;
-		setPendingRequest(undefined);
-		setError(undefined);
-	}
-
-	return {
-		pending: pendingRequest !== undefined,
-		pendingRequest,
-		error,
-		create,
-		reset,
 	};
 }
 
@@ -457,12 +369,12 @@ function useContextCreationJourney(
 	}
 
 	async function recheck() {
-		if (created === undefined || dependencies.verifyContext === undefined) {
+		if (created === undefined || dependencies.refreshContext === undefined) {
 			return;
 		}
-		const verified = await dependencies.verifyContext(created);
-		if (verified.ok) {
-			setCreated(verified.data);
+		const refreshed = await dependencies.refreshContext(created);
+		if (refreshed.ok) {
+			setCreated(refreshed.data);
 		}
 	}
 
@@ -494,16 +406,12 @@ export type {
 	ContextCreationExecutionResult,
 	ContextCreationJourneyDependencies,
 	ContextCreationJourneyState,
-	ContextCreationState,
 	ContextCreationStep,
 	ContextCreationStepStatus,
-	CreateContextAndRefreshDependencies,
-	CreateContextAndRefreshResult,
 };
 export {
 	beginContextCreation,
 	completeContextCreation,
-	createContextAndRefresh,
 	editContextCreateSection,
 	executeContextCreation,
 	initialContextCreateFlow,
@@ -512,6 +420,5 @@ export {
 	returnToContextCreateReview,
 	updateContextCreateDraft,
 	updateContextCreateProjects,
-	useContextCreation,
 	useContextCreationJourney,
 };

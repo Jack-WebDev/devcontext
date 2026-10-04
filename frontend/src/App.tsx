@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { Layers3 } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
 	ContextsContent,
 	HistoryContent,
@@ -15,41 +15,39 @@ import {
 } from "./components/command-palette/actions";
 import { CommandPalette } from "./components/command-palette/CommandPalette";
 import { isCommandPaletteShortcut } from "./components/command-palette/shortcut";
+import { ContextDeleteDialog } from "./components/contexts/ContextDeleteDialog";
+import { ContextDetailView } from "./components/contexts/ContextDetailView";
 import {
 	ContextDetailsDrawer,
 	CreateContextDialog,
 } from "./components/contexts/ContextManagement";
-import { ContextDeleteDialog } from "./components/contexts/ContextDeleteDialog";
-import { ContextDetailView } from "./components/contexts/ContextDetailView";
 import type { ContextListAction } from "./components/contexts/ContextsView";
 import { DiagnosticsView } from "./components/diagnostics/DiagnosticsView";
 import { RecentProjectConfirmationDialog } from "./components/home/RecentProjectConfirmationDialog";
+import { LauncherFlow } from "./components/launcher/LauncherFlow";
 import { notifyCodingToolLaunched } from "./components/notifications/notifications";
-import { ProjectContextChangeDialog } from "./components/projects/ProjectContextChangeDialog";
-import { ProjectBindingRemovalDialog } from "./components/projects/ProjectBindingRemovalDialog";
-import { ProjectDetailView } from "./components/projects/ProjectDetailView";
 import {
 	continueProjectLaunchJourney,
+	type ProjectLaunchJourneyResult,
 	requiresPreflightReview,
 	runProjectLaunchJourney,
-	type ProjectLaunchJourneyResult,
 } from "./components/project-launch/project-launch-journey.js";
+import { ProjectBindingRemovalDialog } from "./components/projects/ProjectBindingRemovalDialog";
+import { ProjectContextChangeDialog } from "./components/projects/ProjectContextChangeDialog";
+import { ProjectDetailView } from "./components/projects/ProjectDetailView";
 import { RunningEnvironmentConflictDialog } from "./components/running/RunningEnvironmentConflictDialog";
+import { FirstRunWelcome } from "./components/selector/FirstRunWelcome";
 import { GuiErrorNotice } from "./components/selector/GuiErrorNotice";
 import { PreflightReviewDialog } from "./components/selector/PreflightReviewDialog";
-import { FirstRunWelcome } from "./components/selector/FirstRunWelcome";
-import { createContextAndRefresh } from "./components/contexts/context-creation";
-import { LauncherFlow } from "./components/launcher/LauncherFlow";
 import { SettingsView } from "./components/settings/SettingsView";
 import { AppShell } from "./components/shell/AppShell";
 import {
 	type AppRoute,
-	appRouteDefinition,
 	appRouteDefinitions,
 	appRouteFromHash,
+	type ContextDetailDestination,
 	contextDetailHash,
 	contextDetailRouteFromHash,
-	type ContextDetailDestination,
 	projectDetailHash,
 	projectDetailRouteFromHash,
 } from "./components/shell/routes";
@@ -58,15 +56,13 @@ import { DestructiveConfirmationDialog } from "./components/ui/destructive-confi
 import {
 	type ApiResult,
 	type ApplicationMode,
-	type CreateContextResult,
-	type CreateContextRequest,
 	type DisplayError,
 	devContextApi,
 	type ImportContextMetadataRequest,
 	type ImportContextMetadataResult,
-	type ProjectListItem,
 	type LaunchProjectRequest,
 	type PreflightLaunchProjectResult,
+	type ProjectListItem,
 	type RecentProjectState,
 	type RunningEnvironmentConflict,
 	type RunningEnvironmentsState,
@@ -152,7 +148,6 @@ function ManagementApp() {
 	);
 	const {
 		launchState,
-		setLaunchState,
 		homeDashboard,
 		recentProjects,
 		contexts,
@@ -311,26 +306,6 @@ function ManagementApp() {
 		} finally {
 			setCommandPaletteLaunchPending(false);
 		}
-	}
-
-	async function handleCreateContext(
-		request: CreateContextRequest,
-	): Promise<ApiResult<CreateContextResult>> {
-		const result = await createContextAndRefresh({
-			request,
-			createContext: devContextApi.createContext,
-			getLaunchState: () => devContextApi.getLaunchState(),
-		});
-		if (result.ok) {
-			setLaunchState({ status: "loaded", data: result.launchState });
-			void refreshHomeDashboard();
-			void refreshRecentProjects();
-			void refreshContexts();
-			void refreshProjects();
-			return { ok: true, data: result.created };
-		}
-
-		return { ok: false, error: result.error };
 	}
 
 	async function handleImportContextMetadata(
@@ -821,7 +796,9 @@ function ManagementApp() {
 						onOpenProjects={() => handleNavigate("projects")}
 						getHistory={devContextApi.getHistory}
 						getDiagnostics={devContextApi.getDiagnostics}
-						onContextUpdated={refreshContexts}
+						onContextUpdated={async () => {
+							await refreshContexts();
+						}}
 					/>
 				) : (
 					<>
@@ -877,26 +854,23 @@ function ManagementApp() {
 							<CreateContextDialog
 								contexts={contexts.data}
 								onClose={() => setCreatingContext(false)}
-								create={async (request) => {
-									const result = await devContextApi.createContext(request);
-									if (result.ok) {
-										await refreshContexts();
-									}
-									return result;
-								}}
+								create={devContextApi.createContext}
 								loadCreationOptions={devContextApi.getContextTemplates}
 								bindProject={async (request) => {
 									const result = await devContextApi.bindProject(request);
 									if (result.ok) await refreshProjects();
 									return result;
 								}}
-								verifyContext={async (context) => {
+								refreshContext={async (context) => {
 									const result = await devContextApi.getContextDetails({
 										contextId: context.id,
 									});
-									return result.ok
+									if (!result.ok) return result;
+
+									const refreshed = await refreshContexts();
+									return refreshed.ok
 										? { ok: true, data: result.data.context }
-										: result;
+										: refreshed;
 								}}
 								onViewContext={(contextId) => {
 									setCreatingContext(false);

@@ -1,23 +1,16 @@
 import { useEffect, useState } from "react";
 
-import type {
-	ApiResult,
-	CreateContextRequest,
-	CreateContextResult,
-	LaunchState,
-	SettingsState,
-} from "../../lib/devctx-api";
+import type { LaunchState, SettingsState } from "../../lib/devctx-api";
 import { devContextApi } from "../../lib/devctx-api.js";
 import { devContextWindow } from "../../lib/devctx-window.js";
+import { type LoadState, loadStateFromResult } from "../app/load-state.js";
+import { CreateContextDialog } from "../contexts/ContextManagement.js";
 import { notifyCodingToolLaunched } from "../notifications/notifications.js";
 import { GuiErrorNotice } from "../selector/GuiErrorNotice.js";
-import { createContextAndRefresh } from "../contexts/context-creation.js";
-import { CreateContextDialog } from "../contexts/ContextManagement.js";
 import { SelectorView } from "../selector/SelectorView.js";
 import { LauncherSurface } from "./LauncherSurface.js";
 import { ProjectNotFoundView } from "./ProjectNotFoundView.js";
 import { ProjectResolvingView } from "./ProjectResolvingView.js";
-import { type LoadState, loadStateFromResult } from "../app/load-state.js";
 
 interface LauncherFlowProps {
 	projectPath: string;
@@ -31,7 +24,11 @@ type LauncherSettingsState = LoadState<SettingsState>;
 // LauncherFlow is intentionally separate from the management shell. Later
 // launcher phases add resolution and selection states inside this focused
 // surface without bringing management navigation into a project launch.
-function LauncherFlow({ projectPath, onCancel, onRunDiagnostics }: LauncherFlowProps) {
+function LauncherFlow({
+	projectPath,
+	onCancel,
+	onRunDiagnostics,
+}: LauncherFlowProps) {
 	const cancel = onCancel ?? (() => void devContextWindow.closeSelector());
 	const [requestedProjectPath, setRequestedProjectPath] = useState(projectPath);
 	const [hostProjectPath, setHostProjectPath] = useState(projectPath);
@@ -89,27 +86,6 @@ function LauncherFlow({ projectPath, onCancel, onRunDiagnostics }: LauncherFlowP
 		};
 	}, []);
 
-	async function createContext(
-		request: CreateContextRequest,
-	): Promise<ApiResult<CreateContextResult>> {
-		const result = await createContextAndRefresh({
-			request,
-			createContext: devContextApi.createContext,
-			getLaunchState: () =>
-				devContextApi.getLaunchState({ projectPath: activeProjectPath }),
-		});
-		if (!result.ok) {
-			return { ok: false, error: result.error };
-		}
-
-		setLaunchState({
-			projectPath: activeProjectPath,
-			status: "loaded",
-			data: result.launchState,
-		});
-		return { ok: true, data: result.created };
-	}
-
 	async function chooseProjectFolder() {
 		setChoosingFolder(true);
 		try {
@@ -150,7 +126,6 @@ function LauncherFlow({ projectPath, onCancel, onRunDiagnostics }: LauncherFlowP
 					onLaunchProject={devContextApi.launchProject}
 					onCancel={cancel}
 					onRunDiagnostics={onRunDiagnostics}
-					onCreateContext={createContext}
 					onStartContextCreation={() => setCreatingFirstContext(true)}
 					onRetryDetection={() => setDetectionRetry((attempt) => attempt + 1)}
 					launchSuccessCloseBehavior={
@@ -179,7 +154,7 @@ function LauncherFlow({ projectPath, onCancel, onRunDiagnostics }: LauncherFlowP
 					create={devContextApi.createContext}
 					loadCreationOptions={devContextApi.getContextTemplates}
 					bindProject={devContextApi.bindProject}
-					verifyContext={async (context) => {
+					refreshContext={async (context) => {
 						const result = await devContextApi.getLaunchState({
 							projectPath: activeProjectPath,
 						});

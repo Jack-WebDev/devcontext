@@ -1,8 +1,5 @@
 import type {
-	ApiResult,
 	ContextListItem,
-	CreateContextRequest,
-	CreateContextResult,
 	DisplayError,
 	HistoryState,
 	HomeDashboardState,
@@ -11,12 +8,12 @@ import type {
 	ProjectsState,
 	RecentProjectState,
 	RunningEnvironmentsState,
-	WorkspaceRevealResult,
 	SettingsState,
+	WorkspaceRevealResult,
 } from "../../lib/devctx-api";
-import type { ContextListAction } from "../contexts/ContextsView";
 import { devContextApi } from "../../lib/devctx-api";
 import { devContextWindow } from "../../lib/devctx-window";
+import type { ContextListAction } from "../contexts/ContextsView";
 import { ContextsView } from "../contexts/ContextsView";
 import { HistoryView } from "../history/HistoryView";
 import { HomeView } from "../home/HomeView";
@@ -25,8 +22,8 @@ import { ProjectsView } from "../projects/ProjectsView";
 import { RunningView } from "../running/RunningView";
 import { GuiErrorNotice } from "../selector/GuiErrorNotice";
 import { SelectorView } from "../selector/SelectorView";
-import { CollectionSkeleton } from "../ui/collection-state";
 import { type AppRoute, appRouteDefinition } from "../shell/routes";
+import { CollectionSkeleton } from "../ui/collection-state";
 import type { LoadState } from "./load-state";
 
 export function HistoryContent({
@@ -180,16 +177,14 @@ export function HomeDashboardContent({
 
 export function SelectorContent({
 	launchState,
-	onCreateContext,
+	onStartContextCreation,
 	onRunDiagnostics,
 	settings,
 	showOnboardingReplay,
 	onDismissOnboardingReplay,
 }: {
 	launchState: LoadState<LaunchState>;
-	onCreateContext: (
-		request: CreateContextRequest,
-	) => Promise<ApiResult<CreateContextResult>>;
+	onStartContextCreation: () => void;
 	onRunDiagnostics: () => void;
 	settings?: SettingsState;
 	showOnboardingReplay?: boolean;
@@ -207,7 +202,7 @@ export function SelectorContent({
 			onPreflightLaunchProject={devContextApi.preflightLaunchProject}
 			onLaunchProject={devContextApi.launchProject}
 			onCancel={devContextWindow.closeSelector}
-			onCreateContext={onCreateContext}
+			onStartContextCreation={onStartContextCreation}
 			onRunDiagnostics={onRunDiagnostics}
 			onCodingToolLaunched={notifyLaunch}
 			launchSuccessCloseBehavior={

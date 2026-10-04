@@ -62,6 +62,7 @@ export function useAppData(activeRoute: AppRoute) {
 				? { status: "loaded", data: result.data.contexts }
 				: { status: "error", error: result.error },
 		);
+		return result;
 	}
 
 	async function refreshProjects() {

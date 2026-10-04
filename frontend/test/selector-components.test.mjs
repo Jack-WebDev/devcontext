@@ -49,7 +49,10 @@ import {
 	homeConfidenceSummary,
 } from "../.tmp-test/src/components/home/HomeView.js";
 import { RecentProjectConfirmationDialog } from "../.tmp-test/src/components/home/RecentProjectConfirmationDialog.js";
-import { isToastEligible, notificationPresentation } from "../.tmp-test/src/components/notifications/notification-policy.js";
+import {
+	isToastEligible,
+	notificationPresentation,
+} from "../.tmp-test/src/components/notifications/notification-policy.js";
 import {
 	ProjectContextChangeDialog,
 	safetyImplication,
@@ -125,7 +128,6 @@ import {
 import {
 	beginContextCreation,
 	completeContextCreation,
-	createContextAndRefresh,
 	editContextCreateSection,
 	executeContextCreation,
 	initialContextCreateFlow,
@@ -257,7 +259,7 @@ test("context metadata import review identifies unavailable integrations before 
 
 test("account identity mismatch review is limited to backend identity evidence", () => {
 	assert.equal(
-			hasAccountIdentityMismatch({
+		hasAccountIdentityMismatch({
 			confidence: {
 				checks: [{ component: "identity", severity: "needs_attention" }],
 			},
@@ -265,7 +267,7 @@ test("account identity mismatch review is limited to backend identity evidence",
 		true,
 	);
 	assert.equal(
-			hasAccountIdentityMismatch({
+		hasAccountIdentityMismatch({
 			confidence: {
 				checks: [{ component: "provider", severity: "needs_attention" }],
 			},
@@ -709,25 +711,36 @@ test("running environments show immutable launch context and tool action entry p
 });
 
 test("unknown workspaces disclose their lifecycle and disable unsupported actions", () => {
-	const environments = [{
-		id: "environment-unknown",
-		project: { name: "api", path: "/work/api" },
-		context: { id: "company", name: "Company" },
-		tool: { id: "vscode", name: "VS Code" },
-		startedAt: "2026-08-28T10:30:00Z",
-		process: { state: "unknown" },
-		session: { state: "unknown" },
-		launch: { source: "gui", resolutionSource: "explicit" },
-		lifecycle: { state: "unknown", focusable: false, revealable: false, stoppable: false },
-	}];
-	const html = renderToStaticMarkup(createElement(RunningView, {
-		environments,
-		onReveal: async () => ({ revealed: false, targets: [] }),
-		onStop: () => {},
-	}));
+	const environments = [
+		{
+			id: "environment-unknown",
+			project: { name: "api", path: "/work/api" },
+			context: { id: "company", name: "Company" },
+			tool: { id: "vscode", name: "VS Code" },
+			startedAt: "2026-08-28T10:30:00Z",
+			process: { state: "unknown" },
+			session: { state: "unknown" },
+			launch: { source: "gui", resolutionSource: "explicit" },
+			lifecycle: {
+				state: "unknown",
+				focusable: false,
+				revealable: false,
+				stoppable: false,
+			},
+		},
+	];
+	const html = renderToStaticMarkup(
+		createElement(RunningView, {
+			environments,
+			onReveal: async () => ({ revealed: false, targets: [] }),
+			onStop: () => {},
+		}),
+	);
 
 	assert.ok(html.includes("Lifecycle unknown"));
-	assert.ok(html.includes("could not verify whether this workspace is still open"));
+	assert.ok(
+		html.includes("could not verify whether this workspace is still open"),
+	);
 	assert.ok(html.includes("cannot be revealed"));
 	assert.ok(html.includes("cannot be stopped"));
 	assert.match(html, /disabled=""/);
@@ -2023,7 +2036,12 @@ test("context card renders only backend-provided provider identity information",
 			},
 		},
 		{
-			...providerFixture("unavailable", "Unavailable Provider", true, "local_state"),
+			...providerFixture(
+				"unavailable",
+				"Unavailable Provider",
+				true,
+				"local_state",
+			),
 			identity: { status: "unavailable", fields: [] },
 		},
 	]);
@@ -3607,74 +3625,63 @@ test("cancel closes the selector without launch or binding side effects", async 
 	assert.deepEqual(calls, ["closeSelector"]);
 });
 
-test("context creation refreshes launch state after success", async () => {
+test("context creation retains a completed context when refresh fails", async () => {
 	const calls = [];
-	const refreshedState = launchStateFixture({
-		contexts: [contextFixture("personal", "Personal")],
-		firstRun: false,
-	});
+	const steps = [];
+	const context = contextFixture("personal", "Personal");
+	const refreshError = apiError(
+		"internal_error",
+		"Could not refresh the created context.",
+		"Retry the refresh.",
+	).error;
 
-	const request = {
-		contextId: "personal",
-		name: "Personal",
-		importProviderIds: ["codex"],
-	};
-	const result = await createContextAndRefresh({
-		request,
+	const failed = await executeContextCreation({
+		request: { contextId: "personal", name: "Personal" },
+		projects: [],
+		boundProjectPaths: [],
 		createContext(receivedRequest) {
-			calls.push(["createContext", receivedRequest]);
-			return Promise.resolve({
-				ok: true,
-				data: {
-					context: contextFixture("personal", "Personal"),
-				},
-			});
+			calls.push(["create", receivedRequest]);
+			return Promise.resolve({ ok: true, data: { context } });
 		},
-		getLaunchState() {
-			calls.push(["getLaunchState"]);
-			return Promise.resolve({
-				ok: true,
-				data: refreshedState,
-			});
+		refreshContext(receivedContext) {
+			calls.push(["refresh", receivedContext.id]);
+			return Promise.resolve({ ok: false, error: refreshError });
+		},
+		onStep(id, status, detail) {
+			steps.push([id, status, detail]);
 		},
 	});
 
-	assert.deepEqual(result, {
-		ok: true,
-		created: {
-			context: contextFixture("personal", "Personal"),
-		},
-		launchState: refreshedState,
-	});
-	assert.deepEqual(calls, [["createContext", request], ["getLaunchState"]]);
-});
-
-test("context creation returns failures without refreshing", async () => {
-	const calls = [];
-	const error = apiError(
-		"validation_error",
-		"Unable to complete request.",
-		"Check the selected project and context, then retry.",
-	);
-
-	const request = { contextId: "company" };
-	const result = await createContextAndRefresh({
-		request,
-		createContext(receivedRequest) {
-			calls.push(["createContext", receivedRequest]);
-			return Promise.resolve(error);
-		},
-		getLaunchState() {
-			calls.push(["getLaunchState"]);
-			return Promise.resolve({ ok: true, data: launchStateFixture() });
-		},
-	});
-
-	assert.deepEqual(result, {
+	assert.deepEqual(failed, {
 		ok: false,
-		error: error.error,
+		error: refreshError,
+		context,
+		boundProjectPaths: [],
 	});
-	assert.deepEqual(calls, [["createContext", request]]);
+	assert.deepEqual(steps.at(-1), ["refresh", "failed", undefined]);
+
+	const retried = await executeContextCreation({
+		request: { contextId: "personal", name: "Personal" },
+		projects: [],
+		createdContext: failed.context,
+		boundProjectPaths: failed.boundProjectPaths,
+		createContext() {
+			calls.push(["create", "retried"]);
+			return Promise.resolve({ ok: true, data: { context } });
+		},
+		refreshContext(receivedContext) {
+			calls.push(["refresh", receivedContext.id]);
+			return Promise.resolve({ ok: true, data: receivedContext });
+		},
+		onStep() {},
+	});
+
+	assert.deepEqual(retried, { ok: true, context, boundProjectPaths: [] });
+	assert.deepEqual(calls, [
+		["create", { contextId: "personal", name: "Personal" }],
+		["refresh", "personal"],
+		["refresh", "personal"],
+	]);
 });
 
 test("context creation retains successful project bindings when retrying", async () => {
@@ -3708,8 +3715,8 @@ test("context creation retains successful project bindings when retrying", async
 					: { ok: true, data: {} },
 			);
 		},
-		verifyContext(receivedContext) {
-			calls.push(["verify", receivedContext.id]);
+		refreshContext(receivedContext) {
+			calls.push(["refresh", receivedContext.id]);
 			return Promise.resolve({ ok: true, data: receivedContext });
 		},
 		onStep(id, status, detail) {
@@ -3723,7 +3730,11 @@ test("context creation retains successful project bindings when retrying", async
 		context,
 		boundProjectPaths: ["/work/api"],
 	});
-	assert.deepEqual(steps.at(-1), ["bind", "failed", "1 of 2 project associations saved."]);
+	assert.deepEqual(steps.at(-1), [
+		"bind",
+		"failed",
+		"1 of 2 project associations saved.",
+	]);
 
 	const retried = await executeContextCreation({
 		request,
@@ -3738,8 +3749,8 @@ test("context creation retains successful project bindings when retrying", async
 			calls.push(["bind", bindingRequest]);
 			return Promise.resolve({ ok: true, data: {} });
 		},
-		verifyContext(receivedContext) {
-			calls.push(["verify", receivedContext.id]);
+		refreshContext(receivedContext) {
+			calls.push(["refresh", receivedContext.id]);
 			return Promise.resolve({ ok: true, data: receivedContext });
 		},
 		onStep() {},
@@ -3755,7 +3766,7 @@ test("context creation retains successful project bindings when retrying", async
 		["bind", { projectPath: "/work/api", contextId: "personal" }],
 		["bind", { projectPath: "/work/web", contextId: "personal" }],
 		["bind", { projectPath: "/work/web", contextId: "personal" }],
-		["verify", "personal"],
+		["refresh", "personal"],
 	]);
 });
 
@@ -3958,7 +3969,7 @@ test("context creation progress and success present completed local work", () =>
 			label: "Initialize isolated tool storage",
 			status: "complete",
 		},
-		{ id: "verify", label: "Verify context readiness", status: "running" },
+		{ id: "refresh", label: "Refresh context state", status: "running" },
 	];
 	const progress = renderToStaticMarkup(
 		createElement(ContextCreationProgress, { steps }),
@@ -4328,10 +4339,19 @@ test("privacy settings describe implemented local data boundaries", () => {
 			"Portable exports",
 		],
 	);
-	assert.match(privacyStatements[1].description, /recent launches, active workspaces, and local activity/);
-	assert.match(privacyStatements[1].description, /Forgetting a project removes/);
+	assert.match(
+		privacyStatements[1].description,
+		/recent launches, active workspaces, and local activity/,
+	);
+	assert.match(
+		privacyStatements[1].description,
+		/Forgetting a project removes/,
+	);
 	assert.match(privacyStatements[2].description, /explicitly choose to import/);
-	assert.match(privacyStatements[2].description, /never displays, logs, uploads, or exports credential contents/);
+	assert.match(
+		privacyStatements[2].description,
+		/never displays, logs, uploads, or exports credential contents/,
+	);
 	assert.match(privacyStatements[3].description, /do not include credentials/);
 });
 

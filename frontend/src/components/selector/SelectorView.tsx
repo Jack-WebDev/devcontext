@@ -11,35 +11,27 @@ import type {
 	PreflightLaunchProjectRequest,
 	PreflightLaunchProjectResult,
 	ProjectBindingState,
-	ProviderCredentialSession,
 	UnbindProjectRequest,
 } from "../../lib/devctx-api";
 import { contextPositionFromShortcut } from "../command-palette/shortcut";
-import { RunningEnvironmentConflictDialog } from "../running/RunningEnvironmentConflictDialog";
-
 import { requiresPreflightReview } from "../project-launch/project-launch-journey.js";
+import { RunningEnvironmentConflictDialog } from "../running/RunningEnvironmentConflictDialog";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
 import { AccountIdentityMismatchDialog } from "./AccountIdentityMismatchDialog";
 import { hasAccountIdentityMismatch } from "./account-identity-mismatch";
 import { bindingReplacementForLaunch } from "./binding-replacement";
 import { ContextChoiceList } from "./ContextChoiceList";
-import {
-	type ContextCreationAction,
-	useContextCreation,
-} from "../contexts/context-creation";
 import { ContextMismatchDialog } from "./ContextMismatchDialog";
-import { DanglingBindingDialog } from "./DanglingBindingDialog";
 import { cancelSelector } from "./cancel-action";
+import { DanglingBindingDialog } from "./DanglingBindingDialog";
 import { missingDefaultContextIds } from "./default-context-actions";
 import {
 	FirstRunWelcome,
 	shouldRenderFirstRunWelcome,
 } from "./FirstRunWelcome";
-import { GuiErrorNotice } from "./GuiErrorNotice";
 import { LaunchFailureView } from "./LaunchFailureView";
 import { LaunchProgressView } from "./LaunchProgressView";
-import { PreflightReviewView } from "./PreflightReviewView";
 import {
 	createLaunchRequestGuard,
 	launchSelectedContext,
@@ -57,12 +49,9 @@ import {
 	launcherStateIsPending,
 	selectingLauncherState,
 } from "./launcher-state";
+import { PreflightReviewView } from "./PreflightReviewView";
 import { ProjectIdentity } from "./ProjectIdentity";
-import {
-	ProviderCredentialClassification,
-	type ProviderSessionAssignment,
-	type ProviderSessionAssignments,
-} from "./ProviderCredentialClassification.js";
+import { projectMemoryBindingContextId } from "./project-memory.js";
 import {
 	canRememberProject,
 	RememberProjectControl,
@@ -72,7 +61,6 @@ import { SelectorActions } from "./SelectorActions";
 import { SelectorConfidenceSummary } from "./SelectorConfidenceSummary";
 import { SelectorLayout } from "./SelectorLayout";
 import { SingleContextLaunchView } from "./SingleContextLaunchView";
-import { WelcomeView } from "./WelcomeView";
 import {
 	type ContextNavigationDirection,
 	initialRovingContextId,
@@ -84,7 +72,7 @@ import {
 	canLaunchSelectedContextFromKeyboard,
 	escapeKeyboardAction,
 } from "./selector-keyboard";
-import { projectMemoryBindingContextId } from "./project-memory.js";
+import { WelcomeView } from "./WelcomeView";
 
 interface SelectorViewProps {
 	launchState: LaunchState;
@@ -102,7 +90,6 @@ interface SelectorViewProps {
 	) => Promise<ApiResult<LaunchProjectResult>>;
 	onCancel: () => Promise<void> | void;
 	launchSuccessCloseBehavior?: LaunchSuccessCloseBehavior;
-	onCreateContext?: ContextCreationAction;
 	onRunDiagnostics?: () => void;
 	onCodingToolLaunched?: (result: LaunchProjectResult) => void;
 	showLaunchVerification?: boolean;
@@ -110,7 +97,7 @@ interface SelectorViewProps {
 	requireContextMismatchConfirmation?: boolean;
 	showOnboardingReplay?: boolean;
 	onDismissOnboardingReplay?: () => void;
-	onStartContextCreation?: () => void;
+	onStartContextCreation: () => void;
 	onRetryDetection?: () => void;
 }
 
@@ -122,7 +109,6 @@ function SelectorView({
 	onLaunchProject,
 	onCancel,
 	launchSuccessCloseBehavior = defaultLaunchSuccessCloseBehavior,
-	onCreateContext,
 	onRunDiagnostics,
 	onCodingToolLaunched,
 	showLaunchVerification = true,
@@ -136,11 +122,7 @@ function SelectorView({
 	const [launcherState, setLauncherState] = useState<LauncherState>(() =>
 		initialLauncherState(launchState),
 	);
-	const contextCreation = useContextCreation(onCreateContext);
-	const [providerSessionAssignments, setProviderSessionAssignments] =
-		useState<ProviderSessionAssignments>({});
 	const [showContextChoices, setShowContextChoices] = useState(false);
-	const [showFirstRunSetup, setShowFirstRunSetup] = useState(false);
 	const [contextSearch, setContextSearch] = useState("");
 	const contextButtonRefs = useRef(new Map<string, HTMLButtonElement>());
 	const launchGuard = useRef(createLaunchRequestGuard());
@@ -157,14 +139,12 @@ function SelectorView({
 		(context) => context.id === selectedContextId,
 	);
 	const launchPending = launcherStateIsPending(launcherState);
-	const cancellationPending = launchPending || contextCreation.pending;
+	const cancellationPending = launchPending;
 	const singleHealthyContext = singleHealthyLaunchContext(launchState);
 	const showSingleContextConfirmation =
 		singleHealthyContext !== undefined && !showContextChoices;
 	const showWelcome =
-		shouldRenderFirstRunWelcome(launchState) &&
-		launchState.firstRun &&
-		!showFirstRunSetup;
+		shouldRenderFirstRunWelcome(launchState) && launchState.firstRun;
 	const launchInProgress =
 		launcherState.status === "preflighting" ||
 		launcherState.status === "launching";
@@ -182,10 +162,7 @@ function SelectorView({
 
 	useEffect(() => {
 		setLauncherState(initialLauncherState(launchState));
-		contextCreation.reset();
-		setProviderSessionAssignments({});
 		setShowContextChoices(false);
-		setShowFirstRunSetup(false);
 		setContextSearch("");
 		launchGuard.current = createLaunchRequestGuard();
 	}, [launchState]);
@@ -517,34 +494,6 @@ function SelectorView({
 		);
 	}
 
-	function handleClassifyProviderSession(
-		providerId: string,
-		assignment: ProviderSessionAssignment,
-	) {
-		setProviderSessionAssignments((current) => ({
-			...current,
-			[providerId]: assignment,
-		}));
-	}
-
-	function importProviderIdsForContext(
-		contextId: "personal" | "company",
-	): string[] {
-		return launchState.providerCredentialSessions
-			.filter(
-				(session) =>
-					providerSessionAssignments[session.providerId] === contextId,
-			)
-			.map((session) => session.providerId);
-	}
-
-	function handleCreateContext(contextId: "personal" | "company") {
-		void contextCreation.create({
-			contextId,
-			importProviderIds: importProviderIdsForContext(contextId),
-		});
-	}
-
 	if (launchInProgress) {
 		return (
 			<LaunchProgressView
@@ -570,29 +519,12 @@ function SelectorView({
 			onKeyDown={handleSelectorKeyDown}
 		>
 			{showWelcome ? (
-				<WelcomeView
-					onCreateFirstContext={
-						onStartContextCreation ?? (() => setShowFirstRunSetup(true))
-					}
-				/>
-			) : shouldRenderFirstRunWelcome(launchState) || showOnboardingReplay ? (
+				<WelcomeView onCreateFirstContext={onStartContextCreation} />
+			) : showOnboardingReplay ? (
 				<>
 					<ProjectIdentity project={launchState.project} />
 					<FirstRunWelcome
 						launchState={launchState}
-						providerCredentialSessions={launchState.providerCredentialSessions}
-						providerSessionAssignments={providerSessionAssignments}
-						pendingContextId={contextCreation.pendingRequest?.contextId}
-						error={contextCreation.error}
-						onClassifyProviderSession={handleClassifyProviderSession}
-						onCreatePersonal={
-							onCreateContext
-								? () => handleCreateContext("personal")
-								: undefined
-						}
-						onCreateCompany={
-							onCreateContext ? () => handleCreateContext("company") : undefined
-						}
 						replay={showOnboardingReplay && !launchState.firstRun}
 						onContinue={
 							showOnboardingReplay && !launchState.firstRun
@@ -634,23 +566,7 @@ function SelectorView({
 
 							<MissingDefaultContextActions
 								launchState={launchState}
-								providerCredentialSessions={
-									launchState.providerCredentialSessions
-								}
-								providerSessionAssignments={providerSessionAssignments}
-								pendingContextId={contextCreation.pendingRequest?.contextId}
-								error={contextCreation.error}
-								onClassifyProviderSession={handleClassifyProviderSession}
-								onCreatePersonal={
-									onCreateContext
-										? () => handleCreateContext("personal")
-										: undefined
-								}
-								onCreateCompany={
-									onCreateContext
-										? () => handleCreateContext("company")
-										: undefined
-								}
+								onStartContextCreation={onStartContextCreation}
 							/>
 						</>
 					}
@@ -905,33 +821,14 @@ function unexpectedBindingRemovalError(error: unknown): DisplayError {
 
 function MissingDefaultContextActions({
 	launchState,
-	providerCredentialSessions,
-	providerSessionAssignments,
-	pendingContextId,
-	error,
-	onClassifyProviderSession,
-	onCreatePersonal,
-	onCreateCompany,
+	onStartContextCreation,
 }: {
 	launchState: LaunchState;
-	providerCredentialSessions: ProviderCredentialSession[];
-	providerSessionAssignments: ProviderSessionAssignments;
-	pendingContextId?: string;
-	error?: DisplayError;
-	onClassifyProviderSession: (
-		providerId: string,
-		assignment: ProviderSessionAssignment,
-	) => void;
-	onCreatePersonal?: () => void;
-	onCreateCompany?: () => void;
+	onStartContextCreation: () => void;
 }) {
 	const missingDefaults = missingDefaultContextIds(launchState.contexts);
 	const missingPersonal = missingDefaults.includes("personal");
 	const missingCompany = missingDefaults.includes("company");
-	const pending = pendingContextId !== undefined;
-	const classificationComplete = providerCredentialSessions.every(
-		(session) => providerSessionAssignments[session.providerId] !== undefined,
-	);
 
 	if (!missingPersonal && !missingCompany) {
 		return null;
@@ -955,54 +852,15 @@ function MissingDefaultContextActions({
 							needs both identities.
 						</p>
 					</div>
-					<div className="flex flex-wrap gap-2">
-						{missingPersonal ? (
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								disabled={
-									pending ||
-									!classificationComplete ||
-									onCreatePersonal === undefined
-								}
-								onClick={onCreatePersonal}
-							>
-								{pendingContextId === "personal"
-									? "Creating..."
-									: "Add Personal"}
-							</Button>
-						) : null}
-						{missingCompany ? (
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								disabled={
-									pending ||
-									!classificationComplete ||
-									onCreateCompany === undefined
-								}
-								onClick={onCreateCompany}
-							>
-								{pendingContextId === "company" ? "Creating..." : "Add Company"}
-							</Button>
-						) : null}
-					</div>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={onStartContextCreation}
+					>
+						Create a context
+					</Button>
 				</div>
-				<ProviderCredentialClassification
-					sessions={providerCredentialSessions}
-					assignments={providerSessionAssignments}
-					disabled={pending}
-					onAssign={onClassifyProviderSession}
-				/>
-				{pendingContextId ? (
-					<p className="mt-3 text-sm text-muted-foreground" role="status">
-						Creating {pendingContextId === "personal" ? "Personal" : "Company"}{" "}
-						context...
-					</p>
-				) : null}
-				{error ? <GuiErrorNotice error={error} /> : null}
 			</CardContent>
 		</Card>
 	);
