@@ -20,6 +20,17 @@ interface ProjectLaunchJourneyDependencies {
 	onLaunchStarting?: (preflight: PreflightLaunchProjectResult) => void;
 }
 
+// The journey owns launch decisions; callers supply the host-specific API
+// adapter. This keeps browser tests independent from the desktop bridge.
+interface ProjectLaunchAdapter {
+	preflightLaunchProject: (
+		request: PreflightLaunchProjectRequest,
+	) => Promise<ApiResult<PreflightLaunchProjectResult>>;
+	launchProject: (
+		request: LaunchProjectRequest,
+	) => Promise<ApiResult<LaunchProjectResult>>;
+}
+
 type ProjectLaunchPreparationResult =
 	| { ok: true }
 	| { ok: false; error: DisplayError };
@@ -108,6 +119,7 @@ async function continueProjectLaunchJourney(
 }
 
 export type {
+	ProjectLaunchAdapter,
 	ProjectLaunchContinuationDependencies,
 	ProjectLaunchDecision,
 	ProjectLaunchJourneyDependencies,

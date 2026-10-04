@@ -28,6 +28,7 @@ import { LauncherFlow } from "./components/launcher/LauncherFlow";
 import { notifyCodingToolLaunched } from "./components/notifications/notifications";
 import {
 	continueProjectLaunchJourney,
+	type ProjectLaunchAdapter,
 	type ProjectLaunchJourneyResult,
 	type ProjectLaunchPending,
 	runProjectLaunchJourney,
@@ -72,6 +73,11 @@ interface PendingRunningEnvironmentLaunch {
 	conflict: RunningEnvironmentConflict;
 	pending: ProjectLaunchPending;
 }
+
+const desktopProjectLaunchAdapter: ProjectLaunchAdapter = {
+	preflightLaunchProject: devContextApi.preflightLaunchProject,
+	launchProject: devContextApi.launchProject,
+};
 
 function App() {
 	const [applicationMode, setApplicationMode] = useState<
@@ -640,8 +646,7 @@ function ManagementApp() {
 	}) {
 		const result = await runProjectLaunchJourney({
 			request: options.request,
-			preflightLaunchProject: devContextApi.preflightLaunchProject,
-			launchProject: devContextApi.launchProject,
+			...desktopProjectLaunchAdapter,
 		});
 		await handleManagementLaunchOutcome(result, options);
 	}
@@ -657,7 +662,7 @@ function ManagementApp() {
 			const result = await continueProjectLaunchJourney({
 				pending: pendingPreflightReview,
 				decision: "continue-after-review",
-				launchProject: devContextApi.launchProject,
+				...desktopProjectLaunchAdapter,
 			});
 			await handleManagementLaunchOutcome(result, {
 				onError: setPreflightReviewError,
@@ -684,7 +689,7 @@ function ManagementApp() {
 			const result = await continueProjectLaunchJourney({
 				pending: pendingRunningEnvironmentLaunch.pending,
 				decision: "launch-another",
-				launchProject: devContextApi.launchProject,
+				...desktopProjectLaunchAdapter,
 			});
 			await handleManagementLaunchOutcome(result, {
 				onError: setRunningEnvironmentLaunchError,

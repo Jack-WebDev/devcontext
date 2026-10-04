@@ -14,7 +14,10 @@ import type {
 	UnbindProjectRequest,
 } from "../../lib/devctx-api";
 import { contextPositionFromShortcut } from "../command-palette/shortcut";
-import type { ProjectLaunchPending } from "../project-launch/project-launch-journey.js";
+import type {
+	ProjectLaunchJourneyResult,
+	ProjectLaunchPending,
+} from "../project-launch/project-launch-journey.js";
 import { RunningEnvironmentConflictDialog } from "../running/RunningEnvironmentConflictDialog";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
@@ -36,7 +39,6 @@ import {
 	continueLaunchingSelectedContext,
 	createLaunchRequestGuard,
 	launchSelectedContext,
-	type LaunchSelectorResult,
 } from "./launch-action";
 import {
 	defaultLaunchSuccessCloseBehavior,
@@ -398,32 +400,32 @@ function SelectorView({
 	}
 
 	async function handleLaunchResult(
-		result: Exclude<LaunchSelectorResult, undefined>,
+		result: ProjectLaunchJourneyResult,
 		selection: LauncherSelection,
 	) {
-		if ("runningEnvironmentConflict" in result) {
+		if (result.kind === "running-environment-conflict") {
 			setLauncherState({
 				status: "existing_workspace",
 				selection,
-				conflict: result.runningEnvironmentConflict,
+				conflict: result.conflict,
 				pending: result.pending,
 			});
 			return;
 		}
-		if ("preflightReview" in result) {
+		if (result.kind === "preflight-review") {
 			setLauncherState({
 				status: "preflight_review",
 				selection,
-				pending: result.preflightReview,
+				pending: result.pending,
 			});
 			return;
 		}
-		if (result.ok) {
-			if ("project" in result.data && "context" in result.data) {
-				onCodingToolLaunched?.(result.data);
+		if (result.kind === "launched") {
+			if ("project" in result.result && "context" in result.result) {
+				onCodingToolLaunched?.(result.result);
 				const replacement = bindingReplacementForLaunch(
 					launchState.binding,
-					result.data.context.id,
+					result.result.context.id,
 				);
 				if (replacement !== undefined) {
 					setLauncherState({
@@ -438,18 +440,20 @@ function SelectorView({
 			await finishSuccessfulLaunch(selection);
 			return;
 		}
-		if (
-			result.error.code === "context_mismatch_requires_confirmation" &&
-			result.error.contextMismatch
-		) {
-			setLauncherState({
-				status: "context_mismatch",
-				selection,
-				error: result.error,
-			});
-			return;
+		if (result.kind === "failed") {
+			if (
+				result.error.code === "context_mismatch_requires_confirmation" &&
+				result.error.contextMismatch
+			) {
+				setLauncherState({
+					status: "context_mismatch",
+					selection,
+					error: result.error,
+				});
+				return;
+			}
+			setLauncherState({ status: "failure", selection, error: result.error });
 		}
-		setLauncherState({ status: "failure", selection, error: result.error });
 	}
 
 	async function finishSuccessfulLaunch(selection: LauncherSelection) {

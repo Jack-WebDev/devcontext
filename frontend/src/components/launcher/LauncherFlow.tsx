@@ -1,12 +1,26 @@
 import { useEffect, useState } from "react";
 
-import type { LaunchState, SettingsState } from "../../lib/devctx-api";
+import type {
+	DisplayError,
+	LaunchState,
+	RunningEnvironmentConflict,
+	SettingsState,
+} from "../../lib/devctx-api";
 import { devContextApi } from "../../lib/devctx-api.js";
 import { devContextWindow } from "../../lib/devctx-window.js";
 import { type LoadState, loadStateFromResult } from "../app/load-state.js";
 import { CreateContextDialog } from "../contexts/ContextManagement.js";
 import { notifyCodingToolLaunched } from "../notifications/notifications.js";
+import {
+	continueProjectLaunchJourney,
+	type ProjectLaunchAdapter,
+	type ProjectLaunchJourneyResult,
+	type ProjectLaunchPending,
+	runProjectLaunchJourney,
+} from "../project-launch/project-launch-journey.js";
+import { RunningEnvironmentConflictDialog } from "../running/RunningEnvironmentConflictDialog.js";
 import { GuiErrorNotice } from "../selector/GuiErrorNotice.js";
+import { PreflightReviewDialog } from "../selector/PreflightReviewDialog.js";
 import { SelectorView } from "../selector/SelectorView.js";
 import { LauncherSurface } from "./LauncherSurface.js";
 import { ProjectNotFoundView } from "./ProjectNotFoundView.js";
@@ -20,6 +34,16 @@ interface LauncherFlowProps {
 
 type ProjectLaunchState = LoadState<LaunchState> & { projectPath: string };
 type LauncherSettingsState = LoadState<SettingsState>;
+
+interface PendingRunningEnvironmentLaunch {
+	conflict: RunningEnvironmentConflict;
+	pending: ProjectLaunchPending;
+}
+
+const desktopProjectLaunchAdapter: ProjectLaunchAdapter = {
+	preflightLaunchProject: devContextApi.preflightLaunchProject,
+	launchProject: devContextApi.launchProject,
+};
 
 // LauncherFlow is intentionally separate from the management shell. Later
 // launcher phases add resolution and selection states inside this focused
@@ -46,6 +70,16 @@ function LauncherFlow({
 	const [choosingFolder, setChoosingFolder] = useState(false);
 	const [detectionRetry, setDetectionRetry] = useState(0);
 	const [creatingFirstContext, setCreatingFirstContext] = useState(false);
+	const [createdContextLaunchPending, setCreatedContextLaunchPending] =
+		useState(false);
+	const [createdContextLaunchError, setCreatedContextLaunchError] = useState<
+		DisplayError | undefined
+	>();
+	const [pendingPreflightReview, setPendingPreflightReview] = useState<
+		ProjectLaunchPending | undefined
+	>();
+	const [pendingRunningEnvironmentLaunch, setPendingRunningEnvironmentLaunch] =
+		useState<PendingRunningEnvironmentLaunch | undefined>();
 	const resolving =
 		launchState.projectPath !== activeProjectPath ||
 		launchState.status === "loading" ||
@@ -57,6 +91,8 @@ function LauncherFlow({
 	}, [projectPath]);
 
 	useEffect(() => {
+		// This counter intentionally re-runs detection without changing the request.
+		void detectionRetry;
 		let active = true;
 		setLaunchState({ projectPath: activeProjectPath, status: "loading" });
 		void devContextApi
@@ -95,6 +131,73 @@ function LauncherFlow({
 			}
 		} finally {
 			setChoosingFolder(false);
+		}
+	}
+
+	async function handleCreatedContextLaunchOutcome(
+		result: ProjectLaunchJourneyResult,
+	) {
+		if (result.kind === "preflight-review") {
+			setPendingPreflightReview(result.pending);
+			return;
+		}
+		if (result.kind === "running-environment-conflict") {
+			setPendingRunningEnvironmentLaunch({
+				conflict: result.conflict,
+				pending: result.pending,
+			});
+			return;
+		}
+		if (result.kind === "failed") {
+			setCreatedContextLaunchError(result.error);
+			return;
+		}
+
+		notifyCodingToolLaunched({
+			projectName: result.result.project.name,
+			contextName: result.result.context.name,
+			toolName: result.result.context.tool.name,
+		});
+		setCreatingFirstContext(false);
+	}
+
+	async function launchCreatedContext(contextId: string) {
+		if (createdContextLaunchPending) {
+			return;
+		}
+		setCreatedContextLaunchPending(true);
+		setCreatedContextLaunchError(undefined);
+		try {
+			await handleCreatedContextLaunchOutcome(
+				await runProjectLaunchJourney({
+					request: { projectPath: activeProjectPath, contextId },
+					...desktopProjectLaunchAdapter,
+				}),
+			);
+		} finally {
+			setCreatedContextLaunchPending(false);
+		}
+	}
+
+	async function continueCreatedContextLaunch(
+		pending: ProjectLaunchPending,
+		decision: "continue-after-review" | "launch-another",
+	) {
+		if (createdContextLaunchPending) {
+			return;
+		}
+		setCreatedContextLaunchPending(true);
+		setCreatedContextLaunchError(undefined);
+		try {
+			await handleCreatedContextLaunchOutcome(
+				await continueProjectLaunchJourney({
+					pending,
+					decision,
+					...desktopProjectLaunchAdapter,
+				}),
+			);
+		} finally {
+			setCreatedContextLaunchPending(false);
 		}
 	}
 
@@ -150,6 +253,8 @@ function LauncherFlow({
 					contexts={[]}
 					initialProjects={[launchState.data.project]}
 					projectName={launchState.data.project.name}
+					launchPending={createdContextLaunchPending}
+					launchError={createdContextLaunchError}
 					onClose={() => setCreatingFirstContext(false)}
 					create={devContextApi.createContext}
 					loadCreationOptions={devContextApi.getContextTemplates}
@@ -181,19 +286,45 @@ function LauncherFlow({
 						}
 						return result;
 					}}
-					onOpenProject={async (context) => {
-						const launched = await devContextApi.launchProject({
-							projectPath: activeProjectPath,
-							contextId: context.id,
-						});
-						if (!launched.ok) return;
-						notifyCodingToolLaunched({
-							projectName: launched.data.project.name,
-							contextName: launched.data.context.name,
-							toolName: launched.data.context.tool.name,
-						});
-						setCreatingFirstContext(false);
+					onOpenProject={(context) => void launchCreatedContext(context.id)}
+				/>
+			) : null}
+			{pendingPreflightReview ? (
+				<PreflightReviewDialog
+					preflight={pendingPreflightReview.preflight}
+					pending={createdContextLaunchPending}
+					error={createdContextLaunchError}
+					onCancel={() => {
+						if (!createdContextLaunchPending) {
+							setPendingPreflightReview(undefined);
+							setCreatedContextLaunchError(undefined);
+						}
 					}}
+					onContinue={() =>
+						void continueCreatedContextLaunch(
+							pendingPreflightReview,
+							"continue-after-review",
+						)
+					}
+				/>
+			) : null}
+			{pendingRunningEnvironmentLaunch ? (
+				<RunningEnvironmentConflictDialog
+					conflict={pendingRunningEnvironmentLaunch.conflict}
+					launchPending={createdContextLaunchPending}
+					error={createdContextLaunchError}
+					onCancel={() => {
+						if (!createdContextLaunchPending) {
+							setPendingRunningEnvironmentLaunch(undefined);
+							setCreatedContextLaunchError(undefined);
+						}
+					}}
+					onLaunchAnother={() =>
+						void continueCreatedContextLaunch(
+							pendingRunningEnvironmentLaunch.pending,
+							"launch-another",
+						)
+					}
 				/>
 			) : null}
 		</LauncherSurface>

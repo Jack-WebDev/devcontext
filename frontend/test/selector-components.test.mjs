@@ -2907,7 +2907,10 @@ test("selector critical path renders selected context and submits remembered lau
 		},
 	});
 
-	assert.deepEqual(result, launchProjectResult());
+	assert.deepEqual(result, {
+		kind: "launched",
+		result: launchProjectResult().data,
+	});
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",
@@ -3017,7 +3020,10 @@ test("launch action launches the selected context when remember is off", async (
 		},
 	});
 
-	assert.deepEqual(result, launchProjectResult());
+	assert.deepEqual(result, {
+		kind: "launched",
+		result: launchProjectResult().data,
+	});
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",
@@ -3058,7 +3064,7 @@ test("launch action exposes preflight verification steps before starting the cod
 		},
 	});
 
-	assert.equal(result?.ok, true);
+	assert.equal(result?.kind, "launched");
 	assert.deepEqual(calls, [
 		["preflight", { projectPath: "/work/api", contextId: "personal" }],
 		["verification", verificationSteps],
@@ -3086,7 +3092,10 @@ test("launch action preflights before binding when remember is on", async () => 
 		},
 	});
 
-	assert.deepEqual(result, launchProjectResult());
+	assert.deepEqual(result, {
+		kind: "launched",
+		result: launchProjectResult().data,
+	});
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",
@@ -3131,7 +3140,8 @@ test("launch action pauses before binding when preflight needs review", async ()
 	});
 
 	assert.deepEqual(result, {
-		preflightReview: {
+		kind: "preflight-review",
+		pending: {
 			request: { projectPath: "/work/api", contextId: "company" },
 			preflight,
 		},
@@ -3197,14 +3207,14 @@ test("launch action returns binding errors without launching", async () => {
 		},
 	});
 
-	assert.deepEqual(
-		result,
-		apiError(
+	assert.deepEqual(result, {
+		kind: "failed",
+		error: apiError(
 			"validation_error",
 			"Unable to complete request.",
 			"Check the selected project and context, then retry.",
-		),
-	);
+		).error,
+	});
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",
@@ -3238,7 +3248,7 @@ test("launch action returns preflight errors without launching", async () => {
 		},
 	});
 
-	assert.deepEqual(result, error);
+	assert.deepEqual(result, { kind: "failed", error: error.error });
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",
@@ -3267,7 +3277,10 @@ test("launch action resubmits explicit context mismatch confirmation", async () 
 		},
 	});
 
-	assert.deepEqual(result, launchProjectResult());
+	assert.deepEqual(result, {
+		kind: "launched",
+		result: launchProjectResult().data,
+	});
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",
@@ -3439,7 +3452,10 @@ test("context mismatch open anyway submits exactly one confirmed launch", async 
 		},
 	});
 
-	assert.deepEqual(result, launchProjectResult());
+	assert.deepEqual(result, {
+		kind: "launched",
+		result: launchProjectResult().data,
+	});
 	assert.deepEqual(calls, [
 		[
 			"preflightLaunchProject",

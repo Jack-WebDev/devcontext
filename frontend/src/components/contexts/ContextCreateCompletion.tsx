@@ -1,4 +1,4 @@
-import type { ContextState } from "../../lib/devctx-api.js";
+import type { ContextState, DisplayError } from "../../lib/devctx-api.js";
 import { Button } from "../ui/button.js";
 import type {
 	ContextCreationStep,
@@ -82,6 +82,8 @@ function ContextCreateSuccessScreen({
 	context,
 	projectName,
 	onOpenProject,
+	launchPending = false,
+	launchError,
 	onRecheckContext,
 	onViewContext,
 	onCreateAnother,
@@ -89,6 +91,8 @@ function ContextCreateSuccessScreen({
 	context: ContextState;
 	projectName?: string;
 	onOpenProject?: (context: ContextState) => void;
+	launchPending?: boolean;
+	launchError?: DisplayError;
 	onRecheckContext?: (context: ContextState) => void;
 	onViewContext?: () => void;
 	onCreateAnother: () => void;
@@ -128,6 +132,7 @@ function ContextCreateSuccessScreen({
 							<Button
 								type="button"
 								variant="outline"
+								disabled={launchPending}
 								onClick={() => onOpenProject(context)}
 							>
 								Open context for sign-in
@@ -145,10 +150,23 @@ function ContextCreateSuccessScreen({
 					</div>
 				</div>
 			) : null}
+			{launchError ? (
+				<p className="text-sm text-destructive" role="alert">
+					{launchError.message}
+				</p>
+			) : null}
 			<div className="flex flex-wrap gap-3">
 				{onOpenProject ? (
-					<Button type="button" onClick={() => onOpenProject(context)}>
-						{projectName ? `Open ${projectName}` : "Open a Project"}
+					<Button
+						type="button"
+						disabled={launchPending}
+						onClick={() => onOpenProject(context)}
+					>
+						{launchPending
+							? "Launching..."
+							: projectName
+								? `Open ${projectName}`
+								: "Open a Project"}
 					</Button>
 				) : null}
 				{onViewContext ? (

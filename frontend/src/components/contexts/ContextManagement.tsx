@@ -6,6 +6,7 @@ import type {
 	CreateContextRequest,
 	CreateContextResult,
 	DevelopmentToolIntegration,
+	DisplayError,
 	ProjectState,
 } from "../../lib/devctx-api";
 import {
@@ -37,6 +38,8 @@ export function CreateContextDialog({
 	initialProjects = [],
 	projectName,
 	onOpenProject,
+	launchPending = false,
+	launchError,
 	onViewContext,
 }: {
 	contexts: ContextListItem[];
@@ -55,6 +58,8 @@ export function CreateContextDialog({
 	initialProjects?: ProjectState[];
 	projectName?: string;
 	onOpenProject?: (context: ContextState) => void;
+	launchPending?: boolean;
+	launchError?: DisplayError;
 	onViewContext?: (contextId: string) => void;
 }) {
 	const creation = useContextCreationJourney({
@@ -164,6 +169,8 @@ export function CreateContextDialog({
 							context={creation.created}
 							projectName={projectName}
 							onOpenProject={onOpenProject}
+							launchPending={launchPending}
+							launchError={launchError}
 							onRecheckContext={() => void creation.recheck()}
 							onViewContext={() => {
 								if (creation.created !== undefined) {

@@ -6,10 +6,10 @@ import type {
 	PreflightLaunchProjectRequest,
 	PreflightLaunchProjectResult,
 	ProjectBindingState,
-	RunningEnvironmentConflict,
 } from "../../lib/devctx-api";
 import type {
 	ProjectLaunchDecision,
+	ProjectLaunchJourneyResult,
 	ProjectLaunchPending,
 } from "../project-launch/project-launch-journey.js";
 import {
@@ -33,15 +33,6 @@ interface LaunchSelectorDependencies {
 		request: LaunchProjectRequest,
 	) => Promise<ApiResult<LaunchProjectResult>>;
 }
-
-type LaunchSelectorResult =
-	| ApiResult<LaunchProjectResult>
-	| {
-			runningEnvironmentConflict: RunningEnvironmentConflict;
-			pending: ProjectLaunchPending;
-	  }
-	| { preflightReview: ProjectLaunchPending }
-	| undefined;
 
 interface LaunchSelectorContinuationDependencies {
 	projectPath: string;
@@ -82,7 +73,7 @@ function createLaunchRequestGuard(): LaunchRequestGuard {
 
 async function launchSelectedContext(
 	dependencies: LaunchSelectorDependencies,
-): Promise<LaunchSelectorResult> {
+): Promise<ProjectLaunchJourneyResult | undefined> {
 	const contextId = dependencies.selectedContextId;
 	const bindingContextId = dependencies.bindingContextId;
 	if (contextId === undefined) {
@@ -100,20 +91,19 @@ async function launchSelectedContext(
 			: {}),
 	};
 
-	const result = await runProjectLaunchJourney({
+	return runProjectLaunchJourney({
 		request: launchRequest,
 		prepareLaunch: prepareLaunchForSelection(dependencies, bindingContextId),
 		onLaunchStarting: dependencies.onLaunchStarting,
 		preflightLaunchProject: dependencies.preflightLaunchProject,
 		launchProject: dependencies.launchProject,
 	});
-	return launchSelectorResult(result);
 }
 
 async function continueLaunchingSelectedContext(
 	dependencies: LaunchSelectorContinuationDependencies,
-): Promise<LaunchSelectorResult> {
-	const result = await continueProjectLaunchJourney({
+): Promise<Exclude<ProjectLaunchJourneyResult, { kind: "preflight-review" }>> {
+	return continueProjectLaunchJourney({
 		pending: dependencies.pending,
 		decision: dependencies.decision,
 		prepareLaunch: prepareLaunchForSelection(
@@ -123,7 +113,6 @@ async function continueLaunchingSelectedContext(
 		onLaunchStarting: dependencies.onLaunchStarting,
 		launchProject: dependencies.launchProject,
 	});
-	return launchSelectorResult(result);
 }
 
 function prepareLaunchForSelection(
@@ -148,29 +137,10 @@ function prepareLaunchForSelection(
 	};
 }
 
-function launchSelectorResult(
-	result: Awaited<ReturnType<typeof runProjectLaunchJourney>>,
-): Exclude<LaunchSelectorResult, undefined> {
-	if (result.kind === "launched") {
-		return { ok: true, data: result.result };
-	}
-	if (result.kind === "failed") {
-		return { ok: false, error: result.error };
-	}
-	if (result.kind === "preflight-review") {
-		return { preflightReview: result.pending };
-	}
-	return {
-		runningEnvironmentConflict: result.conflict,
-		pending: result.pending,
-	};
-}
-
 export type {
 	LaunchRequestGuard,
 	LaunchSelectorContinuationDependencies,
 	LaunchSelectorDependencies,
-	LaunchSelectorResult,
 };
 export {
 	continueLaunchingSelectedContext,
